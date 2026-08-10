@@ -990,11 +990,11 @@ function factorTagsFor(checks){
   (checks||[]).forEach(c=>{const f=FACTOR_CHECK_MAP[c.name];if(f)set.add(f);});
   return[...set];
 }
-const FACTOR_ICON={profitability:'⚙',value:'🏷',momentum:'📈'};
+const FACTOR_ICON={profitability:'⚙',value:'',momentum:''};
 function renderFactorPanel(sc){
   const tags=[...new Set([...factorTagsFor(sc.quality),...factorTagsFor(sc.priceChecks),...factorTagsFor(sc.momentum)])];
   const head='<div class="row" style="margin-bottom:6px;align-items:center">'+
-    '<span style="font-size:17px">📚</span><b style="font-size:16px">Academic Context</b><div class="spacer"></div>'+
+    '<span style="font-size:17px"></span><b style="font-size:16px">Academic Context</b><div class="spacer"></div>'+
     '<span class="muted" style="font-size:12px">Source: <a href="'+FACTOR_REFERENCE.citation_url+'" target="_blank" rel="noopener" style="color:var(--research)">Kenneth R. French Data Library</a></span></div>'+
     '<p class="muted" style="margin-bottom:18px;line-height:1.55;font-size:13px">What long-run academic research says about the market-wide style category behind a few of the checks above — reference data, never a projection, score, or calculation involving this stock.</p>';
   let body;
@@ -1397,7 +1397,7 @@ function renderAnalysis(sym,sc){
     '<table style="margin-top:10px"><thead><tr><th>Check</th><th>Target</th><th>Actual</th><th>Result</th><th>Note</th></tr></thead><tbody>'+
     sc.momentum.map(checkRow).join('')+'</tbody></table>'+
     '<div class="row" style="margin-top:14px">'+
-      '<button class="btn btn-ghost btn-sm" style="border-color:var(--research);color:var(--research)" onclick="toggleFactorPanel()">📚 Academic Context — what does research say about this style?</button>'+
+      '<button class="btn btn-ghost btn-sm" style="border-color:var(--research);color:var(--research)" onclick="toggleFactorPanel()"> Academic Context — what does research say about this style?</button>'+
     '</div>'+
     '<div id="factorPanel" class="card" style="margin-top:12px;display:none;background:var(--panel2)">'+renderFactorPanel(sc)+'</div>'+
     '<h3 style="margin-top:22px">4 · Risk-Adjusted Outlook — is the expected return worth the volatility?</h3>'+
