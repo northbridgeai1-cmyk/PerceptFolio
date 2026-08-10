@@ -990,7 +990,7 @@ function factorTagsFor(checks){
   (checks||[]).forEach(c=>{const f=FACTOR_CHECK_MAP[c.name];if(f)set.add(f);});
   return[...set];
 }
-const FACTOR_ICON={profitability:'⚙',value:'',momentum:''};
+const FACTOR_ICON={profitability:'',value:'',momentum:''};
 function renderFactorPanel(sc){
   const tags=[...new Set([...factorTagsFor(sc.quality),...factorTagsFor(sc.priceChecks),...factorTagsFor(sc.momentum)])];
   const head='<div class="row" style="margin-bottom:6px;align-items:center">'+
