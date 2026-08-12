@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NorthBridge Quant — Your Portfolio Quant</title>
+<title>NorthBridge QuantFolio — Your Portfolio Quant</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
@@ -116,7 +116,7 @@ small.src{color:var(--muted)}
 <!-- ============ LOGIN SCREEN ============ -->
 <div id="loginScreen" class="login-wrap">
   <div style="text-align:center;margin-bottom:28px">
-    <div class="logo" style="font-size:20px">NorthBridge <span>Quant</span></div>
+    <div class="logo" style="font-size:20px">NorthBridge <span>QuantFolio</span></div>
     <p class="muted" style="margin-top:8px">Know what to buy. Know what to sell.</p>
   </div>
   <div class="card">
@@ -147,7 +147,7 @@ small.src{color:var(--muted)}
 <!-- ============ APP ============ -->
 <div id="app" style="display:none">
 <header>
-  <div class="logo">NorthBridge <span>Quant</span></div>
+  <div class="logo">NorthBridge <span>QuantFolio</span></div>
   <nav>
     <button data-tab="dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
     <button data-tab="portfolio" onclick="showTab('portfolio')">Portfolio</button>
@@ -201,10 +201,10 @@ small.src{color:var(--muted)}
   </div>
   <div id="welcomeCard" class="welcome-card" style="display:none">
     <h2>Let's set up your portfolio</h2>
-    <p class="muted" style="margin-bottom:16px">Three steps and NorthBridge Quant starts working for you.</p>
+    <p class="muted" style="margin-bottom:16px">Three steps and NorthBridge QuantFolio starts working for you.</p>
     <p style="margin-bottom:10px"><span class="step-num">1</span>Add your Finnhub API key in <b>Settings</b> — free, 2 minutes.</p>
     <p style="margin-bottom:10px"><span class="step-num">2</span>Add what you own in <b>Portfolio</b> — stocks, ETFs, mutual funds, and cash on hand.</p>
-    <p style="margin-bottom:18px"><span class="step-num">3</span>Add a few tickers to your <b>Watchlist</b> — NorthBridge Quant scores them automatically.</p>
+    <p style="margin-bottom:18px"><span class="step-num">3</span>Add a few tickers to your <b>Watchlist</b> — NorthBridge QuantFolio scores them automatically.</p>
     <button class="btn" onclick="showTab('portfolio')">Add your first holding</button>
   </div>
   <div class="hero">
@@ -219,7 +219,7 @@ small.src{color:var(--muted)}
   <div class="card">
     <h3>Money made over time</h3>
     <div class="chart-box" id="growthChartBox" style="display:none"><canvas id="growthChart"></canvas></div>
-    <div id="growthChartEmpty" class="empty">NorthBridge Quant can only track what happens from here — it has no record of your portfolio before today. Hit Refresh Data (or just keep using the app) and this fills in day by day.</div>
+    <div id="growthChartEmpty" class="empty">NorthBridge QuantFolio can only track what happens from here — it has no record of your portfolio before today. Hit Refresh Data (or just keep using the app) and this fills in day by day.</div>
   </div>
   <div class="grid grid-2" style="margin-top:16px">
     <div class="card"><h3>Stocks, ETFs &amp; cash</h3><div class="chart-box"><canvas id="pieType"></canvas></div></div>
@@ -293,7 +293,7 @@ small.src{color:var(--muted)}
       <tbody id="holdingsBody"></tbody>
     </table>
     <p class="muted" style="margin-top:10px">Price column is editable — click in and type to set/override any price (required for mutual funds, useful if an auto lookup fails). Click any column header to sort, click again to reverse.</p>
-    <div id="holdingsEmpty" class="empty">No holdings yet. Add what you own above — NorthBridge Quant remembers it.</div>
+    <div id="holdingsEmpty" class="empty">No holdings yet. Add what you own above — NorthBridge QuantFolio remembers it.</div>
   </div>
 </div>
 
@@ -340,7 +340,7 @@ small.src{color:var(--muted)}
 <div id="tab-screener" class="tabs-hidden">
   <div class="card">
     <h3>Scan a list of tickers</h3>
-    <p class="muted" style="margin-bottom:12px">NorthBridge Quant doesn't browse the market on its own — give it a list and it scores each ticker against your checklist. Scoring takes a few seconds per ticker to stay within Finnhub's free-tier rate limit, so this runs in the background; you can leave the tab and come back.</p>
+    <p class="muted" style="margin-bottom:12px">NorthBridge QuantFolio doesn't browse the market on its own — give it a list and it scores each ticker against your checklist. Scoring takes a few seconds per ticker to stay within Finnhub's free-tier rate limit, so this runs in the background; you can leave the tab and come back.</p>
     <div class="row" style="margin-bottom:10px">
       <button class="btn btn-ghost btn-sm" onclick="loadPreset('dow30')">Dow 30</button>
       <button class="btn btn-ghost btn-sm" onclick="loadPreset('megatech')">Mega-cap tech (12)</button>
@@ -356,7 +356,7 @@ small.src{color:var(--muted)}
       <p class="muted" style="font-size:12px;margin-top:6px">Not a live scan of the entire market — Finnhub's free tier doesn't offer that. These are curated snapshots per sector (10–20 well-known names each), same honest caveat as the Dow 30/Mega-cap Tech presets above. Loading a sector fills the box below; you still hit Run screen to score them. Or just paste your own list below.</p>
     </div>
     <div class="field">
-      <label>Or let NorthBridge Quant search on its own — stocks you haven't found yet</label>
+      <label>Or let NorthBridge QuantFolio search on its own — stocks you haven't found yet</label>
       <div class="row">
         <button class="btn btn-ghost btn-sm" onclick="loadRecommendations()">Find recommendations (~350 tickers)</button>
         <span class="muted" style="font-size:12px">Loads a big built-in list of well-known, liquid stocks, minus anything already in your Portfolio or Watchlist. Still just fills the box below — hit Run screen to actually score them.</span>
@@ -553,7 +553,7 @@ small.src{color:var(--muted)}
 </div>
 
 <div class="disclaimer">
-  NorthBridge Quant is an educational analysis tool, not financial advice. Data via Finnhub may be delayed or incomplete — always verify before trading.
+  NorthBridge QuantFolio is an educational analysis tool, not financial advice. Data via Finnhub may be delayed or incomplete — always verify before trading.
   Signals are rule-based scores of your own checklist, not predictions.
 </div>
 </main>
@@ -1585,7 +1585,7 @@ function pushAlert(type,sym,msg){
   if(dup)return;
   D.alerts.unshift({type,sym,msg,when:Date.now(),seen:false});
   D.alerts=D.alerts.slice(0,100);
-  notify('NorthBridge Quant: '+sym,msg);
+  notify('NorthBridge QuantFolio: '+sym,msg);
   toast(sym+': '+msg);
 }
 function evaluateSignals(sym,sc,prev){
@@ -2636,7 +2636,7 @@ function importData(ev){
     saveDB();renderAll();
     document.getElementById('apiKeyInput').value=D.apiKey||'';
     toast('Data imported.');
-  }catch(e){toast('Import failed — not a valid NorthBridge Quant backup.');}};
+  }catch(e){toast('Import failed — not a valid NorthBridge QuantFolio backup.');}};
   r.readAsText(f);
 }
 
