@@ -8,24 +8,30 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
-  --bg:#000000; --panel:#111113; --panel2:#1a1a1d; --border:#27272a;
-  --text:#ffffff; --muted:#8e8e93; --accent:#0a84ff; --green:#00c805;
-  --red:#ff3b30; --yellow:#ffb800; --research:#c9822a; --brand2:#157567; --radius:10px;
+  /* Warm charcoal rather than pure black — less eye strain over a long session, and it gives the
+     accent colours something to sit against instead of maximum-contrast voids. */
+  --bg:#0e0f12; --panel:#16181d; --panel2:#1e2128; --border:#2b2f38;
+  --text:#f2f3f5; --muted:#949aa6; --accent:#3b82f6; --green:#2ea043;
+  --red:#e5534b; --yellow:#d9a441; --research:#c98a3f; --brand2:#1f9e8c; --radius:10px;
   --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
   /* Solid-button fill. Kept separate from --text because the primary button paints --text as its
      BACKGROUND — reusing --text directly would make the button invert into unreadable dark-on-dark
      the moment the theme flips. */
-  --btn-bg:#ffffff; --btn-fg:#000000;
-  --pie-border:#111113;
+  --btn-bg:#f2f3f5; --btn-fg:#0e0f12;
+  --pie-border:#16181d;
+  /* Semantic accents so different KINDS of number stop looking identical.
+     money going out / money coming in / profit / income / your own input. */
+  --c-out:#8b5cf6; --c-in:#3b82f6; --c-profit:#2ea043; --c-income:#d9a441; --c-mine:#ec8f5e;
 }
 /* Light theme. Same variable names, different values — every rule downstream is already written
    against the variables, so nothing else has to change. */
 body.theme-light{
-  --bg:#f5f5f7; --panel:#ffffff; --panel2:#f0f0f3; --border:#d2d2d7;
-  --text:#1d1d1f; --muted:#6e6e73; --accent:#0071e3; --green:#1a8a2e;
-  --red:#d70015; --yellow:#a86800; --research:#8a5a1a; --brand2:#0f5c51;
-  --btn-bg:#1d1d1f; --btn-fg:#ffffff;
+  --bg:#f6f6f4; --panel:#ffffff; --panel2:#eeeeec; --border:#d8d8d4;
+  --text:#1c1c1e; --muted:#6b6b70; --accent:#2563eb; --green:#1a7f37;
+  --red:#c9372c; --yellow:#9a6700; --research:#8a5a1a; --brand2:#0f5c51;
+  --btn-bg:#1c1c1e; --btn-fg:#ffffff;
   --pie-border:#ffffff;
+  --c-out:#7c3aed; --c-in:#2563eb; --c-profit:#1a7f37; --c-income:#9a6700; --c-mine:#c2410c;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);
@@ -78,13 +84,35 @@ main{max-width:1100px;margin:0 auto;padding:32px 24px}
 .privacy-btn:hover{background:rgba(255,255,255,.15);color:var(--text)}
 .privacy-btn svg{width:18px;height:18px;display:block}
 .hero-change{display:inline-flex;align-items:center;gap:4px;margin-top:10px;font-family:var(--mono);font-size:14px;font-weight:600;padding:4px 10px;border-radius:20px}
-.hero-change.pos{background:rgba(0,200,5,.12)}
-.hero-change.neg{background:rgba(255,59,48,.12)}
+.hero-change.pos{background:rgba(46,160,67,.15)}
+.hero-change.neg{background:rgba(229,83,75,.15)}
 .hero-change.flat{background:var(--panel2);color:var(--muted)}
-.stat-row{display:flex;gap:32px;padding:20px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:24px;flex-wrap:wrap}
-.stat{display:flex;flex-direction:column;gap:4px}
+/* Stat cards. Each one carries a coloured left rule keyed to WHAT KIND of number it is, so a row of
+   four dollar figures stops reading as four copies of the same thing. */
+.stat-row{display:flex;gap:14px;padding:18px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:24px;flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;gap:5px;padding:10px 14px;border-left:3px solid var(--border);background:var(--panel);flex:1;min-width:150px}
 .stat-label{font-family:var(--mono);color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
 .stat-value{font-family:var(--mono);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat.s-out{border-left-color:var(--c-out)}
+.stat.s-in{border-left-color:var(--c-in)}
+.stat.s-profit{border-left-color:var(--c-profit)}
+.stat.s-income{border-left-color:var(--c-income)}
+.stat.s-count{border-left-color:var(--muted)}
+.stat.s-out .stat-label{color:var(--c-out)}
+.stat.s-in .stat-label{color:var(--c-in)}
+.stat.s-profit .stat-label{color:var(--c-profit)}
+.stat.s-income .stat-label{color:var(--c-income)}
+/* Column-type tinting: score columns, the app's call, and your own call each get their own hue so
+   adjacent columns of similar-looking pills are immediately separable. */
+.th-quality{color:var(--green)!important}
+.th-value{color:var(--accent)!important}
+.th-momentum{color:var(--yellow)!important}
+.th-ai{color:var(--brand2)!important}
+.th-mine{color:var(--c-mine)!important}
+.th-profit{color:var(--c-profit)!important}
+.th-den{opacity:.6;font-weight:400}
+/* Your own manual call is an input, not a computed badge — outline it so it never reads as a verdict. */
+.mycall-cell select{border:1px dashed var(--c-mine);color:var(--c-mine);background:transparent;font-size:12px;padding:5px 7px}
 .greeting{font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:2px}
 .greeting-sub{color:var(--muted);font-size:14px;margin-bottom:24px}
 .welcome-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px}
@@ -97,10 +125,10 @@ th.sortable:hover{color:var(--text)}
 td{padding:12px 10px;border-bottom:1px solid var(--border)}
 tr:last-child td{border-bottom:none}
 .pill{display:inline-block;padding:3px 9px;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
-.pill-buy{background:rgba(0,200,5,.12);color:var(--green)}
-.pill-sell{background:rgba(255,59,48,.12);color:var(--red)}
-.pill-hold{background:rgba(255,184,0,.12);color:var(--yellow)}
-.pill-watch{background:rgba(10,132,255,.12);color:var(--accent)}
+.pill-buy{background:rgba(46,160,67,.15);color:var(--green)}
+.pill-sell{background:rgba(229,83,75,.15);color:var(--red)}
+.pill-hold{background:rgba(217,164,65,.15);color:var(--yellow)}
+.pill-watch{background:rgba(59,130,246,.15);color:var(--accent)}
 .pill-na{background:var(--panel2);color:var(--muted)}
 .research-card{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--research);border-radius:var(--radius);padding:16px;margin-bottom:12px}
 .research-badge{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--research);background:rgba(201,130,42,.14);padding:3px 8px;border-radius:6px}
@@ -128,10 +156,10 @@ tr:last-child td{border-bottom:none}
 .empty{color:var(--muted);text-align:center;padding:34px 16px;font-size:14px;line-height:1.6}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--btn-bg);color:var(--btn-fg);padding:13px 18px;border-radius:10px;z-index:100;max-width:340px;font-size:14px;font-weight:500}
 .verdict-box{padding:16px;border-radius:var(--radius);margin-bottom:16px;font-size:15px;border:1px solid var(--border)}
-.v-buy{background:rgba(0,200,5,.08)}
-.v-watch{background:rgba(10,132,255,.08)}
-.v-avoid{background:rgba(255,59,48,.08)}
-.v-hold{background:rgba(255,184,0,.08)}
+.v-buy{background:rgba(46,160,67,.10);border-left:3px solid var(--green)}
+.v-watch{background:rgba(59,130,246,.10);border-left:3px solid var(--accent)}
+.v-avoid{background:rgba(229,83,75,.10);border-left:3px solid var(--red)}
+.v-hold{background:rgba(217,164,65,.10);border-left:3px solid var(--yellow)}
 small.src{color:var(--muted)}
 /* ---- Theme slide switch: light on the left, dark on the right ---- */
 .theme-switch{position:relative;width:240px;height:42px;background:var(--panel2);border:1px solid var(--border);border-radius:21px;cursor:pointer;user-select:none;overflow:hidden}
@@ -294,8 +322,8 @@ small.src{color:var(--muted)}
       <div class="hero-change flat" id="bizEarningsSub">From client accounts with a fee % set</div>
     </div>
     <div class="stat-row">
-      <div class="stat"><span class="stat-label">Clients</span><span class="stat-value" id="bizClientCount">0</span></div>
-      <div class="stat"><span class="stat-label">Combined client AUM</span><span class="stat-value" id="bizTotalAUM">$0</span></div>
+      <div class="stat s-count"><span class="stat-label"># Clients</span><span class="stat-value" id="bizClientCount">0</span></div>
+      <div class="stat s-in"><span class="stat-label">Combined client AUM</span><span class="stat-value" id="bizTotalAUM">$0</span></div>
     </div>
     <div class="section-title">Your Clients</div>
     <div class="card" style="overflow-x:auto">
@@ -323,8 +351,8 @@ small.src{color:var(--muted)}
       <div class="hero-change flat" id="dChange">No change data yet</div>
     </div>
     <div class="stat-row">
-      <div class="stat"><span class="stat-label">Cash to invest</span><span class="stat-value" id="dCash">$0</span></div>
-      <div class="stat"><span class="stat-label">Total gain / loss</span><span class="stat-value" id="dGain">$0</span><span class="muted" id="dGainPct"></span></div>
+      <div class="stat s-in"><span class="stat-label">Cash to invest</span><span class="stat-value" id="dCash">$0</span></div>
+      <div class="stat s-profit"><span class="stat-label">Unrealized gain / loss</span><span class="stat-value" id="dGain">$0</span><span class="muted" id="dGainPct" style="font-size:11px"></span></div>
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:12px">
@@ -405,11 +433,11 @@ small.src{color:var(--muted)}
         <th class="sortable" id="pfTh_broker" onclick="sortPortfolio('broker')">Broker</th>
         <th class="sortable" id="pfTh_shares" onclick="sortPortfolio('shares')">Shares</th>
         <th class="sortable" id="pfTh_cost" onclick="sortPortfolio('cost')">Avg Cost</th>
-        <th class="sortable" id="pfTh_price" onclick="sortPortfolio('price')">Price</th>
-        <th class="sortable" id="pfTh_value" onclick="sortPortfolio('value')">Value</th>
-        <th class="sortable" id="pfTh_gl" onclick="sortPortfolio('gl')">Gain/Loss</th>
-        <th class="sortable" id="pfTh_signal" onclick="sortPortfolio('signal')">Signal</th>
-        <th>My Call</th>
+        <th class="sortable" id="pfTh_price" onclick="sortPortfolio('price')">Price Now</th>
+        <th class="sortable" id="pfTh_value" onclick="sortPortfolio('value')">Market Value</th>
+        <th class="sortable th-profit" id="pfTh_gl" onclick="sortPortfolio('gl')">Gain/Loss</th>
+        <th class="sortable th-ai" id="pfTh_signal" onclick="sortPortfolio('signal')">AI Call</th>
+        <th class="th-mine">My Call</th>
         <th></th>
       </tr></thead>
       <tbody id="holdingsBody"></tbody>
@@ -443,12 +471,12 @@ small.src{color:var(--muted)}
     <table>
       <thead><tr>
         <th class="sortable" id="wlTh_sym" onclick="sortWatchlist('sym')">Ticker</th>
-        <th class="sortable" id="wlTh_price" onclick="sortWatchlist('price')">Price</th>
-        <th class="sortable" id="wlTh_quality" onclick="sortWatchlist('quality')">Quality</th>
-        <th class="sortable" id="wlTh_pricescore" onclick="sortWatchlist('pricescore')">Price</th>
-        <th class="sortable" id="wlTh_momentum" onclick="sortWatchlist('momentum')">Momentum</th>
-        <th class="sortable" id="wlTh_signal" onclick="sortWatchlist('signal')">AI</th>
-        <th>My Call</th>
+        <th class="sortable" id="wlTh_price" onclick="sortWatchlist('price')">Share Price</th>
+        <th class="sortable th-quality sortable" id="wlTh_quality" onclick="sortWatchlist('quality')">Quality <span class="th-den">/12</span></th>
+        <th class="sortable th-value" id="wlTh_pricescore" onclick="sortWatchlist('pricescore')">Value <span class="th-den">/6</span></th>
+        <th class="sortable th-momentum" id="wlTh_momentum" onclick="sortWatchlist('momentum')">Momentum <span class="th-den">/4</span></th>
+        <th class="sortable th-ai" id="wlTh_signal" onclick="sortWatchlist('signal')">AI Call</th>
+        <th class="th-mine">My Call</th>
         <th></th>
       </tr></thead>
       <tbody id="watchBody"></tbody>
@@ -461,10 +489,10 @@ small.src{color:var(--muted)}
 <!-- HISTORY -->
 <div id="tab-history" class="tabs-hidden">
   <div class="stat-row">
-    <div class="stat"><span class="stat-label">Total invested (buys)</span><span class="stat-value" id="histTotalIn">$0</span></div>
-    <div class="stat"><span class="stat-label">Total sold</span><span class="stat-value" id="histTotalOut">$0</span></div>
-    <div class="stat"><span class="stat-label">Realized gain / loss</span><span class="stat-value" id="histRealized">$0</span></div>
-    <div class="stat"><span class="stat-label">Est. annual dividends</span><span class="stat-value" id="histTotalDiv">$0</span></div>
+    <div class="stat s-in"><span class="stat-label">↓ Money in (buys)</span><span class="stat-value" id="histTotalIn">$0</span></div>
+    <div class="stat s-out"><span class="stat-label">↑ Money out (sells)</span><span class="stat-value" id="histTotalOut">$0</span></div>
+    <div class="stat s-profit"><span class="stat-label">✓ Realized gain / loss</span><span class="stat-value" id="histRealized">$0</span></div>
+    <div class="stat s-income"><span class="stat-label">≈ Est. annual dividends</span><span class="stat-value" id="histTotalDiv">$0</span></div>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Dividend Income (estimated, automatic)</h3>
@@ -543,7 +571,7 @@ small.src{color:var(--muted)}
   </div>
   <div class="card" style="overflow-x:auto">
     <table>
-      <thead><tr><th>Ticker</th><th>Price</th><th>Quality</th><th>Price</th><th>Momentum</th><th>AI</th><th>My Call</th><th></th></tr></thead>
+      <thead><tr><th>Ticker</th><th>Share Price</th><th class="th-quality">Quality <span class="th-den">/12</span></th><th class="th-value">Value <span class="th-den">/6</span></th><th class="th-momentum">Momentum <span class="th-den">/4</span></th><th class="th-ai">AI Call</th><th class="th-mine">My Call</th><th></th></tr></thead>
       <tbody id="screenerBody"></tbody>
     </table>
     <div id="screenerEmpty" class="empty">Run a screen to see results here. Anything scoring at or above your buy bar (Settings) will sort to the top.</div>
@@ -1334,7 +1362,7 @@ function setDisplayName(val){
   updateGreeting();
   toast(D.displayName?'Name updated.':'Name cleared.');
 }
-const AVATAR_COLORS=['','#0a84ff','#00c805','#ff3b30','#ffb800','#c9822a','#64d2ff','#8e8e93'];
+const AVATAR_COLORS=['','#3b82f6','#2ea043','#e5534b','#d9a441','#8b5cf6','#5eb0ef','#949aa6'];
 function renderAvatarColorPicker(){
   const el=document.getElementById('avatarColorPicker');
   if(!el)return;
@@ -2102,7 +2130,7 @@ function renderScreenerTable(){
     const inWatch=D.watchlist.includes(sym);
     return '<tr><td><b>'+esc(sym)+'</b></td><td>'+fmt$(sc.price)+'</td><td>'+sc.qScore+'/12</td><td>'+sc.pScore+'/6</td><td>'+sc.mScore+'/4</td>'+
       '<td><span class="pill '+v.cls+'">'+v.label+'</span></td>'+
-      '<td>'+myTagSelect(sym)+'</td>'+
+      '<td class="mycall-cell">'+myTagSelect(sym)+'</td>'+
       '<td class="row"><button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(sym)+'\')">Analyze</button>'+
       (inWatch?'':'<button class="btn btn-sm" onclick="addWatchSym(\''+esc(sym)+'\')">+ Watch</button>')+'</td></tr>';
   }).join('');
@@ -2818,18 +2846,21 @@ function drawBoxWhisker(canvasId,p5,p25,p50,p75,p95){
   const range=(max-min)||1;
   const x=v=>pad+((v-min)/range)*(w-2*pad);
   const midY=h/2-6,boxH=36;
-  ctx.strokeStyle='#8e8e93';ctx.lineWidth=2;
+  const cs=getComputedStyle(document.body);
+  const cMuted=cs.getPropertyValue('--muted').trim()||'#949aa6';
+  const cText=cs.getPropertyValue('--text').trim()||'#f2f3f5';
+  ctx.strokeStyle=cMuted;ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(x(p5),midY);ctx.lineTo(x(p95),midY);ctx.stroke();
   [p5,p95].forEach(v=>{ctx.beginPath();ctx.moveTo(x(v),midY-10);ctx.lineTo(x(v),midY+10);ctx.stroke();});
-  const boxColor=p50>=0?'rgba(0,200,5,.35)':'rgba(255,59,48,.35)';
-  const boxBorder=p50>=0?'#00c805':'#ff3b30';
+  const boxColor=p50>=0?'rgba(46,160,67,.35)':'rgba(229,83,75,.35)';
+  const boxBorder=p50>=0?'#2ea043':'#e5534b';
   const bx=x(p25),bw2=Math.max(2,x(p75)-x(p25));
   ctx.fillStyle=boxColor;ctx.fillRect(bx,midY-boxH/2,bw2,boxH);
   ctx.strokeStyle=boxBorder;ctx.lineWidth=2;ctx.strokeRect(bx,midY-boxH/2,bw2,boxH);
-  ctx.strokeStyle='#ffffff';ctx.lineWidth=3;
+  ctx.strokeStyle=cText;ctx.lineWidth=3;
   ctx.beginPath();ctx.moveTo(x(p50),midY-boxH/2);ctx.lineTo(x(p50),midY+boxH/2);ctx.stroke();
   ctx.font='11px -apple-system,BlinkMacSystemFont,sans-serif';ctx.textAlign='center';
-  ctx.fillStyle='#8e8e93';
+  ctx.fillStyle=cMuted;
   ctx.fillText((p5>=0?'+':'')+p5.toFixed(1)+'%',x(p5),midY+36);
   ctx.fillText((p95>=0?'+':'')+p95.toFixed(1)+'%',x(p95),midY+36);
   ctx.fillText((p25>=0?'+':'')+p25.toFixed(1)+'%',x(p25),midY-boxH/2-10);
@@ -2840,12 +2871,12 @@ function drawBoxWhisker(canvasId,p5,p25,p50,p75,p95){
 function drawMcHistogram(r){
   const ctx=document.getElementById('mcHistCanvas');if(!ctx)return;
   if(mcHistChart)mcHistChart.destroy();
-  const colors=r.hist.labels.map(l=>parseFloat(l)>=0?'rgba(0,200,5,.55)':'rgba(255,59,48,.55)');
+  const colors=r.hist.labels.map(l=>parseFloat(l)>=0?'rgba(46,160,67,.55)':'rgba(229,83,75,.55)');
   mcHistChart=new Chart(ctx,{type:'bar',
     data:{labels:r.hist.labels,datasets:[{label:'Simulations',data:r.hist.counts,backgroundColor:colors,borderWidth:0,barPercentage:1,categoryPercentage:1}]},
     options:{responsive:true,maintainAspectRatio:false,
-      scales:{x:{ticks:{color:'#8e8e93',maxTicksLimit:12,autoSkip:true},grid:{display:false}},
-        y:{ticks:{color:'#8e8e93'},grid:{color:'#27272a'}}},
+      scales:{x:{ticks:{color:'#949aa6',maxTicksLimit:12,autoSkip:true},grid:{display:false}},
+        y:{ticks:{color:'#949aa6'},grid:{color:'#2b2f38'}}},
       plugins:{legend:{display:false},
         tooltip:{callbacks:{label:x=>' '+x.parsed.y.toLocaleString()+' of '+r.sims.toLocaleString()+' simulations'}}}}
   });
@@ -2855,16 +2886,16 @@ function drawMcChart(r){
   if(mcChart)mcChart.destroy();
   mcChart=new Chart(ctx,{type:'line',
     data:{labels:r.labels,datasets:[
-      {label:'95th pct',data:r.p95,borderColor:'transparent',backgroundColor:'rgba(0,200,5,.10)',fill:'+1',pointRadius:0,tension:.2},
-      {label:'75th pct',data:r.p75,borderColor:'transparent',backgroundColor:'rgba(0,200,5,.14)',fill:'+1',pointRadius:0,tension:.2},
+      {label:'95th pct',data:r.p95,borderColor:'transparent',backgroundColor:'rgba(46,160,67,.10)',fill:'+1',pointRadius:0,tension:.2},
+      {label:'75th pct',data:r.p75,borderColor:'transparent',backgroundColor:'rgba(46,160,67,.16)',fill:'+1',pointRadius:0,tension:.2},
       {label:'Median',data:r.p50,borderColor:'#ffffff',backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.2,fill:false},
-      {label:'25th pct',data:r.p25,borderColor:'transparent',backgroundColor:'rgba(255,59,48,.14)',fill:'-1',pointRadius:0,tension:.2},
-      {label:'5th pct',data:r.p5,borderColor:'transparent',backgroundColor:'rgba(255,59,48,.10)',fill:'-1',pointRadius:0,tension:.2}
+      {label:'25th pct',data:r.p25,borderColor:'transparent',backgroundColor:'rgba(229,83,75,.16)',fill:'-1',pointRadius:0,tension:.2},
+      {label:'5th pct',data:r.p5,borderColor:'transparent',backgroundColor:'rgba(229,83,75,.10)',fill:'-1',pointRadius:0,tension:.2}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      scales:{x:{ticks:{color:'#8e8e93',maxTicksLimit:10},grid:{color:'#27272a'}},
-        y:{ticks:{color:'#8e8e93',callback:v=>'$'+(v/1000).toFixed(0)+'k'},grid:{color:'#27272a'}}},
-      plugins:{legend:{labels:{color:'#8e8e93'}},
+      scales:{x:{ticks:{color:'#949aa6',maxTicksLimit:10},grid:{color:'#2b2f38'}},
+        y:{ticks:{color:'#949aa6',callback:v=>'$'+(v/1000).toFixed(0)+'k'},grid:{color:'#2b2f38'}}},
+      plugins:{legend:{labels:{color:'#949aa6'}},
         tooltip:{callbacks:{label:x=>' '+x.dataset.label+': '+fmt$(x.parsed.y)}}}}
   });
 }
@@ -2965,7 +2996,7 @@ function renderAll(){
   /* pie charts */
   const byType={Stock:0,ETF:0,Fund:0,Cash:D.cash||0};
   D.holdings.forEach(h=>{byType[h.type]=(byType[h.type]||0)+(h.price??h.cost)*h.shares;});
-  drawPie('pieType',chartType,c=>chartType=c,['Stocks','ETFs','Mutual Funds','Cash'],[byType.Stock,byType.ETF,byType.Fund,byType.Cash],['#0a84ff','#00c805','#ffb800','#3a3a3d']);
+  drawPie('pieType',chartType,c=>chartType=c,['Stocks','ETFs','Mutual Funds','Cash'],[byType.Stock,byType.ETF,byType.Fund,byType.Cash],['#3b82f6','#2ea043','#d9a441','#4a4f5a']);
   const holdLabels=D.holdings.map(h=>h.sym),holdVals=D.holdings.map(h=>(h.price??h.cost)*h.shares);
   if(D.cash>0){holdLabels.push('Cash');holdVals.push(D.cash);}
   drawPie('pieHold',chartHold,c=>chartHold=c,holdLabels,holdVals,null);
@@ -3014,7 +3045,7 @@ function renderAll(){
       return v?SIGNAL_RANK[v.key]:null;
     }
   };
-  updateSortHeaders('pfTh',pfSort,{sym:'Ticker',type:'Type',broker:'Broker',shares:'Shares',cost:'Avg Cost',price:'Price',value:'Value',gl:'Gain/Loss',signal:'Signal'});
+  updateSortHeaders('pfTh',pfSort,{sym:'Ticker',type:'Type',broker:'Broker',shares:'Shares',cost:'Avg Cost',price:'Price Now',value:'Market Value',gl:'Gain/Loss',signal:'AI Call'});
   applySort(filteredHoldings,pfSort,pfGetters).forEach(({h,i})=>{
     const p=h.price,val=(p??h.cost)*h.shares,gl=p!=null?(p-h.cost)*h.shares:null;
     const sc=h.type==='Stock'?D.analyses[h.sym]:null;
@@ -3031,7 +3062,7 @@ function renderAll(){
       '<td>'+pmask(fmt$(h.cost))+'</td><td>'+priceCell+'</td><td>'+pmask(fmt$(val))+'</td>'+
       '<td class="'+(gl==null?'':gl>=0?'pos':'neg')+'">'+(gl==null?'—':pmask(fmt$(gl)))+'</td>'+
       '<td>'+(v?'<span class="pill '+v.cls+'">'+v.label+'</span>':(h.type!=='Stock'?'<span class="pill pill-na">'+h.type+'</span>':'<span class="muted">refresh</span>'))+'</td>'+
-      '<td>'+myTagSelect(h.sym)+'</td>'+
+      '<td class="mycall-cell">'+myTagSelect(h.sym)+'</td>'+
       '<td class="row"><button class="btn btn-ghost btn-sm" onclick="toggleFavorite(\''+esc(h.sym)+'\')" title="'+(isFavorite(h.sym)?'Remove from Favorites':'Add to Favorites')+'">'+(isFavorite(h.sym)?'★':'☆')+'</button> <button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(h.sym)+'\')">Analyze</button> <button class="btn btn-ghost btn-sm" onclick="toggleSellRow('+i+')">Sell</button> <button class="btn-danger btn btn-sm" onclick="removeHolding('+i+')">✕</button></td>';
     hb.appendChild(tr);
     if(sellingIndex===i){
@@ -3072,14 +3103,14 @@ function renderAll(){
     momentum:x=>{const sc=D.analyses[x.s];return sc&&!sc.error?sc.mScore:null;},
     signal:x=>{const sc=D.analyses[x.s];const v=sc?verdictOf(sc,false):null;return v?SIGNAL_RANK[v.key]:null;}
   };
-  updateSortHeaders('wlTh',wlSort,{sym:'Ticker',price:'Price',quality:'Quality',pricescore:'Price',momentum:'Momentum',signal:'AI'});
+  updateSortHeaders('wlTh',wlSort,{sym:'Ticker',price:'Share Price',quality:'Quality /12',pricescore:'Value /6',momentum:'Momentum /4',signal:'AI Call'});
   applySort(filteredWatch,wlSort,wlGetters).forEach(({s,i})=>{
     const sc=D.analyses[s];const v=sc?verdictOf(sc,false):null;
     const tr=document.createElement('tr');
     tr.innerHTML='<td><b>'+esc(s)+'</b></td><td>'+(sc&&sc.price?fmt$(sc.price):'—')+'</td>'+
       '<td>'+(sc&&!sc.error?sc.qScore+'/12':'—')+'</td><td>'+(sc&&!sc.error?sc.pScore+'/6':'—')+'</td><td>'+(sc&&!sc.error?sc.mScore+'/4':'—')+'</td>'+
       '<td>'+(v?'<span class="pill '+v.cls+'">'+v.label+'</span>':'<span class="muted">refresh to score</span>')+'</td>'+
-      '<td>'+myTagSelect(s)+'</td>'+
+      '<td class="mycall-cell">'+myTagSelect(s)+'</td>'+
       '<td class="row"><button class="btn btn-ghost btn-sm" onclick="toggleFavorite(\''+esc(s)+'\')" title="'+(isFavorite(s)?'Remove from Favorites':'Add to Favorites')+'">'+(isFavorite(s)?'★':'☆')+'</button> <button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(s)+'\')">Analyze</button> <button class="btn-danger btn btn-sm" onclick="removeWatch('+i+')">✕</button></td>';
     wb.appendChild(tr);
   });
@@ -3143,7 +3174,7 @@ function renderAll(){
 function drawPie(id,inst,setInst,labels,vals,colors){
   const ctx=document.getElementById(id);if(!ctx)return;
   if(inst)inst.destroy();
-  const palette=colors||['#0a84ff','#00c805','#ffb800','#ff3b30','#c9822a','#64d2ff','#2dd4bf','#ff9f0a','#30d158','#a2845e','#8e8e93','#ffffff'];
+  const palette=colors||['#3b82f6','#2ea043','#d9a441','#e5534b','#c98a3f','#5eb0ef','#2dd4bf','#f0883e','#57ab5a','#a2845e','#949aa6','#c9a0dc'];
   const total=vals.reduce((a,b)=>a+b,0);
   const c=new Chart(ctx,{type:'doughnut',
     data:{labels,datasets:[{data:vals,backgroundColor:palette,borderColor:getComputedStyle(document.body).getPropertyValue('--pie-border').trim()||'#111113',borderWidth:2}]},
@@ -3250,7 +3281,7 @@ function drawGrowthChart(){
     currentChartHist=series;clearScrub();
     growthChartInst=new Chart(ctx,{type:'line',
       data:{labels:series.map(d=>d.date),datasets:[
-        {label:'Est. annual dividend income',data:series.map(d=>d.divIncome),borderColor:'#ffb800',backgroundColor:'rgba(255,184,0,.10)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
+        {label:'Est. annual dividend income',data:series.map(d=>d.divIncome),borderColor:'#d9a441',backgroundColor:'rgba(217,164,65,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
       ]},
       options:chartOpts(true)});
     return;
@@ -3267,13 +3298,13 @@ function drawGrowthChart(){
     // One line: everything you have in the portfolio right now, which already includes what you've made.
     if(titleEl)titleEl.textContent='Total value — money in the portfolio, gains included';
     datasets=[
-      {label:'Total value',data:hist.map(d=>d.value),borderColor:'#0a84ff',backgroundColor:'rgba(10,132,255,.10)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
+      {label:'Total value',data:hist.map(d=>d.value),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
     ];
   }else{
     // Growth is money made only — the total-value line lives in its own view now.
     if(titleEl)titleEl.textContent='Portfolio growth — money made';
     datasets=[
-      {label:'Money made (gain)',data:hist.map(d=>d.gain),borderColor:'#00c805',backgroundColor:'rgba(0,200,5,.08)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
+      {label:'Money made (gain)',data:hist.map(d=>d.gain),borderColor:'#2ea043',backgroundColor:'rgba(46,160,67,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
     ];
   }
   growthChartInst=new Chart(ctx,{type:'line',data:{labels,datasets},options:chartOpts(true)});
