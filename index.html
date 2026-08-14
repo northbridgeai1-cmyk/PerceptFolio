@@ -111,8 +111,17 @@ main{max-width:1100px;margin:0 auto;padding:32px 24px}
 .th-mine{color:var(--c-mine)!important}
 .th-profit{color:var(--c-profit)!important}
 .th-den{opacity:.6;font-weight:400}
-/* Your own manual call is an input, not a computed badge — outline it so it never reads as a verdict. */
-.mycall-cell select{border:1px dashed var(--c-mine);color:var(--c-mine);background:transparent;font-size:12px;padding:5px 7px}
+/* Your own manual call is an input, not a computed badge — dashed border keeps it reading as something
+   you filled in, while the colour tells you what you picked at a glance. */
+.mycall{max-width:112px;font-size:12px;padding:5px 8px;border-style:dashed;border-width:1px;background:transparent;font-weight:600}
+.mycall-buy{border-color:var(--green);color:var(--green)}
+.mycall-hold{border-color:var(--c-mine);color:var(--c-mine)}
+.mycall-sell{border-color:var(--red);color:var(--red)}
+.mycall-watching{border-color:var(--accent);color:var(--accent)}
+/* Unset: deliberately low-contrast so untagged rows stay quiet. */
+.mycall-none{border-color:var(--border);color:var(--muted);opacity:.65;font-weight:400}
+.mycall-none:hover{opacity:1}
+.mycall option{background:var(--panel);color:var(--text);font-weight:400}
 .greeting{font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:2px}
 .greeting-sub{color:var(--muted);font-size:14px;margin-bottom:24px}
 .welcome-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px}
@@ -420,7 +429,10 @@ small.src{color:var(--muted)}
       </select>
       <select id="pfFilterBroker" style="max-width:150px" onchange="renderAll()"><option value="All">All brokers</option></select>
       <select id="pfFilterSignal" style="max-width:150px" onchange="renderAll()">
-        <option value="All">All signals</option><option value="buy">BUY candidate</option><option value="sell">Consider selling</option><option value="watch">Watch</option><option value="hold">Hold</option>
+        <option value="All">All AI calls</option><option value="buy">AI: BUY candidate</option><option value="sell">AI: Consider selling</option><option value="watch">AI: Watch</option><option value="hold">AI: Hold</option>
+      </select>
+      <select id="pfFilterMine" style="max-width:150px" onchange="renderAll()">
+        <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
       </select>
       <button class="btn-ghost btn btn-sm" onclick="clearPortfolioFilters()">Clear</button>
     </div>
@@ -461,6 +473,9 @@ small.src{color:var(--muted)}
   <div class="card" style="margin-bottom:14px">
     <div class="row">
       <input id="wlFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderAll()">
+      <select id="wlFilterMine" style="max-width:150px" onchange="renderAll()">
+        <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
+      </select>
       <select id="wlFilterVerdict" style="max-width:170px" onchange="renderAll()">
         <option value="All">All AI calls</option><option value="buy">BUY candidate</option><option value="watch">Watch</option><option value="no">Doesn't qualify</option><option value="na">No data yet</option>
       </select>
@@ -564,6 +579,9 @@ small.src{color:var(--muted)}
         <option value="sell">Consider selling</option>
         <option value="no">Doesn't qualify</option>
         <option value="na">No data</option>
+      </select>
+      <select id="scFilterMine" style="max-width:150px" onchange="renderScreenerTable()">
+        <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
       </select>
       <button class="btn-ghost btn btn-sm" onclick="clearScreenerFilters()">Clear</button>
       <span class="muted" id="screenerFilterCount"></span>
@@ -877,15 +895,25 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   rules:{qBuy:9,pBuy:4,qSell:6,mBuy:0,autoRefresh:'yes'},lastRefresh:0};}
 /* Your own manual call per ticker (Buy/Hold/Sell/Watching) — independent of the app's computed verdict above.
    Defensive lazy-init so profiles saved before this feature still work. */
-const MY_TAG_OPTS=[['','—'],['buy','(Buy)'],['hold','(Hold)'],['sell','(Sell)'],['watching','(Watching)']];
+const MY_TAG_OPTS=[['','—'],['buy','Buy'],['hold','Hold'],['sell','Sell'],['watching','Watching']];
 function myTag(sym){return(D.myTags&&D.myTags[sym])||'';}
 function setMyTag(sym,val){if(!D.myTags)D.myTags={};if(val)D.myTags[sym]=val;else delete D.myTags[sym];saveDB();renderAll();}
 function myTagOptionsHtml(sym){
   const cur=myTag(sym);
   return MY_TAG_OPTS.map(([val,label])=>'<option value="'+val+'"'+(val===cur?' selected':'')+'>'+esc(label)+'</option>').join('');
 }
+/* The select is tinted by whatever you picked: green Buy, orange Hold, red Sell, blue Watching, and a
+   quiet grey for unset so blank rows recede into the background instead of competing for attention. */
 function myTagSelect(sym){
-  return '<select onchange="setMyTag(\''+esc(sym)+'\',this.value)" style="max-width:110px">'+myTagOptionsHtml(sym)+'</select>';
+  const cur=myTag(sym);
+  return '<select class="mycall mycall-'+(cur||'none')+'" onchange="setMyTag(\''+esc(sym)+'\',this.value)">'+myTagOptionsHtml(sym)+'</select>';
+}
+/* Shared My Call filter test. 'none' means you haven't tagged it at all, which is a useful thing to
+   filter FOR — it's your "what haven't I formed an opinion on yet" list. */
+function matchesMyCall(sym,filter){
+  if(!filter||filter==='All')return true;
+  const t=myTag(sym);
+  return filter==='none'?!t:t===filter;
 }
 /* Favorites: a starred subset of Portfolio/Watchlist symbols for a quick daily glance — separate from the
    full Watchlist, which can grow long. Defensive lazy-init so profiles saved before this feature still work. */
@@ -1079,6 +1107,7 @@ function resetTransientState(){
   const sInput=document.getElementById('screenerInput');if(sInput)sInput.value='';
   const scQ=document.getElementById('scFilterQ');if(scQ)scQ.value='';
   const scV=document.getElementById('scFilterVerdict');if(scV)scV.value='All';
+  const scM=document.getElementById('scFilterMine');if(scM)scM.value='All';
   const scCount=document.getElementById('screenerFilterCount');if(scCount)scCount.textContent='';
   const startBtn=document.getElementById('screenerStartBtn');if(startBtn)startBtn.style.display='';
   const stopBtn=document.getElementById('screenerStopBtn');if(stopBtn)stopBtn.style.display='none';
@@ -1935,12 +1964,13 @@ function addWatch(){
 function removeWatch(i){D.watchlist.splice(i,1);saveDB();renderAll();}
 function clearPortfolioFilters(){
   ['pfFilterQ'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  ['pfFilterType','pfFilterBroker','pfFilterSignal'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='All';});
+  ['pfFilterType','pfFilterBroker','pfFilterSignal','pfFilterMine'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='All';});
   renderAll();
 }
 function clearWatchlistFilters(){
   const q=document.getElementById('wlFilterQ');if(q)q.value='';
   const v=document.getElementById('wlFilterVerdict');if(v)v.value='All';
+  const m=document.getElementById('wlFilterMine');if(m)m.value='All';
   renderAll();
 }
 
@@ -2095,6 +2125,7 @@ function addWatchSym(sym){
 function clearScreenerFilters(){
   const q=document.getElementById('scFilterQ');if(q)q.value='';
   const v=document.getElementById('scFilterVerdict');if(v)v.value='All';
+  const m=document.getElementById('scFilterMine');if(m)m.value='All';
   renderScreenerTable();
 }
 function renderScreenerTable(){
@@ -2102,9 +2133,11 @@ function renderScreenerTable(){
   if(!tb)return;
   const q=((document.getElementById('scFilterQ')||{}).value||'').trim().toUpperCase();
   const vf=((document.getElementById('scFilterVerdict')||{}).value)||'All';
-  // Filter against the same verdict the row will actually display, so what you filter by is what you see.
+  const mf=((document.getElementById('scFilterMine')||{}).value)||'All';
+  // Filter against the same call the row will actually display, so what you filter by is what you see.
   const filtered=screenerResults.filter(({sym,sc})=>{
     if(q&&!sym.includes(q))return false;
+    if(!matchesMyCall(sym,mf))return false;
     if(vf==='All')return true;
     if(sc.error)return vf==='na';
     return verdictOf(sc,D.holdings.some(h=>h.sym===sym&&h.type==='Stock')).key===vf;
@@ -3016,10 +3049,12 @@ function renderAll(){
   const pfType=document.getElementById('pfFilterType')?.value||'All';
   const pfBroker=document.getElementById('pfFilterBroker')?.value||'All';
   const pfSignal=document.getElementById('pfFilterSignal')?.value||'All';
+  const pfMine=document.getElementById('pfFilterMine')?.value||'All';
   const filteredHoldings=D.holdings.map((h,i)=>({h,i})).filter(({h})=>{
     if(pfQ&&!h.sym.includes(pfQ))return false;
     if(pfType!=='All'&&h.type!==pfType)return false;
     if(pfBroker!=='All'&&h.broker!==pfBroker)return false;
+    if(!matchesMyCall(h.sym,pfMine))return false;
     if(pfSignal!=='All'){
       const sc0=h.type==='Stock'?D.analyses[h.sym]:null;
       const v0=sc0?verdictOf(sc0,true):null;
@@ -3083,8 +3118,10 @@ function renderAll(){
   document.getElementById('watchEmpty').style.display=D.watchlist.length?'none':'block';
   const wlQ=(document.getElementById('wlFilterQ')?.value||'').trim().toUpperCase();
   const wlVerdict=document.getElementById('wlFilterVerdict')?.value||'All';
+  const wlMine=document.getElementById('wlFilterMine')?.value||'All';
   const filteredWatch=D.watchlist.map((s,i)=>({s,i})).filter(({s})=>{
     if(wlQ&&!s.includes(wlQ))return false;
+    if(!matchesMyCall(s,wlMine))return false;
     if(wlVerdict!=='All'){
       const sc0=D.analyses[s];const v0=sc0?verdictOf(sc0,false):null;
       const key0=v0?v0.key:'na';
