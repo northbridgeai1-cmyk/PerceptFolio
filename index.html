@@ -368,6 +368,7 @@ small.src{color:var(--muted)}
         <div class="row" style="gap:6px">
           <button class="btn btn-ghost btn-sm" id="gvBtn_valuegain" onclick="setGraphView('valuegain')">Total Value</button>
           <button class="btn btn-ghost btn-sm" id="gvBtn_growth" onclick="setGraphView('growth')">Growth</button>
+          <button class="btn btn-ghost btn-sm" id="gvBtn_vsspy" onclick="setGraphView('vsspy')">vs S&amp;P 500</button>
           <button class="btn btn-ghost btn-sm" id="gvBtn_dividends" onclick="setGraphView('dividends')">Dividends</button>
         </div>
         <div class="row" style="gap:6px">
@@ -681,7 +682,8 @@ small.src{color:var(--muted)}
       <div class="field"><label>Time horizon (years)</label><input id="mcYears" type="number" min="1" max="40" value="10"></div>
       <div class="field"><label>Simulations</label><input id="mcSims" type="number" min="200" max="10000" step="200" value="10000"></div>
       <div class="field"><label>Risk-free rate (%/yr) — e.g. short-term Treasury yield</label><input id="mcRf" type="number" step="0.1" value="4.5"></div>
-      <div class="field"><label>Expected market return (%/yr) — e.g. long-run S&amp;P 500 average</label><input id="mcMkt" type="number" step="0.1" value="8"></div>
+      <div class="field"><label>Expected return of the whole market (%/yr)</label><input id="mcMkt" type="number" step="0.1" value="8">
+        <span class="muted" style="font-size:11.5px;display:block;margin-top:5px;line-height:1.5">This is the <b>S&amp;P 500 as a whole</b>, not any one stock. 8–10% is the common long-run assumption. Don't paste a single stock's expected or median return here — the model already works each holding out from this number using its own beta, so putting a stock figure in would double-count it and inflate every projection.</span></div>
       <div class="field"><label>Monthly contribution ($, optional)</label><input id="mcContrib" type="number" min="0" step="50" value="0"></div>
     </div>
     <button class="btn" id="mcRunBtn" onclick="runMonteCarlo()">Run simulation</button>
@@ -768,6 +770,24 @@ small.src{color:var(--muted)}
       <div class="field"><label>Auto-refresh on page load</label><select id="setAutoRefresh"><option value="yes">Yes</option><option value="no">No</option></select></div>
     </div>
     <button class="btn" onclick="saveRules()">Save Rules</button>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Copy Holdings / Watchlist to Another Account</h3>
+    <p class="muted" style="margin-bottom:12px">Copies from the account you're in right now into another one on this browser — useful for setting a new client up with a starting book, or cloning your own list into a second account. It copies the positions and tickers only; cash, transaction history, dividends, alerts, and settings are left alone.</p>
+    <div class="row" style="margin-bottom:10px">
+      <select id="copyTarget" style="max-width:280px"></select>
+      <select id="copyWhat" style="max-width:190px">
+        <option value="both">Holdings + Watchlist</option>
+        <option value="holdings">Holdings only</option>
+        <option value="watchlist">Watchlist only</option>
+      </select>
+      <select id="copyMode" style="max-width:210px">
+        <option value="merge">Merge into theirs</option>
+        <option value="replace">Replace theirs</option>
+      </select>
+      <button class="btn" onclick="copyToAccount()">Copy</button>
+    </div>
+    <p class="muted" style="font-size:12px"><b>Merge</b> adds anything they don't already have and leaves their existing positions untouched. <b>Replace</b> wipes the selected lists on the target account first — that can't be undone, so it asks first.</p>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Backup / Restore</h3>
@@ -925,7 +945,7 @@ function toggleFavorite(sym){
   if(i>=0)arr.splice(i,1);else arr.push(sym);
   saveDB();renderAll();
 }
-function recordHistorySnapshot(){
+function recordHistorySnapshot(spyClose){
   if(!D.history)D.history=[];
   let value=0,cost=0;
   D.holdings.forEach(h=>{const p=h.price??h.cost;value+=p*h.shares;cost+=h.cost*h.shares;});
@@ -934,8 +954,11 @@ function recordHistorySnapshot(){
   const gain=value-cost;
   const divIncome=estimatedDividendIncome();
   const existing=D.history.find(d=>d.date===today);
-  if(existing){existing.value=value;existing.cost=cost;existing.gain=gain;existing.divIncome=divIncome;}
-  else D.history.push({date:today,value,cost,gain,divIncome});
+  if(existing){
+    existing.value=value;existing.cost=cost;existing.gain=gain;existing.divIncome=divIncome;
+    if(spyClose!=null)existing.spy=spyClose;   // don't wipe an earlier good reading with a failed one
+  }
+  else D.history.push(Object.assign({date:today,value,cost,gain,divIncome},spyClose!=null?{spy:spyClose}:{}));
   D.history.sort((a,b)=>a.date<b.date?-1:1);
   if(D.history.length>400)D.history=D.history.slice(D.history.length-400);
 }
@@ -1148,6 +1171,7 @@ function enterSession(){
   document.getElementById('setQSell').value=D.rules.qSell;
   document.getElementById('setAutoRefresh').value=D.rules.autoRefresh;
   applyTheme();
+  populateCopyTargets();
   updateAccountTypeUI();
   updateBizBanner();
   renderAll();
@@ -1227,6 +1251,7 @@ async function createClientProfile(){
   document.getElementById('clientPassword').value='';
   document.getElementById('clientFeePct').value='';
   toast('Client "'+name+'" created. Click Switch to start tracking their portfolio — only hand over the login if you actually want them to see it themselves.');
+  populateCopyTargets();
   renderClientsList();
 }
 function setClientFee(email,val){
@@ -2203,8 +2228,12 @@ async function refreshAll(){
       }catch(e){handleApiErr(e,s);}
     }
     checkPriceAlerts();
+    // Stamp the day's SPY close alongside the portfolio snapshot so the S&P comparison chart can be
+    // drawn later with no extra API calls. Failure here is non-fatal — the chart just skips that day.
+    let spyClose=null;
+    try{const sq=await getQuote('SPY');if(sq&&isFinite(sq.c))spyClose=sq.c;}catch(e){}
     D.lastRefresh=Date.now();
-    recordHistorySnapshot();
+    recordHistorySnapshot(spyClose);
     saveDB();renderAll();
     document.getElementById('lastRefresh').textContent='Updated '+new Date().toLocaleTimeString();
   }finally{refreshing=false;}
@@ -3286,7 +3315,7 @@ function clearScrub(){
 function setGraphView(v){graphView=v;drawGrowthChart();}
 function setGraphRange(d){graphRange=d;drawGrowthChart();}
 function updateGraphButtons(){
-  ['growth','valuegain','dividends'].forEach(v=>{
+  ['growth','valuegain','vsspy','dividends'].forEach(v=>{
     const b=document.getElementById('gvBtn_'+v);
     if(b)b.style.borderColor=(graphView===v)?'var(--accent)':'';
     if(b)b.style.color=(graphView===v)?'var(--accent)':'';
@@ -3307,6 +3336,33 @@ function drawGrowthChart(){
   const hist=(D.history||[]).filter(d=>!cutoffDate||d.date>=cutoffDate);
   const ctx=document.getElementById('growthChart');
   const showEmpty=msg=>{box.style.display='none';empty.style.display='block';empty.textContent=msg;currentChartHist=[];clearScrub();};
+
+  if(graphView==='vsspy'){
+    if(titleEl)titleEl.textContent='Your portfolio vs the S&P 500';
+    // Only days where BOTH a portfolio value and a SPY close were captured can be compared fairly.
+    const series=hist.filter(d=>d.spy!=null&&d.value>0);
+    if(series.length<2)return showEmpty('Not enough data to compare yet. PerceptFolio records the S&P 500 (SPY) alongside your portfolio each time you hit Refresh data — come back after a couple of refreshes on different days.');
+    box.style.display='block';empty.style.display='none';
+    if(!ctx)return;
+    if(growthChartInst)growthChartInst.destroy();
+    currentChartHist=series;clearScrub();
+    // Both lines are rebased to 0% at the first day in view, so the comparison is like-for-like
+    // regardless of how much money is actually in the portfolio.
+    const base=series[0],baseV=base.value,baseS=base.spy;
+    const mine=series.map(d=>(d.value/baseV-1)*100);
+    const spy=series.map(d=>(d.spy/baseS-1)*100);
+    growthChartInst=new Chart(ctx,{type:'line',
+      data:{labels:series.map(d=>d.date),datasets:[
+        {label:'My portfolio',data:mine,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2},
+        {label:'S&P 500 (SPY)',data:spy,borderColor:'#949aa6',backgroundColor:'transparent',fill:false,pointRadius:0,tension:.2,borderWidth:2,borderDash:[5,4]}
+      ]},
+      options:chartOpts(true,'pct')});
+    ctx.onmouseleave=clearScrub;
+    const last=series[series.length-1];
+    const diff=((last.value/baseV)-(last.spy/baseS))*100;
+    if(titleEl)titleEl.innerHTML='Your portfolio vs the S&P 500 &nbsp;<span style="font-size:13px;font-weight:600" class="'+(diff>=0?'pos':'neg')+'">'+(diff>=0?'ahead by ':'behind by ')+Math.abs(diff).toFixed(2)+' pts</span>';
+    return;
+  }
 
   if(graphView==='dividends'){
     if(titleEl)titleEl.textContent='Estimated annual dividend income';
@@ -3348,15 +3404,17 @@ function drawGrowthChart(){
   // onHover only fires while the pointer is over the canvas, so leaving it entirely needs its own reset.
   ctx.onmouseleave=clearScrub;
 }
-function chartOpts(scrubbable){
-  const grid=getComputedStyle(document.body).getPropertyValue('--border').trim()||'#27272a';
-  const muted=getComputedStyle(document.body).getPropertyValue('--muted').trim()||'#8e8e93';
+function chartOpts(scrubbable,unit){
+  const grid=getComputedStyle(document.body).getPropertyValue('--border').trim()||'#2b2f38';
+  const muted=getComputedStyle(document.body).getPropertyValue('--muted').trim()||'#949aa6';
+  // Percent mode is deliberately NOT masked by privacy mode — a relative return exposes no dollar amounts.
+  const isPct=unit==='pct';
   const o={responsive:true,maintainAspectRatio:false,
     interaction:{mode:'index',intersect:false},
     scales:{x:{ticks:{color:muted,maxTicksLimit:8},grid:{color:grid}},
-      y:{ticks:{color:muted,callback:v=>D.privacyMode?'$**':'$'+(Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0))},grid:{color:grid}}},
+      y:{ticks:{color:muted,callback:v=>isPct?((v>=0?'+':'')+v.toFixed(1)+'%'):(D.privacyMode?'$**':'$'+(Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0)))},grid:{color:grid}}},
     plugins:{legend:{labels:{color:muted}},
-      tooltip:{callbacks:{label:x=>' '+x.dataset.label+': '+pmask(fmt$(x.parsed.y))}}}};
+      tooltip:{callbacks:{label:x=>' '+x.dataset.label+': '+(isPct?((x.parsed.y>=0?'+':'')+x.parsed.y.toFixed(2)+'%'):pmask(fmt$(x.parsed.y)))}}}};
   if(scrubbable){
     // Drive the hero numbers from whatever point the cursor is nearest.
     o.onHover=(e,els)=>{
@@ -3550,6 +3608,77 @@ function fcGainLoss(){
   const gl=(n-c)*s,pct=c>0?((n-c)/c*100):0;
   fcOut('fcGlOut','<b class="'+(gl>=0?'pos':'neg')+'">'+(gl>=0?'+':'')+fmt$(gl)+'</b> ('+(pct>=0?'+':'')+pct.toFixed(2)+'%)<br>'+
     '<span class="muted">Now worth '+fmt$(s*n)+' · cost basis '+fmt$(s*c)+'</span>');
+}
+
+/* ================= COPY BETWEEN ACCOUNTS =================
+   Writes straight into the target profile's stored data rather than swapping USER/D, so the account
+   you're sitting in is never disturbed. If the target happens to be the account currently loaded in
+   memory, D is refreshed too — otherwise the in-memory copy would overwrite the change on next save. */
+function populateCopyTargets(){
+  const sel=document.getElementById('copyTarget');
+  if(!sel)return;
+  const prev=sel.value;
+  const targets=Object.keys(DB.profiles).filter(e=>e!==USER);
+  if(!targets.length){
+    sel.innerHTML='<option value="">No other accounts on this browser</option>';
+    return;
+  }
+  sel.innerHTML=targets.map(e=>{
+    const p=DB.profiles[e];
+    const tag=p.managedBy===USER?' (your client)':(p.accountType==='business'?' (business)':'');
+    return '<option value="'+esc(e)+'">'+esc(p.clientLabel||e)+tag+'</option>';
+  }).join('');
+  if(targets.includes(prev))sel.value=prev;
+}
+function copyToAccount(){
+  const sel=document.getElementById('copyTarget');
+  const email=sel?sel.value:'';
+  if(!email||!DB.profiles[email])return toast('Pick an account to copy into first.');
+  const what=document.getElementById('copyWhat').value;
+  const mode=document.getElementById('copyMode').value;
+  const target=DB.profiles[email];
+  const label=target.clientLabel||email;
+  if(!target.data)target.data=defaultData();
+  const td=target.data;
+  if(!Array.isArray(td.holdings))td.holdings=[];
+  if(!Array.isArray(td.watchlist))td.watchlist=[];
+
+  const doHoldings=what==='both'||what==='holdings';
+  const doWatch=what==='both'||what==='watchlist';
+  if(doHoldings&&!D.holdings.length&&!doWatch)return toast('You have no holdings to copy.');
+  if(doWatch&&!D.watchlist.length&&!doHoldings)return toast('Your watchlist is empty.');
+
+  if(mode==='replace'){
+    const parts=[];
+    if(doHoldings)parts.push(td.holdings.length+' holding'+(td.holdings.length===1?'':'s'));
+    if(doWatch)parts.push(td.watchlist.length+' watchlist ticker'+(td.watchlist.length===1?'':'s'));
+    if(!confirm('Replace '+label+'\'s '+parts.join(' and ')+' with yours? This erases what they currently have and cannot be undone.'))return;
+  }
+
+  let addedH=0,skippedH=0,addedW=0;
+  if(doHoldings){
+    if(mode==='replace')td.holdings=[];
+    D.holdings.forEach(h=>{
+      const existing=td.holdings.find(x=>x.sym===h.sym&&x.type===h.type);
+      if(existing){skippedH++;return;} // merge never silently rewrites someone's cost basis
+      // Structured clone so the two accounts never share an object reference.
+      td.holdings.push({sym:h.sym,type:h.type,shares:h.shares,cost:h.cost,broker:h.broker,
+        price:h.price??null,manualPrice:!!h.manualPrice,priceDate:h.priceDate??null,autoFailed:false});
+      addedH++;
+    });
+  }
+  if(doWatch){
+    if(mode==='replace')td.watchlist=[];
+    D.watchlist.forEach(s=>{if(!td.watchlist.includes(s)){td.watchlist.push(s);addedW++;}});
+  }
+
+  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  if(email===USER)D=Object.assign(defaultData(),td);
+  renderAll();
+  const bits=[];
+  if(doHoldings)bits.push(addedH+' holding'+(addedH===1?'':'s')+(skippedH?' ('+skippedH+' already there, left alone)':''));
+  if(doWatch)bits.push(addedW+' watchlist ticker'+(addedW===1?'':'s'));
+  toast('Copied to '+label+': '+bits.join(', ')+'. Their prices refresh next time that account runs Refresh data.');
 }
 
 /* ================= SETTINGS ================= */
