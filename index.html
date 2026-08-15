@@ -810,10 +810,26 @@ small.src{color:var(--muted)}
     <p class="muted" style="font-size:12px"><b>Merge</b> adds anything they don't already have and leaves their existing positions untouched. <b>Replace</b> wipes the selected lists on the target account first — that can't be undone, so it asks first.</p>
   </div>
   <div class="card" style="margin-top:16px">
+    <h3>Sync Across Your Devices</h3>
+    <p class="muted" style="margin-bottom:12px">Keeps this account's holdings, watchlist, history and settings the same on your phone and your computer. Paste the same two values on every device. Setup instructions are in <b>SYNC-SETUP.md</b>.</p>
+    <div class="field"><label>Sync URL</label><input id="syncUrlInput" placeholder="https://perceptfolio-sync.yourname.workers.dev" autocomplete="off"></div>
+    <div class="field"><label>Sync key</label><input id="syncKeyInput" type="password" placeholder="The SYNC_SECRET you set in Cloudflare" autocomplete="off"></div>
+    <div class="row">
+      <button class="btn" onclick="saveSyncConfig()">Save &amp; connect</button>
+      <button class="btn btn-ghost" onclick="syncNow()">Sync now</button>
+      <button class="btn btn-ghost" onclick="syncPullForce()">Pull from cloud</button>
+      <button class="btn-danger btn btn-ghost" onclick="disableSync()">Turn off</button>
+    </div>
+    <p class="muted" id="syncStatus" style="margin-top:10px;font-size:13px"></p>
+    <p class="muted" style="margin-top:10px;font-size:11.5px;line-height:1.55">Once connected it syncs automatically — when you open the app, a few seconds after you make changes, and when you close the tab. <b>This is whole-account last-write-wins, not a merge.</b> If you edit on your phone and your laptop without letting them sync in between, the device that saves last overwrites the other. It warns you before clobbering something newer, but the safe habit is to open the app on a device and let it sync before you start editing there.</p>
+  </div>
+  <div class="card" style="margin-top:16px">
     <h3>Backup / Restore</h3>
     <div class="row">
       <button class="btn btn-ghost" onclick="exportData()">Export All Data (JSON)</button>
-      <label class="btn btn-ghost" style="display:inline-block">Import JSON<input type="file" accept=".json" style="display:none" onchange="importData(event)"></label>
+      <!-- Deliberately permissive: iOS matches by UTI rather than file extension, so a bare
+           accept=".json" greys the backup file out in the Files picker and makes import impossible. -->
+      <label class="btn btn-ghost" style="display:inline-block">Import JSON<input type="file" accept=".json,application/json,text/json,text/plain" style="display:none" onchange="importData(event)"></label>
     </div>
     <p class="muted" style="margin-top:10px">Your data lives in this browser only. Export regularly, and import on a new device to move everything over.</p>
   </div>
@@ -928,10 +944,20 @@ const STORE_KEY='quantfolio_v1';
 let DB={profiles:{}}, USER=null, D=null; // D = current user's data
 
 function loadDB(){try{DB=JSON.parse(localStorage.getItem(STORE_KEY))||{profiles:{}};}catch(e){DB={profiles:{}};}}
-function saveDB(){if(USER)DB.profiles[USER].data=D;localStorage.setItem(STORE_KEY,JSON.stringify(DB));}
+function saveDB(){
+  if(USER){
+    // Timestamp every local change so a pull can tell whether taking the cloud copy would
+    // silently destroy work done on this device since the last successful sync.
+    if(D)D.lastLocalEdit=Date.now();
+    DB.profiles[USER].data=D;
+  }
+  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  if(typeof scheduleSync==='function')scheduleSync();
+}
 function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorites:[],alerts:[],priceAlerts:[],analyses:{},manual:{},myTags:{},privacyMode:false,history:[],
   displayName:'',avatarColor:'',avatarImage:'',weeklyPicks:{weekKey:'',tickers:[],newCount:0},
   transactions:[],dividends:[],theme:'dark',
+  syncedAt:0,lastLocalEdit:0,
   rules:{qBuy:9,pBuy:4,qSell:6,mBuy:0,autoRefresh:'yes'},lastRefresh:0};}
 /* Your own manual call per ticker (Buy/Hold/Sell/Watching) — independent of the app's computed verdict above.
    Defensive lazy-init so profiles saved before this feature still work. */
@@ -1122,6 +1148,13 @@ async function finishLogin(email){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='block';
   enterSession();
+  /* Pull once on login so you land on whatever the other device left. Deliberately not awaited —
+     a slow or unreachable worker must never block getting into the app. */
+  if(syncConfigured()){
+    syncPull(false)
+      .then(r=>{ if(!r.applied&&!r.pushedInstead&&r.empty)return syncPush(); })
+      .catch(e=>setSyncStatus('✗ '+e.message,'neg'));
+  }
   if(D.apiKey&&D.rules.autoRefresh==='yes')refreshAll();
 }
 /* ---- Business accounts: switch into a client's portfolio without a server, then switch back ----
@@ -1192,6 +1225,9 @@ function enterSession(){
   document.getElementById('setAutoRefresh').value=D.rules.autoRefresh;
   applyTheme();
   populateCopyTargets();
+  // Display only — must never kick off a pull, because syncPull() calls enterSession() on success
+  // and the two would recurse into each other.
+  renderSyncSettings();
   updateAccountTypeUI();
   updateBizBanner();
   renderAll();
@@ -3737,6 +3773,163 @@ function importData(ev){
   r.readAsText(f);
 }
 
+/* ================= CLOUD SYNC =================
+   Syncs the CURRENT profile's data between your own devices via a Cloudflare Worker.
+
+   Why the config lives in localStorage and not in D: D is the thing being synced. If the URL and key
+   were inside it, pulling from another device would overwrite them, and a device that had just been
+   set up could disconnect itself mid-sync. Sync settings are per-device; portfolio data is shared.
+
+   Conflict model is honest last-write-wins on the whole profile. There's no field-level merge — two
+   devices editing different holdings offline will not combine, the later save wins. Rather than hide
+   that, a pull that would overwrite newer local changes asks first. */
+const SYNC_CFG_KEY='pf_sync_cfg';
+let syncCfg=null, syncTimer=null, syncing=false;
+
+function loadSyncCfg(){
+  try{syncCfg=JSON.parse(localStorage.getItem(SYNC_CFG_KEY))||null;}catch(e){syncCfg=null;}
+  return syncCfg;
+}
+function syncConfigured(){return !!(syncCfg&&syncCfg.url&&syncCfg.key);}
+function setSyncStatus(msg,cls){
+  const el=document.getElementById('syncStatus');
+  if(el){el.textContent=msg;el.className=cls?cls:'muted';}
+}
+/* Each profile gets its own slot so switching accounts doesn't cross-contaminate. */
+async function syncSlotId(){
+  const digest=await sha('pf-slot:'+(USER||'anon'));
+  return digest.slice(0,32);
+}
+function syncEndpoint(slot){
+  const base=syncCfg.url.replace(/\/+$/,'');
+  return base+'/?slot='+encodeURIComponent(slot);
+}
+function saveSyncConfig(){
+  const url=(document.getElementById('syncUrlInput').value||'').trim();
+  const key=(document.getElementById('syncKeyInput').value||'').trim();
+  if(!url||!key)return toast('Enter both the sync URL and the sync key.');
+  if(!/^https:\/\//i.test(url))return toast('The sync URL must start with https://');
+  syncCfg={url,key};
+  localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg));
+  setSyncStatus('Connecting…');
+  syncNow();
+}
+function disableSync(){
+  if(!confirm('Turn off sync on this device? Your data stays here and stays in the cloud — this device just stops talking to it.'))return;
+  localStorage.removeItem(SYNC_CFG_KEY);
+  syncCfg=null;
+  const u=document.getElementById('syncUrlInput'),k=document.getElementById('syncKeyInput');
+  if(u)u.value='';if(k)k.value='';
+  setSyncStatus('Sync is off on this device.');
+  toast('Sync turned off here.');
+}
+function syncPayloadFromD(){
+  // Straight copy of the profile. Nothing device-specific lives in D, so nothing needs stripping.
+  return JSON.parse(JSON.stringify(D));
+}
+async function syncFetch(method,slot,body){
+  const res=await fetch(syncEndpoint(slot),{
+    method,
+    headers:Object.assign({'Authorization':'Bearer '+syncCfg.key},
+      body?{'Content-Type':'application/json'}:{}),
+    body:body||undefined
+  });
+  if(res.status===401)throw new Error('Sync key rejected — check it matches SYNC_SECRET exactly.');
+  if(!res.ok){
+    let detail='';
+    try{const j=await res.json();detail=j.error||'';}catch(e){}
+    throw new Error(detail||('Sync failed (HTTP '+res.status+')'));
+  }
+  return res.json();
+}
+async function syncPush(){
+  if(!syncConfigured()||!D)return;
+  const slot=await syncSlotId();
+  const stamp=Date.now();
+  const payload={updatedAt:stamp,user:USER,data:syncPayloadFromD()};
+  await syncFetch('PUT',slot,JSON.stringify(payload));
+  D.syncedAt=stamp;
+  DB.profiles[USER].data=D;
+  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  setSyncStatus('✓ Synced '+new Date(stamp).toLocaleTimeString());
+}
+/* force=true skips the "are you sure" and always takes the cloud copy. */
+async function syncPull(force){
+  if(!syncConfigured()||!D)return{applied:false,empty:true};
+  const slot=await syncSlotId();
+  const remote=await syncFetch('GET',slot);
+  if(remote.empty)return{applied:false,empty:true};
+  const localStamp=D.syncedAt||0;
+  if(!force&&remote.updatedAt<=localStamp)return{applied:false,empty:false,upToDate:true};
+  // Local edits made since the last successful sync would be lost by taking the cloud copy.
+  const localDirty=(D.lastLocalEdit||0)>localStamp;
+  if(!force&&localDirty){
+    const when=new Date(remote.updatedAt).toLocaleString();
+    if(!confirm('The cloud copy (saved '+when+') is newer, but you have unsaved changes on this device that would be replaced.\n\nOK = take the cloud copy and lose this device\'s changes.\nCancel = keep this device and push it up instead.')){
+      await syncPush();
+      return{applied:false,pushedInstead:true};
+    }
+  }
+  D=Object.assign(defaultData(),remote.data||{});
+  D.syncedAt=remote.updatedAt;
+  DB.profiles[USER].data=D;
+  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  enterSession();
+  setSyncStatus('✓ Pulled from cloud — '+new Date(remote.updatedAt).toLocaleString());
+  return{applied:true};
+}
+async function syncPullForce(){
+  if(!syncConfigured())return toast('Set up sync first.');
+  if(!confirm('Replace everything on this device with the cloud copy? Anything here that hasn\'t been synced will be lost.'))return;
+  try{
+    setSyncStatus('Pulling…');
+    const r=await syncPull(true);
+    toast(r.empty?'Nothing in the cloud yet for this account.':'Pulled from cloud.');
+    if(r.empty)setSyncStatus('Cloud is empty for this account — hit Sync now to upload this device.');
+  }catch(e){setSyncStatus('✗ '+e.message,'neg');toast(e.message);}
+}
+async function syncNow(){
+  if(!syncConfigured())return toast('Enter your sync URL and key first.');
+  if(syncing)return;
+  syncing=true;
+  try{
+    setSyncStatus('Syncing…');
+    const r=await syncPull(false);
+    if(!r.applied&&!r.pushedInstead)await syncPush();
+    toast('Sync complete.');
+  }catch(e){
+    setSyncStatus('✗ '+e.message,'neg');
+    toast(e.message);
+  }finally{syncing=false;}
+}
+/* saveDB() fires on nearly every interaction. Cloudflare's KV free tier allows 1,000 writes a day,
+   so pushing on every save would burn through it in an afternoon. This waits for a lull instead. */
+function scheduleSync(){
+  if(!syncConfigured())return;
+  if(syncTimer)clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>{
+    syncPush().catch(e=>setSyncStatus('✗ '+e.message,'neg'));
+  },8000);
+}
+function flushSync(){
+  if(!syncConfigured()||!syncTimer)return;
+  clearTimeout(syncTimer);syncTimer=null;
+  syncPush().catch(()=>{});
+}
+// Closing the tab or backgrounding the app is the last chance to get changes up.
+window.addEventListener('pagehide',flushSync);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSync();});
+
+function renderSyncSettings(){
+  loadSyncCfg();
+  const u=document.getElementById('syncUrlInput'),k=document.getElementById('syncKeyInput');
+  if(u)u.value=(syncCfg&&syncCfg.url)||'';
+  if(k)k.value=(syncCfg&&syncCfg.key)||'';
+  if(!syncConfigured()){setSyncStatus('Not connected on this device.');return;}
+  const s=D&&D.syncedAt;
+  setSyncStatus(s?('Connected. Last synced '+new Date(s).toLocaleString()):'Connected — not synced yet.');
+}
+
 /* ================= INSTALL (PWA) =================
    Chrome/Edge/Android fire beforeinstallprompt and let us trigger the install sheet ourselves.
    iOS Safari does NOT — there is no programmatic install API, so the only honest thing to do there
@@ -3790,6 +3983,7 @@ async function promptInstall(){
 
 /* ================= INIT ================= */
 loadDB();
+loadSyncCfg();   // must run before finishLogin, which checks syncConfigured()
 runCalc();
 updateInstallCard();
 /* Service worker: offline shell + faster loads. Registered only over HTTPS or localhost, which is
