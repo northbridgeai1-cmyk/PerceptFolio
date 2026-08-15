@@ -2,9 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>PerceptFolio — Your Portfolio Quant</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<!-- ---- Installable app (PWA) ---- -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e0f12">
+<meta name="description" content="Know what to buy. Know what to sell. A private, offline-first portfolio tracker and stock checklist scorer.">
+<!-- iOS doesn't read manifest.json for these, so they have to be declared separately. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PerceptFolio">
+<link rel="apple-touch-icon" href="icon.svg">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
@@ -49,7 +58,11 @@ input::placeholder{color:var(--muted)}
 .btn-danger{background:transparent;color:var(--red);border:1px solid var(--border);font-family:var(--mono);font-size:13px}
 .btn-danger:hover{border-color:var(--red)}
 .btn-sm{padding:7px 6px;font-size:12px}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:50}
+/* Installed on iOS the status bar is translucent and content runs under the notch, so the header
+   pads itself by whatever the device reports as its safe area. On desktop these insets are 0. */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:50;
+  padding-top:env(safe-area-inset-top);height:calc(56px + env(safe-area-inset-top));
+  padding-left:calc(24px + env(safe-area-inset-left));padding-right:calc(24px + env(safe-area-inset-right))}
 .logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;display:inline-flex;align-items:center;gap:7px}
 .logo-mark{flex-shrink:0}
 /* The wordmark is ONE flex child. Without this wrapper the .logo `gap` would push the two coloured
@@ -63,7 +76,9 @@ nav button.active{color:#000;background:var(--text)}
 nav button:hover{color:var(--text)}
 .badge{position:absolute;top:14px;right:2px;background:var(--red);color:#fff;border-radius:9px;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px}
 .avatar{width:30px;height:30px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--text);flex-shrink:0}
-main{max-width:1100px;margin:0 auto;padding:32px 24px}
+main{max-width:1100px;margin:0 auto;padding:32px 24px;
+  padding-left:calc(24px + env(safe-area-inset-left));padding-right:calc(24px + env(safe-area-inset-right));
+  padding-bottom:calc(32px + env(safe-area-inset-bottom))}
 .grid{display:grid;gap:14px}
 .grid-2{grid-template-columns:1fr 1fr}
 .grid-3{grid-template-columns:repeat(3,1fr)}
@@ -741,7 +756,13 @@ small.src{color:var(--muted)}
 
 <!-- SETTINGS -->
 <div id="tab-settings" class="tabs-hidden">
-  <div class="card">
+  <div class="card" id="installCard" style="display:none">
+    <h3>Install PerceptFolio</h3>
+    <p class="muted" style="margin-bottom:12px">Install it and PerceptFolio gets its own icon, opens without browser chrome, and keeps working offline. On iPhone this also matters for your data: Safari clears storage for sites you haven't opened in 7 days, but installed apps are exempt.</p>
+    <button class="btn" id="installBtn" onclick="promptInstall()">Install app</button>
+    <p class="muted" id="installHint" style="margin-top:10px;font-size:12.5px;line-height:1.55"></p>
+  </div>
+  <div class="card" style="margin-top:16px">
     <h3>Appearance</h3>
     <label class="muted" style="display:block;font-size:13px;margin-bottom:8px">Theme</label>
     <div class="theme-switch" id="themeSwitch" onclick="toggleTheme()" title="Click to switch between light and dark">
@@ -3716,9 +3737,69 @@ function importData(ev){
   r.readAsText(f);
 }
 
+/* ================= INSTALL (PWA) =================
+   Chrome/Edge/Android fire beforeinstallprompt and let us trigger the install sheet ourselves.
+   iOS Safari does NOT — there is no programmatic install API, so the only honest thing to do there
+   is tell the user the exact manual steps rather than show a button that can't work. */
+let deferredInstallPrompt=null;
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+}
+function updateInstallCard(){
+  const card=document.getElementById('installCard');
+  const btn=document.getElementById('installBtn');
+  const hint=document.getElementById('installHint');
+  if(!card)return;
+  if(isStandalone()){
+    card.style.display='block';
+    if(btn)btn.style.display='none';
+    if(hint)hint.textContent='✓ Installed — you\'re running the app version right now.';
+    return;
+  }
+  const ua=navigator.userAgent;
+  const isIOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(deferredInstallPrompt){
+    card.style.display='block';
+    if(btn)btn.style.display='';
+    if(hint)hint.textContent='';
+  }else if(isIOS){
+    card.style.display='block';
+    if(btn)btn.style.display='none';
+    if(hint)hint.innerHTML='On iPhone or iPad, Safari has no install button we can trigger for you. Tap the <b>Share</b> icon at the bottom of Safari, scroll down, and choose <b>Add to Home Screen</b>. It must be Safari — Chrome on iOS can\'t install web apps.';
+  }else{
+    card.style.display='none';
+  }
+}
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();            // stop the mini-infobar so we can offer it from Settings instead
+  deferredInstallPrompt=e;
+  updateInstallCard();
+});
+window.addEventListener('appinstalled',()=>{
+  deferredInstallPrompt=null;
+  updateInstallCard();
+  toast('PerceptFolio installed. Open it from your home screen or app list.');
+});
+async function promptInstall(){
+  if(!deferredInstallPrompt)return updateInstallCard();
+  deferredInstallPrompt.prompt();
+  try{await deferredInstallPrompt.userChoice;}catch(e){}
+  deferredInstallPrompt=null;   // the event can only be used once
+  updateInstallCard();
+}
+
 /* ================= INIT ================= */
 loadDB();
 runCalc();
+updateInstallCard();
+/* Service worker: offline shell + faster loads. Registered only over HTTPS or localhost, which is
+   what the API requires anyway — opening index.html straight off the disk (file://) will skip this
+   and the app simply runs without offline support. */
+if('serviceWorker' in navigator&&location.protocol!=='file:'){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW registration failed:',e));
+  });
+}
 (function(){
   const u=sessionStorage.getItem('qf_user');
   if(u&&DB.profiles[u]&&!DB.profiles[u].pinHash){

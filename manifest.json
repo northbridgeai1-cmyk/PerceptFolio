@@ -1,0 +1,42 @@
+{
+  "name": "PerceptFolio",
+  "short_name": "PerceptFolio",
+  "description": "Know what to buy. Know what to sell. A private, offline-first portfolio tracker and stock checklist scorer.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e0f12",
+  "theme_color": "#0e0f12",
+  "categories": ["finance", "productivity", "utilities"],
+  "lang": "en-US",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Portfolio value, growth, and today's signals",
+      "url": "./index.html#dashboard"
+    },
+    {
+      "name": "Screener",
+      "short_name": "Screener",
+      "description": "Score a list of tickers against your checklist",
+      "url": "./index.html#screener"
+    }
+  ]
+}

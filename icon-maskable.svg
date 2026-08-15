@@ -1,0 +1,10 @@
+<!-- Maskable icon: full-bleed background (Android applies its own mask shape) with the wordmark kept
+     inside the 80% safe zone so nothing is clipped when cropped to a circle or squircle. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#0e0f12"/>
+  <text x="256" y="320" text-anchor="middle"
+        font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"
+        font-size="170" font-weight="700">
+    <tspan fill="#f2f3f5">P</tspan><tspan fill="#1f9e8c">F</tspan>
+  </text>
+</svg>
