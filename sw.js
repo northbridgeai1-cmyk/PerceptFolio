@@ -1,7 +1,7 @@
 /* PerceptFolio service worker.
    Bump CACHE_VERSION whenever index.html changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v1';
+const CACHE_VERSION = 'perceptfolio-v2';
 
 /* Only these two are genuinely required for the app to open offline. */
 const REQUIRED = ['./', './index.html'];
@@ -40,11 +40,21 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(req.url);
 
-  /* ---- NEVER cache market data. ----
-     Serving a cached quote would show someone a stale price as if it were live, which for a finance
-     app is worse than showing nothing. Finnhub always goes straight to the network and any failure is
-     surfaced to the app's own error handling rather than papered over with old data. */
-  if (url.hostname.endsWith('finnhub.io')) return;
+  /* ---- WHITELIST, not blacklist. ----
+     An earlier version listed what to skip (Finnhub) and cached everything else. That silently broke
+     the first API added afterwards — the sync worker — because a cross-origin authenticated request
+     handled cache-first fails and falls through to Response.error().
+     So: only intercept things we KNOW are static assets. Any other request, including every present
+     and future API call, passes straight through to the network untouched.
+
+     Two rules that must never change:
+       - Market data must never be cached; a stale quote shown as live is worse than no quote.
+       - Authenticated requests must never be cached; that would put private data in a shared cache. */
+  const sameOrigin = url.origin === self.location.origin;
+  const isChartCdn = req.url === 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+  const hasAuth = req.headers.has('Authorization');
+  if (hasAuth) return;
+  if (!sameOrigin && !isChartCdn) return;
 
   /* Navigations: network-first so a redeployed index.html is picked up as soon as there's a
      connection, with the cached shell as the offline fallback. */
