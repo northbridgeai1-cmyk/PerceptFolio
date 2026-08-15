@@ -225,6 +225,93 @@ small.src{color:var(--muted)}
 .fc-line span:first-child{color:var(--muted)}
 .fc-line span:last-child{font-family:var(--mono);font-weight:600}
 .fc-note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;display:block}
+
+/* =========================================================================
+   PHONE LAYOUT
+   Deliberately the LAST thing in the stylesheet. A media query adds no
+   specificity, so at equal specificity whichever rule comes last wins — put
+   these earlier and a later plain rule like .fc-grid-2 silently overrides them.
+   Everything here applies only at 768px and under, so the desktop layout is
+   untouched by construction.
+   ========================================================================= */
+@media (max-width:768px){
+
+  /* Header becomes two rows: logo + controls on top, tabs scrolling underneath.
+     Eight tabs cannot fit across a phone, and shrinking them to fit makes them
+     untappable, so they scroll sideways instead. */
+  header{flex-wrap:wrap;height:auto;align-items:center;gap:8px;
+    padding:8px 12px;
+    padding-top:calc(8px + env(safe-area-inset-top));
+    padding-left:calc(12px + env(safe-area-inset-left));
+    padding-right:calc(12px + env(safe-area-inset-right))}
+  header>.row{flex:1;min-width:0;justify-content:flex-end;gap:6px;flex-wrap:nowrap}
+  #globalSearch{max-width:none!important;min-width:0;flex:1}
+  nav{order:3;width:100%;height:auto;overflow-x:auto;overflow-y:hidden;
+    border-top:1px solid var(--border);margin:0 -12px;padding:0 12px;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  nav::-webkit-scrollbar{display:none}
+  nav button{height:auto;padding:13px 13px;white-space:nowrap;flex-shrink:0;font-size:11px}
+  .badge{top:7px;right:-2px}
+
+  main{padding:18px 12px;
+    padding-left:calc(12px + env(safe-area-inset-left));
+    padding-right:calc(12px + env(safe-area-inset-right));
+    padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+
+  .greeting{font-size:19px}
+  .hero{padding:4px 0 20px}
+  .hero-value{font-size:34px;letter-spacing:-.5px}
+  .section-title{margin:24px 0 12px}
+
+  /* Two stat cards per row rather than four squeezed flat. */
+  .stat{min-width:calc(50% - 7px);padding:9px 11px}
+  .stat-value{font-size:16px}
+
+  /* Wide tables scroll sideways inside their card instead of stretching the page. */
+  .card{padding:13px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{font-size:12.5px}
+  th{padding:7px 7px;font-size:9.5px}
+  td{padding:9px 7px}
+
+  /* Form rows stack. Inputs carry inline max-widths sized for desktop, which is why
+     these need !important — it's overriding a style attribute, not another rule. */
+  .card .row>input,.card .row>select,.card .row>textarea{
+    max-width:none!important;width:100%;flex:1 1 100%}
+  .card .row>.btn,.card .row>button{flex:1 1 auto}
+
+  /* iOS zooms the whole page when you focus an input under 16px. Bumping the font
+     size is the only reliable way to stop it. The .fc-f and .mycall selectors are
+     listed explicitly because they outrank a bare `input` on specificity. */
+  input,select,textarea{font-size:16px}
+  .fc-f>input{font-size:16px}
+  .mycall{font-size:16px}
+  .calc-display{font-size:26px}
+
+  /* Calculator fills the screen width rather than overflowing it. The left offset is
+     set inline by JS, hence !important. */
+  .calc-panel{width:auto!important;left:8px!important;right:8px!important;max-height:72vh}
+  .fc-grid-2{grid-template-columns:1fr 1fr}
+  .fc-grid-3{grid-template-columns:1fr 1fr}
+
+  /* Account menu was pinned to a desktop-width column. */
+  #accountMenu{width:min(280px,calc(100vw - 24px))}
+
+  .theme-switch{width:100%;max-width:260px}
+  .theme-knob{width:calc(50% - 3px)}
+  .theme-switch.is-dark .theme-knob{transform:translateX(100%)}
+  .theme-side{width:50%}
+
+  .login-wrap{margin:5vh auto;padding:16px}
+  .toast{left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));max-width:none}
+  .chart-box{height:210px}
+}
+
+/* Very narrow phones (SE, mini): one stat per row rather than two cramped ones. */
+@media (max-width:400px){
+  .stat{min-width:100%}
+  .hero-value{font-size:29px}
+  .fc-grid-2,.fc-grid-3{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
