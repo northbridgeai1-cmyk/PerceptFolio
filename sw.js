@@ -1,7 +1,7 @@
 /* PerceptFolio service worker.
    Bump CACHE_VERSION whenever index.html changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v2';
+const CACHE_VERSION = 'perceptfolio-v3';
 
 /* Only these two are genuinely required for the app to open offline. */
 const REQUIRED = ['./', './index.html'];
@@ -11,8 +11,11 @@ const REQUIRED = ['./', './index.html'];
    are added one at a time and allowed to fail individually. */
 const OPTIONAL = [
   './manifest.json',
+  './apple-touch-icon.png',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-512.png',
   './icon.svg',
-  './icon-maskable.svg',
   './favicon.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'
 ];
