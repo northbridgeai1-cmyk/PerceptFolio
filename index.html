@@ -508,15 +508,25 @@ small.src{color:var(--muted)}
     <div class="row">
       <input id="hTicker" placeholder="Ticker (e.g. AAPL, VOO)" style="max-width:150px">
       <select id="hType" style="max-width:130px"><option value="Stock">Stock</option><option value="ETF">ETF</option><option value="Fund">Mutual Fund</option></select>
-      <input id="hShares" type="number" step="any" placeholder="Shares" style="max-width:110px">
-      <input id="hCost" type="number" step="any" placeholder="Avg cost / share $" style="max-width:150px">
+      <select id="hUnit" style="max-width:130px" onchange="updateAmountLabel()">
+        <option value="shares">Enter shares</option>
+        <option value="dollars">Enter dollars</option>
+      </select>
+      <input id="hAmount" type="number" step="any" placeholder="Shares" style="max-width:130px" oninput="updateBuyPreview()">
+      <input id="hCost" type="number" step="any" placeholder="Price / share $" style="max-width:150px" oninput="updateBuyPreview()">
       <select id="hBroker" style="max-width:140px">
         <option>Fidelity</option><option>Robinhood</option><option>Schwab</option><option>Vanguard</option>
         <option>E*TRADE</option><option>Webull</option><option>Merrill</option><option>Other</option>
       </select>
       <button class="btn" onclick="addHolding()">Add</button>
     </div>
-    <p class="muted" style="margin-top:8px">Mutual funds (e.g. FSKAX, FXAIX, FZILX) don't have a live exchange quote — Finnhub doesn't price them. Add them as <b>Mutual Fund</b> and enter/update the NAV yourself in the table below; it only changes once a day anyway.</p>
+    <div class="row" style="margin-top:8px">
+      <label class="row" style="gap:6px;align-items:center;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="hDeductCash" checked style="width:auto"> Take this out of my cash
+      </label>
+      <span class="muted" id="buyPreview" style="font-size:13px"></span>
+    </div>
+    <p class="muted" style="margin-top:8px">Switch to <b>Enter dollars</b> to buy by amount instead of share count — PerceptFolio works out the fractional shares from the price. Mutual funds (e.g. FSKAX, FXAIX, FZILX) don't have a live exchange quote, so add them as <b>Mutual Fund</b> and enter the NAV yourself in the table below.</p>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Cash Available to Invest</h3>
@@ -609,14 +619,16 @@ small.src{color:var(--muted)}
 <!-- HISTORY -->
 <div id="tab-history" class="tabs-hidden">
   <div class="stat-row">
-    <div class="stat s-in"><span class="stat-label">↓ Money in (buys)</span><span class="stat-value" id="histTotalIn">$0</span></div>
-    <div class="stat s-out"><span class="stat-label">↑ Money out (sells)</span><span class="stat-value" id="histTotalOut">$0</span></div>
+    <div class="stat s-in"><span class="stat-label">↓ Bought (logged here)</span><span class="stat-value" id="histTotalIn">$0</span></div>
+    <div class="stat s-out"><span class="stat-label">↑ Sold (logged here)</span><span class="stat-value" id="histTotalOut">$0</span></div>
     <div class="stat s-profit"><span class="stat-label">✓ Realized gain / loss</span><span class="stat-value" id="histRealized">$0</span></div>
-    <div class="stat s-income"><span class="stat-label">≈ Est. annual dividends</span><span class="stat-value" id="histTotalDiv">$0</span></div>
+    <div class="stat s-income"><span class="stat-label">≈ Dividends earned</span><span class="stat-value" id="histTotalDiv">$0</span></div>
   </div>
-  <div class="card" style="margin-top:16px">
-    <h3>Dividend Income (estimated, automatic)</h3>
-    <p class="muted" style="margin-bottom:10px">Worked out for you from your holdings — no logging needed. This is what your positions would pay over a year at each company's current declared rate, not a record of cash that actually landed. Finnhub's free tier doesn't expose real payment dates or amounts, so treat it as a forward estimate that ignores cuts, raises, and taxes.</p>
+  <p class="muted" style="font-size:12px;margin:-12px 0 20px;line-height:1.55">
+    <b>Bought</b> and <b>Sold</b> add up the rows in the ledger below — nothing else. They only count trades you recorded <i>inside PerceptFolio</i>, so a position you typed in before the ledger existed won't appear, and Bought never goes down when you sell. They're a record of activity, not a statement of what you currently have in. For that, use <b>Portfolio value</b> and <b>Unrealized gain / loss</b> on the dashboard.</p>
+  <div class="card">
+    <h3>Dividend Income</h3>
+    <p class="muted" style="margin-bottom:10px">Worked out from your holdings automatically — nothing to log. The <b>Dividends earned</b> figure above accrues day by day from the rates below, so it grows the longer you hold. Finnhub's free tier doesn't expose actual payment dates or amounts, so this is an estimate at each company's current declared rate — it can't see a cut, a raise, or tax withheld.</p>
     <div id="divBreakdown"></div>
   </div>
   <div class="section-title">Transaction History</div>
@@ -1080,20 +1092,52 @@ function toggleFavorite(sym){
   if(i>=0)arr.splice(i,1);else arr.push(sym);
   saveDB();renderAll();
 }
+/* Every sell records what it made or lost. Summing those gives profit you've actually banked,
+   which no longer shows up anywhere in the holdings once the position is closed. */
+function realizedToDate(){
+  return (D.transactions||[]).reduce((s,t)=>s+(t.realized||0),0);
+}
 function recordHistorySnapshot(spyClose){
   if(!D.history)D.history=[];
-  let value=0,cost=0;
-  D.holdings.forEach(h=>{const p=h.price??h.cost;value+=p*h.shares;cost+=h.cost*h.shares;});
-  value+=D.cash||0;
+  let holdingsValue=0,cost=0;
+  D.holdings.forEach(h=>{const p=h.price??h.cost;holdingsValue+=p*h.shares;cost+=h.cost*h.shares;});
+  const cash=D.cash||0;
+  const value=holdingsValue+cash;   // everything you have
+
+  /* GAIN IS NOT value − cost.
+     An earlier version computed it that way, and because `value` includes cash while `cost` only
+     covers holdings, every dollar of cash was counted as a dollar of profit — sell at a loss, watch
+     the proceeds land in cash, and the growth line would jump by the sale amount.
+
+     Money made = what your open positions are up (unrealized)
+                + what you banked on positions you've closed (realized).
+     Cash itself is neither; moving money between cash and holdings must never change gain. */
+  const unrealized=holdingsValue-cost;
+  const realized=realizedToDate();
+  const gain=unrealized+realized;
+
+  /* Dividends ACCRUED, not the forward annual rate. divIncome is what the holdings would pay over a
+     full year; this converts it to what they earned in the days actually elapsed, and accumulates. */
+  const divRate=estimatedDividendIncome();
   const today=new Date().toISOString().slice(0,10);
-  const gain=value-cost;
-  const divIncome=estimatedDividendIncome();
+  const prior=D.history.length?D.history[D.history.length-1]:null;
+  let divEarned=prior&&prior.divEarned!=null?prior.divEarned:0;
   const existing=D.history.find(d=>d.date===today);
-  if(existing){
-    existing.value=value;existing.cost=cost;existing.gain=gain;existing.divIncome=divIncome;
-    if(spyClose!=null)existing.spy=spyClose;   // don't wipe an earlier good reading with a failed one
+  if(!existing&&prior){
+    const days=Math.max(0,Math.min(31,(Date.parse(today)-Date.parse(prior.date))/86400000));
+    divEarned+=(prior.divRate||0)/365*days;
   }
-  else D.history.push(Object.assign({date:today,value,cost,gain,divIncome},spyClose!=null?{spy:spyClose}:{}));
+
+  if(existing){
+    existing.value=value;existing.cost=cost;existing.gain=gain;
+    existing.unrealized=unrealized;existing.realized=realized;
+    existing.cash=cash;existing.divRate=divRate;
+    if(spyClose!=null)existing.spy=spyClose;   // don't wipe an earlier good reading with a failed one
+  }else{
+    D.history.push(Object.assign(
+      {date:today,value,cost,gain,unrealized,realized,cash,divRate,divEarned},
+      spyClose!=null?{spy:spyClose}:{}));
+  }
   D.history.sort((a,b)=>a.date<b.date?-1:1);
   if(D.history.length>400)D.history=D.history.slice(D.history.length-400);
 }
@@ -1136,8 +1180,11 @@ function renderDividendCard(){
   const el=document.getElementById('divBreakdown');
   if(!el)return;
   const{rows,total,unanalyzed}=dividendBreakdown();
+  // The stat card reports what you've EARNED so far (accrued), not the forward annual rate —
+  // the per-holding rates are shown in the table below instead.
   const totalEl=document.getElementById('histTotalDiv');
-  if(totalEl)totalEl.textContent=pmask(fmt$(total));
+  const lastSnap=(D.history&&D.history.length)?D.history[D.history.length-1]:null;
+  if(totalEl)totalEl.textContent=pmask(fmt$((lastSnap&&lastSnap.divEarned)||0));
   if(!rows.length){
     el.innerHTML='<div class="empty">No dividend-paying stocks detected yet.'+
       (unanalyzed?' '+unanalyzed+' holding'+(unanalyzed===1?'':'s')+' not analyzed yet — hit Refresh data so PerceptFolio can check.':' Analyze your holdings and any that pay a dividend will show up here automatically.')+'</div>';
@@ -2045,45 +2092,86 @@ function toggleFactorPanel(){
 
 
 /* ================= PORTFOLIO ================= */
+/* The amount box accepts either a share count or a dollar amount. Dollars are converted to shares
+   here at the price given, so everything downstream still deals only in shares. */
+function updateAmountLabel(){
+  const unit=document.getElementById('hUnit').value;
+  const amt=document.getElementById('hAmount');
+  if(amt)amt.placeholder=(unit==='dollars')?'Dollars $':'Shares';
+  updateBuyPreview();
+}
+function buyInputs(){
+  const unit=(document.getElementById('hUnit')||{}).value||'shares';
+  const amount=parseFloat((document.getElementById('hAmount')||{}).value);
+  const price=parseFloat((document.getElementById('hCost')||{}).value);
+  if(!isFinite(amount)||amount<=0||!isFinite(price)||price<=0)return null;
+  const shares=(unit==='dollars')?(amount/price):amount;
+  return{shares:+shares.toFixed(6),price,spend:+(shares*price).toFixed(2),unit};
+}
+function updateBuyPreview(){
+  const el=document.getElementById('buyPreview');
+  if(!el)return;
+  const b=buyInputs();
+  if(!b){el.textContent='';return;}
+  const cash=D&&D.cash?D.cash:0;
+  const short=(document.getElementById('hDeductCash')||{}).checked&&b.spend>cash;
+  el.innerHTML=(b.unit==='dollars'
+      ? '= <b>'+b.shares+'</b> shares'
+      : '= <b>'+fmt$(b.spend)+'</b>')
+    +(short?' <span class="neg">— more than your '+fmt$(cash)+' cash</span>':'');
+}
 function addHolding(){
   if(isBizOwnView())return toast('A business account doesn\'t hold its own investments in PerceptFolio — switch into a client to add holdings for them.');
   const t=document.getElementById('hTicker').value.trim().toUpperCase();
   const type=document.getElementById('hType').value;
-  const sh=parseFloat(document.getElementById('hShares').value);
-  const cost=parseFloat(document.getElementById('hCost').value);
   const broker=document.getElementById('hBroker').value;
-  if(!t||!isFinite(sh)||sh<=0||!isFinite(cost)||cost<0)return toast('Fill ticker, shares, and avg cost.');
+  const b=buyInputs();
+  if(!t||!b)return toast('Fill in the ticker, an amount, and a price above zero.');
+  const sh=b.shares, cost=b.price, spend=b.spend;
+  const deduct=(document.getElementById('hDeductCash')||{}).checked;
+  if(deduct&&spend>(D.cash||0)+1e-9){
+    if(!confirm('This costs '+fmt$(spend)+' but you only have '+fmt$(D.cash||0)+' in cash.\n\nOK = buy anyway and let cash go negative.\nCancel = go back (untick "Take this out of my cash" to record a purchase made with outside money).'))return;
+  }
+  const clearForm=()=>['hTicker','hAmount','hCost'].forEach(id=>document.getElementById(id).value='');
+  // Buying moves money from cash into a position — the total is unchanged, which is why this must
+  // never touch gain. Sells do the reverse via confirmSell.
+  const applyCash=()=>{if(deduct)D.cash=+(((D.cash||0)-spend).toFixed(2));};
+
   const existing=D.holdings.find(h=>h.sym===t&&h.type===type);
   if(existing){
     const prevShares=existing.shares,prevCost=existing.cost;
-    const totalShares=existing.shares+sh;
+    const totalShares=+(existing.shares+sh).toFixed(6);
     existing.cost=(existing.cost*existing.shares+cost*sh)/totalShares;
     existing.shares=totalShares;
     if(broker)existing.broker=broker;
     existing.price=null;existing.manualPrice=false;existing.autoFailed=false;
+    applyCash();
     recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,
-      note:'Added to existing position — '+prevShares+' sh @ $'+prevCost.toFixed(2)+' → '+totalShares+' sh @ $'+existing.cost.toFixed(2)});
-    ['hTicker','hShares','hCost'].forEach(id=>document.getElementById(id).value='');
+      note:'Added to existing position — '+prevShares+' sh @ $'+prevCost.toFixed(2)+' -> '+totalShares+' sh @ $'+existing.cost.toFixed(2)+(deduct?' · paid from cash':'')});
+    clearForm();updateBuyPreview();
     recordHistorySnapshot();saveDB();renderAll();
-    if(type==='Fund')toast(t+' updated — now '+totalShares+' shares at avg cost $'+existing.cost.toFixed(2)+'. Enter its NAV manually in the Price column.');
-    else{toast(t+' updated — now '+totalShares+' shares at avg cost $'+existing.cost.toFixed(2)+'.');refreshPrices([t]);}
+    const tail=deduct?' Cash is now '+fmt$(D.cash||0)+'.':'';
+    if(type==='Fund')toast(t+' updated — now '+totalShares+' shares at avg cost $'+existing.cost.toFixed(2)+'.'+tail+' Enter its NAV in the Price column.');
+    else{toast(t+' updated — now '+totalShares+' shares at avg cost $'+existing.cost.toFixed(2)+'.'+tail);refreshPrices([t]);}
     return;
   }
   D.holdings.push({sym:t,type,shares:sh,cost,broker,price:null,manualPrice:false,priceDate:null,autoFailed:false});
-  recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,note:'Opened position'});
-  ['hTicker','hShares','hCost'].forEach(id=>document.getElementById(id).value='');
+  applyCash();
+  recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,note:'Opened position'+(deduct?' · paid from cash':'')});
+  clearForm();updateBuyPreview();
   recordHistorySnapshot();saveDB();renderAll();
-  if(type==='Fund')toast(t+' added. Enter its NAV manually in the Price column — mutual funds aren\'t quoted by Finnhub.');
-  else refreshPrices([t]);
+  const tail=deduct?' Cash is now '+fmt$(D.cash||0)+'.':'';
+  if(type==='Fund')toast(t+' added.'+tail+' Enter its NAV in the Price column — mutual funds aren\'t quoted by Finnhub.');
+  else{toast(t+' added — '+sh+' shares at $'+cost.toFixed(2)+'.'+tail);refreshPrices([t]);}
 }
 function addToPortfolioFromAnalyzer(sym){
   if(isBizOwnView())return toast('A business account doesn\'t hold its own investments in PerceptFolio — switch into a client first.');
   showTab('portfolio');
   document.getElementById('hTicker').value=sym;
   document.getElementById('hType').value='Stock';
-  const sh=document.getElementById('hShares');
-  sh.focus();
-  toast('Enter shares and avg cost for '+sym+', then click Add.');
+  const amt=document.getElementById('hAmount');
+  if(amt)amt.focus();
+  toast('Enter an amount and price for '+sym+', then click Add.');
 }
 function removeHolding(i){D.holdings.splice(i,1);saveDB();renderAll();}
 let sellingIndex=null;
@@ -3189,6 +3277,8 @@ function renderAll(){
     value+=p*h.shares;costTotal+=h.cost*h.shares;
     if(h.dayPct!=null)dayW+=(h.dayPct/100)*(p*h.shares);
   });
+  // Unrealized only, to match the "Unrealized gain / loss" label. Realized profit is reported
+  // separately in the History tab so the two are never conflated.
   liveHero={total:value+(D.cash||0),cash:D.cash||0,gain:value-costTotal,costTotal,value,dayW};
   renderHeroStats();
 
@@ -3377,6 +3467,7 @@ function renderAll(){
   pal.innerHTML=D.priceAlerts.map((p,i)=>'<div class="row" style="margin-bottom:6px"><span><b>'+esc(p.sym)+'</b> '+(p.dir==='above'?'rises above':'falls below')+' '+fmt$(p.price)+'</span><button class="btn-danger btn btn-sm" onclick="removePriceAlert('+i+')">✕</button></div>').join('')||'<span class="muted">No active price alerts.</span>';
 
   renderHistory();
+  updateBuyPreview();
   if(DB.profiles[USER]&&DB.profiles[USER].accountType==='business')renderClientsList();
 
   if(D.lastRefresh)document.getElementById('lastRefresh').textContent='Updated '+new Date(D.lastRefresh).toLocaleString();
@@ -3510,18 +3601,21 @@ function drawGrowthChart(){
   }
 
   if(graphView==='dividends'){
-    if(titleEl)titleEl.textContent='Estimated annual dividend income';
-    const series=hist.filter(d=>d.divIncome!=null);
-    if(series.length<1)return showEmpty('No dividend data yet. PerceptFolio works this out automatically from your holdings once they\'ve been analyzed — hit Refresh data, and any dividend-paying stock you own will start showing here.');
+    if(titleEl)titleEl.textContent='Dividends earned';
+    // Cumulative money earned, not the forward annual rate. Older snapshots predate this field.
+    const series=hist.filter(d=>d.divEarned!=null);
+    if(series.length<2)return showEmpty('No dividend earnings tracked yet. PerceptFolio accrues this from your dividend-paying holdings each time you refresh — it needs a couple of days of data before there\'s anything to draw.');
     box.style.display='block';empty.style.display='none';
     if(!ctx)return;
     if(growthChartInst)growthChartInst.destroy();
     currentChartHist=series;clearScrub();
     growthChartInst=new Chart(ctx,{type:'line',
       data:{labels:series.map(d=>d.date),datasets:[
-        {label:'Est. annual dividend income',data:series.map(d=>d.divIncome),borderColor:'#d9a441',backgroundColor:'rgba(217,164,65,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
+        {label:'Dividends earned (running total)',data:series.map(d=>d.divEarned),borderColor:'#d9a441',backgroundColor:'rgba(217,164,65,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
       ]},
       options:chartOpts(true)});
+    const latest=series[series.length-1];
+    if(titleEl)titleEl.innerHTML='Dividends earned &nbsp;<span style="font-size:13px;font-weight:600" class="pos">'+fmt$(latest.divEarned||0)+' so far</span>';
     return;
   }
 
