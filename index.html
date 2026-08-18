@@ -2203,6 +2203,9 @@ function setHoldingPrice(i,val){
   const p=parseFloat(val);
   if(!isFinite(p)||p<0)return toast('Enter a valid price.');
   D.holdings[i].price=p;D.holdings[i].manualPrice=true;D.holdings[i].priceDate=Date.now();D.holdings[i].autoFailed=false;
+  /* A hand-entered price has no "yesterday" to compare against, and leaving the old values behind
+     would keep reporting a day move that no longer relates to the price on screen. */
+  D.holdings[i].dayPct=null;D.holdings[i].prevClose=null;
   recordHistorySnapshot();saveDB();renderAll();
 }
 function setCash(){
@@ -2433,7 +2436,7 @@ async function refreshPrices(symbols){
   for(const s of symbols){
     const h0=D.holdings.find(h=>h.sym===s);
     if(h0&&h0.type==='Fund')continue; // mutual funds: no exchange quote, manual only
-    try{const q=await getQuote(s);D.holdings.forEach(h=>{if(h.sym===s){h.price=q.c;h.dayPct=q.dp;h.autoFailed=false;h.manualPrice=false;h.priceDate=Date.now();}});}
+    try{const q=await getQuote(s);D.holdings.forEach(h=>{if(h.sym===s){h.price=q.c;h.dayPct=q.dp;h.prevClose=(isFinite(q.pc)&&q.pc>0)?q.pc:null;h.autoFailed=false;h.manualPrice=false;h.priceDate=Date.now();}});}
     catch(e){D.holdings.forEach(h=>{if(h.sym===s)h.autoFailed=true;});handleApiErr(e,s);}
   }
   saveDB();renderAll();
@@ -2447,7 +2450,7 @@ async function refreshAll(){
     // Prices for all holdings (skip mutual funds — Finnhub has no NAV/exchange quote for them)
     const syms=[...new Set(D.holdings.filter(h=>h.type!=='Fund').map(h=>h.sym))];
     for(const s of syms){
-      try{const q=await getQuote(s);D.holdings.forEach(h=>{if(h.sym===s){h.price=q.c;h.dayPct=q.dp;h.autoFailed=false;h.manualPrice=false;h.priceDate=Date.now();}});}
+      try{const q=await getQuote(s);D.holdings.forEach(h=>{if(h.sym===s){h.price=q.c;h.dayPct=q.dp;h.prevClose=(isFinite(q.pc)&&q.pc>0)?q.pc:null;h.autoFailed=false;h.manualPrice=false;h.priceDate=Date.now();}});}
       catch(e){D.holdings.forEach(h=>{if(h.sym===s)h.autoFailed=true;});handleApiErr(e,s);}
     }
     // Score watchlist + stock holdings
@@ -3271,22 +3274,40 @@ function renderAll(){
   if(wc)wc.style.display=(isNew&&!bizOwnView)?'block':'none';
 
   /* dashboard numbers */
-  let value=0,costTotal=0,dayW=0;
+  let value=0,costTotal=0;
+  /* TODAY'S CHANGE — computed only from holdings that actually have a live quote AND the previous
+     close it should be measured against, using exact dollars: (price − previous close) × shares.
+
+     Two bugs lived here before. The percentage was derived by dividing the summed change by the
+     value of EVERY holding, including ones with no day data at all — so the numerator and the
+     denominator described different sets of stocks and the percentage came out nonsense. And a
+     stale dayPct left over from an old refresh kept contributing after the price had been replaced
+     by hand. dayBase below is the value of exactly the holdings that contributed, so the two always
+     agree; anything that can't be measured is excluded and counted in dayMissing instead of being
+     silently folded in. */
+  let dayChange=0,dayBase=0,dayMissing=0;
   D.holdings.forEach(h=>{
     const p=h.price??h.cost;
     value+=p*h.shares;costTotal+=h.cost*h.shares;
-    if(h.dayPct!=null)dayW+=(h.dayPct/100)*(p*h.shares);
+    const canMeasure=!h.manualPrice&&h.price!=null&&h.prevClose!=null&&h.prevClose>0;
+    if(canMeasure){
+      dayChange+=(h.price-h.prevClose)*h.shares;
+      dayBase+=h.prevClose*h.shares;
+    }else if(h.shares>0){
+      dayMissing++;
+    }
   });
   // Unrealized only, to match the "Unrealized gain / loss" label. Realized profit is reported
   // separately in the History tab so the two are never conflated.
-  liveHero={total:value+(D.cash||0),cash:D.cash||0,gain:value-costTotal,costTotal,value,dayW};
+  liveHero={total:value+(D.cash||0),cash:D.cash||0,gain:value-costTotal,costTotal,value,
+    dayChange,dayBase,dayMissing};
   renderHeroStats();
 
   const gs=document.getElementById('greetingSub');
   if(gs){
     if(bizOwnView)gs.textContent='Here\'s how your clients are doing.';
     else if(isNew)gs.textContent='Let\'s get your portfolio set up below.';
-    else if(value>0&&dayW!==0)gs.textContent=(dayW>=0?'You\'re up ':'You\'re down ')+pmask(fmt$(Math.abs(dayW)))+' today. '+(dayW>=0?'Nice.':'Markets move — check Signals below.');
+    else if(dayBase>0&&dayChange!==0)gs.textContent=(dayChange>=0?'You\'re up ':'You\'re down ')+pmask(fmt$(Math.abs(dayChange)))+' today. '+(dayChange>=0?'Nice.':'Markets move — check Signals below.');
     else gs.textContent='Here\'s where things stand today.';
   }
 
@@ -3495,7 +3516,7 @@ let growthChartInst=null,graphView='valuegain',graphRange=0;
    hovering the chart — the hero then shows what the portfolio was worth on THAT day instead of now.
    Mousing off the chart clears scrubRow and the live numbers come straight back. currentChartHist is
    the exact filtered series the chart was drawn from, so a hovered point index maps to the right day. */
-let liveHero={total:0,cash:0,gain:0,costTotal:0,value:0,dayW:0};
+let liveHero={total:0,cash:0,gain:0,costTotal:0,value:0,dayChange:0,dayBase:0,dayMissing:0};
 let scrubRow=null,currentChartHist=[];
 function renderHeroStats(){
   const el=id=>document.getElementById(id);
@@ -3531,12 +3552,21 @@ function renderHeroStats(){
   if(gpEl)gpEl.textContent=liveHero.costTotal>0?pmask(fmtP(liveHero.gain/liveHero.costTotal*100))+' vs cost basis':'';
   updatePrivacyIcon();
   if(!dc)return;
-  if(liveHero.value>0&&liveHero.dayW!==0){
-    dc.textContent=(liveHero.dayW>=0?'▲ ':'▼ ')+pmask(fmt$(Math.abs(liveHero.dayW)))+' ('+pmask(fmtP(liveHero.dayW/liveHero.value*100))+') today';
-    dc.className='hero-change '+(liveHero.dayW>=0?'pos':'neg');
+  // Percentage is against dayBase — the previous close of exactly the holdings that were measured —
+  // so the dollar figure and the percentage always describe the same set of stocks.
+  if(liveHero.dayBase>0){
+    const d=liveHero.dayChange;
+    const pct=d/liveHero.dayBase*100;
+    dc.textContent=(d>=0?'▲ ':'▼ ')+pmask(fmt$(Math.abs(d)))+' ('+pmask(fmtP(pct))+') today'
+      +(liveHero.dayMissing?' · '+liveHero.dayMissing+' not priced':'');
+    dc.className='hero-change '+(d>=0?'pos':'neg');
+    dc.title=liveHero.dayMissing
+      ? liveHero.dayMissing+' holding'+(liveHero.dayMissing===1?' has':'s have')+' no live quote today (manually priced, a mutual fund, or not refreshed yet) and are left out of this figure.'
+      : 'Change since yesterday\'s close, across every holding with a live quote.';
   }else{
-    dc.textContent='No change data yet';
+    dc.textContent=D.holdings.length?'No live prices yet — hit Refresh data':'No change data yet';
     dc.className='hero-change flat';
+    dc.title='';
   }
 }
 function scrubTo(i){
@@ -3633,10 +3663,20 @@ function drawGrowthChart(){
       {label:'Total value',data:hist.map(d=>d.value),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
     ];
   }else{
-    // Growth is money made only — the total-value line lives in its own view now.
-    if(titleEl)titleEl.textContent='Portfolio growth — money made';
+    /* Growth = one line, total money made or lost, full stop. No benchmark, no second series,
+       nothing to compare against — that's what the vs S&P 500 view is for. The line is green above
+       zero and red below, and a zero baseline is drawn so "am I up or down" is answerable at a glance. */
+    const totals=hist.map(d=>d.gain);
+    const latest=totals[totals.length-1]||0;
+    const up=latest>=0;
+    if(titleEl)titleEl.innerHTML='Total made / lost &nbsp;<span style="font-size:13px;font-weight:600" class="'+(up?'pos':'neg')+'">'+(up?'+':'')+fmt$(latest)+'</span>';
     datasets=[
-      {label:'Money made (gain)',data:hist.map(d=>d.gain),borderColor:'#2ea043',backgroundColor:'rgba(46,160,67,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
+      {label:'Total made / lost',data:totals,
+       borderColor:up?'#2ea043':'#e5534b',
+       backgroundColor:up?'rgba(46,160,67,.12)':'rgba(229,83,75,.12)',
+       fill:'origin',pointRadius:0,tension:.2,borderWidth:2},
+      {label:'Break even',data:hist.map(()=>0),borderColor:'#949aa6',backgroundColor:'transparent',
+       fill:false,pointRadius:0,borderWidth:1,borderDash:[4,4]}
     ];
   }
   growthChartInst=new Chart(ctx,{type:'line',data:{labels,datasets},options:chartOpts(true)});
