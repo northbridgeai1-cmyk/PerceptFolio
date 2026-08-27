@@ -358,6 +358,7 @@ small.src{color:var(--muted)}
     <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')">Portfolio</button>
     <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')">Watchlist</button>
     <button data-tab="history" id="navHistory" onclick="showTab('history')">History</button>
+    <button data-tab="market" id="navMarket" onclick="showTab('market')">Market</button>
     <button data-tab="screener" id="navScreener" onclick="showTab('screener')">Screener</button>
     <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')">Analyzer</button>
     <button data-tab="risk" id="navRisk" onclick="showTab('risk')">Risk</button>
@@ -550,6 +551,11 @@ small.src{color:var(--muted)}
         <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
       </select>
       <button class="btn-ghost btn btn-sm" onclick="clearPortfolioFilters()">Clear</button>
+      <div class="spacer"></div>
+      <select id="pfGlMode" style="max-width:190px" onchange="renderAll()" title="What the Gain/Loss column shows">
+        <option value="total">Gain/Loss: Total</option>
+        <option value="today">Gain/Loss: Today</option>
+      </select>
     </div>
   </div>
   <div class="card" style="overflow-x:auto">
@@ -648,6 +654,70 @@ small.src{color:var(--muted)}
     </table>
     <div id="historyEmpty" class="empty">No transactions yet. Every buy, sell, and dividend you record from here on shows up in this ledger — including buying more of something you already own.</div>
     <p class="muted" style="margin-top:10px;font-size:12px">This ledger starts from the moment you record a trade in PerceptFolio — it can't reconstruct purchases you made before adding them here. Deleting a row only removes the history entry; it does not change your current holdings.</p>
+  </div>
+</div>
+
+<!-- MARKET -->
+<div id="tab-market" class="tabs-hidden">
+
+  <!-- 1. Today's move, in context -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Today's Move, In Context</h3>
+      <button class="btn btn-ghost btn-sm" onclick="loadMarketData(true)">Refresh market data</button>
+    </div>
+    <div id="todaysMove" style="margin-top:12px"><div class="empty">Loading…</div></div>
+    <p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.55">The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b> — it's a ruler, not a forecast.</p>
+  </div>
+
+  <!-- 2. Market weather -->
+  <div class="section-title">Market Weather — long-run valuation</div>
+  <div class="grid grid-3" id="weatherCards">
+    <div class="card"><div class="empty">Loading…</div></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Figures With No Free Feed</h3>
+    <p class="muted" style="margin-bottom:12px">CAPE comes from Robert Shiller's spreadsheet and margin debt from FINRA. Neither publishes a free API, so these are typed in. Update them monthly; the cards show how stale they are.</p>
+    <div class="grid grid-2">
+      <div>
+        <div class="field"><label>CAPE (Shiller P/E) — <a href="https://www.multpl.com/shiller-pe" target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroCape" type="number" step="0.01" placeholder="e.g. 34.2"></div>
+        <div class="field"><label>As of (month)</label><input id="macroCapeAsOf" type="month"></div>
+      </div>
+      <div>
+        <div class="field"><label>Margin debt $bn — <a href="https://www.finra.org/investors/insights/margin-statistics" target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroMargin" type="number" step="0.1" placeholder="e.g. 1417.2"></div>
+        <div class="field"><label>As of (month)</label><input id="macroMarginAsOf" type="month"></div>
+      </div>
+    </div>
+    <button class="btn" onclick="saveMacro()">Save figures</button>
+  </div>
+  <p class="muted" style="margin-top:14px;font-size:12px;line-height:1.6">
+    <b>Read these as long-run expectations, not crash warnings.</b> All three describe what returns over the next ten to fifteen years are likely to look like from today's prices. They have almost no power to time the next twelve months. The Buffett indicator has read "expensive" since roughly 2013 and CAPE has been above 30 since 2017, through years of large gains. Use them to decide how much to put in, not when to get out.</p>
+
+  <!-- 3. Call scorecard -->
+  <div class="section-title">Your Call Scorecard — is the checklist actually working?</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px;flex-wrap:wrap">
+      <select id="scoreWindow" style="max-width:170px" onchange="renderScorecard()">
+        <option value="30">30 days after call</option>
+        <option value="90" selected>90 days after call</option>
+        <option value="180">180 days after call</option>
+      </select>
+      <select id="scoreVerdict" style="max-width:170px" onchange="renderScorecard()">
+        <option value="buy">BUY calls only</option>
+        <option value="sell">SELL calls only</option>
+        <option value="all">All calls</option>
+      </select>
+      <div class="spacer"></div>
+      <span class="muted" id="scoreCount" style="font-size:12px"></span>
+    </div>
+    <div id="scorecardSummary"></div>
+    <div style="overflow-x:auto;margin-top:14px">
+      <table>
+        <thead><tr><th>Ticker</th><th>Called</th><th>Call</th><th>Scores</th><th>Price then</th><th>Now</th><th>Stock</th><th>SPY</th><th>vs SPY</th></tr></thead>
+        <tbody id="scorecardBody"></tbody>
+      </table>
+    </div>
+    <div id="scorecardEmpty" class="empty">No calls recorded yet. PerceptFolio starts logging every time its verdict on a ticker changes, from the next Refresh onward — it can't grade calls it never wrote down. Come back once you have a few weeks of history.</div>
   </div>
 </div>
 
@@ -1059,6 +1129,8 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   displayName:'',avatarColor:'',avatarImage:'',weeklyPicks:{weekKey:'',tickers:[],newCount:0},
   transactions:[],dividends:[],theme:'dark',
   syncedAt:0,lastLocalEdit:0,
+  calls:[],                                     // graded in the Market tab's scorecard
+  macro:{cape:null,capeAsOf:'',margin:null,marginAsOf:'',marginPrev:null},
   rules:{qBuy:9,pBuy:4,qSell:6,mBuy:0,autoRefresh:'yes'},lastRefresh:0};}
 /* Your own manual call per ticker (Buy/Hold/Sell/Watching) — independent of the app's computed verdict above.
    Defensive lazy-init so profiles saved before this feature still work. */
@@ -1338,6 +1410,11 @@ function resetTransientState(){
   if(growthChartInst){growthChartInst.destroy();growthChartInst=null;}
   graphView='valuegain';graphRange=0;
   scrubRow=null;currentChartHist=[];
+  /* macroCache holds FRED series — market-wide data, identical for everyone, so it is deliberately
+     NOT cleared here. The per-account CAPE and margin figures live in D and swap with the profile. */
+  const tm=document.getElementById('todaysMove');if(tm)tm.innerHTML='<div class="empty">Loading…</div>';
+  const sb=document.getElementById('scorecardBody');if(sb)sb.innerHTML='';
+  const ss=document.getElementById('scorecardSummary');if(ss)ss.innerHTML='';
 
   sellingIndex=null;
   openClientReport=null;
@@ -1383,7 +1460,7 @@ function updateAccountTypeUI(){
   // the business account doesn't hold investments of its own — it exists to manage client books.
   // Switching into a client (bizContext set) restores the full nav, since that's the client's money.
   const hideOwnInvesting=isBiz&&!bizContext;
-  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk'].forEach(id=>{
+  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navMarket'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display=hideOwnInvesting?'none':'';
   });
@@ -1684,6 +1761,9 @@ function showTab(t){
   document.getElementById('tab-'+t).classList.remove('tabs-hidden');
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   if(t==='alerts')markAlertsSeen();
+  // Macro data is fetched only when the tab is actually opened, so a user who never looks at it
+  // never spends a request on it.
+  if(t==='market'){fillMacroInputs();renderScorecard();loadMarketData(false);}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -1747,6 +1827,9 @@ async function getCandles(sym,days){
 function pick(obj,keys){for(const k of keys){if(obj&&obj[k]!=null&&isFinite(obj[k]))return obj[k];}return null;}
 
 /* Cache SPY's 52-week return for the session so every stock isn't re-fetching the same benchmark */
+/* SPY's latest price, kept so a recorded call can be graded against the market over the same window.
+   Shared market data, not user data, so it is deliberately NOT cleared on account switch. */
+let _spyPriceCache=null;
 let _spyReturnCache=null,_spyReturnFetchedAt=0;
 async function getSpy52wReturn(){
   if(_spyReturnCache!=null&&Date.now()-_spyReturnFetchedAt<15*60*1000)return _spyReturnCache;
@@ -2226,6 +2309,7 @@ function removeWatch(i){D.watchlist.splice(i,1);saveDB();renderAll();}
 function clearPortfolioFilters(){
   ['pfFilterQ'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['pfFilterType','pfFilterBroker','pfFilterSignal','pfFilterMine'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='All';});
+  // Gain/Loss mode is a view preference, not a filter — Clear leaves it alone on purpose.
   renderAll();
 }
 function clearWatchlistFilters(){
@@ -2453,6 +2537,14 @@ async function refreshAll(){
       try{const q=await getQuote(s);D.holdings.forEach(h=>{if(h.sym===s){h.price=q.c;h.dayPct=q.dp;h.prevClose=(isFinite(q.pc)&&q.pc>0)?q.pc:null;h.autoFailed=false;h.manualPrice=false;h.priceDate=Date.now();}});}
       catch(e){D.holdings.forEach(h=>{if(h.sym===s)h.autoFailed=true;});handleApiErr(e,s);}
     }
+    /* SPY is fetched BEFORE scoring, not after. Every call recorded during scoring stamps SPY's
+       price alongside it so the scorecard can measure the call against the market over the same
+       window — if this ran afterwards, every call would be saved with no benchmark to compare to. */
+    let spyClose=null;
+    try{
+      const sq=await getQuote('SPY');
+      if(sq&&isFinite(sq.c)){spyClose=sq.c;_spyPriceCache={price:sq.c,at:Date.now()};}
+    }catch(e){}
     // Score watchlist + stock holdings
     const toScore=[...new Set([...D.watchlist,...D.holdings.filter(h=>h.type==='Stock').map(h=>h.sym)])];
     for(const s of toScore){
@@ -2464,10 +2556,6 @@ async function refreshAll(){
       }catch(e){handleApiErr(e,s);}
     }
     checkPriceAlerts();
-    // Stamp the day's SPY close alongside the portfolio snapshot so the S&P comparison chart can be
-    // drawn later with no extra API calls. Failure here is non-fatal — the chart just skips that day.
-    let spyClose=null;
-    try{const sq=await getQuote('SPY');if(sq&&isFinite(sq.c))spyClose=sq.c;}catch(e){}
     D.lastRefresh=Date.now();
     recordHistorySnapshot(spyClose);
     saveDB();renderAll();
@@ -2492,10 +2580,33 @@ function pushAlert(type,sym,msg){
   notify('PerceptFolio: '+sym,msg);
   toast(sym+': '+msg);
 }
+/* ---- Recording calls so they can be graded later ----
+   D.analyses only ever holds the LATEST score for a ticker; every refresh overwrites it. That means
+   the app has never kept a record of what it said and when, and so could never check whether it was
+   right. D.calls is that record: one row each time a verdict CHANGES, stamped with the price at the
+   time and SPY's price at the time so the eventual comparison is like-for-like.
+
+   Only changes are recorded. Appending on every refresh would produce hundreds of duplicate rows
+   for one unchanged opinion and make the hit rate meaningless. */
+function recordCall(sym,sc,verdictKey,verdictLabel){
+  if(!D.calls)D.calls=[];
+  const last=[...D.calls].reverse().find(c=>c.sym===sym);
+  if(last&&last.verdict===verdictKey)return;      // unchanged opinion, nothing new to grade
+  D.calls.push({
+    sym,verdict:verdictKey,label:verdictLabel,
+    ts:Date.now(),date:new Date().toISOString().slice(0,10),
+    price:(sc&&isFinite(sc.price))?sc.price:null,
+    spy:(_spyPriceCache&&isFinite(_spyPriceCache.price))?_spyPriceCache.price:null,
+    q:sc?sc.qScore:null,p:sc?sc.pScore:null,m:sc?sc.mScore:null,
+    mOk:!!(sc&&D.rules&&sc.mScore>=(D.rules.mBuy||0))
+  });
+  if(D.calls.length>2000)D.calls=D.calls.slice(D.calls.length-2000);
+}
 function evaluateSignals(sym,sc,prev){
   const isHolding=D.holdings.some(h=>h.sym===sym&&h.type==='Stock');
   const v=verdictOf(sc,isHolding);
   const prevV=prev?verdictOf(prev,isHolding).key:null;
+  if(!sc.error)recordCall(sym,sc,v.key,v.label);
   if(v.key==='buy'&&prevV!=='buy')pushAlert('buy',sym,'Now a BUY candidate — quality '+sc.qScore+'/12, price '+sc.pScore+'/6. Review before acting.');
   if(v.key==='sell'&&prevV!=='sell')pushAlert('sell',sym,'Quality dropped to '+sc.qScore+'/'+sc.qTotal+' — review whether to sell.');
 }
@@ -3204,6 +3315,30 @@ let chartType=null,chartHold=null;
 /* ================= SORTING (Portfolio & Watchlist) ================= */
 let pfSort={col:null,dir:1},wlSort={col:null,dir:1};
 const SIGNAL_RANK={buy:4,watch:3,hold:2,sell:1,na:0,no:0};
+/* ---- Portfolio Gain/Loss column: total vs today ----
+   Total  = (price now − what you paid) × shares. Available for anything with a price.
+   Today  = (price now − yesterday's close) × shares. Only meaningful for a live auto quote, so a
+            manually priced holding or a mutual fund returns null and renders as a dash rather than
+            a made-up number. Same rule as the dashboard's "today" figure, deliberately. */
+function glMode(){
+  const el=document.getElementById('pfGlMode');
+  return (el&&el.value)||'total';
+}
+function holdingGL(h){
+  if(glMode()==='today'){
+    if(h.manualPrice||h.price==null||h.prevClose==null||!(h.prevClose>0))return null;
+    return (h.price-h.prevClose)*h.shares;
+  }
+  return h.price!=null?(h.price-h.cost)*h.shares:null;
+}
+function holdingGLPct(h){
+  if(glMode()==='today'){
+    if(h.manualPrice||h.price==null||h.prevClose==null||!(h.prevClose>0))return null;
+    return (h.price-h.prevClose)/h.prevClose*100;
+  }
+  if(h.price==null||!(h.cost>0))return null;
+  return (h.price-h.cost)/h.cost*100;
+}
 function sortPortfolio(col){
   if(pfSort.col===col)pfSort.dir*=-1;else{pfSort.col=col;pfSort.dir=1;}
   renderAll();
@@ -3358,16 +3493,18 @@ function renderAll(){
     cost:x=>x.h.cost,
     price:x=>x.h.price??x.h.cost??null,
     value:x=>{const p=x.h.price??x.h.cost;return p!=null?p*x.h.shares:null;},
-    gl:x=>x.h.price!=null?(x.h.price-x.h.cost)*x.h.shares:null,
+    gl:x=>holdingGL(x.h),
     signal:x=>{
       if(x.h.type!=='Stock')return null;
       const sc=D.analyses[x.h.sym];const v=sc?verdictOf(sc,true):null;
       return v?SIGNAL_RANK[v.key]:null;
     }
   };
-  updateSortHeaders('pfTh',pfSort,{sym:'Ticker',type:'Type',broker:'Broker',shares:'Shares',cost:'Avg Cost',price:'Price Now',value:'Market Value',gl:'Gain/Loss',signal:'AI Call'});
+  updateSortHeaders('pfTh',pfSort,{sym:'Ticker',type:'Type',broker:'Broker',shares:'Shares',cost:'Avg Cost',price:'Price Now',value:'Market Value',
+    gl:(glMode()==='today'?'Today':'Total')+' Gain/Loss',signal:'AI Call'});
   applySort(filteredHoldings,pfSort,pfGetters).forEach(({h,i})=>{
-    const p=h.price,val=(p??h.cost)*h.shares,gl=p!=null?(p-h.cost)*h.shares:null;
+    const p=h.price,val=(p??h.cost)*h.shares,gl=holdingGL(h);
+    const glPct=holdingGLPct(h);
     const sc=h.type==='Stock'?D.analyses[h.sym]:null;
     const v=sc?verdictOf(sc,true):null;
     const typePill=h.type==='Fund'?'<span class="pill pill-na">Fund</span>':h.type;
@@ -3380,7 +3517,9 @@ function renderAll(){
     const tr=document.createElement('tr');
     tr.innerHTML='<td><b>'+esc(h.sym)+'</b></td><td>'+typePill+'</td><td class="muted">'+esc(h.broker)+'</td><td>'+pmask(h.shares)+'</td>'+
       '<td>'+pmask(fmt$(h.cost))+'</td><td>'+priceCell+'</td><td>'+pmask(fmt$(val))+'</td>'+
-      '<td class="'+(gl==null?'':gl>=0?'pos':'neg')+'">'+(gl==null?'—':pmask(fmt$(gl)))+'</td>'+
+      '<td class="'+(gl==null?'':gl>=0?'pos':'neg')+'">'+(gl==null
+          ?'<span class="muted" title="'+(glMode()==='today'?'No live quote today — manually priced, a mutual fund, or not refreshed yet.':'Set a price to see this.')+'">—</span>'
+          :pmask(fmt$(gl))+(glPct!=null?'<div style="font-size:11px;opacity:.8">'+(glPct>=0?'+':'')+glPct.toFixed(2)+'%</div>':''))+'</td>'+
       '<td>'+(v?'<span class="pill '+v.cls+'">'+v.label+'</span>':(h.type!=='Stock'?'<span class="pill pill-na">'+h.type+'</span>':'<span class="muted">refresh</span>'))+'</td>'+
       '<td class="mycall-cell">'+myTagSelect(h.sym)+'</td>'+
       '<td class="row"><button class="btn btn-ghost btn-sm" onclick="toggleFavorite(\''+esc(h.sym)+'\')" title="'+(isFavorite(h.sym)?'Remove from Favorites':'Add to Favorites')+'">'+(isFavorite(h.sym)?'★':'☆')+'</button> <button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(h.sym)+'\')">Analyze</button> <button class="btn btn-ghost btn-sm" onclick="toggleSellRow('+i+')">Sell</button> <button class="btn-danger btn btn-sm" onclick="removeHolding('+i+')">✕</button></td>';
@@ -3994,6 +4133,297 @@ function importData(ev){
     toast('Data imported.');
   }catch(e){toast('Import failed — not a valid PerceptFolio backup.');}};
   r.readAsText(f);
+}
+
+/* ================= MARKET TAB =================
+   Macro data comes from FRED via the Cloudflare Worker. The Worker is required, not optional:
+   FRED sends no CORS headers, so a browser cannot call it directly under any circumstances. The
+   same worker URL and key that sync uses are reused here — one piece of infrastructure, two jobs. */
+let macroCache={};        // series -> {observations, fetchedAt}
+let macroLoading=false;
+
+async function fredSeries(series,limit){
+  if(!syncConfigured())throw new Error('NEEDS_WORKER');
+  const base=syncCfg.url.replace(/\/+$/,'');
+  const res=await fetch(base+'/fred?series='+encodeURIComponent(series)+'&limit='+(limit||1),{
+    headers:{'Authorization':'Bearer '+syncCfg.key}
+  });
+  if(res.status===401)throw new Error('Sync key rejected — check it matches SYNC_SECRET.');
+  if(!res.ok){
+    let d='';try{const j=await res.json();d=j.error||'';}catch(e){}
+    throw new Error(d||('FRED request failed (HTTP '+res.status+')'));
+  }
+  const j=await res.json();
+  return j.observations||[];
+}
+function fmtAsOf(dateStr){
+  if(!dateStr)return 'unknown date';
+  const d=new Date(dateStr+'T12:00:00');
+  if(isNaN(d))return dateStr;
+  return d.toLocaleDateString(undefined,{month:'short',year:'numeric'});
+}
+function monthsAgo(dateStr){
+  if(!dateStr)return null;
+  const d=Date.parse(dateStr.length===7?dateStr+'-01':dateStr);
+  if(isNaN(d))return null;
+  return Math.floor((Date.now()-d)/(30.44*86400000));
+}
+async function loadMarketData(force){
+  if(macroLoading)return;
+  macroLoading=true;
+  try{
+    if(!syncConfigured()){
+      renderTodaysMove({error:'NEEDS_WORKER'});
+      renderWeather({error:'NEEDS_WORKER'});
+      return;
+    }
+    if(force)macroCache={};
+    const need=['VIXCLS','SP500','WILL5000PR','GDP'];
+    const out={};
+    for(const s of need){
+      if(macroCache[s]&&!force){out[s]=macroCache[s];continue;}
+      try{
+        // Two readings for VIX/SP500 so the previous close is available for today's move.
+        out[s]=await fredSeries(s,(s==='VIXCLS'||s==='SP500')?5:2);
+        macroCache[s]=out[s];
+      }catch(e){out[s]={error:e.message};}
+    }
+    renderTodaysMove(out);
+    renderWeather(out);
+  }finally{macroLoading=false;}
+}
+/* VIX / sqrt(252) = the size of an ordinary day at the current level of implied volatility.
+   sqrt(252) is 15.8745; the familiar "divide by 16" is that rounded. */
+const TRADING_DAYS=252;
+function renderTodaysMove(data){
+  const el=document.getElementById('todaysMove');
+  if(!el)return;
+  if(data&&data.error==='NEEDS_WORKER'){
+    el.innerHTML='<div class="empty">Market data needs the Cloudflare Worker set up — the FRED API blocks direct browser access. Configure it under <b>Settings → Sync Across Your Devices</b>, then add a <b>FRED_API_KEY</b> variable to the worker (see SYNC-SETUP.md).</div>';
+    return;
+  }
+  const vix=data.VIXCLS,spx=data.SP500;
+  if(!vix||vix.error||!vix.length){
+    el.innerHTML='<div class="empty neg">Couldn\'t load VIX'+(vix&&vix.error?': '+esc(vix.error):'')+'</div>';
+    return;
+  }
+  const vixNow=vix[0].value;
+  const expected=vixNow/Math.sqrt(TRADING_DAYS);      // expected daily move, %
+  let actual=null,spxDate=null;
+  if(spx&&!spx.error&&spx.length>=2){
+    actual=(spx[0].value-spx[1].value)/spx[1].value*100;
+    spxDate=spx[0].date;
+  }
+  const sigma=(actual!=null&&expected>0)?Math.abs(actual)/expected:null;
+  const band=sigma==null?'':sigma<1?'quiet':sigma<2?'busy':'unusual';
+  const cls=sigma==null?'flat':sigma<1?'':sigma<2?'warn':'neg';
+  el.innerHTML=
+    '<div style="font-size:26px;font-weight:700;line-height:1.35;letter-spacing:-.3px">'+
+      (actual!=null
+        ? 'The S&P is '+(actual>=0?'up':'down')+' <span class="'+(actual>=0?'pos':'neg')+'">'+Math.abs(actual).toFixed(2)+'%</span> '+
+          '<span class="muted" style="font-size:15px;font-weight:500">as of '+esc(spxDate)+'</span>'
+        : 'VIX is '+vixNow.toFixed(2))+
+    '</div>'+
+    '<div style="margin-top:10px;font-size:15px;line-height:1.6">'+
+      'VIX '+vixNow.toFixed(2)+' implies an ordinary day of about <b>±'+expected.toFixed(2)+'%</b>.'+
+      (sigma!=null
+        ? ' Today is a <b class="'+cls+'">'+sigma.toFixed(1)+'σ</b> move — <b class="'+cls+'">'+band+'</b>.'
+        : ' No index reading to compare against yet.')+
+    '</div>'+
+    (sigma!=null?'<div class="muted" style="font-size:12.5px;margin-top:8px">'+
+      (sigma<1?'Inside the normal range. Days like this are the majority of days and rarely mean anything.'
+       :sigma<2?'Larger than typical but not rare — roughly a once-a-fortnight size of move.'
+       :'Well outside the normal range. Moves this size cluster around real news.')+'</div>':'')+
+    '<div class="muted" style="font-size:11.5px;margin-top:8px">VIX as of '+esc(vix[0].date)+' · source FRED</div>';
+}
+function weatherCard(title,value,asOf,band,bandCls,detail,note){
+  return '<div class="card">'+
+    '<h3>'+esc(title)+'</h3>'+
+    '<div class="big '+(bandCls||'')+'">'+value+'</div>'+
+    /* The as-of date is deliberately the same size as the value. A quarterly figure sitting beside a
+       live one must announce its age before anything else. */
+    '<div style="font-size:13px;font-weight:600;margin-top:4px" class="muted">as of '+esc(asOf)+'</div>'+
+    (band?'<div style="margin-top:8px"><span class="pill '+(bandCls==='neg'?'pill-sell':bandCls==='warn'?'pill-hold':'pill-buy')+'">'+esc(band)+'</span></div>':'')+
+    (detail?'<div class="muted" style="font-size:12px;margin-top:8px;line-height:1.5">'+detail+'</div>':'')+
+    (note?'<div class="muted" style="font-size:11px;margin-top:6px">'+note+'</div>':'')+
+  '</div>';
+}
+function renderWeather(data){
+  const el=document.getElementById('weatherCards');
+  if(!el)return;
+  if(data&&data.error==='NEEDS_WORKER'){
+    el.innerHTML='<div class="card"><div class="empty">Set up the worker to load the Buffett indicator. CAPE and margin debt can still be entered by hand below.</div></div>';
+    return;
+  }
+  const cards=[];
+
+  /* --- Buffett indicator: total market value vs the size of the economy --- */
+  const w=data.WILL5000PR,g=data.GDP;
+  if(w&&!w.error&&w.length&&g&&!g.error&&g.length){
+    /* WILL5000PR is a price index in index points; GDP is in $bn. These are not the same unit, so
+       the RATIO is not the textbook percentage — what matters is where it sits against its own
+       history, which is why the bands below are calibrated on the ratio, not on "100%". */
+    const ratio=w[0].value/g[0].value;
+    const pct=ratio*100;
+    const band=pct>=190?'Stretched':pct>=120?'Elevated':'Fair';
+    const cls=pct>=190?'neg':pct>=120?'warn':'pos';
+    cards.push(weatherCard('Buffett Indicator',pct.toFixed(0)+'%',
+      fmtAsOf(g[0].date)+' (GDP)',band,cls,
+      'Total US market value against the size of the economy. Above roughly 190% has historically marked expensive markets.',
+      'Wilshire 5000 '+fmtAsOf(w[0].date)+' ÷ GDP '+fmtAsOf(g[0].date)+' · GDP is quarterly and revised twice'));
+  }else{
+    cards.push(weatherCard('Buffett Indicator','—','unavailable','','',
+      'Couldn\'t load '+((w&&w.error)?'the Wilshire 5000 series':'GDP')+' from FRED.',
+      (w&&w.error)?esc(w.error):(g&&g.error?esc(g.error):'')));
+  }
+
+  /* --- CAPE: manual --- */
+  const m=D.macro||{};
+  if(isFinite(m.cape)&&m.cape>0){
+    const band=m.cape>30?'Stretched':m.cape<15?'Cheap':'Fair';
+    const cls=m.cape>30?'neg':m.cape<15?'pos':'warn';
+    const age=monthsAgo(m.capeAsOf);
+    cards.push(weatherCard('CAPE (Shiller P/E)',m.cape.toFixed(1),
+      m.capeAsOf?fmtAsOf(m.capeAsOf+'-01'):'no date given',band,cls,
+      'Price against ten years of inflation-adjusted earnings, so one unusual year can\'t flatter it. Over 30 stretched, under 15 cheap.',
+      age!=null&&age>2?'<span class="neg">'+age+' months old — worth updating</span>':''));
+  }else{
+    cards.push(weatherCard('CAPE (Shiller P/E)','—','not entered','','',
+      'No free API publishes this. Enter it below from multpl.com; it changes slowly.',''));
+  }
+
+  /* --- Margin debt: manual --- */
+  if(isFinite(m.margin)&&m.margin>0){
+    const age=monthsAgo(m.marginAsOf);
+    let band='',cls='',detail='Money borrowed against portfolios to buy more. Records tend to mark late-cycle confidence.';
+    if(isFinite(m.marginPrev)&&m.marginPrev>0){
+      const chg=(m.margin-m.marginPrev)/m.marginPrev*100;
+      band=chg>=5?'Rising fast':chg<=-5?'Falling fast':'Steady';
+      cls=chg>=5?'neg':chg<=-5?'warn':'pos';
+      detail+=' <b>'+(chg>=0?'+':'')+chg.toFixed(1)+'%</b> since the previous figure you entered.';
+    }
+    cards.push(weatherCard('Margin Debt','$'+(m.margin>=1000?(m.margin/1000).toFixed(2)+'tn':m.margin.toFixed(0)+'bn'),
+      m.marginAsOf?fmtAsOf(m.marginAsOf+'-01'):'no date given',band,cls,detail,
+      age!=null&&age>2?'<span class="neg">'+age+' months old — worth updating</span>':'FINRA publishes monthly, roughly a month in arrears'));
+  }else{
+    cards.push(weatherCard('Margin Debt','—','not entered','','',
+      'FINRA publishes this monthly with no API. Enter it below.',''));
+  }
+
+  el.innerHTML=cards.join('');
+}
+function saveMacro(){
+  if(!D.macro)D.macro={};
+  const cape=parseFloat(document.getElementById('macroCape').value);
+  const margin=parseFloat(document.getElementById('macroMargin').value);
+  // Keep the previous margin reading so the card can show the direction of travel.
+  if(isFinite(margin)&&isFinite(D.macro.margin)&&margin!==D.macro.margin)D.macro.marginPrev=D.macro.margin;
+  D.macro.cape=isFinite(cape)?cape:null;
+  D.macro.capeAsOf=document.getElementById('macroCapeAsOf').value||'';
+  D.macro.margin=isFinite(margin)?margin:null;
+  D.macro.marginAsOf=document.getElementById('macroMarginAsOf').value||'';
+  saveDB();
+  renderWeather(macroCache);
+  toast('Saved.');
+}
+function fillMacroInputs(){
+  const m=D.macro||{};
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=(v==null?'':v);};
+  set('macroCape',m.cape);set('macroCapeAsOf',m.capeAsOf);
+  set('macroMargin',m.margin);set('macroMarginAsOf',m.marginAsOf);
+}
+
+/* ---- Call scorecard ----
+   Grades what the app said against what happened, measured against SPY over the identical window so
+   a call that made 4% while the market made 6% is correctly shown as a loss in relative terms.
+   Only calls old enough for the chosen window are graded; younger ones are excluded rather than
+   flattered by a shorter holding period. */
+function scorecardRows(){
+  const days=parseInt((document.getElementById('scoreWindow')||{}).value||'90',10);
+  const want=(document.getElementById('scoreVerdict')||{}).value||'buy';
+  const cutoff=Date.now()-days*86400000;
+  const spyNow=_spyPriceCache?_spyPriceCache.price:null;
+  return (D.calls||[])
+    .filter(c=>c.ts<=cutoff)
+    .filter(c=>want==='all'?true:c.verdict===want)
+    .map(c=>{
+      const sc=D.analyses[c.sym];
+      const now=(sc&&isFinite(sc.price))?sc.price:null;
+      const stockRet=(c.price>0&&now!=null)?((now-c.price)/c.price*100):null;
+      const spyRet=(c.spy>0&&spyNow!=null)?((spyNow-c.spy)/c.spy*100):null;
+      const alpha=(stockRet!=null&&spyRet!=null)?(stockRet-spyRet):null;
+      return{c,now,stockRet,spyRet,alpha};
+    })
+    .sort((a,b)=>b.c.ts-a.c.ts);
+}
+function median(arr){
+  if(!arr.length)return null;
+  const s=[...arr].sort((a,b)=>a-b),m=Math.floor(s.length/2);
+  return s.length%2?s[m]:(s[m-1]+s[m])/2;
+}
+function renderScorecard(){
+  const tb=document.getElementById('scorecardBody');
+  if(!tb)return;
+  const rows=scorecardRows();
+  const graded=rows.filter(r=>r.alpha!=null);
+  const emptyEl=document.getElementById('scorecardEmpty');
+  const sumEl=document.getElementById('scorecardSummary');
+  const cntEl=document.getElementById('scoreCount');
+  const total=(D.calls||[]).length;
+  if(cntEl)cntEl.textContent=total?(total+' call'+(total===1?'':'s')+' recorded · '+graded.length+' old enough to grade'):'';
+
+  if(!graded.length){
+    tb.innerHTML='';
+    if(sumEl)sumEl.innerHTML='';
+    if(emptyEl){
+      emptyEl.style.display='block';
+      emptyEl.innerHTML=total
+        ? 'You have '+total+' recorded call'+(total===1?'':'s')+', but none are old enough for this window yet. Try a shorter window, or come back later.'
+        : 'No calls recorded yet. PerceptFolio starts logging every time its verdict on a ticker changes, from the next Refresh onward — it can\'t grade calls it never wrote down.';
+    }
+    return;
+  }
+  if(emptyEl)emptyEl.style.display='none';
+
+  const alphas=graded.map(r=>r.alpha);
+  const medAlpha=median(alphas);
+  const beat=graded.filter(r=>r.alpha>0).length;
+  const medStock=median(graded.map(r=>r.stockRet));
+
+  // Does requiring momentum actually help? Split the same set and compare.
+  const withM=graded.filter(r=>r.c.mOk),withoutM=graded.filter(r=>!r.c.mOk);
+  const mA=withM.length?median(withM.map(r=>r.alpha)):null;
+  const nA=withoutM.length?median(withoutM.map(r=>r.alpha)):null;
+
+  if(sumEl){
+    const thin=graded.length<20;
+    sumEl.innerHTML=
+      '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+        '<div class="stat s-count"><span class="stat-label">Calls graded</span><span class="stat-value">'+graded.length+'</span></div>'+
+        '<div class="stat s-profit"><span class="stat-label">Median vs SPY</span><span class="stat-value '+(medAlpha>=0?'pos':'neg')+'">'+(medAlpha>=0?'+':'')+medAlpha.toFixed(2)+'pts</span></div>'+
+        '<div class="stat s-in"><span class="stat-label">Beat the market</span><span class="stat-value">'+beat+' / '+graded.length+'</span></div>'+
+        '<div class="stat s-income"><span class="stat-label">Median raw return</span><span class="stat-value '+(medStock>=0?'pos':'neg')+'">'+(medStock>=0?'+':'')+medStock.toFixed(2)+'%</span></div>'+
+      '</div>'+
+      (mA!=null&&nA!=null
+        ? '<p class="muted" style="font-size:13px;margin-top:12px">Calls that cleared your momentum minimum ran <b class="'+(mA>=nA?'pos':'neg')+'">'+(mA-nA>=0?'+':'')+(mA-nA).toFixed(2)+'pts</b> '+(mA>=nA?'better':'worse')+' than those that didn\'t ('+withM.length+' vs '+withoutM.length+' calls).</p>'
+        : '')+
+      (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+graded.length+' calls is not evidence.</b> Under roughly 20 this is noise and a couple of lucky picks will dominate the median. Treat it as a running tally, not a verdict on the checklist.</p>':'');
+  }
+
+  tb.innerHTML=graded.map(({c,now,stockRet,spyRet,alpha})=>{
+    const pill=c.verdict==='buy'?'pill-buy':c.verdict==='sell'?'pill-sell':c.verdict==='watch'?'pill-watch':'pill-na';
+    return '<tr>'+
+      '<td><b>'+esc(c.sym)+'</b></td>'+
+      '<td class="muted" style="white-space:nowrap">'+esc(c.date)+'</td>'+
+      '<td><span class="pill '+pill+'">'+esc((c.verdict||'').toUpperCase())+'</span></td>'+
+      '<td class="muted" style="font-size:12px;white-space:nowrap">'+(c.q!=null?c.q+'/12 · '+c.p+'/6 · '+c.m+'/4':'—')+'</td>'+
+      '<td>'+(c.price!=null?fmt$(c.price):'—')+'</td>'+
+      '<td>'+(now!=null?fmt$(now):'—')+'</td>'+
+      '<td class="'+(stockRet>=0?'pos':'neg')+'">'+(stockRet>=0?'+':'')+stockRet.toFixed(2)+'%</td>'+
+      '<td class="muted">'+(spyRet>=0?'+':'')+spyRet.toFixed(2)+'%</td>'+
+      '<td class="'+(alpha>=0?'pos':'neg')+'"><b>'+(alpha>=0?'+':'')+alpha.toFixed(2)+'</b></td>'+
+    '</tr>';
+  }).join('');
 }
 
 /* ================= CLOUD SYNC =================
