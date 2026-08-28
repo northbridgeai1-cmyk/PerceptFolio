@@ -667,8 +667,10 @@ small.src{color:var(--muted)}
     <div class="row">
       <input id="mapTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')loadMap()">
       <button class="btn" onclick="loadMap()">Map it</button>
+      <button class="btn btn-ghost" onclick="relinkAll()" title="Creates the missing opposite entry for every relationship that has a ticker">⇄ Link all maps</button>
       <span class="muted" id="mapStatus"></span>
     </div>
+    <div id="mappedList" style="margin-top:12px"></div>
   </div>
 
   <div class="card" style="margin-top:16px;overflow-x:auto">
@@ -4410,12 +4412,21 @@ function relationsFor(sym){
 async function loadMap(){
   const t=(document.getElementById('mapTicker').value||'').trim().toUpperCase();
   if(!t)return toast('Enter a ticker first.');
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');return;}
   if(mapLoading)return;
   mapLoading=true;
   const st=document.getElementById('mapStatus');
   if(st)st.textContent='Loading…';
   mapSym=t;mapProfile=null;mapPeers=[];
+  /* The relationships are stored locally, so the map itself needs no API at all. Only the company
+     profile and the peer row do. Draw first, enrich after — that way a missing key, a rate limit or
+     a foreign ticker Finnhub can't price still gives you a working map. */
+  drawMap();renderRelList();
+  if(!D.apiKey){
+    mapLoading=false;
+    if(st)st.textContent='';
+    toast('Showing saved relationships. Add a Finnhub key in Settings for the company profile and peers.');
+    return;
+  }
   try{
     try{mapProfile=await getProfile(t);}catch(e){}
     // Peers is a free endpoint and gives the "similar companies" row for nothing.
@@ -4615,6 +4626,35 @@ function addRelation(){
   saveDB();drawMap();renderRelList();
   toast('Added to '+mapSym+'\'s map.'+(mirrored?' Also added '+mapSym+' to '+ticker+'\'s map.':''));
 }
+/* Back-fill for relationships entered before mirroring existed, or added while offline on another
+   device. Walks every company you've mapped and creates the missing opposite entry.
+
+   The key list is snapshotted before iterating, because relationsFor() adds new companies to
+   D.relations as it goes. Without the snapshot this would walk into the entries it just created and
+   keep going. Mirrors don't need mirroring — they already are one. */
+function relinkAll(){
+  if(!D.relations)D.relations={};
+  const syms=Object.keys(D.relations);
+  if(!syms.length)return toast('Nothing mapped yet — add some relationships first.');
+  let created=0,noTicker=0;
+  syms.forEach(sym=>{
+    ['suppliers','customers'].forEach(side=>{
+      const list=(D.relations[sym]&&D.relations[sym][side])||[];
+      list.forEach(x=>{
+        if(!x.ticker||x.ticker===sym){noTicker++;return;}
+        const other=relationsFor(x.ticker);
+        const otherSide=OPPOSITE[side];
+        if(other[otherSide].some(y=>y.ticker===sym))return;   // already linked
+        other[otherSide].push({name:x.linkName||sym,ticker:sym,weight:x.weight||10,note:'',linked:true});
+        created++;
+      });
+    });
+  });
+  saveDB();drawMap();renderRelList();
+  toast(created
+    ? 'Linked '+created+' relationship'+(created===1?'':'s')+' across '+Object.keys(D.relations).length+' companies.'+(noTicker?' '+noTicker+' skipped — no ticker to link to.':'')
+    : 'Everything is already linked'+(noTicker?'. '+noTicker+' entries have no ticker, so they can\'t be linked.':'.'));
+}
 function removeRelation(side,i){
   const rel=relationsFor(mapSym);
   const x=rel[side][i];
@@ -4639,7 +4679,26 @@ function setRelWeight(side,i,v){
   const n=parseFloat(v);
   if(rel[side][i]){rel[side][i].weight=isFinite(n)?Math.max(1,Math.min(100,n)):10;saveDB();drawMap();}
 }
+/* Every company that has relationships recorded, so the linked maps are actually reachable — the
+   mirror is useless if there's no way to notice the other company now exists. */
+function renderMappedList(){
+  const el=document.getElementById('mappedList');
+  if(!el)return;
+  const syms=Object.keys(D.relations||{}).filter(s=>{
+    const r=D.relations[s];
+    return r&&((r.suppliers||[]).length||(r.customers||[]).length);
+  }).sort();
+  if(!syms.length){el.innerHTML='';return;}
+  el.innerHTML='<span class="muted" style="font-size:12px;margin-right:8px">Mapped:</span>'+
+    syms.map(s=>{
+      const r=D.relations[s];
+      const n=(r.suppliers||[]).length+(r.customers||[]).length;
+      const active=s===mapSym;
+      return '<button class="btn btn-ghost btn-sm" style="margin:0 5px 5px 0'+(active?';border-color:var(--accent);color:var(--accent)':'')+'" onclick="mapTo(\''+esc(s)+'\')">'+esc(s)+' <span class="muted">'+n+'</span></button>';
+    }).join('');
+}
 function renderRelList(){
+  renderMappedList();
   const el=document.getElementById('relList');
   if(!el)return;
   if(!mapSym){el.innerHTML='';return;}
