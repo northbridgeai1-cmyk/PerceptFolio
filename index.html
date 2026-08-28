@@ -359,6 +359,7 @@ small.src{color:var(--muted)}
     <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')">Watchlist</button>
     <button data-tab="history" id="navHistory" onclick="showTab('history')">History</button>
     <button data-tab="market" id="navMarket" onclick="showTab('market')">Market</button>
+    <button data-tab="map" id="navMap" onclick="showTab('map')">Map</button>
     <button data-tab="screener" id="navScreener" onclick="showTab('screener')">Screener</button>
     <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')">Analyzer</button>
     <button data-tab="risk" id="navRisk" onclick="showTab('risk')">Risk</button>
@@ -466,7 +467,8 @@ small.src{color:var(--muted)}
     </div>
     <div class="stat-row">
       <div class="stat s-in"><span class="stat-label">Cash to invest</span><span class="stat-value" id="dCash">$0</span></div>
-      <div class="stat s-profit"><span class="stat-label">Unrealized gain / loss</span><span class="stat-value" id="dGain">$0</span><span class="muted" id="dGainPct" style="font-size:11px"></span></div>
+      <div class="stat s-income"><span class="stat-label">Today's gain / loss</span><span class="stat-value" id="dToday">$0</span><span class="muted" id="dTodayPct" style="font-size:11px"></span></div>
+      <div class="stat s-profit"><span class="stat-label">Total gain / loss</span><span class="stat-value" id="dGain">$0</span><span class="muted" id="dGainPct" style="font-size:11px"></span></div>
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:12px">
@@ -657,14 +659,57 @@ small.src{color:var(--muted)}
   </div>
 </div>
 
+<!-- MAP (Layer Deep) -->
+<div id="tab-map" class="tabs-hidden">
+  <div class="card">
+    <h3>Layer Deep — who a company depends on</h3>
+    <p class="muted" style="margin-bottom:12px">Put a company in the middle and map what it depends on. Suppliers to the left, customers to the right, similar companies below. Bubble size reflects how much of its business each relationship represents.</p>
+    <div class="row">
+      <input id="mapTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')loadMap()">
+      <button class="btn" onclick="loadMap()">Map it</button>
+      <span class="muted" id="mapStatus"></span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;overflow-x:auto">
+    <div id="mapCanvas"><div class="empty">Enter a ticker above to build its map.</div></div>
+  </div>
+
+  <div id="mapDetail" style="margin-top:16px"></div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Add a Relationship</h3>
+    <p class="muted" style="margin-bottom:12px">Supplier and customer links have to be entered by hand. That data is assembled by vendors from filings and transcripts and sold at institutional rates — no free API publishes it. The <b>10-K</b> is where to find it: any customer worth more than 10% of revenue must be disclosed, usually under "Concentration of Credit Risk" or in the risk factors.</p>
+    <div class="row">
+      <select id="relSide" style="max-width:150px">
+        <option value="suppliers">They buy from</option>
+        <option value="customers">They sell to</option>
+      </select>
+      <input id="relTicker" placeholder="Ticker (optional)" style="max-width:140px">
+      <input id="relName" placeholder="Company name" style="max-width:200px">
+      <input id="relWeight" type="number" step="1" min="1" max="100" placeholder="% of business" style="max-width:150px">
+      <button class="btn" onclick="addRelation()">Add</button>
+    </div>
+    <div id="relList" style="margin-top:14px"></div>
+  </div>
+
+  <p class="muted" style="margin-top:14px;font-size:12px;line-height:1.6">
+    <b>What's automatic and what isn't.</b> The centre company's profile and the "similar companies" row come from Finnhub and fill in on their own. Suppliers and customers are yours to enter. Institutional holders were deliberately left out: the free source for that is quarterly 13F filings, which are up to four months stale, exclude short positions entirely, and would list Vanguard, BlackRock and State Street at the top of nearly every company you could look up. A list that says the same thing about everything isn't worth the screen space.</p>
+</div>
+
 <!-- MARKET -->
 <div id="tab-market" class="tabs-hidden">
 
   <!-- 1. Today's move, in context -->
   <div class="card">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-      <h3 style="margin:0">Today's Move, In Context</h3>
-      <button class="btn btn-ghost btn-sm" onclick="loadMarketData(true)">Refresh market data</button>
+      <h3 style="margin:0">The Move, In Context</h3>
+      <div class="row" style="gap:6px">
+        <button class="btn btn-ghost btn-sm" id="mvBtn_today" onclick="setMoveDay('today')">Today</button>
+        <button class="btn btn-ghost btn-sm" id="mvBtn_yesterday" onclick="setMoveDay('yesterday')">Yesterday</button>
+        <button class="btn btn-ghost btn-sm" id="mvBtn_tomorrow" onclick="setMoveDay('tomorrow')">Tomorrow</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadMarketData(true)">↻</button>
+      </div>
     </div>
     <div id="todaysMove" style="margin-top:12px"><div class="empty">Loading…</div></div>
     <p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.55">The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b> — it's a ruler, not a forecast.</p>
@@ -672,13 +717,14 @@ small.src{color:var(--muted)}
 
   <!-- 2. Market weather -->
   <div class="section-title">Market Weather — long-run valuation</div>
+  <div id="weatherVerdict" style="margin-bottom:14px"></div>
   <div class="grid grid-3" id="weatherCards">
     <div class="card"><div class="empty">Loading…</div></div>
   </div>
   <div class="card" style="margin-top:14px">
     <h3>Figures With No Free Feed</h3>
     <p class="muted" style="margin-bottom:12px">CAPE comes from Robert Shiller's spreadsheet and margin debt from FINRA. Neither publishes a free API, so these are typed in. Update them monthly; the cards show how stale they are.</p>
-    <div class="grid grid-2">
+    <div class="grid grid-3">
       <div>
         <div class="field"><label>CAPE (Shiller P/E) — <a href="https://www.multpl.com/shiller-pe" target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroCape" type="number" step="0.01" placeholder="e.g. 34.2"></div>
         <div class="field"><label>As of (month)</label><input id="macroCapeAsOf" type="month"></div>
@@ -687,8 +733,13 @@ small.src{color:var(--muted)}
         <div class="field"><label>Margin debt $bn — <a href="https://www.finra.org/investors/insights/margin-statistics" target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroMargin" type="number" step="0.1" placeholder="e.g. 1417.2"></div>
         <div class="field"><label>As of (month)</label><input id="macroMarginAsOf" type="month"></div>
       </div>
+      <div>
+        <div class="field"><label>Buffett indicator % — <a href="https://www.gurufocus.com/global-market-valuation.php" target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroBuffett" type="number" step="0.1" placeholder="e.g. 205"></div>
+        <div class="field"><label>As of (month)</label><input id="macroBuffettAsOf" type="month"></div>
+      </div>
     </div>
     <button class="btn" onclick="saveMacro()">Save figures</button>
+    <p class="muted" style="font-size:11.5px;margin-top:10px">A Buffett figure entered here overrides the one calculated from FRED. Worth doing — FRED's Wilshire series is a price index rather than a dollar market cap, so the calculated version tracks the right direction but isn't the textbook percentage. A number from a source that computes it properly is more trustworthy.</p>
   </div>
   <p class="muted" style="margin-top:14px;font-size:12px;line-height:1.6">
     <b>Read these as long-run expectations, not crash warnings.</b> All three describe what returns over the next ten to fifteen years are likely to look like from today's prices. They have almost no power to time the next twelve months. The Buffett indicator has read "expensive" since roughly 2013 and CAPE has been above 30 since 2017, through years of large gains. Use them to decide how much to put in, not when to get out.</p>
@@ -1130,7 +1181,8 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   transactions:[],dividends:[],theme:'dark',
   syncedAt:0,lastLocalEdit:0,
   calls:[],                                     // graded in the Market tab's scorecard
-  macro:{cape:null,capeAsOf:'',margin:null,marginAsOf:'',marginPrev:null},
+  macro:{cape:null,capeAsOf:'',margin:null,marginAsOf:'',marginPrev:null,buffett:null,buffettAsOf:''},
+  relations:{},                                 // ticker -> {suppliers:[],customers:[]} for the Map tab
   rules:{qBuy:9,pBuy:4,qSell:6,mBuy:0,autoRefresh:'yes'},lastRefresh:0};}
 /* Your own manual call per ticker (Buy/Hold/Sell/Watching) — independent of the app's computed verdict above.
    Defensive lazy-init so profiles saved before this feature still work. */
@@ -1413,6 +1465,13 @@ function resetTransientState(){
   /* macroCache holds FRED series — market-wide data, identical for everyone, so it is deliberately
      NOT cleared here. The per-account CAPE and margin figures live in D and swap with the profile. */
   const tm=document.getElementById('todaysMove');if(tm)tm.innerHTML='<div class="empty">Loading…</div>';
+  // The map is per-account data, so it must not carry over when profiles swap.
+  mapSym='';mapProfile=null;mapPeers=[];moveDay='today';
+  const mc=document.getElementById('mapCanvas');if(mc)mc.innerHTML='<div class="empty">Enter a ticker above to build its map.</div>';
+  const md=document.getElementById('mapDetail');if(md)md.innerHTML='';
+  const rl=document.getElementById('relList');if(rl)rl.innerHTML='';
+  const mt=document.getElementById('mapTicker');if(mt)mt.value='';
+  const ms=document.getElementById('mapStatus');if(ms)ms.textContent='';
   const sb=document.getElementById('scorecardBody');if(sb)sb.innerHTML='';
   const ss=document.getElementById('scorecardSummary');if(ss)ss.innerHTML='';
 
@@ -1460,7 +1519,7 @@ function updateAccountTypeUI(){
   // the business account doesn't hold investments of its own — it exists to manage client books.
   // Switching into a client (bizContext set) restores the full nav, since that's the client's money.
   const hideOwnInvesting=isBiz&&!bizContext;
-  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navMarket'].forEach(id=>{
+  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navMarket','navMap'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display=hideOwnInvesting?'none':'';
   });
@@ -1764,6 +1823,7 @@ function showTab(t){
   // Macro data is fetched only when the tab is actually opened, so a user who never looks at it
   // never spends a request on it.
   if(t==='market'){fillMacroInputs();renderScorecard();loadMarketData(false);}
+  if(t==='map'){drawMap();renderRelList();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -3432,9 +3492,12 @@ function renderAll(){
       dayMissing++;
     }
   });
-  // Unrealized only, to match the "Unrealized gain / loss" label. Realized profit is reported
-  // separately in the History tab so the two are never conflated.
-  liveHero={total:value+(D.cash||0),cash:D.cash||0,gain:value-costTotal,costTotal,value,
+  /* Total gain matches the Growth chart exactly: what open positions are up, plus what was banked on
+     closed ones. Keeping these two in step matters — they disagreed once and it was confusing. */
+  const unrealized=value-costTotal;
+  const realized=realizedToDate();
+  liveHero={total:value+(D.cash||0),cash:D.cash||0,
+    gain:unrealized+realized,unrealized,realized,costTotal,value,
     dayChange,dayBase,dayMissing};
   renderHeroStats();
 
@@ -3688,7 +3751,25 @@ function renderHeroStats(){
   tEl.textContent=pmask(fmt$(liveHero.total));
   if(cEl)cEl.textContent=pmask(fmt$(liveHero.cash));
   if(gEl){gEl.textContent=pmask(fmt$(liveHero.gain));gEl.className='stat-value '+(liveHero.gain>=0?'pos':'neg');}
-  if(gpEl)gpEl.textContent=liveHero.costTotal>0?pmask(fmtP(liveHero.gain/liveHero.costTotal*100))+' vs cost basis':'';
+  if(gpEl){
+    gpEl.textContent=liveHero.costTotal>0?pmask(fmtP(liveHero.gain/liveHero.costTotal*100))+' vs cost basis':'';
+    gpEl.title=liveHero.realized
+      ? 'Open positions '+fmt$(liveHero.unrealized)+' + banked on sales '+fmt$(liveHero.realized)
+      : 'All from open positions — nothing sold yet.';
+  }
+  // Today's gain gets its own stat so it's readable without hunting in the hero line.
+  const tdEl=el('dToday'),tdPctEl=el('dTodayPct');
+  if(tdEl){
+    if(liveHero.dayBase>0){
+      tdEl.textContent=pmask(fmt$(liveHero.dayChange));
+      tdEl.className='stat-value '+(liveHero.dayChange>=0?'pos':'neg');
+      if(tdPctEl)tdPctEl.textContent=pmask(fmtP(liveHero.dayChange/liveHero.dayBase*100))
+        +(liveHero.dayMissing?' · '+liveHero.dayMissing+' not priced':'');
+    }else{
+      tdEl.textContent='—';tdEl.className='stat-value muted';
+      if(tdPctEl)tdPctEl.textContent=D.holdings.length?'refresh for live prices':'';
+    }
+  }
   updatePrivacyIcon();
   if(!dc)return;
   // Percentage is against dayBase — the previous close of exactly the holdings that were measured —
@@ -4135,6 +4216,197 @@ function importData(ev){
   r.readAsText(f);
 }
 
+/* ================= MAP (LAYER DEEP) =================
+   Drawn as inline SVG rather than pulling in a graph library — one file, no new dependencies, and a
+   layout this fixed doesn't need a force simulation.
+
+   Honest split on the data: the centre company's profile and the peer row come from Finnhub's free
+   endpoints. Suppliers and customers do not exist on any free API — that graph is assembled by
+   vendors from filings and transcripts and sold at institutional rates — so those are entered by
+   hand and stored per ticker in D.relations. */
+let mapSym='',mapProfile=null,mapPeers=[],mapLoading=false;
+
+function relationsFor(sym){
+  if(!D.relations)D.relations={};
+  if(!D.relations[sym])D.relations[sym]={suppliers:[],customers:[]};
+  const r=D.relations[sym];
+  if(!Array.isArray(r.suppliers))r.suppliers=[];
+  if(!Array.isArray(r.customers))r.customers=[];
+  return r;
+}
+async function loadMap(){
+  const t=(document.getElementById('mapTicker').value||'').trim().toUpperCase();
+  if(!t)return toast('Enter a ticker first.');
+  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');return;}
+  if(mapLoading)return;
+  mapLoading=true;
+  const st=document.getElementById('mapStatus');
+  if(st)st.textContent='Loading…';
+  mapSym=t;mapProfile=null;mapPeers=[];
+  try{
+    try{mapProfile=await getProfile(t);}catch(e){}
+    // Peers is a free endpoint and gives the "similar companies" row for nothing.
+    try{
+      const r=await fh('/stock/peers?symbol='+encodeURIComponent(t));
+      mapPeers=Array.isArray(r)?r.filter(s=>s&&s!==t).slice(0,6):[];
+    }catch(e){}
+    if(st)st.textContent=mapProfile&&mapProfile.name?esc(mapProfile.name):'';
+    drawMap();renderRelList();
+  }catch(e){
+    if(st)st.textContent='';
+    handleApiErr(e,t);
+  }finally{mapLoading=false;}
+}
+/* Bubble radius scales with the square root of weight, not weight itself. Area is what the eye
+   reads as "size", and area grows with the square of the radius — scaling radius linearly would
+   make a 40% supplier look four times bigger than a 10% one instead of twice. */
+function bubbleR(weight){
+  const w=Math.max(1,Math.min(100,weight||10));
+  return 16+Math.sqrt(w)*3.4;
+}
+function mapNode(x,y,r,label,sub,color,onclick,dim){
+  const fs=r>30?13:11;
+  return '<g class="map-node" style="cursor:pointer" onclick="'+onclick+'">'+
+    '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+color+'" fill-opacity="'+(dim?0.13:0.22)+'" stroke="'+color+'" stroke-width="2"/>'+
+    '<text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" font-size="'+fs+'" font-weight="700" fill="var(--text)" style="pointer-events:none">'+esc(label)+'</text>'+
+    (sub?'<text x="'+x+'" y="'+(y+r+15)+'" text-anchor="middle" font-size="10" fill="var(--muted)" style="pointer-events:none">'+esc(sub)+'</text>':'')+
+  '</g>';
+}
+function drawMap(){
+  const el=document.getElementById('mapCanvas');
+  if(!el)return;
+  if(!mapSym){el.innerHTML='<div class="empty">Enter a ticker above to build its map.</div>';return;}
+  const rel=relationsFor(mapSym);
+  const sup=rel.suppliers,cus=rel.customers;
+  const W=920,H=520,cx=W/2,cy=H/2-30;
+  const acc=getComputedStyle(document.body).getPropertyValue('--accent').trim()||'#3b82f6';
+  const grn=getComputedStyle(document.body).getPropertyValue('--green').trim()||'#2ea043';
+  const pur=getComputedStyle(document.body).getPropertyValue('--c-out').trim()||'#8b5cf6';
+  const mut=getComputedStyle(document.body).getPropertyValue('--muted').trim()||'#949aa6';
+  let s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="min-width:820px;height:auto">';
+
+  const colY=(i,n,span)=>n===1?cy:(cy-span/2)+(span/(n-1))*i;
+
+  // Left: suppliers
+  sup.forEach((x,i)=>{
+    const y=colY(i,sup.length,Math.min(340,sup.length*84)),r=bubbleR(x.weight),nx=150;
+    s+='<line x1="'+(nx+r)+'" y1="'+y+'" x2="'+(cx-70)+'" y2="'+cy+'" stroke="'+pur+'" stroke-width="'+(1+Math.sqrt(x.weight||10)/4)+'" stroke-opacity=".45"/>';
+    s+=mapNode(nx,y,r,x.ticker||x.name.slice(0,6),(x.weight?x.weight+'% ':'')+(x.ticker?x.name.slice(0,16):''),pur,"showMapDetail('supplier',"+i+")");
+  });
+  // Right: customers
+  cus.forEach((x,i)=>{
+    const y=colY(i,cus.length,Math.min(340,cus.length*84)),r=bubbleR(x.weight),nx=W-150;
+    s+='<line x1="'+(cx+70)+'" y1="'+cy+'" x2="'+(nx-r)+'" y2="'+y+'" stroke="'+grn+'" stroke-width="'+(1+Math.sqrt(x.weight||10)/4)+'" stroke-opacity=".45"/>';
+    s+=mapNode(nx,y,r,x.ticker||x.name.slice(0,6),(x.weight?x.weight+'% ':'')+(x.ticker?x.name.slice(0,16):''),grn,"showMapDetail('customer',"+i+")");
+  });
+  // Centre
+  s+='<circle cx="'+cx+'" cy="'+cy+'" r="70" fill="'+acc+'" fill-opacity=".18" stroke="'+acc+'" stroke-width="3"/>';
+  s+='<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-size="20" font-weight="700" fill="var(--text)">'+esc(mapSym)+'</text>';
+  s+='<text x="'+cx+'" y="'+(cy+16)+'" text-anchor="middle" font-size="10" fill="var(--muted)">'+esc(((mapProfile&&mapProfile.finnhubIndustry)||'').slice(0,22))+'</text>';
+  // Bottom: peers
+  if(mapPeers.length){
+    const py=H-70;
+    mapPeers.forEach((p,i)=>{
+      const px=(W/(mapPeers.length+1))*(i+1);
+      s+='<line x1="'+cx+'" y1="'+(cy+70)+'" x2="'+px+'" y2="'+(py-24)+'" stroke="'+mut+'" stroke-width="1" stroke-opacity=".3" stroke-dasharray="3,3"/>';
+      s+=mapNode(px,py,24,p,'',mut,"analyzeStock('"+esc(p)+"')",true);
+    });
+    s+='<text x="'+cx+'" y="'+(H-14)+'" text-anchor="middle" font-size="10" fill="'+mut+'">similar companies · click to analyze</text>';
+  }
+  // Column headers
+  s+='<text x="150" y="34" text-anchor="middle" font-size="11" font-weight="700" fill="'+pur+'">BUYS FROM</text>';
+  s+='<text x="'+(W-150)+'" y="34" text-anchor="middle" font-size="11" font-weight="700" fill="'+grn+'">SELLS TO</text>';
+  if(!sup.length)s+='<text x="150" y="'+cy+'" text-anchor="middle" font-size="11" fill="'+mut+'">none added yet</text>';
+  if(!cus.length)s+='<text x="'+(W-150)+'" y="'+cy+'" text-anchor="middle" font-size="11" fill="'+mut+'">none added yet</text>';
+  s+='</svg>';
+  el.innerHTML=s;
+
+  // Concentration risk is the single most decision-relevant thing this map can tell you.
+  const top=[...cus].sort((a,b)=>(b.weight||0)-(a.weight||0))[0];
+  const d=document.getElementById('mapDetail');
+  if(d&&top&&top.weight>=20){
+    d.innerHTML='<div class="card" style="border-left:4px solid var(--red)">'+
+      '<h3 class="neg">Customer concentration</h3>'+
+      '<p style="font-size:14px;line-height:1.6"><b>'+esc(top.name)+'</b> accounts for about <b>'+top.weight+'%</b> of '+esc(mapSym)+'\'s business. '+
+      'A single customer at that weight is a real risk: if they switch supplier, insource, or simply have a bad year, it lands directly on '+esc(mapSym)+'\'s revenue. '+
+      'Worth sizing the position with that in mind.</p></div>';
+  }else if(d&&!mapProfile){d.innerHTML='';}
+  else if(d&&mapProfile){
+    d.innerHTML='<div class="card"><h3>'+esc(mapProfile.name||mapSym)+'</h3>'+
+      '<div class="row" style="gap:20px;flex-wrap:wrap;font-size:13px">'+
+        (mapProfile.finnhubIndustry?'<span class="muted">Industry: <b style="color:var(--text)">'+esc(mapProfile.finnhubIndustry)+'</b></span>':'')+
+        (mapProfile.country?'<span class="muted">Country: <b style="color:var(--text)">'+esc(mapProfile.country)+'</b></span>':'')+
+        (mapProfile.marketCapitalization?'<span class="muted">Market cap: <b style="color:var(--text)">$'+Math.round(mapProfile.marketCapitalization/1000)+'bn</b></span>':'')+
+        (mapProfile.weburl?'<a href="'+esc(mapProfile.weburl)+'" target="_blank" rel="noopener" style="color:var(--accent)">Website</a>':'')+
+      '</div>'+
+      '<button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="analyzeStock(\''+esc(mapSym)+'\')">Analyze '+esc(mapSym)+'</button></div>';
+  }
+}
+function showMapDetail(side,i){
+  const rel=relationsFor(mapSym);
+  const x=(side==='supplier'?rel.suppliers:rel.customers)[i];
+  if(!x)return;
+  const d=document.getElementById('mapDetail');
+  if(!d)return;
+  d.innerHTML='<div class="card">'+
+    '<h3>'+esc(x.name)+(x.ticker?' <span class="muted">('+esc(x.ticker)+')</span>':'')+'</h3>'+
+    '<p class="muted" style="font-size:13px;margin-bottom:10px">'+
+      (side==='supplier'?esc(mapSym)+' buys from them':esc(mapSym)+' sells to them')+
+      (x.weight?' · about <b style="color:var(--text)">'+x.weight+'%</b> of the relationship':'')+'</p>'+
+    (x.note?'<p style="font-size:14px;line-height:1.6;margin-bottom:10px">'+esc(x.note)+'</p>':'<p class="muted" style="font-size:13px;margin-bottom:10px">No summary saved. Add one in the list below to remember what they do.</p>')+
+    '<div class="row">'+
+      (x.ticker?'<button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(x.ticker)+'\')">Analyze '+esc(x.ticker)+'</button>':'')+
+      (x.ticker?'<button class="btn btn-ghost btn-sm" onclick="mapTo(\''+esc(x.ticker)+'\')">Map '+esc(x.ticker)+'</button>':'')+
+    '</div></div>';
+}
+function mapTo(t){
+  document.getElementById('mapTicker').value=t;
+  loadMap();
+}
+function addRelation(){
+  if(!mapSym)return toast('Map a company first, then add its relationships.');
+  const side=document.getElementById('relSide').value;
+  const name=(document.getElementById('relName').value||'').trim();
+  const ticker=(document.getElementById('relTicker').value||'').trim().toUpperCase();
+  const weight=parseFloat(document.getElementById('relWeight').value);
+  if(!name&&!ticker)return toast('Enter at least a company name or a ticker.');
+  const rel=relationsFor(mapSym);
+  rel[side].push({name:name||ticker,ticker:ticker||'',weight:isFinite(weight)?Math.max(1,Math.min(100,weight)):10,note:''});
+  ['relName','relTicker','relWeight'].forEach(id=>document.getElementById(id).value='');
+  saveDB();drawMap();renderRelList();
+  toast('Added to '+mapSym+'\'s map.');
+}
+function removeRelation(side,i){
+  const rel=relationsFor(mapSym);
+  rel[side].splice(i,1);
+  saveDB();drawMap();renderRelList();
+}
+function setRelNote(side,i,v){
+  const rel=relationsFor(mapSym);
+  if(rel[side][i]){rel[side][i].note=v;saveDB();}
+}
+function setRelWeight(side,i,v){
+  const rel=relationsFor(mapSym);
+  const n=parseFloat(v);
+  if(rel[side][i]){rel[side][i].weight=isFinite(n)?Math.max(1,Math.min(100,n)):10;saveDB();drawMap();}
+}
+function renderRelList(){
+  const el=document.getElementById('relList');
+  if(!el)return;
+  if(!mapSym){el.innerHTML='';return;}
+  const rel=relationsFor(mapSym);
+  const row=(x,side,i)=>'<tr>'+
+    '<td><b>'+esc(x.name)+'</b>'+(x.ticker?' <span class="muted">'+esc(x.ticker)+'</span>':'')+'</td>'+
+    '<td>'+(side==='suppliers'?'<span class="pill pill-watch">BUYS FROM</span>':'<span class="pill pill-buy">SELLS TO</span>')+'</td>'+
+    '<td><input type="number" min="1" max="100" value="'+(x.weight||10)+'" style="width:70px" onchange="setRelWeight(\''+side+'\','+i+',this.value)">%</td>'+
+    '<td><input value="'+esc(x.note||'')+'" placeholder="what they do…" onchange="setRelNote(\''+side+'\','+i+',this.value)"></td>'+
+    '<td><button class="btn-danger btn btn-sm" onclick="removeRelation(\''+side+'\','+i+')">✕</button></td></tr>';
+  const rows=rel.suppliers.map((x,i)=>row(x,'suppliers',i)).join('')+rel.customers.map((x,i)=>row(x,'customers',i)).join('');
+  el.innerHTML=rows
+    ?'<div style="overflow-x:auto"><table><thead><tr><th>Company</th><th>Direction</th><th>Weight</th><th>What they do</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    :'<div class="empty">Nothing added for '+esc(mapSym)+' yet.</div>';
+}
+
 /* ================= MARKET TAB =================
    Macro data comes from FRED via the Cloudflare Worker. The Worker is required, not optional:
    FRED sends no CORS headers, so a browser cannot call it directly under any circumstances. The
@@ -4207,34 +4479,71 @@ function renderTodaysMove(data){
     el.innerHTML='<div class="empty neg">Couldn\'t load VIX'+(vix&&vix.error?': '+esc(vix.error):'')+'</div>';
     return;
   }
-  const vixNow=vix[0].value;
+  updateMoveButtons();
+  /* Index 0 is the most recent reading (FRED is fetched newest-first). "Today" compares [0] to [1];
+     "yesterday" shifts one back and compares [1] to [2]. */
+  const shift=moveDay==='yesterday'?1:0;
+  const vixRow=vix[shift]||vix[0];
+  const vixNow=vixRow.value;
   const expected=vixNow/Math.sqrt(TRADING_DAYS);      // expected daily move, %
-  let actual=null,spxDate=null;
-  if(spx&&!spx.error&&spx.length>=2){
-    actual=(spx[0].value-spx[1].value)/spx[1].value*100;
-    spxDate=spx[0].date;
+
+  /* TOMORROW is not a forecast and cannot be. There is no data for a day that hasn't happened.
+     What VIX genuinely gives is the RANGE the market expects — so this shows the range and says
+     plainly that the direction is unknowable. Anything else here would be fabrication. */
+  if(moveDay==='tomorrow'){
+    el.innerHTML=
+      '<div style="font-size:26px;font-weight:700;line-height:1.35;letter-spacing:-.3px">'+
+        'Tomorrow: expect roughly <span class="warn">±'+expected.toFixed(2)+'%</span></div>'+
+      '<div style="margin-top:10px;font-size:15px;line-height:1.6">'+
+        'At VIX '+vixNow.toFixed(2)+', a normal day is about ±'+expected.toFixed(2)+'%. '+
+        'Two thirds of days land inside that. About one day in twenty exceeds <b>±'+(expected*2).toFixed(2)+'%</b>.'+
+      '</div>'+
+      '<div class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.55">'+
+        '<b>This is a range, not a prediction.</b> Nothing here says up or down — VIX measures how big '+
+        'a move the market is bracing for, and it is equally consistent with a rise or a fall. If any tool '+
+        'claims to know tomorrow\'s direction, it is guessing.</div>'+
+      '<div class="muted" style="font-size:11.5px;margin-top:8px">VIX as of '+esc(vixRow.date)+' · source FRED</div>';
+    return;
   }
+
+  let actual=null,spxDate=null;
+  if(spx&&!spx.error&&spx.length>=shift+2){
+    actual=(spx[shift].value-spx[shift+1].value)/spx[shift+1].value*100;
+    spxDate=spx[shift].date;
+  }
+  const label=moveDay==='yesterday'?'That':'Today';
   const sigma=(actual!=null&&expected>0)?Math.abs(actual)/expected:null;
   const band=sigma==null?'':sigma<1?'quiet':sigma<2?'busy':'unusual';
   const cls=sigma==null?'flat':sigma<1?'':sigma<2?'warn':'neg';
   el.innerHTML=
     '<div style="font-size:26px;font-weight:700;line-height:1.35;letter-spacing:-.3px">'+
       (actual!=null
-        ? 'The S&P is '+(actual>=0?'up':'down')+' <span class="'+(actual>=0?'pos':'neg')+'">'+Math.abs(actual).toFixed(2)+'%</span> '+
-          '<span class="muted" style="font-size:15px;font-weight:500">as of '+esc(spxDate)+'</span>'
+        ? 'The S&P was '+(actual>=0?'up':'down')+' <span class="'+(actual>=0?'pos':'neg')+'">'+Math.abs(actual).toFixed(2)+'%</span> '+
+          '<span class="muted" style="font-size:15px;font-weight:500">on '+esc(spxDate)+'</span>'
         : 'VIX is '+vixNow.toFixed(2))+
     '</div>'+
     '<div style="margin-top:10px;font-size:15px;line-height:1.6">'+
       'VIX '+vixNow.toFixed(2)+' implies an ordinary day of about <b>±'+expected.toFixed(2)+'%</b>.'+
       (sigma!=null
-        ? ' Today is a <b class="'+cls+'">'+sigma.toFixed(1)+'σ</b> move — <b class="'+cls+'">'+band+'</b>.'
+        ? ' '+label+' was a <b class="'+cls+'">'+sigma.toFixed(1)+'σ</b> move — <b class="'+cls+'">'+band+'</b>.'
         : ' No index reading to compare against yet.')+
     '</div>'+
     (sigma!=null?'<div class="muted" style="font-size:12.5px;margin-top:8px">'+
       (sigma<1?'Inside the normal range. Days like this are the majority of days and rarely mean anything.'
        :sigma<2?'Larger than typical but not rare — roughly a once-a-fortnight size of move.'
        :'Well outside the normal range. Moves this size cluster around real news.')+'</div>':'')+
-    '<div class="muted" style="font-size:11.5px;margin-top:8px">VIX as of '+esc(vix[0].date)+' · source FRED</div>';
+    '<div class="muted" style="font-size:11.5px;margin-top:8px">VIX as of '+esc(vixRow.date)+' · source FRED. '+
+      'FRED publishes end-of-day, so "today" means the most recent close, not live intraday.</div>';
+}
+let moveDay='today';
+function setMoveDay(d){moveDay=d;renderTodaysMove(macroCache);}
+function updateMoveButtons(){
+  ['today','yesterday','tomorrow'].forEach(d=>{
+    const b=document.getElementById('mvBtn_'+d);
+    if(!b)return;
+    b.style.borderColor=(moveDay===d)?'var(--accent)':'';
+    b.style.color=(moveDay===d)?'var(--accent)':'';
+  });
 }
 function weatherCard(title,value,asOf,band,bandCls,detail,note){
   return '<div class="card">'+
@@ -4251,29 +4560,41 @@ function weatherCard(title,value,asOf,band,bandCls,detail,note){
 function renderWeather(data){
   const el=document.getElementById('weatherCards');
   if(!el)return;
-  if(data&&data.error==='NEEDS_WORKER'){
-    el.innerHTML='<div class="card"><div class="empty">Set up the worker to load the Buffett indicator. CAPE and margin debt can still be entered by hand below.</div></div>';
-    return;
-  }
+  /* No early return when the worker is missing. Only the Buffett indicator needs FRED; CAPE and
+     margin debt are typed in, and they should still display and still feed the overall verdict for
+     someone who never sets up a worker at all. */
+  if(!data)data={};
   const cards=[];
+  const m0=D.macro||{};
+  // Each signal reports a level 0-2 (fair / elevated / stretched) so the overall read below can
+  // combine them. null means no data, and a missing signal must never be counted as "fine".
+  const levels=[];
 
-  /* --- Buffett indicator: total market value vs the size of the economy --- */
+  /* --- Buffett indicator: manual entry wins over the FRED calculation --- */
   const w=data.WILL5000PR,g=data.GDP;
-  if(w&&!w.error&&w.length&&g&&!g.error&&g.length){
-    /* WILL5000PR is a price index in index points; GDP is in $bn. These are not the same unit, so
-       the RATIO is not the textbook percentage — what matters is where it sits against its own
-       history, which is why the bands below are calibrated on the ratio, not on "100%". */
-    const ratio=w[0].value/g[0].value;
-    const pct=ratio*100;
+  if(isFinite(m0.buffett)&&m0.buffett>0){
+    const pct=m0.buffett;
     const band=pct>=190?'Stretched':pct>=120?'Elevated':'Fair';
     const cls=pct>=190?'neg':pct>=120?'warn':'pos';
+    levels.push(pct>=190?2:pct>=120?1:0);
+    const age=monthsAgo(m0.buffettAsOf);
     cards.push(weatherCard('Buffett Indicator',pct.toFixed(0)+'%',
-      fmtAsOf(g[0].date)+' (GDP)',band,cls,
+      m0.buffettAsOf?fmtAsOf(m0.buffettAsOf+'-01'):'no date given',band,cls,
       'Total US market value against the size of the economy. Above roughly 190% has historically marked expensive markets.',
-      'Wilshire 5000 '+fmtAsOf(w[0].date)+' ÷ GDP '+fmtAsOf(g[0].date)+' · GDP is quarterly and revised twice'));
+      (age!=null&&age>2?'<span class="neg">'+age+' months old — worth updating</span>':'entered by hand')));
+  }else if(w&&!w.error&&w.length&&g&&!g.error&&g.length){
+    /* WILL5000PR is a price index in index points; GDP is in $bn. Those are not the same unit, so
+       this ratio is NOT the textbook percentage — it tracks the right direction but the absolute
+       number is not comparable to published figures. Labelled as such, and overridden the moment a
+       real figure is typed in above. */
+    const pct=(w[0].value/g[0].value)*100;
+    cards.push(weatherCard('Buffett Indicator','~'+pct.toFixed(0),
+      fmtAsOf(g[0].date)+' (GDP)','Uncalibrated','warn',
+      'Wilshire index points ÷ GDP. Direction is meaningful, the absolute level is not — enter a real figure below for a usable reading.',
+      'Wilshire '+fmtAsOf(w[0].date)+' ÷ GDP '+fmtAsOf(g[0].date)));
   }else{
-    cards.push(weatherCard('Buffett Indicator','—','unavailable','','',
-      'Couldn\'t load '+((w&&w.error)?'the Wilshire 5000 series':'GDP')+' from FRED.',
+    cards.push(weatherCard('Buffett Indicator','—','not entered','','',
+      'Enter it below, or set up the FRED key for a rough calculated version.',
       (w&&w.error)?esc(w.error):(g&&g.error?esc(g.error):'')));
   }
 
@@ -4282,6 +4603,7 @@ function renderWeather(data){
   if(isFinite(m.cape)&&m.cape>0){
     const band=m.cape>30?'Stretched':m.cape<15?'Cheap':'Fair';
     const cls=m.cape>30?'neg':m.cape<15?'pos':'warn';
+    levels.push(m.cape>30?2:m.cape<15?0:1);
     const age=monthsAgo(m.capeAsOf);
     cards.push(weatherCard('CAPE (Shiller P/E)',m.cape.toFixed(1),
       m.capeAsOf?fmtAsOf(m.capeAsOf+'-01'):'no date given',band,cls,
@@ -4300,6 +4622,7 @@ function renderWeather(data){
       const chg=(m.margin-m.marginPrev)/m.marginPrev*100;
       band=chg>=5?'Rising fast':chg<=-5?'Falling fast':'Steady';
       cls=chg>=5?'neg':chg<=-5?'warn':'pos';
+      levels.push(chg>=5?2:chg<=-5?1:0);
       detail+=' <b>'+(chg>=0?'+':'')+chg.toFixed(1)+'%</b> since the previous figure you entered.';
     }
     cards.push(weatherCard('Margin Debt','$'+(m.margin>=1000?(m.margin/1000).toFixed(2)+'tn':m.margin.toFixed(0)+'bn'),
@@ -4311,17 +4634,60 @@ function renderWeather(data){
   }
 
   el.innerHTML=cards.join('');
+  renderWeatherVerdict(levels);
+}
+/* Plain-English read on all three at once. Wording is deliberately about PRICE, never about timing —
+   "expensive" is a statement about what you're paying, "a crash is coming" would be a prediction
+   these indicators have no power to make. Every verdict says what it implies for long-run returns
+   and none of them tell you to sell. */
+function renderWeatherVerdict(levels){
+  const el=document.getElementById('weatherVerdict');
+  if(!el)return;
+  const n=levels.length;
+  if(!n){
+    el.innerHTML='<div class="empty">Enter at least one figure below and PerceptFolio will read them together.</div>';
+    return;
+  }
+  const score=levels.reduce((a,b)=>a+b,0)/n;   // 0 = fair, 2 = stretched
+  const stretched=levels.filter(l=>l===2).length;
+  let headline,body,cls,icon;
+  if(score>=1.6){
+    icon='🔴';cls='neg';
+    headline='This looks like a bubble.';
+    body='All the signals reading are at levels that historically marked expensive markets. That does <b>not</b> mean a crash is coming, and it does not mean sell — these have read expensive for years at a stretch while prices kept rising. What it reliably means is that you are paying a high price for future earnings, and buyers at levels like this have historically earned weak returns over the following decade. Sensible response: be choosier about what you buy and keep more cash than usual, not liquidate.';
+  }else if(score>=1.0){
+    icon='🟠';cls='warn';
+    headline='Expensive, but not extreme.';
+    body='Prices are above their historical norms without being at the far end of the range. Long-run returns from here are likely to be below average. Worth raising your buy bar a little and being patient rather than doing anything dramatic.';
+  }else if(score>=0.5){
+    icon='🟡';cls='warn';
+    headline='Around fair value.';
+    body='Nothing here is flashing. Prices are in the normal range against history, which is the least informative state these indicators have — it means valuation isn\'t the thing to worry about right now, so judge companies on their own merits.';
+  }else{
+    icon='🟢';cls='pos';
+    headline='Cheap by historical standards.';
+    body='Prices are below their long-run norms. Historically that has been when future ten-year returns were strongest. It has also usually felt dreadful at the time, because markets get cheap for reasons. This is a signal to be less picky and put more to work, not a promise the bottom is in.';
+  }
+  el.innerHTML='<div class="card" style="border-left:4px solid var(--'+(cls==='neg'?'red':cls==='warn'?'yellow':'green')+')">'+
+    '<div style="font-size:20px;font-weight:700;margin-bottom:8px" class="'+cls+'">'+icon+' '+headline+'</div>'+
+    '<p style="font-size:14px;line-height:1.65;margin-bottom:8px">'+body+'</p>'+
+    '<div class="muted" style="font-size:11.5px">Based on '+n+' of 3 signals'+(n<3?' — the missing ones are not counted as reassuring, they are simply absent':'')+
+      (stretched?' · '+stretched+' at stretched levels':'')+'.</div>'+
+  '</div>';
 }
 function saveMacro(){
   if(!D.macro)D.macro={};
   const cape=parseFloat(document.getElementById('macroCape').value);
   const margin=parseFloat(document.getElementById('macroMargin').value);
+  const buffett=parseFloat(document.getElementById('macroBuffett').value);
   // Keep the previous margin reading so the card can show the direction of travel.
   if(isFinite(margin)&&isFinite(D.macro.margin)&&margin!==D.macro.margin)D.macro.marginPrev=D.macro.margin;
   D.macro.cape=isFinite(cape)?cape:null;
   D.macro.capeAsOf=document.getElementById('macroCapeAsOf').value||'';
   D.macro.margin=isFinite(margin)?margin:null;
   D.macro.marginAsOf=document.getElementById('macroMarginAsOf').value||'';
+  D.macro.buffett=isFinite(buffett)?buffett:null;
+  D.macro.buffettAsOf=document.getElementById('macroBuffettAsOf').value||'';
   saveDB();
   renderWeather(macroCache);
   toast('Saved.');
@@ -4331,6 +4697,7 @@ function fillMacroInputs(){
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=(v==null?'':v);};
   set('macroCape',m.cape);set('macroCapeAsOf',m.capeAsOf);
   set('macroMargin',m.margin);set('macroMarginAsOf',m.marginAsOf);
+  set('macroBuffett',m.buffett);set('macroBuffettAsOf',m.buffettAsOf);
 }
 
 /* ---- Call scorecard ----
