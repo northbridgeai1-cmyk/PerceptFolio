@@ -4272,52 +4272,99 @@ function mapNode(x,y,r,label,sub,color,onclick,dim){
     (sub?'<text x="'+x+'" y="'+(y+r+15)+'" text-anchor="middle" font-size="10" fill="var(--muted)" style="pointer-events:none">'+esc(sub)+'</text>':'')+
   '</g>';
 }
+/* Stacks a column so no two bubbles touch, whatever their sizes.
+   An evenly-spaced column can't work here: spacing has to depend on the actual radii, or a big
+   bubble next to another big one overlaps while two small ones sit in wasted space. This walks down
+   the column adding each radius plus a gap, then centres the finished stack. LABEL_ROOM is the
+   space the name underneath each bubble needs so text doesn't collide with the next circle.
+   Odd rows are nudged sideways, which buys visual separation without needing more height. */
+const LABEL_ROOM=20,BUBBLE_GAP=16;
+function layoutColumn(items,baseX,centreY){
+  const rs=items.map(x=>bubbleR(x.weight));
+  const totalH=rs.reduce((a,r)=>a+r*2+LABEL_ROOM,0)+BUBBLE_GAP*Math.max(0,items.length-1);
+  let y=centreY-totalH/2;
+  return items.map((x,i)=>{
+    const r=rs[i];
+    y+=r;
+    const pos={x:baseX+(items.length>4?(i%2?30:-30):0),y,r};
+    y+=r+LABEL_ROOM+BUBBLE_GAP;
+    return pos;
+  });
+}
+function columnHeight(items){
+  if(!items.length)return 0;
+  return items.reduce((a,x)=>a+bubbleR(x.weight)*2+LABEL_ROOM,0)+BUBBLE_GAP*(items.length-1);
+}
 function drawMap(){
   const el=document.getElementById('mapCanvas');
   if(!el)return;
   if(!mapSym){el.innerHTML='<div class="empty">Enter a ticker above to build its map.</div>';return;}
   const rel=relationsFor(mapSym);
   const sup=rel.suppliers,cus=rel.customers;
-  const W=920,H=520,cx=W/2,cy=H/2-30;
   const acc=getComputedStyle(document.body).getPropertyValue('--accent').trim()||'#3b82f6';
   const grn=getComputedStyle(document.body).getPropertyValue('--green').trim()||'#2ea043';
   const pur=getComputedStyle(document.body).getPropertyValue('--c-out').trim()||'#8b5cf6';
   const mut=getComputedStyle(document.body).getPropertyValue('--muted').trim()||'#949aa6';
-  let s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="min-width:820px;height:auto">';
 
-  const colY=(i,n,span)=>n===1?cy:(cy-span/2)+(span/(n-1))*i;
+  /* The canvas grows to fit whichever side is taller rather than squeezing bubbles into a fixed box.
+     Wider too when a column is staggered, so the nudged bubbles don't run off the edge. */
+  const HEAD=56,FOOT=mapPeers.length?110:40;
+  const tallest=Math.max(columnHeight(sup),columnHeight(cus),240);
+  const H=Math.max(520,HEAD+tallest+FOOT);
+  const W=980,cx=W/2,cy=HEAD+tallest/2;
 
-  // Left: suppliers
-  sup.forEach((x,i)=>{
-    const y=colY(i,sup.length,Math.min(340,sup.length*84)),r=bubbleR(x.weight),nx=150;
-    s+='<line x1="'+(nx+r)+'" y1="'+y+'" x2="'+(cx-70)+'" y2="'+cy+'" stroke="'+pur+'" stroke-width="'+(1+Math.sqrt(x.weight||10)/4)+'" stroke-opacity=".45"/>';
-    s+=mapNode(nx,y,r,x.ticker||x.name.slice(0,6),(x.weight?x.weight+'% ':'')+(x.ticker?x.name.slice(0,16):''),pur,"showMapDetail('supplier',"+i+")");
+  let s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="min-width:860px;height:auto">';
+
+  const supPos=layoutColumn(sup,175,cy);
+  const cusPos=layoutColumn(cus,W-175,cy);
+
+  // Connector lines are drawn first so they sit behind every bubble.
+  supPos.forEach((p,i)=>{
+    const wgt=sup[i].weight||10;
+    s+='<line x1="'+(p.x+p.r)+'" y1="'+p.y+'" x2="'+(cx-72)+'" y2="'+cy+'" stroke="'+pur+'" stroke-width="'+(1+Math.sqrt(wgt)/4).toFixed(2)+'" stroke-opacity=".38"/>';
   });
-  // Right: customers
-  cus.forEach((x,i)=>{
-    const y=colY(i,cus.length,Math.min(340,cus.length*84)),r=bubbleR(x.weight),nx=W-150;
-    s+='<line x1="'+(cx+70)+'" y1="'+cy+'" x2="'+(nx-r)+'" y2="'+y+'" stroke="'+grn+'" stroke-width="'+(1+Math.sqrt(x.weight||10)/4)+'" stroke-opacity=".45"/>';
-    s+=mapNode(nx,y,r,x.ticker||x.name.slice(0,6),(x.weight?x.weight+'% ':'')+(x.ticker?x.name.slice(0,16):''),grn,"showMapDetail('customer',"+i+")");
+  cusPos.forEach((p,i)=>{
+    const wgt=cus[i].weight||10;
+    s+='<line x1="'+(cx+72)+'" y1="'+cy+'" x2="'+(p.x-p.r)+'" y2="'+p.y+'" stroke="'+grn+'" stroke-width="'+(1+Math.sqrt(wgt)/4).toFixed(2)+'" stroke-opacity=".38"/>';
   });
-  // Centre
-  s+='<circle cx="'+cx+'" cy="'+cy+'" r="70" fill="'+acc+'" fill-opacity=".18" stroke="'+acc+'" stroke-width="3"/>';
-  s+='<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-size="20" font-weight="700" fill="var(--text)">'+esc(mapSym)+'</text>';
-  s+='<text x="'+cx+'" y="'+(cy+16)+'" text-anchor="middle" font-size="10" fill="var(--muted)">'+esc(((mapProfile&&mapProfile.finnhubIndustry)||'').slice(0,22))+'</text>';
-  // Bottom: peers
   if(mapPeers.length){
-    const py=H-70;
+    const py=H-FOOT+30;
     mapPeers.forEach((p,i)=>{
       const px=(W/(mapPeers.length+1))*(i+1);
-      s+='<line x1="'+cx+'" y1="'+(cy+70)+'" x2="'+px+'" y2="'+(py-24)+'" stroke="'+mut+'" stroke-width="1" stroke-opacity=".3" stroke-dasharray="3,3"/>';
-      s+=mapNode(px,py,24,p,'',mut,"analyzeStock('"+esc(p)+"')",true);
+      s+='<line x1="'+cx+'" y1="'+(cy+72)+'" x2="'+px+'" y2="'+(py-22)+'" stroke="'+mut+'" stroke-width="1" stroke-opacity=".25" stroke-dasharray="3,3"/>';
     });
-    s+='<text x="'+cx+'" y="'+(H-14)+'" text-anchor="middle" font-size="10" fill="'+mut+'">similar companies · click to analyze</text>';
   }
+
+  // Bubbles on top of the lines.
+  supPos.forEach((p,i)=>{
+    const x=sup[i];
+    s+=mapNode(p.x,p.y,p.r,x.ticker||x.name.slice(0,7),(x.weight?x.weight+'% · ':'')+(x.name||'').slice(0,18),pur,"showMapDetail('supplier',"+i+")");
+  });
+  cusPos.forEach((p,i)=>{
+    const x=cus[i];
+    s+=mapNode(p.x,p.y,p.r,x.ticker||x.name.slice(0,7),(x.weight?x.weight+'% · ':'')+(x.name||'').slice(0,18),grn,"showMapDetail('customer',"+i+")");
+  });
+
+  // Centre
+  s+='<circle cx="'+cx+'" cy="'+cy+'" r="72" fill="var(--bg)"/>';
+  s+='<circle cx="'+cx+'" cy="'+cy+'" r="72" fill="'+acc+'" fill-opacity=".18" stroke="'+acc+'" stroke-width="3"/>';
+  s+='<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="21" font-weight="700" fill="var(--text)">'+esc(mapSym)+'</text>';
+  s+='<text x="'+cx+'" y="'+(cy+17)+'" text-anchor="middle" font-size="10" fill="var(--muted)">'+esc(((mapProfile&&mapProfile.finnhubIndustry)||'').slice(0,24))+'</text>';
+
+  if(mapPeers.length){
+    const py=H-FOOT+30;
+    mapPeers.forEach((p,i)=>{
+      const px=(W/(mapPeers.length+1))*(i+1);
+      s+=mapNode(px,py,22,p,'',mut,"analyzeStock('"+esc(p)+"')",true);
+    });
+    s+='<text x="'+cx+'" y="'+(H-12)+'" text-anchor="middle" font-size="10" fill="'+mut+'">similar companies · click to analyze</text>';
+  }
+
   // Column headers
-  s+='<text x="150" y="34" text-anchor="middle" font-size="11" font-weight="700" fill="'+pur+'">BUYS FROM</text>';
-  s+='<text x="'+(W-150)+'" y="34" text-anchor="middle" font-size="11" font-weight="700" fill="'+grn+'">SELLS TO</text>';
-  if(!sup.length)s+='<text x="150" y="'+cy+'" text-anchor="middle" font-size="11" fill="'+mut+'">none added yet</text>';
-  if(!cus.length)s+='<text x="'+(W-150)+'" y="'+cy+'" text-anchor="middle" font-size="11" fill="'+mut+'">none added yet</text>';
+  s+='<text x="175" y="30" text-anchor="middle" font-size="11" font-weight="700" fill="'+pur+'" letter-spacing="1">BUYS FROM</text>';
+  s+='<text x="'+(W-175)+'" y="30" text-anchor="middle" font-size="11" font-weight="700" fill="'+grn+'" letter-spacing="1">SELLS TO</text>';
+  if(!sup.length)s+='<text x="175" y="'+cy+'" text-anchor="middle" font-size="11" fill="'+mut+'">none added yet</text>';
+  if(!cus.length)s+='<text x="'+(W-175)+'" y="'+cy+'" text-anchor="middle" font-size="11" fill="'+mut+'">none added yet</text>';
   s+='</svg>';
   el.innerHTML=s;
 
