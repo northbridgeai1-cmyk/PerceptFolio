@@ -716,6 +716,8 @@ small.src{color:var(--muted)}
   </div>
 
   <!-- 2. Market weather -->
+  <div id="regimeBanner" style="margin-top:16px"></div>
+
   <div class="section-title">Market Weather — long-run valuation</div>
   <div id="weatherVerdict" style="margin-bottom:14px"></div>
   <div class="grid grid-3" id="weatherCards">
@@ -1979,12 +1981,41 @@ async function scoreStock(sym){
 
   add(out.quality,'Revenue Guidance','Raised',man.guidance==='unknown'?null:man.guidance,man.guidance==='unknown'?null:man.guidance==='yes','Manual — check latest earnings call');
 
-  let insPass=null,insVal=null;
+  /* ---- Insider buying, read as clusters rather than a raw count ----
+     One executive buying is noise — it can be a scheduled plan, a tax move, or one person's view.
+     Several DIFFERENT insiders buying inside the same few weeks is a different signal entirely,
+     because it means multiple people with the same private information acted the same way at the
+     same time. Counting transactions can't see that; counting distinct people in a window can. */
+  let insPass=null,insVal=null,insNote='';
   if(ins&&Array.isArray(ins.data)){
-    const buys=ins.data.filter(t=>t.change>0).length,sells=ins.data.filter(t=>t.change<0).length;
-    insVal=buys+' buys / '+sells+' sells (6mo)';insPass=buys>0&&buys>=sells*0.5;
+    const txs=ins.data.filter(t=>t.transactionDate);
+    const buys=txs.filter(t=>t.change>0),sells=txs.filter(t=>t.change<0);
+    // Widest 45-day window, counting unique names rather than transactions.
+    let bestCluster=0,clusterEnd=null;
+    const WINDOW=45*864e5;
+    buys.forEach(anchor=>{
+      const t0=Date.parse(anchor.transactionDate);
+      if(isNaN(t0))return;
+      const names=new Set();
+      buys.forEach(b=>{
+        const t=Date.parse(b.transactionDate);
+        if(!isNaN(t)&&Math.abs(t-t0)<=WINDOW)names.add((b.name||'?').trim().toUpperCase());
+      });
+      if(names.size>bestCluster){bestCluster=names.size;clusterEnd=anchor.transactionDate;}
+    });
+    const buyers=new Set(buys.map(b=>(b.name||'?').trim().toUpperCase())).size;
+    out.insiderCluster={cluster:bestCluster,buyers,buys:buys.length,sells:sells.length,when:clusterEnd};
+    insVal=bestCluster>=2
+      ? bestCluster+' insiders bought within 45 days'
+      : buys.length+' buys / '+sells.length+' sells (6mo)';
+    // Passes on a genuine cluster, or on the old ratio test as a fallback.
+    insPass=bestCluster>=3?true:(buys.length>0&&buys.length>=sells.length*0.5);
+    insNote=bestCluster>=3
+      ? 'Cluster buy — '+bestCluster+' different insiders bought in the same 45-day window'+(clusterEnd?' around '+clusterEnd:'')+'. Stronger than the same number of trades by one person.'
+      : bestCluster===2?'Two insiders bought close together. Mild, not a cluster.'
+      : buyers===1&&buys.length>1?'All buying came from one insider — could simply be a scheduled plan.':'';
   }
-  add(out.quality,'Insider Buying','Active',insVal,insPass,insPass==null?'Insider data unavailable':'');
+  add(out.quality,'Insider Buying','Cluster',insVal,insPass,insPass==null?'Insider data unavailable':insNote);
 
   add(out.quality,'Clear Growth Runway','Yes',man.runway==='unknown'?null:man.runway,man.runway==='unknown'?null:man.runway==='yes','Manual — your judgment');
   add(out.quality,'Competitive Moat','Durable',man.moat==='unknown'?null:man.moat,man.moat==='unknown'?null:man.moat==='yes','Manual — your judgment');
@@ -2953,11 +2984,106 @@ async function calculateRisk(){
     try{const c=await getCandles(sym,180);priceSeries[sym]=c.c;}catch(e){}
     if(idx<stocks.length-1)await new Promise(r=>setTimeout(r,600));
   }
+  // SPY is the market leg the Kalman filter regresses each holding against.
+  let marketSeries=null;
+  statusEl.textContent='Fetching market benchmark…';
+  try{const c=await getCandles('SPY',180);marketSeries=c.c;}catch(e){}
   statusEl.textContent='Done.';
   btn.disabled=false;
-  renderRiskResults(stocks,sectorVal,betaMap,priceSeries);
+  renderRiskResults(stocks,sectorVal,betaMap,priceSeries,marketSeries);
 }
-function renderRiskResults(stocks,sectorVal,betaMap,priceSeries){
+/* ---- Shared dependencies ----
+   Correlation tells you two holdings move together. It cannot tell you WHY. This can: it walks the
+   supplier maps you've built and finds companies that more than one of your holdings depends on.
+   Two stocks correlating because they both need the same foundry is a different, and more dangerous,
+   fact than two stocks correlating because they're both large-cap tech. */
+function sharedDependencies(){
+  const held=[...new Set(D.holdings.filter(h=>h.type==='Stock').map(h=>h.sym))];
+  const valOf=s=>D.holdings.filter(h=>h.sym===s&&h.type==='Stock').reduce((a,h)=>a+(h.price??h.cost)*h.shares,0);
+  const map={};   // supplier key -> {name, via:[{sym,weight,value}]}
+  held.forEach(sym=>{
+    const rel=(D.relations||{})[sym];
+    if(!rel||!Array.isArray(rel.suppliers))return;
+    rel.suppliers.forEach(s=>{
+      const key=(s.ticker||s.name||'').toUpperCase();
+      if(!key)return;
+      if(!map[key])map[key]={name:s.name||key,ticker:s.ticker||'',via:[]};
+      map[key].via.push({sym,weight:s.weight||0,value:valOf(sym)});
+    });
+  });
+  const totalStock=held.reduce((a,s)=>a+valOf(s),0);
+  return Object.values(map)
+    .filter(d=>d.via.length>=2)
+    .map(d=>{
+      /* Look-through exposure: for each holding, the share of that position riding on this supplier,
+         weighted by how big the position is. A 40% dependency inside a small position matters less
+         than a 25% dependency inside your largest one. */
+      const exposure=d.via.reduce((a,v)=>a+v.value*(v.weight/100),0);
+      return{...d,exposure,pctOfStock:totalStock>0?exposure/totalStock*100:0};
+    })
+    .sort((a,b)=>b.exposure-a.exposure);
+}
+function renderSharedDeps(){
+  const el=document.getElementById('sharedDeps');
+  if(!el)return;
+  const mapped=Object.keys(D.relations||{}).length;
+  const deps=sharedDependencies();
+  if(!deps.length){
+    el.innerHTML='<div class="empty">'+(mapped
+      ? 'No supplier appears under more than one of your holdings yet. Map a few more companies in the <b>Map</b> tab and shared dependencies will surface here.'
+      : 'Nothing mapped yet. Build supplier maps for your holdings in the <b>Map</b> tab and this will show where they overlap.')+'</div>';
+    return;
+  }
+  el.innerHTML=deps.map(d=>{
+    const via=d.via.map(v=>esc(v.sym)+' ('+v.weight+'%)').join(' · ');
+    const heavy=d.pctOfStock>=15;
+    return '<div class="card" style="margin-bottom:10px;border-left:3px solid var(--'+(heavy?'red':'yellow')+')">'+
+      '<div class="row" style="justify-content:space-between;flex-wrap:wrap">'+
+        '<b style="font-size:15px">'+esc(d.name)+(d.ticker?' <span class="muted">'+esc(d.ticker)+'</span>':'')+'</b>'+
+        '<span class="'+(heavy?'neg':'warn')+'" style="font-family:var(--mono);font-weight:700">'+pmask(fmt$(d.exposure))+' · '+d.pctOfStock.toFixed(1)+'% of your stocks</span>'+
+      '</div>'+
+      '<div class="muted" style="font-size:13px;margin-top:6px">You own <b>'+d.via.length+'</b> companies that depend on them: '+via+'</div>'+
+      (heavy?'<div class="neg" style="font-size:12.5px;margin-top:6px">That is a single point of failure sitting behind a meaningful share of your equity. These positions will not diversify each other if this supplier has a problem.</div>':'')+
+    '</div>';
+  }).join('')+
+  '<p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.55">Calculated from the supplier weights you entered in the Map tab, multiplied by each position\'s value. Only as good as what you\'ve mapped — a dependency you haven\'t recorded is invisible here.</p>';
+}
+
+/* ---- Kalman-filtered beta ----
+   A single beta over a fixed window assumes the relationship never changes, which is false — beta
+   drifts as a company's business and the market's mood shift. A Kalman filter treats it as a moving
+   target: predict it stayed the same, then correct by however much the latest day disagreed.
+
+   Q is how much drift we allow per step, R how noisy we consider one day's observation. Higher Q
+   tracks faster and jitters more. These are deliberately conservative. */
+function kalmanBeta(stockReturns,marketReturns,Q,R){
+  const n=Math.min(stockReturns.length,marketReturns.length);
+  if(n<20)return null;
+  let beta=1,P=1;
+  const q=Q||1e-5,r=R||1e-3;
+  const path=[];
+  for(let i=0;i<n;i++){
+    const x=marketReturns[i],y=stockReturns[i];
+    if(!isFinite(x)||!isFinite(y))continue;
+    const Ppred=P+q;                       // predict: beta unchanged, uncertainty grows
+    const denom=x*x*Ppred+r;
+    if(denom<=0)continue;
+    const K=Ppred*x/denom;                 // gain: how much to trust today's observation
+    beta=beta+K*(y-x*beta);                // correct
+    P=(1-K*x)*Ppred;
+    path.push(beta);
+  }
+  if(path.length<25)return null;
+  /* Burn-in. The filter is seeded at beta=1, so the first values reflect that guess more than the
+     data. Reporting path[0] as "beta six months ago" would be reporting the seed. Everything shown
+     is measured after the filter has had 20 observations to settle. */
+  const BURN=Math.min(20,Math.floor(path.length/4));
+  const settled=path.slice(BURN);
+  if(!settled.length)return null;
+  return{current:settled[settled.length-1],start:settled[0],path:settled,
+    min:Math.min(...settled),max:Math.max(...settled)};
+}
+function renderRiskResults(stocks,sectorVal,betaMap,priceSeries,marketSeries){
   const el=document.getElementById('riskResults');
   const totalStockVal=Object.values(sectorVal).reduce((a,b)=>a+b,0);
   const sectors=Object.entries(sectorVal).sort((a,b)=>b[1]-a[1]);
@@ -3010,6 +3136,53 @@ function renderRiskResults(stocks,sectorVal,betaMap,priceSeries){
       '<table><thead><tr><th>Pair</th><th>Correlation (6mo daily)</th></tr></thead><tbody>'+corrRows+'</tbody></table>'+
       '<p class="muted" style="margin-top:10px">Approximate — aligned by trading-day count, not exact calendar dates. 1.0 = move perfectly together, 0 = unrelated, -1.0 = move opposite. Pairs above 0.7 aren\'t really diversifying each other.</p>'
       :'<p class="empty">Historical price data wasn\'t available for enough of your holdings to calculate correlation — this endpoint is sometimes restricted on Finnhub\'s free plan. Sector concentration and beta above still work.</p>')+
+    '</div>'+
+    betaDriftHtml(stocks,priceSeries,marketSeries)+
+    '<div class="section-title">Shared dependencies — what your holdings have in common</div>'+
+    '<div id="sharedDeps"></div>';
+  renderSharedDeps();
+}
+/* Beta as a moving target rather than one static number. A holding whose beta has climbed from 1.0
+   to 1.8 is a materially different investment than the one you bought, and a single fixed-window
+   figure hides that completely. */
+function betaDriftHtml(stocks,priceSeries,marketSeries){
+  if(!marketSeries||marketSeries.length<30){
+    return '<div class="section-title">Beta drift</div><div class="card"><p class="empty">Couldn\'t load SPY price history to measure beta against. Finnhub\'s free plan restricts this endpoint intermittently.</p></div>';
+  }
+  const mkt=toReturns(marketSeries);
+  const rows=[];
+  stocks.forEach(sym=>{
+    const ser=priceSeries[sym];
+    if(!ser||ser.length<30)return;
+    const ret=toReturns(ser);
+    // Align on the shorter of the two — trading-day count, not calendar dates.
+    const n=Math.min(ret.length,mkt.length);
+    const k=kalmanBeta(ret.slice(ret.length-n),mkt.slice(mkt.length-n));
+    if(!k)return;
+    const drift=k.current-k.start;
+    rows.push({sym,k,drift});
+  });
+  if(!rows.length){
+    return '<div class="section-title">Beta drift</div><div class="card"><p class="empty">Not enough price history to track beta movement.</p></div>';
+  }
+  rows.sort((a,b)=>Math.abs(b.drift)-Math.abs(a.drift));
+  const body=rows.map(({sym,k,drift})=>{
+    const moved=Math.abs(drift)>=0.25;
+    return '<tr><td><b>'+esc(sym)+'</b></td>'+
+      '<td>'+k.start.toFixed(2)+'</td>'+
+      '<td><b>'+k.current.toFixed(2)+'</b></td>'+
+      '<td class="'+(moved?(drift>0?'neg':'warn'):'muted')+'">'+(drift>=0?'+':'')+drift.toFixed(2)+'</td>'+
+      '<td class="muted">'+k.min.toFixed(2)+' – '+k.max.toFixed(2)+'</td></tr>';
+  }).join('');
+  const biggest=rows[0];
+  return '<div class="section-title">Beta drift — is this still the stock you bought?</div>'+
+    '<div class="card">'+
+    '<table><thead><tr><th>Ticker</th><th>Beta 6mo ago</th><th>Beta now</th><th>Change</th><th>Range</th></tr></thead><tbody>'+body+'</tbody></table>'+
+    (Math.abs(biggest.drift)>=0.25
+      ? '<p style="margin-top:10px;font-size:13.5px"><b>'+esc(biggest.sym)+'</b> has moved the most — beta '+(biggest.drift>0?'rose':'fell')+' from '+biggest.k.start.toFixed(2)+' to '+biggest.k.current.toFixed(2)+'. '+
+        (biggest.drift>0?'It now amplifies market moves more than it did when you bought it.':'It has become less sensitive to the market than it was.')+'</p>'
+      : '<p class="muted" style="margin-top:10px;font-size:13px">No holding has drifted more than 0.25. Your positions are behaving roughly as they did six months ago.</p>')+
+    '<p class="muted" style="margin-top:8px;font-size:11.5px;line-height:1.55">Tracked with a Kalman filter over six months of daily returns against SPY, updating beta each day rather than averaging the window into one number. The first 20 days are discarded as burn-in, since the filter is seeded at 1.0 and needs data before its output means anything. An estimate from price history, not a published figure.</p>'+
     '</div>';
 }
 
@@ -4410,6 +4583,12 @@ function mapTo(t){
   document.getElementById('mapTicker').value=t;
   loadMap();
 }
+/* A relationship is one fact seen from two ends: if NVDA sells to DELL, then DELL buys from NVDA.
+   Recording it once and mirroring it means the graph stays consistent no matter which company you
+   happen to be looking at when you enter it. Mirrors are marked so they can be told apart from
+   things you typed directly, and either side can be edited afterwards — the weight often isn't
+   symmetric, since a supplier worth 25% of Dell's costs may be a customer worth 4% of NVIDIA's sales. */
+const OPPOSITE={suppliers:'customers',customers:'suppliers'};
 function addRelation(){
   if(!mapSym)return toast('Map a company first, then add its relationships.');
   const side=document.getElementById('relSide').value;
@@ -4417,14 +4596,37 @@ function addRelation(){
   const ticker=(document.getElementById('relTicker').value||'').trim().toUpperCase();
   const weight=parseFloat(document.getElementById('relWeight').value);
   if(!name&&!ticker)return toast('Enter at least a company name or a ticker.');
+  const w=isFinite(weight)?Math.max(1,Math.min(100,weight)):10;
   const rel=relationsFor(mapSym);
-  rel[side].push({name:name||ticker,ticker:ticker||'',weight:isFinite(weight)?Math.max(1,Math.min(100,weight)):10,note:''});
+  if(ticker&&rel[side].some(x=>x.ticker===ticker))return toast(ticker+' is already on '+mapSym+'\'s map.');
+  rel[side].push({name:name||ticker,ticker:ticker||'',weight:w,note:''});
+
+  // Mirror onto the other company, but only when there's a ticker to hang it on.
+  let mirrored=false;
+  if(ticker&&ticker!==mapSym){
+    const other=relationsFor(ticker);
+    const otherSide=OPPOSITE[side];
+    if(!other[otherSide].some(x=>x.ticker===mapSym)){
+      other[otherSide].push({name:(mapProfile&&mapProfile.name)||mapSym,ticker:mapSym,weight:w,note:'',linked:true});
+      mirrored=true;
+    }
+  }
   ['relName','relTicker','relWeight'].forEach(id=>document.getElementById(id).value='');
   saveDB();drawMap();renderRelList();
-  toast('Added to '+mapSym+'\'s map.');
+  toast('Added to '+mapSym+'\'s map.'+(mirrored?' Also added '+mapSym+' to '+ticker+'\'s map.':''));
 }
 function removeRelation(side,i){
   const rel=relationsFor(mapSym);
+  const x=rel[side][i];
+  if(!x)return;
+  // Offer to clear the other end too, so deleting doesn't leave a half-recorded relationship behind.
+  if(x.ticker&&D.relations&&D.relations[x.ticker]){
+    const other=D.relations[x.ticker],otherSide=OPPOSITE[side];
+    const j=(other[otherSide]||[]).findIndex(y=>y.ticker===mapSym);
+    if(j>=0&&confirm('Also remove '+mapSym+' from '+x.ticker+'\'s map?\n\nOK = remove both ends.\nCancel = only remove it here.')){
+      other[otherSide].splice(j,1);
+    }
+  }
   rel[side].splice(i,1);
   saveDB();drawMap();renderRelList();
 }
@@ -4443,7 +4645,8 @@ function renderRelList(){
   if(!mapSym){el.innerHTML='';return;}
   const rel=relationsFor(mapSym);
   const row=(x,side,i)=>'<tr>'+
-    '<td><b>'+esc(x.name)+'</b>'+(x.ticker?' <span class="muted">'+esc(x.ticker)+'</span>':'')+'</td>'+
+    '<td><b>'+esc(x.name)+'</b>'+(x.ticker?' <span class="muted">'+esc(x.ticker)+'</span>':'')+
+      (x.linked?' <span class="pill pill-na" title="Created automatically from the other company\'s map. Edit freely — the weight often differs by direction.">⇄ linked</span>':'')+'</td>'+
     '<td>'+(side==='suppliers'?'<span class="pill pill-watch">BUYS FROM</span>':'<span class="pill pill-buy">SELLS TO</span>')+'</td>'+
     '<td><input type="number" min="1" max="100" value="'+(x.weight||10)+'" style="width:70px" onchange="setRelWeight(\''+side+'\','+i+',this.value)">%</td>'+
     '<td><input value="'+esc(x.note||'')+'" placeholder="what they do…" onchange="setRelNote(\''+side+'\','+i+',this.value)"></td>'+
@@ -4493,6 +4696,7 @@ async function loadMarketData(force){
   try{
     if(!syncConfigured()){
       renderTodaysMove({error:'NEEDS_WORKER'});
+      renderRegimeBanner({});   // clears rather than leaving a stale banner
       renderWeather({error:'NEEDS_WORKER'});
       return;
     }
@@ -4502,12 +4706,15 @@ async function loadMarketData(force){
     for(const s of need){
       if(macroCache[s]&&!force){out[s]=macroCache[s];continue;}
       try{
-        // Two readings for VIX/SP500 so the previous close is available for today's move.
-        out[s]=await fredSeries(s,(s==='VIXCLS'||s==='SP500')?5:2);
+        /* SP500 needs enough history for the regime detector (20 recent + 60 prior + 1); 120 gives
+           headroom for holidays and gaps. VIX only needs a few readings for the day toggle. */
+        const limit=s==='SP500'?120:(s==='VIXCLS'?5:2);
+        out[s]=await fredSeries(s,limit);
         macroCache[s]=out[s];
       }catch(e){out[s]={error:e.message};}
     }
     renderTodaysMove(out);
+    renderRegimeBanner(out);
     renderWeather(out);
   }finally{macroLoading=false;}
 }
@@ -4584,6 +4791,72 @@ function renderTodaysMove(data){
 }
 let moveDay='today';
 function setMoveDay(d){moveDay=d;renderTodaysMove(macroCache);}
+
+/* ---- Regime shift detection ----
+   Named honestly: this is a VARIANCE-RATIO change detector, not PELT or Bayesian change-point
+   detection. It splits recent daily returns from the period before and asks whether volatility has
+   materially changed. Proper CPD searches for the optimal breakpoint across every possible split and
+   is a heavier piece of machinery; this answers the one question that actually matters here — has
+   the ground moved under thresholds I set a while ago — and it does so on data already in hand.
+
+   Why it matters: your buy bar, your sell trigger and your Monte Carlo assumptions were all chosen
+   in some volatility regime. When that regime changes they quietly stop meaning what they meant. */
+const REGIME_RECENT=20,REGIME_PRIOR=60;
+function detectRegimeShift(series){
+  if(!series||series.length<REGIME_RECENT+REGIME_PRIOR+1)return null;
+  const rets=[];
+  for(let i=1;i<series.length;i++){
+    const a=series[i-1].value,b=series[i].value;
+    if(a>0&&isFinite(a)&&isFinite(b))rets.push((b-a)/a);
+  }
+  if(rets.length<REGIME_RECENT+REGIME_PRIOR)return null;
+  // FRED returns newest-first, so index 0 is the most recent day.
+  const recent=rets.slice(0,REGIME_RECENT);
+  const prior=rets.slice(REGIME_RECENT,REGIME_RECENT+REGIME_PRIOR);
+  const variance=a=>{
+    const m=a.reduce((x,y)=>x+y,0)/a.length;
+    return a.reduce((x,y)=>x+(y-m)*(y-m),0)/(a.length-1);
+  };
+  const vR=variance(recent),vP=variance(prior);
+  if(!(vP>0)||!(vR>0))return null;
+  const ratio=vR/vP;
+  return{
+    ratio,
+    recentVol:Math.sqrt(vR*252)*100,   // annualised, %
+    priorVol:Math.sqrt(vP*252)*100,
+    sinceDate:series[REGIME_RECENT]?series[REGIME_RECENT].date:null,
+    changed:ratio>=2||ratio<=0.5
+  };
+}
+function renderRegimeBanner(data){
+  const el=document.getElementById('regimeBanner');
+  if(!el)return;
+  const spx=data&&data.SP500;
+  if(!spx||spx.error||spx.length<REGIME_RECENT+REGIME_PRIOR+1){el.innerHTML='';return;}
+  const r=detectRegimeShift(spx);
+  if(!r){el.innerHTML='';return;}
+  if(!r.changed){
+    el.innerHTML='<div class="card" style="border-left:3px solid var(--green)">'+
+      '<div class="row" style="justify-content:space-between;flex-wrap:wrap">'+
+        '<b class="pos">Volatility regime is stable</b>'+
+        '<span class="muted" style="font-family:var(--mono);font-size:12.5px">'+r.recentVol.toFixed(1)+'% vs '+r.priorVol.toFixed(1)+'% annualised</span>'+
+      '</div>'+
+      '<p class="muted" style="font-size:12.5px;margin-top:6px">The last '+REGIME_RECENT+' trading days look statistically like the '+REGIME_PRIOR+' before them. Thresholds you set previously still describe the same market.</p>'+
+    '</div>';
+    return;
+  }
+  const up=r.ratio>1;
+  el.innerHTML='<div class="card" style="border-left:4px solid var(--'+(up?'red':'yellow')+')">'+
+    '<div style="font-size:17px;font-weight:700;margin-bottom:6px" class="'+(up?'neg':'warn')+'">'+
+      'Volatility regime changed — swings are '+(up?r.ratio.toFixed(1)+'× larger':'calmer, '+(1/r.ratio).toFixed(1)+'× smaller')+' than before</div>'+
+    '<p style="font-size:14px;line-height:1.6">The last '+REGIME_RECENT+' trading days have run at <b>'+r.recentVol.toFixed(1)+'%</b> annualised volatility against <b>'+r.priorVol.toFixed(1)+'%</b> over the '+REGIME_PRIOR+' days before'+
+      (r.sinceDate?', with the shift showing from around <b>'+esc(r.sinceDate)+'</b>':'')+'. '+
+      (up
+        ? 'Rules tuned in the calmer stretch will now trigger more often and stops set then are closer to being hit than you intended.'
+        : 'Rules tuned in the noisier stretch will now trigger less often, and risk figures based on it are overstating the danger.')+'</p>'+
+    '<p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.55">Variance ratio on S&P daily returns, recent '+REGIME_RECENT+' days against the prior '+REGIME_PRIOR+'. Flags at 2× in either direction. This detects that something changed; it says nothing about what caused it or which way prices go next.</p>'+
+  '</div>';
+}
 function updateMoveButtons(){
   ['today','yesterday','tomorrow'].forEach(d=>{
     const b=document.getElementById('mvBtn_'+d);
