@@ -187,6 +187,31 @@ tr:last-child td{border-bottom:none}
 .v-avoid{background:rgba(229,83,75,.10);border-left:3px solid var(--red)}
 .v-hold{background:rgba(217,164,65,.10);border-left:3px solid var(--yellow)}
 small.src{color:var(--muted)}
+/* ---- Command screen ----
+   Deliberately a list, not a stack of cards. The question is "what do I do today", which should be
+   answerable in one glance; a card per item with a paragraph of reasoning buries three actions under
+   a page of prose. Reasoning is one click away, not in your face. */
+.cmd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:4px;flex-wrap:wrap}
+.cmd-list{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--panel)}
+.cmd-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.cmd-row:last-child{border-bottom:none}
+.cmd-row:hover{background:var(--panel2)}
+.cmd-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cmd-kind{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.06em;width:56px;flex-shrink:0}
+.cmd-sym{font-weight:700;font-size:14px;width:64px;flex-shrink:0}
+.cmd-why{flex:1;font-size:13.5px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmd-score{font-family:var(--mono);font-size:11.5px;color:var(--muted);flex-shrink:0}
+.cmd-chev{color:var(--muted);font-size:11px;flex-shrink:0;transition:transform .15s}
+.cmd-row.open .cmd-chev{transform:rotate(90deg)}
+.cmd-detail{padding:0 16px 16px 60px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:13.5px;line-height:1.6}
+.cmd-detail:last-child{border-bottom:none}
+.cmd-empty{padding:26px 16px;text-align:center}
+@media (max-width:768px){
+  .cmd-why{white-space:normal;font-size:12.5px}
+  .cmd-row{align-items:flex-start;flex-wrap:wrap;padding:12px}
+  .cmd-detail{padding-left:16px}
+  .cmd-score{display:none}
+}
 /* ---- Theme slide switch: light on the left, dark on the right ---- */
 .theme-switch{position:relative;width:240px;height:42px;background:var(--panel2);border:1px solid var(--border);border-radius:21px;cursor:pointer;user-select:none;overflow:hidden}
 .theme-knob{position:absolute;top:3px;left:3px;width:117px;height:34px;background:var(--accent);border-radius:17px;transition:transform .22s ease}
@@ -426,23 +451,15 @@ small.src{color:var(--muted)}
 
 <!-- COMMAND — the morning screen -->
 <div id="tab-command">
-  <div id="greetingBlockCmd">
-    <div class="greeting" id="cmdGreeting">Good morning</div>
-    <div class="greeting-sub" id="cmdSub">Checking what needs you…</div>
+  <div class="cmd-head">
+    <div>
+      <div class="greeting" id="cmdGreeting">Good morning</div>
+      <div class="muted" id="cmdSub" style="font-size:13.5px;margin-top:2px">Checking what needs you…</div>
+    </div>
+    <button class="btn" onclick="runDailyReview()" id="cmdRunBtn">Run review</button>
   </div>
-  <div class="row" style="margin-bottom:18px;flex-wrap:wrap">
-    <button class="btn" onclick="runDailyReview()" id="cmdRunBtn">Run daily review</button>
-    <button class="btn btn-ghost" onclick="renderCommand()">Refresh list</button>
-    <span class="muted" id="cmdStatus"></span>
-  </div>
-  <div class="stat-row" id="cmdStats" style="display:none">
-    <div class="stat s-in"><span class="stat-label">Total managed</span><span class="stat-value" id="cmdAum">$0</span></div>
-    <div class="stat s-count"><span class="stat-label">Portfolios</span><span class="stat-value" id="cmdPortfolios">1</span></div>
-    <div class="stat s-profit"><span class="stat-label">Needs attention</span><span class="stat-value" id="cmdActionCount">0</span></div>
-    <div class="stat s-income"><span class="stat-label">Last reviewed</span><span class="stat-value" id="cmdLastRun" style="font-size:13px">never</span></div>
-  </div>
+  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:18px"></div>
   <div id="commandQueue"></div>
-  <p class="muted" style="margin-top:18px;font-size:11.5px;line-height:1.6">Every row states the rule it triggered and the numbers behind it. Nothing here places a trade or moves money — PerceptFolio has no broker connection. It tells you what your own rules flagged; the decision and the execution stay entirely with you.</p>
 </div>
 
 <!-- DASHBOARD -->
@@ -1526,7 +1543,7 @@ function resetTransientState(){
      NOT cleared here. The per-account CAPE and margin figures live in D and swap with the profile. */
   const tm=document.getElementById('todaysMove');if(tm)tm.innerHTML='<div class="empty">Loading…</div>';
   // The map is per-account data, so it must not carry over when profiles swap.
-  mapSym='';mapProfile=null;mapPeers=[];moveDay='today';
+  mapSym='';mapProfile=null;mapPeers=[];moveDay='today';cmdOpen=null;
   const mc=document.getElementById('mapCanvas');if(mc)mc.innerHTML='<div class="empty">Enter a ticker above to build its map.</div>';
   const md=document.getElementById('mapDetail');if(md)md.innerHTML='';
   const rl=document.getElementById('relList');if(rl)rl.innerHTML='';
@@ -4576,33 +4593,34 @@ function buildActionQueue(){
     // 1 — sell signal on something you own
     if(v&&v.key==='sell'){
       A.push({pri:1,kind:'SELL',sym:h.sym,
-        headline:'Sell rule triggered on '+h.sym,
-        detail:'Quality fell to '+sc.qScore+'/'+sc.qTotal+', at or below your sell bar of '+D.rules.qSell+'. Position is '+fmt$(val)+', '+pct.toFixed(1)+'% of the portfolio.',
-        evidence:tot?tot.got+'/'+tot.max+' criteria':'',
+        summary:'Quality fell to '+sc.qScore+'/'+sc.qTotal+', at your sell bar',
+        detail:'Your sell rule fires when quality drops to '+D.rules.qSell+' or below. It is now '+sc.qScore+'/'+sc.qTotal+'. The position is worth '+fmt$(val)+', which is '+pct.toFixed(1)+'% of the portfolio.',
+        evidence:tot?tot.got+'/'+tot.max:'',
         action:'analyzeStock(\''+esc(h.sym)+'\')',actionLabel:'Review '+h.sym});
     }
     // 2 — position exceeds policy
     if(pct>pol.maxPosition){
       A.push({pri:2,kind:'RISK',sym:h.sym,
-        headline:h.sym+' is '+pct.toFixed(1)+'% of the portfolio',
-        detail:'Your policy caps a single position at '+pol.maxPosition+'%. Trimming to the cap would mean selling about '+fmt$(val-(totalVal*pol.maxPosition/100))+'.',
-        evidence:'policy breach',
+        summary:pct.toFixed(1)+'% of portfolio, over your '+pol.maxPosition+'% cap',
+        detail:'Your investment policy caps any single position at '+pol.maxPosition+'%. Trimming back to the cap would mean selling about '+fmt$(val-(totalVal*pol.maxPosition/100))+'.',
+        evidence:'over cap',
         action:'showTab(\'portfolio\')',actionLabel:'Open Portfolio'});
     }
     // 3 — thesis review overdue
     const th=thesisFor(h.sym);
     if(th&&th.reviewDate&&th.reviewDate<=today){
       A.push({pri:3,kind:'REVIEW',sym:h.sym,
-        headline:'Thesis review due for '+h.sym,
-        detail:(th.why?'You wrote: "'+th.why.slice(0,140)+(th.why.length>140?'…':'')+'" ':'')+'Scheduled review was '+th.reviewDate+'.',
-        evidence:th.scoreAtEntry?('was '+th.scoreAtEntry+(tot?', now '+tot.got+'/'+tot.max:'')):'',
+        summary:'Thesis review was due '+th.reviewDate,
+        detail:(th.why?'You wrote: "'+th.why.slice(0,200)+(th.why.length>200?'…':'')+'" ':'')+'The review you scheduled for '+th.reviewDate+' has passed.'+
+          (th.scoreAtEntry&&tot?' Score was '+th.scoreAtEntry+' when you wrote it, now '+tot.got+'/'+tot.max+'.':''),
+        evidence:th.scoreAtEntry&&tot?th.scoreAtEntry+'→'+tot.got+'/'+tot.max:'',
         action:'showTab(\'portfolio\')',actionLabel:'Open thesis'});
     }
     // 4 — holding with no thesis at all
     if(!th&&h.type==='Stock'&&pct>=5){
       A.push({pri:3,kind:'REVIEW',sym:h.sym,
-        headline:'No thesis written for '+h.sym,
-        detail:'It\'s '+pct.toFixed(1)+'% of the portfolio and there\'s no record of why you own it or what would make you sell.',
+        summary:'No thesis written, and it\'s '+pct.toFixed(1)+'% of the book',
+        detail:'There is no record of why you own '+h.sym+' or what would make you sell it. At '+pct.toFixed(1)+'% of the portfolio that is worth writing down now, while you still remember the reasoning.',
         evidence:'',action:'showTab(\'portfolio\')',actionLabel:'Write one'});
     }
   });
@@ -4615,9 +4633,9 @@ function buildActionQueue(){
     if(v.key!=='buy')return;
     const tot=scoreTotal(sc);
     A.push({pri:1,kind:'BUY',sym:s,
-      headline:s+' crossed your buy bar',
-      detail:'Quality '+sc.qScore+'/'+sc.qTotal+' and value '+sc.pScore+'/'+sc.pTotal+', both at or above your thresholds. Cash available: '+fmt$(D.cash||0)+'.',
-      evidence:tot?tot.got+'/'+tot.max+' criteria':'',
+      summary:'Crossed your buy bar — quality '+sc.qScore+'/'+sc.qTotal+', value '+sc.pScore+'/'+sc.pTotal,
+      detail:'Both quality ('+sc.qScore+'/'+sc.qTotal+') and value ('+sc.pScore+'/'+sc.pTotal+') are at or above the thresholds you set in Settings. You have '+fmt$(D.cash||0)+' in cash. Your policy caps a single position at '+pol.maxPosition+'%, which on this portfolio is '+fmt$(totalVal*pol.maxPosition/100)+'.',
+      evidence:tot?tot.got+'/'+tot.max:'',
       action:'analyzeStock(\''+esc(s)+'\')',actionLabel:'Review '+s});
   });
 
@@ -4625,9 +4643,9 @@ function buildActionQueue(){
   const cashPct=totalVal>0?(D.cash||0)/totalVal*100:0;
   if(cashPct>pol.cashTarget&&(D.cash||0)>0&&holdings.length){
     A.push({pri:2,kind:'CASH',sym:'',
-      headline:fmt$(D.cash||0)+' sitting in cash',
-      detail:'That\'s '+cashPct.toFixed(1)+'% against your target of '+pol.cashTarget+'%. About '+fmt$((D.cash||0)-(totalVal*pol.cashTarget/100))+' more than intended is uninvested.',
-      evidence:'policy breach',action:'showTab(\'screener\')',actionLabel:'Find candidates'});
+      summary:fmt$(D.cash||0)+' idle — '+cashPct.toFixed(1)+'% vs '+pol.cashTarget+'% target',
+      detail:'Cash is '+cashPct.toFixed(1)+'% of the portfolio against your target of '+pol.cashTarget+'%. That is about '+fmt$((D.cash||0)-(totalVal*pol.cashTarget/100))+' more than you intended to leave uninvested.',
+      evidence:'over target',action:'showTab(\'screener\')',actionLabel:'Find candidates'});
   }
 
   // Excluded tickers actually held
@@ -4636,9 +4654,9 @@ function buildActionQueue(){
     holdings.forEach(h=>{
       if(ex.includes(h.sym.toUpperCase())){
         A.push({pri:2,kind:'RISK',sym:h.sym,
-          headline:h.sym+' is on your exclusion list',
-          detail:'Your policy excludes it but the position is still open.',
-          evidence:'policy breach',action:'showTab(\'portfolio\')',actionLabel:'Open Portfolio'});
+          summary:'On your exclusion list but still held',
+          detail:'Your investment policy excludes '+h.sym+', but the position is still open.',
+          evidence:'excluded',action:'showTab(\'portfolio\')',actionLabel:'Open Portfolio'});
       }
     });
   }
@@ -4647,12 +4665,17 @@ function buildActionQueue(){
   const stale=holdings.filter(h=>h.type!=='Fund'&&(!h.priceDate||Date.now()-h.priceDate>3*864e5)).length;
   if(stale){
     A.push({pri:2,kind:'DATA',sym:'',
-      headline:stale+' holding'+(stale===1?' has':'s have')+' prices over 3 days old',
-      detail:'Everything on this screen is calculated from those prices. Refresh before acting on any of it.',
-      evidence:'',action:'refreshAll()',actionLabel:'Refresh data'});
+      summary:stale+' price'+(stale===1?'':'s')+' over 3 days old',
+      detail:'Every number on this screen is calculated from those prices, including the verdicts and the policy checks. Refresh before acting on any of it.',
+      evidence:'stale',action:'runDailyReview()',actionLabel:'Run review'});
   }
 
   return A.sort((a,b)=>a.pri-b.pri);
+}
+let cmdOpen=null;   // index of the expanded row, or null
+function toggleCmdRow(i){
+  cmdOpen=(cmdOpen===i)?null:i;
+  renderCommand();
 }
 function renderCommand(){
   const el=document.getElementById('commandQueue');
@@ -4666,45 +4689,48 @@ function renderCommand(){
   const q=buildActionQueue();
   const holdings=D.holdings||[];
   const totalVal=holdings.reduce((a,h)=>a+(h.price??h.cost)*h.shares,0)+(D.cash||0);
-  const clients=Object.values(DB.profiles||{}).filter(p=>p.managedBy===USER).length;
 
-  const stats=document.getElementById('cmdStats');
-  if(stats)stats.style.display=holdings.length||clients?'flex':'none';
-  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-  set('cmdAum',pmask(fmt$(totalVal)));
-  set('cmdPortfolios',1+clients);
-  set('cmdActionCount',q.length);
-  set('cmdLastRun',D.lastRefresh?new Date(D.lastRefresh).toLocaleString():'never');
+  /* One summary line rather than four stat cards. The cards competed with the actions for attention,
+     and the actions are the entire point of the screen. */
+  if(sub){
+    const bits=[];
+    if(q.length)bits.push('<b class="'+(q.some(a=>a.pri===1)?'neg':'warn')+'">'+q.length+' need'+(q.length===1?'s':'')+' you</b>');
+    else if(holdings.length)bits.push('<b class="pos">all clear</b>');
+    if(totalVal>0)bits.push(pmask(fmt$(totalVal)));
+    bits.push(D.lastRefresh?'reviewed '+new Date(D.lastRefresh).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'not reviewed yet');
+    sub.innerHTML=bits.join(' · ');
+  }
 
   if(!holdings.length&&!(D.watchlist||[]).length){
-    if(sub)sub.textContent='Nothing to review yet.';
-    el.innerHTML='<div class="card"><div class="empty">Add holdings in <b>Portfolio</b> or tickers in <b>Watchlist</b>, then hit <b>Run daily review</b>. Command only reports what your own rules flag — with nothing to check, there\'s nothing to say.</div></div>';
+    el.innerHTML='<div class="cmd-list"><div class="cmd-empty muted">Add holdings in <b>Portfolio</b> or tickers in <b>Watchlist</b>, then hit <b>Run review</b>.</div></div>';
     return;
   }
   if(!q.length){
-    if(sub)sub.textContent='Nothing needs you today.';
-    el.innerHTML='<div class="card" style="border-left:3px solid var(--green)">'+
-      '<div style="font-size:17px;font-weight:700" class="pos">✓ Nothing requires action</div>'+
-      '<p class="muted" style="margin-top:6px;font-size:13.5px">No sell rules triggered, no buy bars crossed, no policy breaches, no reviews due. Most days look like this, and that is the system working rather than failing.</p></div>';
+    el.innerHTML='<div class="cmd-list"><div class="cmd-empty">'+
+      '<div class="pos" style="font-size:16px;font-weight:700">Nothing needs you</div>'+
+      '<div class="muted" style="font-size:13px;margin-top:6px;max-width:420px;margin-left:auto;margin-right:auto">No rules triggered, no policy breaches, no reviews due. Most days look like this.</div></div></div>';
     return;
   }
-  if(sub)sub.textContent=q.length+' thing'+(q.length===1?'':'s')+' need'+(q.length===1?'s':'')+' your attention.';
 
-  const colour=k=>k==='SELL'?'red':k==='BUY'?'green':k==='CASH'?'accent':k==='DATA'?'muted':'yellow';
-  const pillCls=k=>k==='SELL'?'pill-sell':k==='BUY'?'pill-buy':k==='REVIEW'?'pill-hold':'pill-watch';
-  el.innerHTML=q.map((a,i)=>
-    '<div class="card" style="margin-bottom:10px;border-left:4px solid var(--'+colour(a.kind)+')">'+
-      '<div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:6px">'+
-        '<div class="row" style="gap:8px">'+
-          '<span class="muted" style="font-family:var(--mono);font-size:12px">'+(i+1)+'</span>'+
-          '<span class="pill '+pillCls(a.kind)+'">'+esc(a.kind)+'</span>'+
-          '<b style="font-size:15px">'+esc(a.headline)+'</b>'+
-        '</div>'+
-        (a.evidence?'<span class="muted" style="font-family:var(--mono);font-size:12px">'+esc(a.evidence)+'</span>':'')+
+  const colour=k=>k==='SELL'?'var(--red)':k==='BUY'?'var(--green)':k==='CASH'?'var(--accent)':k==='DATA'?'var(--muted)':'var(--yellow)';
+  const kindCls=k=>k==='SELL'?'neg':k==='BUY'?'pos':k==='DATA'?'muted':'warn';
+
+  el.innerHTML='<div class="cmd-list">'+q.map((a,i)=>{
+    const open=cmdOpen===i;
+    return '<div class="cmd-row'+(open?' open':'')+'" onclick="toggleCmdRow('+i+')">'+
+        '<span class="cmd-dot" style="background:'+colour(a.kind)+'"></span>'+
+        '<span class="cmd-kind '+kindCls(a.kind)+'">'+esc(a.kind)+'</span>'+
+        '<span class="cmd-sym">'+esc(a.sym||'—')+'</span>'+
+        '<span class="cmd-why">'+esc(a.summary||a.headline)+'</span>'+
+        (a.evidence?'<span class="cmd-score">'+esc(a.evidence)+'</span>':'')+
+        '<span class="cmd-chev">▶</span>'+
       '</div>'+
-      '<p style="font-size:13.5px;line-height:1.6;color:var(--muted)">'+esc(a.detail)+'</p>'+
-      '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="'+a.action+'">'+esc(a.actionLabel)+'</button>'+
-    '</div>').join('');
+      (open?'<div class="cmd-detail">'+
+        '<p style="color:var(--muted)">'+esc(a.detail)+'</p>'+
+        '<button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="event.stopPropagation();'+a.action+'">'+esc(a.actionLabel)+'</button>'+
+      '</div>':'');
+  }).join('')+'</div>'+
+  '<p class="muted" style="margin-top:14px;font-size:11.5px;line-height:1.55">Click any row for the reasoning. Nothing here places a trade — PerceptFolio has no broker connection and reports only what your own rules flagged.</p>';
 }
 async function runDailyReview(){
   const btn=document.getElementById('cmdRunBtn'),st=document.getElementById('cmdStatus');
