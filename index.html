@@ -379,8 +379,8 @@ small.src{color:var(--muted)}
 <header>
   <div class="logo"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
   <nav>
-    <button data-tab="command" id="navCommand" class="active" onclick="showTab('command')">Command</button>
-    <button data-tab="dashboard" onclick="showTab('dashboard')">Dashboard</button>
+    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
+    <button data-tab="command" id="navCommand" onclick="showTab('command')">Command</button>
     <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')">Portfolio</button>
     <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')">Watchlist</button>
     <button data-tab="history" id="navHistory" onclick="showTab('history')">History</button>
@@ -450,7 +450,7 @@ small.src{color:var(--muted)}
 <main>
 
 <!-- COMMAND — the morning screen -->
-<div id="tab-command">
+<div id="tab-command" class="tabs-hidden">
   <div class="cmd-head">
     <div>
       <div class="greeting" id="cmdGreeting">Good morning</div>
@@ -463,7 +463,7 @@ small.src{color:var(--muted)}
 </div>
 
 <!-- DASHBOARD -->
-<div id="tab-dashboard" class="tabs-hidden">
+<div id="tab-dashboard">
   <div id="greetingBlock">
     <div class="greeting" id="greetingText">Welcome</div>
     <div class="greeting-sub" id="greetingSub">Here's where things stand today.</div>
@@ -588,10 +588,12 @@ small.src{color:var(--muted)}
     <div class="field"><label>What must stay true?</label><textarea id="thesisMust" rows="2" placeholder="Margins stay above X. Revenue growth stays above Y. No major competitor displacement." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
     <div class="field"><label>What would make us sell?</label><textarea id="thesisInvalid" rows="2" placeholder="Quality score drops below 8. Margins compress two quarters running. Valuation exceeds X." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
     <div class="row">
+      <div class="field" style="max-width:250px;margin-bottom:0"><label>Sell if quality drops below (of 12)</label><input id="thesisSellBelow" type="number" min="0" max="12" step="1" placeholder="e.g. 8"></div>
       <div class="field" style="max-width:220px;margin-bottom:0"><label>Next review</label><input id="thesisReview" type="date"></div>
       <button class="btn" style="align-self:flex-end" onclick="saveThesis()">Save thesis</button>
       <button class="btn-danger btn btn-ghost" style="align-self:flex-end" onclick="deleteThesis()">Delete</button>
     </div>
+    <p class="muted" style="margin-top:10px;font-size:11.5px;line-height:1.55">The quality threshold is the part the app can act on — free text it can store but not read. Set it and this stock gets <b>its own sell trigger</b>, checked ahead of the global one in Settings. A company you bought for its balance sheet can be held to a different standard than one you bought cheap.</p>
   </div>
 
   <div class="section-title">Your Holdings</div>
@@ -723,10 +725,11 @@ small.src{color:var(--muted)}
     <div class="row">
       <input id="mapTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')loadMap()">
       <button class="btn" onclick="loadMap()">Map it</button>
-      <button class="btn btn-ghost" onclick="relinkAll()" title="Creates the missing opposite entry for every relationship that has a ticker">⇄ Link all maps</button>
+      <button class="btn btn-ghost" onclick="toggleMappedList()" id="mappedToggle">All maps</button>
+      <button class="btn btn-ghost" onclick="relinkAll()" title="Creates the missing opposite entry for every relationship that has a ticker">⇄ Link</button>
       <span class="muted" id="mapStatus"></span>
     </div>
-    <div id="mappedList" style="margin-top:12px"></div>
+    <div id="mappedList" style="margin-top:12px;display:none"></div>
   </div>
 
   <div class="card" style="margin-top:16px;overflow-x:auto">
@@ -1608,9 +1611,8 @@ function updateAccountTypeUI(){
     const activeTab=active?active.getAttribute('data-tab'):null;
     if(activeTab&&activeTab!=='dashboard'&&activeTab!=='clients')showTab('dashboard');
   }else{
-    // Personal view lands on Command, which is the point of it.
     const active=document.querySelector('nav button.active');
-    if(!active)showTab('command');
+    if(!active)showTab('dashboard');
   }
 }
 function hideAccountMenu(){
@@ -2234,9 +2236,18 @@ function scoreTotal(sc){
   const max=(sc.qTotal||12)+(sc.pTotal||6)+(sc.mTotal||4);
   return{got,max};
 }
-function verdictOf(sc,isHolding){
+/* sym is optional. When supplied and a thesis exists for it, the thesis's own sell threshold is
+   checked BEFORE the global rule — a condition you set deliberately for one company should outrank
+   the blanket setting, and it's the mechanism that makes a written thesis do work rather than sit
+   in a text box. */
+function verdictOf(sc,isHolding,sym){
   if(sc.error)return{label:'No data',cls:'pill-na',key:'na'};
   const r=D.rules;
+  const th=sym?thesisFor(sym):null;
+  if(isHolding&&th&&isFinite(th.sellBelow)&&th.sellBelow>0&&sc.qScore<th.sellBelow){
+    return{label:'SELL — your thesis condition',cls:'pill-sell',key:'sell',viaThesis:true,
+      why:'Quality '+sc.qScore+'/'+sc.qTotal+' is below the '+th.sellBelow+' you set for this position'};
+  }
   const mOk=(r.mBuy||0)<=0||sc.mScore>=r.mBuy; // momentum only gates BUY if you've raised mBuy above 0 in Settings
   if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&mOk)return{label:'BUY candidate',cls:'pill-buy',key:'buy'};
   if(isHolding&&sc.qTotal>=6&&sc.qScore<=r.qSell)return{label:'Consider SELLING',cls:'pill-sell',key:'sell'};
@@ -3805,7 +3816,7 @@ function renderAll(){
     if(!matchesMyCall(h.sym,pfMine))return false;
     if(pfSignal!=='All'){
       const sc0=h.type==='Stock'?D.analyses[h.sym]:null;
-      const v0=sc0?verdictOf(sc0,true):null;
+      const v0=sc0?verdictOf(sc0,true,h.sym):null;
       if(!v0||v0.key!==pfSignal)return false;
     }
     return true;
@@ -3824,7 +3835,7 @@ function renderAll(){
     gl:x=>holdingGL(x.h),
     signal:x=>{
       if(x.h.type!=='Stock')return null;
-      const sc=D.analyses[x.h.sym];const v=sc?verdictOf(sc,true):null;
+      const sc=D.analyses[x.h.sym];const v=sc?verdictOf(sc,true,x.h?x.h.sym:x.s):null;
       return v?SIGNAL_RANK[v.key]:null;
     }
   };
@@ -3834,7 +3845,7 @@ function renderAll(){
     const p=h.price,val=(p??h.cost)*h.shares,gl=holdingGL(h);
     const glPct=holdingGLPct(h);
     const sc=h.type==='Stock'?D.analyses[h.sym]:null;
-    const v=sc?verdictOf(sc,true):null;
+    const v=sc?verdictOf(sc,true,h.sym):null;
     const typePill=h.type==='Fund'?'<span class="pill pill-na">Fund</span>':h.type;
     const priceNote=h.type==='Fund'?'<div class="muted" style="font-size:11px">manual NAV'+(h.priceDate?' · '+new Date(h.priceDate).toLocaleDateString():'')+'</div>'
       :h.manualPrice?'<div class="muted" style="font-size:11px">manual'+(h.priceDate?' · '+new Date(h.priceDate).toLocaleDateString():'')+'</div>'
@@ -4508,6 +4519,7 @@ function loadThesis(){
   const t=thesisFor(sym)||{};
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
   set('thesisWhy',t.why);set('thesisMust',t.mustBeTrue);set('thesisInvalid',t.invalidIf);set('thesisReview',t.reviewDate);
+  set('thesisSellBelow',isFinite(t.sellBelow)?t.sellBelow:'');
   const st=document.getElementById('thesisStatus');
   if(st){
     if(!sym)st.textContent='';
@@ -4527,9 +4539,11 @@ function saveThesis(){
   const existing=D.theses[sym];
   const sc=D.analyses[sym];
   const tot=scoreTotal(sc);
+  const sb=parseFloat(val('thesisSellBelow'));
   D.theses[sym]={
     why:val('thesisWhy'),mustBeTrue:val('thesisMust'),invalidIf:val('thesisInvalid'),
     reviewDate:val('thesisReview'),
+    sellBelow:(isFinite(sb)&&sb>0)?Math.min(12,sb):null,
     created:(existing&&existing.created)||new Date().toISOString().slice(0,10),
     // Snapshot the score at the time of writing, so drift since is visible later.
     scoreAtEntry:(existing&&existing.scoreAtEntry)||(tot?tot.got+'/'+tot.max:'')
@@ -4587,15 +4601,21 @@ function buildActionQueue(){
     const val=(h.price??h.cost)*h.shares;
     const pct=totalVal>0?val/totalVal*100:0;
     const sc=h.type==='Stock'?D.analyses[h.sym]:null;
-    const v=sc&&!sc.error?verdictOf(sc,true):null;
+    const v=sc&&!sc.error?verdictOf(sc,true,h.sym):null;
     const tot=scoreTotal(sc);
 
-    // 1 — sell signal on something you own
+    // 1 — sell signal on something you own. A thesis condition ranks above the global rule and says so.
     if(v&&v.key==='sell'){
+      const byThesis=!!v.viaThesis;
       A.push({pri:1,kind:'SELL',sym:h.sym,
-        summary:'Quality fell to '+sc.qScore+'/'+sc.qTotal+', at your sell bar',
-        detail:'Your sell rule fires when quality drops to '+D.rules.qSell+' or below. It is now '+sc.qScore+'/'+sc.qTotal+'. The position is worth '+fmt$(val)+', which is '+pct.toFixed(1)+'% of the portfolio.',
-        evidence:tot?tot.got+'/'+tot.max:'',
+        summary:byThesis?'Your own thesis condition broke — quality '+sc.qScore+'/'+sc.qTotal
+                        :'Quality fell to '+sc.qScore+'/'+sc.qTotal+', at your sell bar',
+        detail:(byThesis
+          ? 'When you wrote the thesis for '+h.sym+' you said to sell if quality dropped below '+thesisFor(h.sym).sellBelow+'. It is now '+sc.qScore+'/'+sc.qTotal+'. This is your own condition firing, not the global rule.'
+            +(thesisFor(h.sym).why?' You bought it because: "'+thesisFor(h.sym).why.slice(0,180)+(thesisFor(h.sym).why.length>180?'…':'')+'"':'')
+          : 'Your global sell rule fires when quality drops to '+D.rules.qSell+' or below. It is now '+sc.qScore+'/'+sc.qTotal+'.')
+          +' The position is worth '+fmt$(val)+', which is '+pct.toFixed(1)+'% of the portfolio.',
+        evidence:byThesis?'thesis':(tot?tot.got+'/'+tot.max:''),
         action:'analyzeStock(\''+esc(h.sym)+'\')',actionLabel:'Review '+h.sym});
     }
     // 2 — position exceeds policy
@@ -5037,21 +5057,44 @@ function setRelWeight(side,i,v){
 }
 /* Every company that has relationships recorded, so the linked maps are actually reachable — the
    mirror is useless if there's no way to notice the other company now exists. */
+let mappedOpen=false;
+function toggleMappedList(){
+  mappedOpen=!mappedOpen;
+  renderMappedList();
+}
+/* Collapsed by default — it's a navigation aid, not something you need on screen while reading a map.
+   Same row treatment as the Command queue so the app has one way of presenting a list. */
 function renderMappedList(){
   const el=document.getElementById('mappedList');
+  const btn=document.getElementById('mappedToggle');
   if(!el)return;
   const syms=Object.keys(D.relations||{}).filter(s=>{
     const r=D.relations[s];
     return r&&((r.suppliers||[]).length||(r.customers||[]).length);
   }).sort();
-  if(!syms.length){el.innerHTML='';return;}
-  el.innerHTML='<span class="muted" style="font-size:12px;margin-right:8px">Mapped:</span>'+
-    syms.map(s=>{
-      const r=D.relations[s];
-      const n=(r.suppliers||[]).length+(r.customers||[]).length;
-      const active=s===mapSym;
-      return '<button class="btn btn-ghost btn-sm" style="margin:0 5px 5px 0'+(active?';border-color:var(--accent);color:var(--accent)':'')+'" onclick="mapTo(\''+esc(s)+'\')">'+esc(s)+' <span class="muted">'+n+'</span></button>';
-    }).join('');
+  if(btn){
+    btn.textContent=syms.length?('All maps ('+syms.length+')'):'All maps';
+    btn.style.borderColor=mappedOpen?'var(--accent)':'';
+    btn.style.color=mappedOpen?'var(--accent)':'';
+  }
+  el.style.display=mappedOpen?'block':'none';
+  if(!mappedOpen)return;
+  if(!syms.length){
+    el.innerHTML='<div class="cmd-list"><div class="cmd-empty muted">Nothing mapped yet.</div></div>';
+    return;
+  }
+  el.innerHTML='<div class="cmd-list">'+syms.map(s=>{
+    const r=D.relations[s];
+    const sup=(r.suppliers||[]).length,cus=(r.customers||[]).length;
+    const active=s===mapSym;
+    return '<div class="cmd-row" onclick="mapTo(\''+esc(s)+'\');toggleMappedList()">'+
+      '<span class="cmd-dot" style="background:'+(active?'var(--accent)':'var(--border)')+'"></span>'+
+      '<span class="cmd-sym" style="width:auto;min-width:64px">'+esc(s)+'</span>'+
+      '<span class="cmd-why">'+sup+' supplier'+(sup===1?'':'s')+' · '+cus+' customer'+(cus===1?'':'s')+'</span>'+
+      (active?'<span class="cmd-score" style="color:var(--accent)">showing</span>':'')+
+      '<span class="cmd-chev">▶</span>'+
+    '</div>';
+  }).join('')+'</div>';
 }
 function renderRelList(){
   renderMappedList();
@@ -5128,6 +5171,18 @@ async function loadMarketData(force){
         macroCache[s]=out[s];
       }catch(e){out[s]={error:e.message};}
     }
+    /* FRED publishes SP500 end-of-day and roughly a day in arrears, so its newest row is yesterday's
+       close, not today's. Finnhub's SPY quote IS live on the free tier and carries the previous
+       close, so today's move is taken from there. Using FRED for "today" was simply wrong. */
+    if(D.apiKey){
+      try{
+        const q=await getQuote('SPY');
+        if(q&&isFinite(q.c)&&isFinite(q.pc)&&q.pc>0){
+          out.LIVE={price:q.c,prevClose:q.pc,pct:(q.c-q.pc)/q.pc*100,at:Date.now()};
+          macroCache.LIVE=out.LIVE;
+        }
+      }catch(e){}
+    }
     renderTodaysMove(out);
     renderRegimeBanner(out);
     renderWeather(out);
@@ -5149,60 +5204,99 @@ function renderTodaysMove(data){
     return;
   }
   updateMoveButtons();
-  /* Index 0 is the most recent reading (FRED is fetched newest-first). "Today" compares [0] to [1];
-     "yesterday" shifts one back and compares [1] to [2]. */
-  const shift=moveDay==='yesterday'?1:0;
-  const vixRow=vix[shift]||vix[0];
-  const vixNow=vixRow.value;
-  const expected=vixNow/Math.sqrt(TRADING_DAYS);      // expected daily move, %
+  const vixNow=vix[0].value;
+  const expected=vixNow/Math.sqrt(TRADING_DAYS);      // implied daily move, %
+
+  /* SECOND PROJECTION — realized volatility.
+     VIX is what the options market EXPECTS. Realized vol is what actually happened over the last 20
+     sessions. Quoting only the first leaves you trusting a single estimate; showing both tells you
+     whether the market is braced for more turbulence than it has been delivering, and by how much.
+     When they diverge sharply, that gap is itself the information. */
+  const realized=(()=>{
+    if(!spx||spx.error||spx.length<21)return null;
+    const r=[];
+    for(let i=1;i<=20&&i<spx.length;i++){
+      const a=spx[i].value,b=spx[i-1].value;
+      if(a>0)r.push((b-a)/a);
+    }
+    if(r.length<10)return null;
+    const m=r.reduce((x,y)=>x+y,0)/r.length;
+    const v=r.reduce((x,y)=>x+(y-m)*(y-m),0)/(r.length-1);
+    const dailyPct=Math.sqrt(v)*100;
+    return{daily:dailyPct,annual:dailyPct*Math.sqrt(TRADING_DAYS)};
+  })();
 
   /* TOMORROW is not a forecast and cannot be. There is no data for a day that hasn't happened.
-     What VIX genuinely gives is the RANGE the market expects — so this shows the range and says
-     plainly that the direction is unknowable. Anything else here would be fabrication. */
+     What VIX gives is the RANGE the market expects — shown here alongside the range recent history
+     would imply, so you can see whether the two estimates agree. Neither says direction. */
   if(moveDay==='tomorrow'){
+    const agree=realized?Math.abs(expected-realized.daily)/Math.max(expected,realized.daily)*100:null;
     el.innerHTML=
       '<div style="font-size:26px;font-weight:700;line-height:1.35;letter-spacing:-.3px">'+
         'Tomorrow: expect roughly <span class="warn">±'+expected.toFixed(2)+'%</span></div>'+
-      '<div style="margin-top:10px;font-size:15px;line-height:1.6">'+
-        'At VIX '+vixNow.toFixed(2)+', a normal day is about ±'+expected.toFixed(2)+'%. '+
-        'Two thirds of days land inside that. About one day in twenty exceeds <b>±'+(expected*2).toFixed(2)+'%</b>.'+
+      '<div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:520px">'+
+        '<div class="card" style="background:var(--panel2)"><h3>Implied — what the market expects</h3>'+
+          '<div class="big warn">±'+expected.toFixed(2)+'%</div>'+
+          '<div class="muted" style="font-size:11.5px;margin-top:4px">VIX '+vixNow.toFixed(2)+' ÷ √252</div></div>'+
+        '<div class="card" style="background:var(--panel2)"><h3>Realized — what actually happened</h3>'+
+          '<div class="big">'+(realized?'±'+realized.daily.toFixed(2)+'%':'—')+'</div>'+
+          '<div class="muted" style="font-size:11.5px;margin-top:4px">'+(realized?'last 20 sessions · '+realized.annual.toFixed(1)+'% annualised':'not enough history')+'</div></div>'+
+      '</div>'+
+      '<div style="margin-top:12px;font-size:14.5px;line-height:1.6">'+
+        'Two thirds of days land inside ±'+expected.toFixed(2)+'%. About one in twenty exceeds <b>±'+(expected*2).toFixed(2)+'%</b>.'+
+        (realized&&agree!=null
+          ? (agree<20
+             ? ' <span class="pos">Both estimates agree</span> within '+agree.toFixed(0)+'%, so this figure is on reasonably firm ground.'
+             : expected>realized.daily
+               ? ' <span class="warn">The market is bracing for '+(expected/realized.daily).toFixed(1)+'× more movement than the last month actually delivered.</span> Either something is expected, or fear is priced above reality.'
+               : ' <span class="warn">Recent days have been '+(realized.daily/expected).toFixed(1)+'× more volatile than VIX implies.</span> The options market may be underpricing what is already happening.')
+          : '')+
       '</div>'+
       '<div class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.55">'+
         '<b>This is a range, not a prediction.</b> Nothing here says up or down — VIX measures how big '+
         'a move the market is bracing for, and it is equally consistent with a rise or a fall. If any tool '+
         'claims to know tomorrow\'s direction, it is guessing.</div>'+
-      '<div class="muted" style="font-size:11.5px;margin-top:8px">VIX as of '+esc(vixRow.date)+' · source FRED</div>';
+      '<div class="muted" style="font-size:11.5px;margin-top:8px">VIX as of '+esc(vix[0].date)+' · source FRED</div>';
     return;
   }
 
-  let actual=null,spxDate=null;
-  if(spx&&!spx.error&&spx.length>=shift+2){
-    actual=(spx[shift].value-spx[shift+1].value)/spx[shift+1].value*100;
-    spxDate=spx[shift].date;
+  let actual=null,spxDate=null,live=false;
+  if(moveDay==='today'&&data.LIVE){
+    // Live SPY from Finnhub — the only genuinely "today" number available.
+    actual=data.LIVE.pct;spxDate='live';live=true;
+  }else if(spx&&!spx.error&&spx.length>=2){
+    // FRED's newest close. With the publishing lag this is yesterday, so it's labelled as its date.
+    actual=(spx[0].value-spx[1].value)/spx[1].value*100;
+    spxDate=spx[0].date;
   }
-  const label=moveDay==='yesterday'?'That':'Today';
+  const label=live?'Today':'That day';
   const sigma=(actual!=null&&expected>0)?Math.abs(actual)/expected:null;
   const band=sigma==null?'':sigma<1?'quiet':sigma<2?'busy':'unusual';
   const cls=sigma==null?'flat':sigma<1?'':sigma<2?'warn':'neg';
   el.innerHTML=
     '<div style="font-size:26px;font-weight:700;line-height:1.35;letter-spacing:-.3px">'+
       (actual!=null
-        ? 'The S&P was '+(actual>=0?'up':'down')+' <span class="'+(actual>=0?'pos':'neg')+'">'+Math.abs(actual).toFixed(2)+'%</span> '+
-          '<span class="muted" style="font-size:15px;font-weight:500">on '+esc(spxDate)+'</span>'
+        ? 'The S&P '+(live?'is':'was')+' '+(actual>=0?'up':'down')+' <span class="'+(actual>=0?'pos':'neg')+'">'+Math.abs(actual).toFixed(2)+'%</span> '+
+          '<span class="muted" style="font-size:15px;font-weight:500">'+(live?'right now':'on '+esc(spxDate))+'</span>'
         : 'VIX is '+vixNow.toFixed(2))+
     '</div>'+
     '<div style="margin-top:10px;font-size:15px;line-height:1.6">'+
-      'VIX '+vixNow.toFixed(2)+' implies an ordinary day of about <b>±'+expected.toFixed(2)+'%</b>.'+
+      'VIX '+vixNow.toFixed(2)+' implies an ordinary day of about <b>±'+expected.toFixed(2)+'%</b>'+
+      (realized?', and the last 20 sessions actually ran <b>±'+realized.daily.toFixed(2)+'%</b>':'')+'.'+
       (sigma!=null
-        ? ' '+label+' was a <b class="'+cls+'">'+sigma.toFixed(1)+'σ</b> move — <b class="'+cls+'">'+band+'</b>.'
+        ? ' '+label+' '+(live?'is':'was')+' a <b class="'+cls+'">'+sigma.toFixed(1)+'σ</b> move — <b class="'+cls+'">'+band+'</b>.'
         : ' No index reading to compare against yet.')+
     '</div>'+
     (sigma!=null?'<div class="muted" style="font-size:12.5px;margin-top:8px">'+
       (sigma<1?'Inside the normal range. Days like this are the majority of days and rarely mean anything.'
        :sigma<2?'Larger than typical but not rare — roughly a once-a-fortnight size of move.'
        :'Well outside the normal range. Moves this size cluster around real news.')+'</div>':'')+
-    '<div class="muted" style="font-size:11.5px;margin-top:8px">VIX as of '+esc(vixRow.date)+' · source FRED. '+
-      'FRED publishes end-of-day, so "today" means the most recent close, not live intraday.</div>';
+    '<div class="muted" style="font-size:11.5px;margin-top:8px">'+
+      (live
+        ? 'S&P move from live SPY via Finnhub, measured against yesterday\'s close. VIX as of '+esc(vix[0].date)+' from FRED.'
+        : 'From FRED, which publishes end-of-day and about a day in arrears — this is the newest close it holds, dated above, not live intraday.'+
+          (moveDay==='today'&&!D.apiKey?' <span class="warn">Add a Finnhub key in Settings for a genuinely live figure.</span>':''))+
+    '</div>';
 }
 let moveDay='today';
 function setMoveDay(d){moveDay=d;renderTodaysMove(macroCache);}
