@@ -354,7 +354,8 @@ small.src{color:var(--muted)}
 <header>
   <div class="logo"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
   <nav>
-    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
+    <button data-tab="command" id="navCommand" class="active" onclick="showTab('command')">Command</button>
+    <button data-tab="dashboard" onclick="showTab('dashboard')">Dashboard</button>
     <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')">Portfolio</button>
     <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')">Watchlist</button>
     <button data-tab="history" id="navHistory" onclick="showTab('history')">History</button>
@@ -423,8 +424,29 @@ small.src{color:var(--muted)}
 </div>
 <main>
 
+<!-- COMMAND — the morning screen -->
+<div id="tab-command">
+  <div id="greetingBlockCmd">
+    <div class="greeting" id="cmdGreeting">Good morning</div>
+    <div class="greeting-sub" id="cmdSub">Checking what needs you…</div>
+  </div>
+  <div class="row" style="margin-bottom:18px;flex-wrap:wrap">
+    <button class="btn" onclick="runDailyReview()" id="cmdRunBtn">Run daily review</button>
+    <button class="btn btn-ghost" onclick="renderCommand()">Refresh list</button>
+    <span class="muted" id="cmdStatus"></span>
+  </div>
+  <div class="stat-row" id="cmdStats" style="display:none">
+    <div class="stat s-in"><span class="stat-label">Total managed</span><span class="stat-value" id="cmdAum">$0</span></div>
+    <div class="stat s-count"><span class="stat-label">Portfolios</span><span class="stat-value" id="cmdPortfolios">1</span></div>
+    <div class="stat s-profit"><span class="stat-label">Needs attention</span><span class="stat-value" id="cmdActionCount">0</span></div>
+    <div class="stat s-income"><span class="stat-label">Last reviewed</span><span class="stat-value" id="cmdLastRun" style="font-size:13px">never</span></div>
+  </div>
+  <div id="commandQueue"></div>
+  <p class="muted" style="margin-top:18px;font-size:11.5px;line-height:1.6">Every row states the rule it triggered and the numbers behind it. Nothing here places a trade or moves money — PerceptFolio has no broker connection. It tells you what your own rules flagged; the decision and the execution stay entirely with you.</p>
+</div>
+
 <!-- DASHBOARD -->
-<div id="tab-dashboard">
+<div id="tab-dashboard" class="tabs-hidden">
   <div id="greetingBlock">
     <div class="greeting" id="greetingText">Welcome</div>
     <div class="greeting-sub" id="greetingSub">Here's where things stand today.</div>
@@ -538,6 +560,23 @@ small.src{color:var(--muted)}
       <button class="btn btn-ghost" onclick="setCash()">Update Cash</button>
     </div>
   </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Investment Thesis</h3>
+    <p class="muted" style="margin-bottom:12px">Write down why you bought something and what would make you sell it, <b>while you still remember</b>. Six months from now the price will have moved and you'll be tempted to invent a reason for whatever it did. A thesis written in advance is the only thing that stops that.</p>
+    <div class="row" style="margin-bottom:10px">
+      <select id="thesisSym" style="max-width:200px" onchange="loadThesis()"></select>
+      <span class="muted" id="thesisStatus" style="font-size:12.5px"></span>
+    </div>
+    <div class="field"><label>Why do we own it?</label><textarea id="thesisWhy" rows="2" placeholder="Durable advantage in X, strong free cash flow, reasonable price…" style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <div class="field"><label>What must stay true?</label><textarea id="thesisMust" rows="2" placeholder="Margins stay above X. Revenue growth stays above Y. No major competitor displacement." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <div class="field"><label>What would make us sell?</label><textarea id="thesisInvalid" rows="2" placeholder="Quality score drops below 8. Margins compress two quarters running. Valuation exceeds X." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <div class="row">
+      <div class="field" style="max-width:220px;margin-bottom:0"><label>Next review</label><input id="thesisReview" type="date"></div>
+      <button class="btn" style="align-self:flex-end" onclick="saveThesis()">Save thesis</button>
+      <button class="btn-danger btn btn-ghost" style="align-self:flex-end" onclick="deleteThesis()">Delete</button>
+    </div>
+  </div>
+
   <div class="section-title">Your Holdings</div>
   <div class="card" style="margin-bottom:14px">
     <div class="row">
@@ -547,7 +586,7 @@ small.src{color:var(--muted)}
       </select>
       <select id="pfFilterBroker" style="max-width:150px" onchange="renderAll()"><option value="All">All brokers</option></select>
       <select id="pfFilterSignal" style="max-width:150px" onchange="renderAll()">
-        <option value="All">All AI calls</option><option value="buy">AI: BUY candidate</option><option value="sell">AI: Consider selling</option><option value="watch">AI: Watch</option><option value="hold">AI: Hold</option>
+        <option value="All">All verdicts</option><option value="buy">System: BUY</option><option value="sell">System: SELL</option><option value="watch">System: Watch</option><option value="hold">System: Hold</option>
       </select>
       <select id="pfFilterMine" style="max-width:150px" onchange="renderAll()">
         <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
@@ -571,7 +610,7 @@ small.src{color:var(--muted)}
         <th class="sortable" id="pfTh_price" onclick="sortPortfolio('price')">Price Now</th>
         <th class="sortable" id="pfTh_value" onclick="sortPortfolio('value')">Market Value</th>
         <th class="sortable th-profit" id="pfTh_gl" onclick="sortPortfolio('gl')">Gain/Loss</th>
-        <th class="sortable th-ai" id="pfTh_signal" onclick="sortPortfolio('signal')">AI Call</th>
+        <th class="sortable th-ai" id="pfTh_signal" onclick="sortPortfolio('signal')">Verdict</th>
         <th class="th-mine">My Call</th>
         <th></th>
       </tr></thead>
@@ -600,7 +639,7 @@ small.src{color:var(--muted)}
         <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
       </select>
       <select id="wlFilterVerdict" style="max-width:170px" onchange="renderAll()">
-        <option value="All">All AI calls</option><option value="buy">BUY candidate</option><option value="watch">Watch</option><option value="no">Doesn't qualify</option><option value="na">No data yet</option>
+        <option value="All">All verdicts</option><option value="buy">BUY candidate</option><option value="watch">Watch</option><option value="no">Doesn't qualify</option><option value="na">No data yet</option>
       </select>
       <button class="btn-ghost btn btn-sm" onclick="clearWatchlistFilters()">Clear</button>
     </div>
@@ -613,7 +652,7 @@ small.src{color:var(--muted)}
         <th class="sortable th-quality sortable" id="wlTh_quality" onclick="sortWatchlist('quality')">Quality <span class="th-den">/12</span></th>
         <th class="sortable th-value" id="wlTh_pricescore" onclick="sortWatchlist('pricescore')">Value <span class="th-den">/6</span></th>
         <th class="sortable th-momentum" id="wlTh_momentum" onclick="sortWatchlist('momentum')">Momentum <span class="th-den">/4</span></th>
-        <th class="sortable th-ai" id="wlTh_signal" onclick="sortWatchlist('signal')">AI Call</th>
+        <th class="sortable th-ai" id="wlTh_signal" onclick="sortWatchlist('signal')">Verdict</th>
         <th class="th-mine">My Call</th>
         <th></th>
       </tr></thead>
@@ -814,7 +853,7 @@ small.src{color:var(--muted)}
     <div class="row">
       <input id="scFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderScreenerTable()">
       <select id="scFilterVerdict" style="max-width:190px" onchange="renderScreenerTable()">
-        <option value="All">All AI calls</option>
+        <option value="All">All verdicts</option>
         <option value="buy">BUY candidate</option>
         <option value="watch">Watch</option>
         <option value="hold">Hold</option>
@@ -831,7 +870,7 @@ small.src{color:var(--muted)}
   </div>
   <div class="card" style="overflow-x:auto">
     <table>
-      <thead><tr><th>Ticker</th><th>Share Price</th><th class="th-quality">Quality <span class="th-den">/12</span></th><th class="th-value">Value <span class="th-den">/6</span></th><th class="th-momentum">Momentum <span class="th-den">/4</span></th><th class="th-ai">AI Call</th><th class="th-mine">My Call</th><th></th></tr></thead>
+      <thead><tr><th>Ticker</th><th>Share Price</th><th class="th-quality">Quality <span class="th-den">/12</span></th><th class="th-value">Value <span class="th-den">/6</span></th><th class="th-momentum">Momentum <span class="th-den">/4</span></th><th class="th-ai">Verdict</th><th class="th-mine">My Call</th><th></th></tr></thead>
       <tbody id="screenerBody"></tbody>
     </table>
     <div id="screenerEmpty" class="empty">Run a screen to see results here. Anything scoring at or above your buy bar (Settings) will sort to the top.</div>
@@ -1005,6 +1044,21 @@ small.src{color:var(--muted)}
       <button class="btn" onclick="saveApiKey()">Save Key</button>
       <span id="apiStatus" class="muted"></span>
     </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Investment Policy</h3>
+    <p class="muted" style="margin-bottom:12px">The limits this portfolio is run to. Command checks every holding against these and flags breaches. Set per account, so a client with a three-year horizon can run different limits from your own book — the same stock can be a buy in one portfolio and a hold in another.</p>
+    <div class="grid grid-2">
+      <div class="field"><label>Risk profile</label><select id="polRisk">
+        <option value="conservative">Conservative — capital preservation</option>
+        <option value="moderate">Moderate — balanced</option>
+        <option value="aggressive">Aggressive — growth, long horizon</option>
+      </select></div>
+      <div class="field"><label>Max single position (% of portfolio)</label><input id="polMaxPos" type="number" min="1" max="100" step="1"></div>
+      <div class="field"><label>Cash target (%) — flags idle cash above this</label><input id="polCash" type="number" min="0" max="100" step="1"></div>
+      <div class="field"><label>Exclusions (tickers or sectors, comma separated)</label><input id="polExclusions" placeholder="e.g. XOM, tobacco, defense"></div>
+    </div>
+    <button class="btn" onclick="savePolicy()">Save policy</button>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Buy / Sell Rules</h3>
@@ -1187,6 +1241,8 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   calls:[],                                     // graded in the Market tab's scorecard
   macro:{cape:null,capeAsOf:'',margin:null,marginAsOf:'',marginPrev:null,buffett:null,buffettAsOf:''},
   relations:{},                                 // ticker -> {suppliers:[],customers:[]} for the Map tab
+  theses:{},                                    // ticker -> {why,mustBeTrue,invalidIf,reviewDate,created,scoreAtEntry}
+  policy:{maxPosition:10,cashTarget:3,risk:'moderate',exclusions:''},
   rules:{qBuy:9,pBuy:4,qSell:6,mBuy:0,autoRefresh:'yes'},lastRefresh:0};}
 /* Your own manual call per ticker (Buy/Hold/Sell/Watching) — independent of the app's computed verdict above.
    Defensive lazy-init so profiles saved before this feature still work. */
@@ -1500,6 +1556,7 @@ function enterSession(){
   document.getElementById('setQSell').value=D.rules.qSell;
   document.getElementById('setAutoRefresh').value=D.rules.autoRefresh;
   applyTheme();
+  fillPolicyInputs();
   populateCopyTargets();
   // Display only — must never kick off a pull, because syncPull() calls enterSession() on success
   // and the two would recurse into each other.
@@ -1523,7 +1580,7 @@ function updateAccountTypeUI(){
   // the business account doesn't hold investments of its own — it exists to manage client books.
   // Switching into a client (bizContext set) restores the full nav, since that's the client's money.
   const hideOwnInvesting=isBiz&&!bizContext;
-  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navMarket','navMap'].forEach(id=>{
+  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navMarket','navMap','navCommand'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display=hideOwnInvesting?'none':'';
   });
@@ -1533,6 +1590,10 @@ function updateAccountTypeUI(){
     const active=document.querySelector('nav button.active');
     const activeTab=active?active.getAttribute('data-tab'):null;
     if(activeTab&&activeTab!=='dashboard'&&activeTab!=='clients')showTab('dashboard');
+  }else{
+    // Personal view lands on Command, which is the point of it.
+    const active=document.querySelector('nav button.active');
+    if(!active)showTab('command');
   }
 }
 function hideAccountMenu(){
@@ -1828,6 +1889,9 @@ function showTab(t){
   // never spends a request on it.
   if(t==='market'){fillMacroInputs();renderScorecard();loadMarketData(false);}
   if(t==='map'){drawMap();renderRelList();}
+  if(t==='command')renderCommand();
+  if(t==='portfolio')fillThesisPicker();
+  if(t==='settings')fillPolicyInputs();
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -2144,6 +2208,15 @@ async function scoreStock(sym){
   return out;
 }
 
+/* Total criteria passed across all three checks. Shown beside the verdict so the call always carries
+   its evidence — "BUY 19/22" is auditable in a way "AI says buy" never is, and if this system ever
+   has to justify a decision after the fact, the number is the justification. */
+function scoreTotal(sc){
+  if(!sc||sc.error)return null;
+  const got=(sc.qScore||0)+(sc.pScore||0)+(sc.mScore||0);
+  const max=(sc.qTotal||12)+(sc.pTotal||6)+(sc.mTotal||4);
+  return{got,max};
+}
 function verdictOf(sc,isHolding){
   if(sc.error)return{label:'No data',cls:'pill-na',key:'na'};
   const r=D.rules;
@@ -2584,7 +2657,7 @@ function renderScreenerTable(){
   if(emptyEl){
     emptyEl.style.display=filtered.length?'none':'block';
     emptyEl.textContent=screenerResults.length
-      ?'No results match this filter. Clear it, or widen the AI call.'
+      ?'No results match this filter. Clear it, or widen the verdict.'
       :'Run a screen to see results here. Anything scoring at or above your buy bar (Settings) will sort to the top.';
   }
   const countEl=document.getElementById('screenerFilterCount');
@@ -3739,7 +3812,7 @@ function renderAll(){
     }
   };
   updateSortHeaders('pfTh',pfSort,{sym:'Ticker',type:'Type',broker:'Broker',shares:'Shares',cost:'Avg Cost',price:'Price Now',value:'Market Value',
-    gl:(glMode()==='today'?'Today':'Total')+' Gain/Loss',signal:'AI Call'});
+    gl:(glMode()==='today'?'Today':'Total')+' Gain/Loss',signal:'Verdict'});
   applySort(filteredHoldings,pfSort,pfGetters).forEach(({h,i})=>{
     const p=h.price,val=(p??h.cost)*h.shares,gl=holdingGL(h);
     const glPct=holdingGLPct(h);
@@ -3802,7 +3875,7 @@ function renderAll(){
     momentum:x=>{const sc=D.analyses[x.s];return sc&&!sc.error?sc.mScore:null;},
     signal:x=>{const sc=D.analyses[x.s];const v=sc?verdictOf(sc,false):null;return v?SIGNAL_RANK[v.key]:null;}
   };
-  updateSortHeaders('wlTh',wlSort,{sym:'Ticker',price:'Share Price',quality:'Quality /12',pricescore:'Value /6',momentum:'Momentum /4',signal:'AI Call'});
+  updateSortHeaders('wlTh',wlSort,{sym:'Ticker',price:'Share Price',quality:'Quality /12',pricescore:'Value /6',momentum:'Momentum /4',signal:'Verdict'});
   applySort(filteredWatch,wlSort,wlGetters).forEach(({s,i})=>{
     const sc=D.analyses[s];const v=sc?verdictOf(sc,false):null;
     const tr=document.createElement('tr');
@@ -3866,6 +3939,8 @@ function renderAll(){
 
   renderHistory();
   updateBuyPreview();
+  fillThesisPicker();
+  renderCommand();
   if(DB.profiles[USER]&&DB.profiles[USER].accountType==='business')renderClientsList();
 
   if(D.lastRefresh)document.getElementById('lastRefresh').textContent='Updated '+new Date(D.lastRefresh).toLocaleString();
@@ -4389,6 +4464,261 @@ function importData(ev){
     toast('Data imported.');
   }catch(e){toast('Import failed — not a valid PerceptFolio backup.');}};
   r.readAsText(f);
+}
+
+/* ================= THESIS =================
+   The written record of why a position exists. Its value is entirely in being written BEFORE the
+   price moves — afterwards you'll construct a reason for whatever happened, and won't notice you're
+   doing it. The review date is what makes it a live document rather than a note nobody reopens. */
+function thesisFor(sym){return (D.theses||{})[sym]||null;}
+function fillThesisPicker(){
+  const sel=document.getElementById('thesisSym');
+  if(!sel)return;
+  const prev=sel.value;
+  const syms=[...new Set(D.holdings.map(h=>h.sym))].sort();
+  if(!syms.length){sel.innerHTML='<option value="">No holdings yet</option>';loadThesis();return;}
+  sel.innerHTML=syms.map(s=>{
+    const t=thesisFor(s);
+    return '<option value="'+esc(s)+'">'+esc(s)+(t?' ✓':' — none written')+'</option>';
+  }).join('');
+  if(syms.includes(prev))sel.value=prev;
+  loadThesis();
+}
+function loadThesis(){
+  const sel=document.getElementById('thesisSym');
+  if(!sel)return;
+  const sym=sel.value;
+  const t=thesisFor(sym)||{};
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  set('thesisWhy',t.why);set('thesisMust',t.mustBeTrue);set('thesisInvalid',t.invalidIf);set('thesisReview',t.reviewDate);
+  const st=document.getElementById('thesisStatus');
+  if(st){
+    if(!sym)st.textContent='';
+    else if(!t.created)st.textContent='No thesis written for '+sym+' yet.';
+    else{
+      const due=t.reviewDate&&Date.parse(t.reviewDate)<Date.now();
+      st.innerHTML='Written '+esc(t.created)+(t.scoreAtEntry?' at '+esc(t.scoreAtEntry):'')+
+        (due?' · <span class="neg">review overdue</span>':(t.reviewDate?' · review '+esc(t.reviewDate):''));
+    }
+  }
+}
+function saveThesis(){
+  const sym=(document.getElementById('thesisSym')||{}).value;
+  if(!sym)return toast('Add a holding first.');
+  if(!D.theses)D.theses={};
+  const val=id=>(document.getElementById(id)||{}).value||'';
+  const existing=D.theses[sym];
+  const sc=D.analyses[sym];
+  const tot=scoreTotal(sc);
+  D.theses[sym]={
+    why:val('thesisWhy'),mustBeTrue:val('thesisMust'),invalidIf:val('thesisInvalid'),
+    reviewDate:val('thesisReview'),
+    created:(existing&&existing.created)||new Date().toISOString().slice(0,10),
+    // Snapshot the score at the time of writing, so drift since is visible later.
+    scoreAtEntry:(existing&&existing.scoreAtEntry)||(tot?tot.got+'/'+tot.max:'')
+  };
+  saveDB();fillThesisPicker();renderCommand();
+  toast('Thesis saved for '+sym+'.');
+}
+function deleteThesis(){
+  const sym=(document.getElementById('thesisSym')||{}).value;
+  if(!sym||!D.theses||!D.theses[sym])return;
+  if(!confirm('Delete the thesis for '+sym+'?'))return;
+  delete D.theses[sym];
+  saveDB();fillThesisPicker();renderCommand();
+}
+
+/* ================= INVESTMENT POLICY ================= */
+function policy(){
+  const p=D.policy||{};
+  return{maxPosition:isFinite(p.maxPosition)?p.maxPosition:10,
+    cashTarget:isFinite(p.cashTarget)?p.cashTarget:3,
+    risk:p.risk||'moderate',exclusions:p.exclusions||''};
+}
+function fillPolicyInputs(){
+  const p=policy();
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
+  set('polRisk',p.risk);set('polMaxPos',p.maxPosition);set('polCash',p.cashTarget);set('polExclusions',p.exclusions);
+}
+function savePolicy(){
+  const num=(id,d)=>{const v=parseFloat((document.getElementById(id)||{}).value);return isFinite(v)?v:d;};
+  D.policy={
+    risk:(document.getElementById('polRisk')||{}).value||'moderate',
+    maxPosition:Math.max(1,Math.min(100,num('polMaxPos',10))),
+    cashTarget:Math.max(0,Math.min(100,num('polCash',3))),
+    exclusions:(document.getElementById('polExclusions')||{}).value||''
+  };
+  saveDB();renderCommand();
+  toast('Policy saved. Command will check against it.');
+}
+
+/* ================= COMMAND — the action queue =================
+   One screen answering one question: what needs me today. It invents nothing — every row is a rule
+   you already configured firing on data already collected. Priority 1 is money at risk, 2 is policy
+   breached, 3 is maintenance.
+
+   Deliberately NOT an execution system. It has no broker connection and never will from a static
+   page. It tells you what your rules flagged and shows the numbers; you decide and you trade. */
+function buildActionQueue(){
+  const A=[];
+  const holdings=D.holdings||[];
+  const totalVal=holdings.reduce((a,h)=>a+(h.price??h.cost)*h.shares,0)+(D.cash||0);
+  const pol=policy();
+  const today=new Date().toISOString().slice(0,10);
+
+  holdings.forEach(h=>{
+    const val=(h.price??h.cost)*h.shares;
+    const pct=totalVal>0?val/totalVal*100:0;
+    const sc=h.type==='Stock'?D.analyses[h.sym]:null;
+    const v=sc&&!sc.error?verdictOf(sc,true):null;
+    const tot=scoreTotal(sc);
+
+    // 1 — sell signal on something you own
+    if(v&&v.key==='sell'){
+      A.push({pri:1,kind:'SELL',sym:h.sym,
+        headline:'Sell rule triggered on '+h.sym,
+        detail:'Quality fell to '+sc.qScore+'/'+sc.qTotal+', at or below your sell bar of '+D.rules.qSell+'. Position is '+fmt$(val)+', '+pct.toFixed(1)+'% of the portfolio.',
+        evidence:tot?tot.got+'/'+tot.max+' criteria':'',
+        action:'analyzeStock(\''+esc(h.sym)+'\')',actionLabel:'Review '+h.sym});
+    }
+    // 2 — position exceeds policy
+    if(pct>pol.maxPosition){
+      A.push({pri:2,kind:'RISK',sym:h.sym,
+        headline:h.sym+' is '+pct.toFixed(1)+'% of the portfolio',
+        detail:'Your policy caps a single position at '+pol.maxPosition+'%. Trimming to the cap would mean selling about '+fmt$(val-(totalVal*pol.maxPosition/100))+'.',
+        evidence:'policy breach',
+        action:'showTab(\'portfolio\')',actionLabel:'Open Portfolio'});
+    }
+    // 3 — thesis review overdue
+    const th=thesisFor(h.sym);
+    if(th&&th.reviewDate&&th.reviewDate<=today){
+      A.push({pri:3,kind:'REVIEW',sym:h.sym,
+        headline:'Thesis review due for '+h.sym,
+        detail:(th.why?'You wrote: "'+th.why.slice(0,140)+(th.why.length>140?'…':'')+'" ':'')+'Scheduled review was '+th.reviewDate+'.',
+        evidence:th.scoreAtEntry?('was '+th.scoreAtEntry+(tot?', now '+tot.got+'/'+tot.max:'')):'',
+        action:'showTab(\'portfolio\')',actionLabel:'Open thesis'});
+    }
+    // 4 — holding with no thesis at all
+    if(!th&&h.type==='Stock'&&pct>=5){
+      A.push({pri:3,kind:'REVIEW',sym:h.sym,
+        headline:'No thesis written for '+h.sym,
+        detail:'It\'s '+pct.toFixed(1)+'% of the portfolio and there\'s no record of why you own it or what would make you sell.',
+        evidence:'',action:'showTab(\'portfolio\')',actionLabel:'Write one'});
+    }
+  });
+
+  // Buy candidates on the watchlist
+  (D.watchlist||[]).forEach(s=>{
+    const sc=D.analyses[s];
+    if(!sc||sc.error)return;
+    const v=verdictOf(sc,false);
+    if(v.key!=='buy')return;
+    const tot=scoreTotal(sc);
+    A.push({pri:1,kind:'BUY',sym:s,
+      headline:s+' crossed your buy bar',
+      detail:'Quality '+sc.qScore+'/'+sc.qTotal+' and value '+sc.pScore+'/'+sc.pTotal+', both at or above your thresholds. Cash available: '+fmt$(D.cash||0)+'.',
+      evidence:tot?tot.got+'/'+tot.max+' criteria':'',
+      action:'analyzeStock(\''+esc(s)+'\')',actionLabel:'Review '+s});
+  });
+
+  // Idle cash above target
+  const cashPct=totalVal>0?(D.cash||0)/totalVal*100:0;
+  if(cashPct>pol.cashTarget&&(D.cash||0)>0&&holdings.length){
+    A.push({pri:2,kind:'CASH',sym:'',
+      headline:fmt$(D.cash||0)+' sitting in cash',
+      detail:'That\'s '+cashPct.toFixed(1)+'% against your target of '+pol.cashTarget+'%. About '+fmt$((D.cash||0)-(totalVal*pol.cashTarget/100))+' more than intended is uninvested.',
+      evidence:'policy breach',action:'showTab(\'screener\')',actionLabel:'Find candidates'});
+  }
+
+  // Excluded tickers actually held
+  const ex=(pol.exclusions||'').split(',').map(s=>s.trim().toUpperCase()).filter(Boolean);
+  if(ex.length){
+    holdings.forEach(h=>{
+      if(ex.includes(h.sym.toUpperCase())){
+        A.push({pri:2,kind:'RISK',sym:h.sym,
+          headline:h.sym+' is on your exclusion list',
+          detail:'Your policy excludes it but the position is still open.',
+          evidence:'policy breach',action:'showTab(\'portfolio\')',actionLabel:'Open Portfolio'});
+      }
+    });
+  }
+
+  // Stale prices — a queue built on old data is worse than no queue
+  const stale=holdings.filter(h=>h.type!=='Fund'&&(!h.priceDate||Date.now()-h.priceDate>3*864e5)).length;
+  if(stale){
+    A.push({pri:2,kind:'DATA',sym:'',
+      headline:stale+' holding'+(stale===1?' has':'s have')+' prices over 3 days old',
+      detail:'Everything on this screen is calculated from those prices. Refresh before acting on any of it.',
+      evidence:'',action:'refreshAll()',actionLabel:'Refresh data'});
+  }
+
+  return A.sort((a,b)=>a.pri-b.pri);
+}
+function renderCommand(){
+  const el=document.getElementById('commandQueue');
+  if(!el)return;
+  const g=document.getElementById('cmdGreeting'),sub=document.getElementById('cmdSub');
+  const hour=new Date().getHours();
+  const period=hour<5?'evening':hour<12?'morning':hour<17?'afternoon':'evening';
+  const name=(D.displayName&&D.displayName.trim().split(' ')[0])||(USER?USER.split('@')[0]:'');
+  if(g)g.textContent='Good '+period+(name?', '+name.charAt(0).toUpperCase()+name.slice(1):'');
+
+  const q=buildActionQueue();
+  const holdings=D.holdings||[];
+  const totalVal=holdings.reduce((a,h)=>a+(h.price??h.cost)*h.shares,0)+(D.cash||0);
+  const clients=Object.values(DB.profiles||{}).filter(p=>p.managedBy===USER).length;
+
+  const stats=document.getElementById('cmdStats');
+  if(stats)stats.style.display=holdings.length||clients?'flex':'none';
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('cmdAum',pmask(fmt$(totalVal)));
+  set('cmdPortfolios',1+clients);
+  set('cmdActionCount',q.length);
+  set('cmdLastRun',D.lastRefresh?new Date(D.lastRefresh).toLocaleString():'never');
+
+  if(!holdings.length&&!(D.watchlist||[]).length){
+    if(sub)sub.textContent='Nothing to review yet.';
+    el.innerHTML='<div class="card"><div class="empty">Add holdings in <b>Portfolio</b> or tickers in <b>Watchlist</b>, then hit <b>Run daily review</b>. Command only reports what your own rules flag — with nothing to check, there\'s nothing to say.</div></div>';
+    return;
+  }
+  if(!q.length){
+    if(sub)sub.textContent='Nothing needs you today.';
+    el.innerHTML='<div class="card" style="border-left:3px solid var(--green)">'+
+      '<div style="font-size:17px;font-weight:700" class="pos">✓ Nothing requires action</div>'+
+      '<p class="muted" style="margin-top:6px;font-size:13.5px">No sell rules triggered, no buy bars crossed, no policy breaches, no reviews due. Most days look like this, and that is the system working rather than failing.</p></div>';
+    return;
+  }
+  if(sub)sub.textContent=q.length+' thing'+(q.length===1?'':'s')+' need'+(q.length===1?'s':'')+' your attention.';
+
+  const colour=k=>k==='SELL'?'red':k==='BUY'?'green':k==='CASH'?'accent':k==='DATA'?'muted':'yellow';
+  const pillCls=k=>k==='SELL'?'pill-sell':k==='BUY'?'pill-buy':k==='REVIEW'?'pill-hold':'pill-watch';
+  el.innerHTML=q.map((a,i)=>
+    '<div class="card" style="margin-bottom:10px;border-left:4px solid var(--'+colour(a.kind)+')">'+
+      '<div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:6px">'+
+        '<div class="row" style="gap:8px">'+
+          '<span class="muted" style="font-family:var(--mono);font-size:12px">'+(i+1)+'</span>'+
+          '<span class="pill '+pillCls(a.kind)+'">'+esc(a.kind)+'</span>'+
+          '<b style="font-size:15px">'+esc(a.headline)+'</b>'+
+        '</div>'+
+        (a.evidence?'<span class="muted" style="font-family:var(--mono);font-size:12px">'+esc(a.evidence)+'</span>':'')+
+      '</div>'+
+      '<p style="font-size:13.5px;line-height:1.6;color:var(--muted)">'+esc(a.detail)+'</p>'+
+      '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="'+a.action+'">'+esc(a.actionLabel)+'</button>'+
+    '</div>').join('');
+}
+async function runDailyReview(){
+  const btn=document.getElementById('cmdRunBtn'),st=document.getElementById('cmdStatus');
+  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(btn)btn.disabled=true;
+  if(st)st.textContent='Pulling prices and re-scoring everything…';
+  try{
+    await refreshAll();          // prices, scores, signals, snapshot — all existing machinery
+    renderCommand();
+    if(st)st.textContent='Reviewed '+new Date().toLocaleTimeString();
+  }catch(e){
+    if(st)st.textContent='';
+    handleApiErr(e);
+  }finally{if(btn)btn.disabled=false;}
 }
 
 /* ================= MAP (LAYER DEEP) =================
