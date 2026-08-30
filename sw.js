@@ -1,7 +1,7 @@
 /* PerceptFolio service worker.
    Bump CACHE_VERSION whenever index.html changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v3';
+const CACHE_VERSION = 'perceptfolio-v4';
 
 /* Only these two are genuinely required for the app to open offline. */
 const REQUIRED = ['./', './index.html'];

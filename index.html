@@ -458,7 +458,10 @@ small.src{color:var(--muted)}
     </div>
     <button class="btn" onclick="runDailyReview()" id="cmdRunBtn">Run review</button>
   </div>
-  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:18px"></div>
+  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"></div>
+  <!-- The track record sits above the actions on purpose. Anything that tells you what to do should
+       have to state, in the same breath, how often it has been right. -->
+  <div id="cmdRecord" style="font-size:12.5px;margin-bottom:18px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)"></div>
   <div id="commandQueue"></div>
 </div>
 
@@ -570,6 +573,26 @@ small.src{color:var(--muted)}
     </div>
     <p class="muted" style="margin-top:8px">Switch to <b>Enter dollars</b> to buy by amount instead of share count — PerceptFolio works out the fractional shares from the price. Mutual funds (e.g. FSKAX, FXAIX, FZILX) don't have a live exchange quote, so add them as <b>Mutual Fund</b> and enter the NAV yourself in the table below.</p>
   </div>
+  <!-- TRADE IMPACT — the sizing step the app never had -->
+  <div class="card" style="margin-top:16px">
+    <h3>Before You Trade — what this does to the portfolio</h3>
+    <p class="muted" style="margin-bottom:12px">Every BUY verdict in this app tells you <b>what</b> and never <b>how much</b>, and size decides the outcome more than selection does — you can be right about the company and ruined by the position. Nothing here is a forecast. It is arithmetic on the portfolio you already have.</p>
+    <div class="row">
+      <input id="tiTicker" placeholder="Ticker" style="max-width:130px" oninput="renderTradeImpact()">
+      <select id="tiSide" style="max-width:110px" onchange="renderTradeImpact()">
+        <option value="buy">Buy</option><option value="sell">Sell</option>
+      </select>
+      <input id="tiAmount" type="number" step="any" placeholder="$ amount" style="max-width:160px" oninput="renderTradeImpact()">
+      <button class="btn btn-ghost btn-sm" onclick="tiUseMax()">Largest size your policy allows</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="row" style="gap:6px;align-items:center;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="tiFromCash" checked style="width:auto" onchange="renderTradeImpact()"> Funded from cash (uncheck if this is new money going in)
+      </label>
+    </div>
+    <div id="tradeImpact" style="margin-top:14px"></div>
+  </div>
+
   <div class="card" style="margin-top:16px">
     <h3>Cash Available to Invest</h3>
     <div class="row">
@@ -637,6 +660,22 @@ small.src{color:var(--muted)}
     </table>
     <p class="muted" style="margin-top:10px">Price column is editable — click in and type to set/override any price (required for mutual funds, useful if an auto lookup fails). Click any column header to sort, click again to reverse.</p>
     <div id="holdingsEmpty" class="empty">No holdings yet. Add what you own above — PerceptFolio remembers it.</div>
+  </div>
+
+  <!-- QUALITY DRIFT -->
+  <div class="section-title">Quality Drift — which businesses are getting better or worse</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <select id="driftWindow" style="max-width:190px" onchange="renderDrift()">
+        <option value="90">Change over 90 days</option>
+        <option value="180" selected>Change over 180 days</option>
+        <option value="365">Change over 1 year</option>
+      </select>
+      <div class="spacer"></div>
+      <span class="muted" id="driftCount" style="font-size:12px"></span>
+    </div>
+    <div id="driftBody"></div>
+    <p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.6">Your sell rule fires when a company is <b>already</b> bad. This shows the ones on the way there — a score sliding from 10 to 7 across two quarters is a business deteriorating on your own criteria, often before the price reflects it. The scores were always being calculated; only the latest one used to be kept. This reads the daily log instead, so it starts thin and gets more useful every week you run a refresh.</p>
   </div>
 </div>
 
@@ -811,10 +850,12 @@ small.src{color:var(--muted)}
   <div class="section-title">Your Call Scorecard — is the checklist actually working?</div>
   <div class="card">
     <div class="row" style="margin-bottom:12px;flex-wrap:wrap">
-      <select id="scoreWindow" style="max-width:170px" onchange="renderScorecard()">
-        <option value="30">30 days after call</option>
-        <option value="90" selected>90 days after call</option>
-        <option value="180">180 days after call</option>
+      <select id="scoreWindow" style="max-width:200px" onchange="renderScorecard()">
+        <option value="30">Marked at 30 days</option>
+        <option value="90" selected>Marked at 90 days</option>
+        <option value="180">Marked at 180 days</option>
+        <option value="365">Marked at 1 year</option>
+        <option value="since">Since the call (open-ended)</option>
       </select>
       <select id="scoreVerdict" style="max-width:170px" onchange="renderScorecard()">
         <option value="buy">BUY calls only</option>
@@ -827,11 +868,12 @@ small.src{color:var(--muted)}
     <div id="scorecardSummary"></div>
     <div style="overflow-x:auto;margin-top:14px">
       <table>
-        <thead><tr><th>Ticker</th><th>Called</th><th>Call</th><th>Scores</th><th>Price then</th><th>Now</th><th>Stock</th><th>SPY</th><th>vs SPY</th></tr></thead>
+        <thead><tr><th>Ticker</th><th>Called</th><th>Call</th><th>Scores</th><th>Held</th><th>Price then</th><th>At mark</th><th>Stock</th><th>SPY</th><th>vs SPY</th><th>Verdict</th></tr></thead>
         <tbody id="scorecardBody"></tbody>
       </table>
     </div>
     <div id="scorecardEmpty" class="empty">No calls recorded yet. PerceptFolio starts logging every time its verdict on a ticker changes, from the next Refresh onward — it can't grade calls it never wrote down. Come back once you have a few weeks of history.</div>
+    <p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.6">Marks are captured live: when a call crosses its 30/90/180/365-day anniversary and the app is open, the price and SPY at that moment are stamped onto the call permanently. Finnhub's free plan has no historical price lookup, so this is the only way to get a true fixed-horizon record — which means the record starts from today and builds forward. If a call's anniversary passes while the app is closed for too long, it is marked unmarkable and dropped rather than graded at the wrong holding period.</p>
   </div>
 </div>
 
@@ -1259,6 +1301,7 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   transactions:[],dividends:[],theme:'dark',
   syncedAt:0,lastLocalEdit:0,
   calls:[],                                     // graded in the Market tab's scorecard
+  scoreLog:{},                                  // ticker -> [{d,q,p,m,t,mx}] one row per day, for quality drift
   macro:{cape:null,capeAsOf:'',margin:null,marginAsOf:'',marginPrev:null,buffett:null,buffettAsOf:''},
   relations:{},                                 // ticker -> {suppliers:[],customers:[]} for the Map tab
   theses:{},                                    // ticker -> {why,mustBeTrue,invalidIf,reviewDate,created,scoreAtEntry}
@@ -1554,6 +1597,15 @@ function resetTransientState(){
   const ms=document.getElementById('mapStatus');if(ms)ms.textContent='';
   const sb=document.getElementById('scorecardBody');if(sb)sb.innerHTML='';
   const ss=document.getElementById('scorecardSummary');if(ss)ss.innerHTML='';
+  /* The record strip, the drift table and the trade-impact panel are all per-account. Leaving any of
+     them on screen after a switch would show one client's numbers under another client's name. */
+  const cr=document.getElementById('cmdRecord');if(cr)cr.innerHTML='';
+  const db=document.getElementById('driftBody');if(db)db.innerHTML='';
+  const dc=document.getElementById('driftCount');if(dc)dc.textContent='';
+  const ti=document.getElementById('tradeImpact');if(ti)ti.innerHTML='';
+  const tit=document.getElementById('tiTicker');if(tit)tit.value='';
+  const tia=document.getElementById('tiAmount');if(tia)tia.value='';
+  const dd=document.getElementById('mcDrawdown');if(dd)dd.innerHTML='';
 
   sellingIndex=null;
   openClientReport=null;
@@ -1909,7 +1961,7 @@ function showTab(t){
   if(t==='market'){fillMacroInputs();renderScorecard();loadMarketData(false);}
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
-  if(t==='portfolio')fillThesisPicker();
+  if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
   if(t==='settings')fillPolicyInputs();
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
@@ -2679,7 +2731,7 @@ function renderScreenerTable(){
     if(!matchesMyCall(sym,mf))return false;
     if(vf==='All')return true;
     if(sc.error)return vf==='na';
-    return verdictOf(sc,D.holdings.some(h=>h.sym===sym&&h.type==='Stock')).key===vf;
+    return verdictOf(sc,D.holdings.some(h=>h.sym===sym&&h.type==='Stock'),sym).key===vf;
   });
   const emptyEl=document.getElementById('screenerEmpty');
   if(emptyEl){
@@ -2698,7 +2750,7 @@ function renderScreenerTable(){
   });
   tb.innerHTML=sorted.map(({sym,sc})=>{
     if(sc.error)return '<tr><td><b>'+esc(sym)+'</b></td><td colspan="4" class="muted">no data ('+esc(sc.error)+')</td><td></td><td></td><td></td></tr>';
-    const v=verdictOf(sc,D.holdings.some(h=>h.sym===sym&&h.type==='Stock'));
+    const v=verdictOf(sc,D.holdings.some(h=>h.sym===sym&&h.type==='Stock'),sym);
     const inWatch=D.watchlist.includes(sym);
     return '<tr><td><b>'+esc(sym)+'</b></td><td>'+fmt$(sc.price)+'</td><td>'+sc.qScore+'/12</td><td>'+sc.pScore+'/6</td><td>'+sc.mScore+'/4</td>'+
       '<td><span class="pill '+v.cls+'">'+v.label+'</span></td>'+
@@ -2747,8 +2799,12 @@ async function refreshAll(){
         const sc=await scoreStock(s);
         D.analyses[s]=sc;
         evaluateSignals(s,sc,prev);
+        logScore(s,sc);
       }catch(e){handleApiErr(e,s);}
     }
+    /* Marks are taken AFTER scoring, so they use this run's fresh prices rather than the previous
+       run's. A mark stamped with a stale price is worse than no mark. */
+    markCalls();
     checkPriceAlerts();
     D.lastRefresh=Date.now();
     recordHistorySnapshot(spyClose);
@@ -2796,10 +2852,88 @@ function recordCall(sym,sc,verdictKey,verdictLabel){
   });
   if(D.calls.length>2000)D.calls=D.calls.slice(D.calls.length-2000);
 }
+/* ---- Fixed-horizon marks ----
+   The original scorecard filtered to calls OLDER than the chosen window and then measured them to
+   TODAY. A call from three years ago therefore appeared in the "90 days" bucket carrying a three-year
+   return. Every bucket was a different, uncontrolled holding period, which makes the medians
+   meaningless and the comparison between windows nonsense.
+
+   Fixing it properly needs the price on the call's 30/90/180/365-day anniversary. Finnhub's free tier
+   has no historical candles for that, so the price is captured going forward instead: on each refresh,
+   any call that has just crossed a horizon gets stamped with the price and SPY at that moment.
+
+   The honesty problem this creates: if the app isn't opened for six weeks, the first chance to take a
+   30-day mark is at day 70, and recording that as a clean 30-day result would be a lie. So a mark
+   taken too late is stored as MISSED and excluded from grading rather than quietly counted. */
+const CALL_HORIZONS=[30,90,180,365];
+function markCalls(){
+  if(!D.calls||!D.calls.length)return;
+  const spyNow=(_spyPriceCache&&isFinite(_spyPriceCache.price))?_spyPriceCache.price:null;
+  if(spyNow==null)return;                      // no benchmark this run; try again next refresh
+  const now=Date.now();
+  D.calls.forEach(c=>{
+    if(!(c.price>0)||!(c.spy>0))return;        // call has no usable entry point, nothing to grade
+    const sc=D.analyses[c.sym];
+    const px=(sc&&!sc.error&&isFinite(sc.price)&&sc.price>0)?sc.price:null;
+    if(px==null)return;                        // ticker no longer scored (dropped from watchlist etc.)
+    if(!c.marks)c.marks={};
+    const ageDays=(now-c.ts)/86400000;
+    CALL_HORIZONS.forEach(h=>{
+      if(c.marks[h]||ageDays<h)return;
+      const lag=ageDays-h;
+      // Tolerance scales with the horizon: 7 days late on a 30-day mark is a different sin to 7 days
+      // late on a year.
+      if(lag>Math.max(7,h*0.25)){c.marks[h]={missed:true,lag:Math.round(lag)};return;}
+      c.marks[h]={price:px,spy:spyNow,at:now,lag:Math.round(lag)};
+    });
+  });
+}
+/* ---- Checklist score, logged over time ----
+   D.analyses holds only the latest score, so a company quietly rotting from 10/12 to 7/12 across three
+   quarters looked identical to one that had always been 7/12. One row per ticker per day, which is the
+   finest granularity the underlying fundamentals actually change at. */
+function logScore(sym,sc){
+  if(!sc||sc.error)return;
+  if(!D.scoreLog)D.scoreLog={};
+  if(!Array.isArray(D.scoreLog[sym]))D.scoreLog[sym]=[];
+  const arr=D.scoreLog[sym];
+  const d=new Date().toISOString().slice(0,10);
+  const tot=scoreTotal(sc);
+  const row={d,q:sc.qScore,p:sc.pScore,m:sc.mScore,t:tot?tot.got:null,mx:tot?tot.max:null};
+  const last=arr[arr.length-1];
+  if(last&&last.d===d){Object.assign(last,row);}
+  else arr.push(row);
+  if(arr.length>300)D.scoreLog[sym]=arr.slice(arr.length-300);
+}
+/* Change in total checklist score over the trailing window. Uses the OLDEST row still inside the
+   window rather than the closest to the boundary, so a sparse log still reports a real span — and
+   reports that span, because "down 3 points" means something different over 20 days than over 200. */
+function scoreDrift(sym,days){
+  const arr=(D.scoreLog||{})[sym];
+  if(!arr||arr.length<2)return null;
+  const now=arr[arr.length-1];
+  if(now.t==null)return null;
+  const cutoff=Date.now()-days*86400000;
+  const older=arr.filter(r=>Date.parse(r.d+'T12:00:00')<=Date.now()&&r.t!=null);
+  if(older.length<2)return null;
+  /* The baseline must sit INSIDE the chosen window. An earlier draft fell back to the oldest reading
+     available, which meant a "90 days" selection could quietly report a 400-day change. */
+  const inWindow=older.filter(r=>Date.parse(r.d+'T12:00:00')>=cutoff);
+  if(inWindow.length<2)return null;
+  const base=inWindow[0];
+  if(base.d===now.d)return null;
+  const spanDays=Math.round((Date.parse(now.d+'T12:00:00')-Date.parse(base.d+'T12:00:00'))/86400000);
+  if(spanDays<7)return null;                   // too short to mean anything
+  return{from:base.t,to:now.t,max:now.mx,delta:now.t-base.t,
+    fromQ:base.q,toQ:now.q,qDelta:now.q-base.q,fromDate:base.d,spanDays};
+}
 function evaluateSignals(sym,sc,prev){
   const isHolding=D.holdings.some(h=>h.sym===sym&&h.type==='Stock');
-  const v=verdictOf(sc,isHolding);
-  const prevV=prev?verdictOf(prev,isHolding).key:null;
+  /* sym is passed so a thesis-driven SELL is recorded as the call it actually was. Without it the
+     scorecard graded the global rule's verdict while Command showed the thesis verdict — two
+     different opinions from one system, only one of them ever checked. */
+  const v=verdictOf(sc,isHolding,sym);
+  const prevV=prev?verdictOf(prev,isHolding,sym).key:null;
   if(!sc.error)recordCall(sym,sc,v.key,v.label);
   if(v.key==='buy'&&prevV!=='buy')pushAlert('buy',sym,'Now a BUY candidate — quality '+sc.qScore+'/12, price '+sc.pScore+'/6. Review before acting.');
   if(v.key==='sell'&&prevV!=='sell')pushAlert('sell',sym,'Quality dropped to '+sc.qScore+'/'+sc.qTotal+' — review whether to sell.');
@@ -2863,7 +2997,7 @@ function renderAnalysis(sym,sc){
   }
   const isHolding=D.holdings.some(h=>h.sym===sym&&h.type==='Stock');
   const isEtf=D.holdings.some(h=>h.sym===sym&&h.type==='ETF');
-  const v=verdictOf(sc,isHolding);
+  const v=verdictOf(sc,isHolding,sym);
   const man=manualFor(sym);
   const checkRow=c=>{
     let s,cls;
@@ -2973,8 +3107,8 @@ function renderCompare(sym1,sc1,sym2,sc2){
     el.innerHTML='<div class="card" style="margin-top:16px"><div class="empty">Could not load data for '+esc(bad)+'. Check the ticker and your API key.</div></div>';
     return;
   }
-  const v1=verdictOf(sc1,D.holdings.some(h=>h.sym===sym1&&h.type==='Stock'));
-  const v2=verdictOf(sc2,D.holdings.some(h=>h.sym===sym2&&h.type==='Stock'));
+  const v1=verdictOf(sc1,D.holdings.some(h=>h.sym===sym1&&h.type==='Stock'),sym1);
+  const v2=verdictOf(sc2,D.holdings.some(h=>h.sym===sym2&&h.type==='Stock'),sym2);
   const row=(label,dispA,dispB,numA,numB,higherIsBetter)=>{
     let aCls='',bCls='';
     if(higherIsBetter!=null&&numA!=null&&numB!=null&&numA!==numB){
@@ -3397,6 +3531,140 @@ function buildHistogram(arr,bins){
   const labels=counts.map((c,i)=>{const lo=min+i*width;return(lo>=0?'+':'')+lo.toFixed(0)+'%';});
   return{labels,counts};
 }
+/* ================= DRAWDOWN — sampled from real history, not a bell curve =================
+   The Monte Carlo above tells you where you might LAND. It says nothing about the hole you pass
+   through on the way, and the hole is what decides whether a person actually holds on.
+
+   Why this can't just reuse the Gaussian engine: geometric Brownian motion assumes daily returns are
+   independent and normally distributed. Real ones are neither. Crashes cluster — bad days arrive in
+   runs, which is exactly the mechanism that turns a 12% dip into a 40% one — and the tails are far
+   fatter than a normal curve allows. A Gaussian model therefore understates maximum drawdown
+   systematically, and understates it worst in precisely the scenarios that matter.
+
+   So the paths here are built by BLOCK BOOTSTRAP: draw consecutive runs of real S&P 500 trading days
+   at random and stitch them together. Fat tails and clustering come along for free because they are
+   in the data rather than in an assumption. Both estimates are shown side by side, because the gap
+   between them is itself the point. */
+let _spxDailyCache=null;
+async function spxDailyReturns(){
+  if(_spxDailyCache&&Date.now()-_spxDailyCache.at<6*60*60*1000)return _spxDailyCache;
+  /* 2600 asks for FRED's entire allowance. S&P Dow Jones licenses FRED exactly ten years of daily
+     history — about 2,520 trading days — so this requests all of it and gets whatever exists. An
+     older worker deployment clamps the request to 2000 and still returns a usable series, so this
+     degrades quietly rather than failing. */
+  const obs=await fredSeries('SP500',2600);        // FRED returns newest-first
+  const asc=[...obs].reverse();
+  const rets=[];
+  for(let i=1;i<asc.length;i++){
+    const a=asc[i-1].value,b=asc[i].value;
+    if(a>0&&b>0)rets.push(b/a-1);
+  }
+  if(rets.length<250)throw new Error('Not enough S&P history came back to bootstrap from.');
+  _spxDailyCache={rets,from:asc[0].date,to:asc[asc.length-1].date,at:Date.now()};
+  return _spxDailyCache;
+}
+function stdev(a){
+  if(a.length<2)return 0;
+  const m=a.reduce((x,y)=>x+y,0)/a.length;
+  return Math.sqrt(a.reduce((x,y)=>x+(y-m)*(y-m),0)/(a.length-1));
+}
+/* scale rescales the market's daily moves to the portfolio's own volatility, so the SHAPE of the path
+   (clustering, tails, sequence) is real while the SIZE matches what you actually hold. */
+function blockBootstrapMaxDD(rets,days,sims,blockLen,scale){
+  const n=rets.length,out=new Float64Array(sims);
+  const maxStart=n-blockLen;
+  for(let s=0;s<sims;s++){
+    let v=1,peak=1,mdd=0,t=0;
+    while(t<days){
+      const start=Math.floor(Math.random()*maxStart);
+      for(let k=0;k<blockLen&&t<days;k++,t++){
+        v*=(1+rets[start+k]*scale);
+        if(v>peak)peak=v;
+        const dd=(peak-v)/peak;
+        if(dd>mdd)mdd=dd;
+      }
+    }
+    out[s]=mdd*100;
+  }
+  return out;
+}
+/* The same measurement under the assumption the Monte Carlo above makes, purely so the two can be
+   compared. This is not a second opinion — it is the control. */
+function gaussianMaxDD(mu,sigma,days,sims){
+  const dMu=mu/TRADING_DAYS,dSig=sigma/Math.sqrt(TRADING_DAYS),out=new Float64Array(sims);
+  for(let s=0;s<sims;s++){
+    let v=1,peak=1,mdd=0;
+    for(let t=0;t<days;t++){
+      const u1=Math.random()||1e-12,u2=Math.random();
+      const z=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+      v*=Math.exp((dMu-0.5*dSig*dSig)+dSig*z);
+      if(v>peak)peak=v;
+      const dd=(peak-v)/peak;
+      if(dd>mdd)mdd=dd;
+    }
+    out[s]=mdd*100;
+  }
+  return out;
+}
+async function runDrawdown(){
+  const el=document.getElementById('mcDrawdown');
+  if(!el)return;
+  if(!lastMcResult){el.innerHTML='<div class="empty">Run the simulation above first — the drawdown model needs your portfolio\'s volatility, which is calculated there.</div>';return;}
+  if(!syncConfigured()){
+    el.innerHTML='<div class="empty">This needs real S&amp;P 500 daily history, which comes from FRED through your Cloudflare Worker (FRED blocks direct browser access entirely). Set the worker up under <b>Settings → Sync Across Your Devices</b> and add a <b>FRED_API_KEY</b> to it.</div>';
+    return;
+  }
+  const btn=document.getElementById('ddBtn');
+  if(btn)btn.disabled=true;
+  el.innerHTML='<div class="empty">Pulling real S&amp;P history…</div>';
+  try{
+    const spx=await spxDailyReturns();
+    const mktSigma=stdev(spx.rets)*Math.sqrt(TRADING_DAYS);
+    const r=lastMcResult;
+    const scale=mktSigma>0?(r.sigmaP/mktSigma):1;
+    const days=Math.round(r.years*TRADING_DAYS);
+    const sims=2000;              // 2000 × 2520 steps is already ~5M iterations; more buys no precision
+    const blockLen=20;            // about a trading month — long enough to carry a crash's clustering
+    el.innerHTML='<div class="empty">Running '+sims.toLocaleString()+' bootstrapped paths…</div>';
+    await new Promise(x=>setTimeout(x,10));
+    const boot=blockBootstrapMaxDD(spx.rets,days,sims,blockLen,scale);
+    const gauss=gaussianMaxDD(r.muP,r.sigmaP,days,sims);
+    const bMed=percentileOf(boot,50),bP90=percentileOf(boot,90),bP99=percentileOf(boot,99);
+    const gMed=percentileOf(gauss,50),gP90=percentileOf(gauss,90);
+    const understate=gMed>0?((bMed-gMed)/gMed*100):0;
+    const dollarsAt=(pctDown)=>fmt$(r.totalVal*(1-pctDown/100));
+    el.innerHTML=
+      '<div class="grid grid-3">'+
+        '<div class="card"><h3>Typical worst drop</h3><div class="big">'+bMed.toFixed(1)+'%</div>'+
+          '<div class="muted">Half of paths dipped at least this far at some point. On '+pmask(fmt$(r.totalVal))+' that is a trough near '+pmask(dollarsAt(bMed))+'.</div></div>'+
+        '<div class="card"><h3>One path in ten</h3><div class="big neg">'+bP90.toFixed(1)+'%</div>'+
+          '<div class="muted">A tenth of futures fell at least this far. Trough near '+pmask(dollarsAt(bP90))+'.</div></div>'+
+        '<div class="card"><h3>One in a hundred</h3><div class="big neg">'+bP99.toFixed(1)+'%</div>'+
+          '<div class="muted">The bad end. Trough near '+pmask(dollarsAt(bP99))+'.</div></div>'+
+      '</div>'+
+      '<div class="card" style="margin-top:16px"><h3>Why this is bigger than the bell curve says</h3>'+
+        '<table><tbody>'+
+          '<tr><td style="width:46%">Median worst drop — real history, blocks kept intact</td><td><b>'+bMed.toFixed(1)+'%</b></td></tr>'+
+          '<tr><td>Median worst drop — normal distribution, same volatility</td><td class="muted">'+gMed.toFixed(1)+'%</td></tr>'+
+          '<tr><td>1-in-10 drop — real history</td><td><b>'+bP90.toFixed(1)+'%</b></td></tr>'+
+          '<tr><td>1-in-10 drop — normal distribution</td><td class="muted">'+gP90.toFixed(1)+'%</td></tr>'+
+          '<tr><td>History sampled</td><td>'+esc(spx.from)+' to '+esc(spx.to)+' · '+spx.rets.length.toLocaleString()+' trading days</td></tr>'+
+          '<tr><td>Market volatility over that period</td><td>'+(mktSigma*100).toFixed(1)+'%/yr · your portfolio '+(r.sigmaP*100).toFixed(1)+'%/yr · scaled '+scale.toFixed(2)+'×</td></tr>'+
+          '<tr><td>Paths / block length</td><td>'+sims.toLocaleString()+' paths over '+r.years+' years, sampled in '+blockLen+'-day runs</td></tr>'+
+        '</tbody></table>'+
+        '<p class="muted" style="margin-top:12px;line-height:1.65">'+
+          (Math.abs(understate)<5
+            ? 'The two agree closely here, which is itself worth knowing — at this volatility the normal assumption isn\'t doing much damage.'
+            : 'The bell curve understates the typical worst drop by about <b class="neg">'+Math.abs(understate).toFixed(0)+'%</b> relative. That gap is the cost of assuming bad days arrive independently. They don\'t; they arrive in runs, and a run is what turns an ordinary dip into the kind of decline people sell into.')+
+        '</p></div>'+
+      '<p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.6">'+
+        '<b>Read the limits.</b> The path shapes are real S&amp;P 500 days, but they are rescaled to your portfolio\'s volatility rather than drawn from your holdings\' own history — so a concentrated book of high-beta names will behave more violently than this suggests, because single-stock blowups are not in the index\'s record. S&amp;P Dow Jones licenses FRED exactly ten years of daily history, so the sample above starts in '+esc(String(spx.from).slice(0,4))+': <b>2008 is not in it</b>, and the deepest real crash available to draw from is COVID in 2020. Block bootstrapping preserves clustering within a '+blockLen+'-day run and breaks it at the seams, so multi-month grinding bear markets are still under-represented. Every one of these caveats points the same way: treat these as a floor on the pain, not a ceiling.</p>';
+  }catch(e){
+    el.innerHTML='<div class="empty">Couldn\'t build the drawdown model: '+esc(e.message||String(e))+'</div>';
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
 function toggleMcHypo(){
   const v=(document.getElementById('mcTickers').value||'').trim();
   document.getElementById('mcHypoWrap').style.display=v?'block':'none';
@@ -3561,7 +3829,13 @@ function renderMonteCarloResults(r){
     '<tr><td>Probability of ending below what you put in</td><td>'+r.probLoss.toFixed(1)+'%</td></tr>'+
     '<tr><td>Simulations / horizon</td><td>'+r.sims.toLocaleString()+' paths over '+r.years+' years</td></tr>'+
     '</tbody></table>'+
-    '<p class="muted" style="margin-top:10px">This assumes returns are randomly distributed around one average (geometric Brownian motion) — real markets have fatter tails, crashes cluster, and correlations spike in downturns. Treat this as a range of plausible outcomes under simplifying assumptions, not a forecast.</p>'+
+    '<p class="muted" style="margin-top:10px">This assumes returns are randomly distributed around one average (geometric Brownian motion) — real markets have fatter tails, crashes cluster, and correlations spike in downturns. Treat this as a range of plausible outcomes under simplifying assumptions, not a forecast. The drawdown model below drops that assumption and samples real history instead.</p>'+
+    '</div>'+
+    '<div class="section-title">The hole on the way there — worst drawdown</div>'+
+    '<div class="card">'+
+      '<p class="muted" style="margin-bottom:12px">Everything above describes where you might <b>end up</b>. None of it describes the worst point you pass through, and that is the number that decides whether you are still holding when the recovery arrives. This one is built from real S&amp;P 500 trading days rather than a bell curve, because bad days cluster and a bell curve cannot represent that.</p>'+
+      '<button class="btn" id="ddBtn" onclick="runDrawdown()">Model the drawdown</button>'+
+      '<div id="mcDrawdown" style="margin-top:14px"></div>'+
     '</div>';
   drawMcHistogram(r);
   drawMcChart(r);
@@ -3923,7 +4197,7 @@ function renderAll(){
     fl.innerHTML=favs.map(s=>{
       const h=D.holdings.find(x=>x.sym===s);
       const sc=D.analyses[s];
-      const v=sc&&!sc.error?verdictOf(sc,!!h):null;
+      const v=sc&&!sc.error?verdictOf(sc,!!h,s):null;
       const price=h?h.price:(sc&&sc.price!=null?sc.price:null);
       const dayPct=h?h.dayPct:null;
       return '<div class="alert-item"><div class="alert-dot" style="background:'+(v?dotColor[v.key]:'var(--muted)')+'"></div>'+
@@ -3944,7 +4218,7 @@ function renderAll(){
     if(sc.error)return;
     const isH=D.holdings.some(h=>h.sym===s&&h.type==='Stock');
     if(!isH&&!D.watchlist.includes(s))return;
-    const v=verdictOf(sc,isH);
+    const v=verdictOf(sc,isH,s);
     if(v.key==='buy'||v.key==='sell')sigs.push({s,sc,v,isH});
   });
   if(sigs.length){
@@ -3968,6 +4242,8 @@ function renderAll(){
   renderHistory();
   updateBuyPreview();
   fillThesisPicker();
+  renderDrift();
+  renderTradeImpact();
   renderCommand();
   if(DB.profiles[USER]&&DB.profiles[USER].accountType==='business')renderClientsList();
 
@@ -4583,6 +4859,216 @@ function savePolicy(){
   toast('Policy saved. Command will check against it.');
 }
 
+/* ================= QUALITY DRIFT ================= */
+function renderDrift(){
+  const el=document.getElementById('driftBody');
+  if(!el||!D)return;
+  const days=parseInt((document.getElementById('driftWindow')||{}).value||'180',10);
+  const syms=[...new Set((D.holdings||[]).filter(h=>h.type==='Stock').map(h=>h.sym))];
+  const rows=syms.map(s=>({sym:s,d:scoreDrift(s,days)})).filter(r=>r.d);
+  const cnt=document.getElementById('driftCount');
+  const logged=Object.keys(D.scoreLog||{}).length;
+  if(cnt)cnt.textContent=rows.length?(rows.length+' of '+syms.length+' holdings have enough history'):'';
+  if(!rows.length){
+    el.innerHTML='<div class="empty">'+(logged
+      ? 'Scores are being logged, but no holding has two readings far enough apart yet for this window. Try a shorter one, or come back after a few more refreshes.'
+      : 'Nothing logged yet. Hit <b>Refresh data</b> and PerceptFolio starts recording each holding\'s checklist score daily. The first comparison needs about a week.')+'</div>';
+    return;
+  }
+  rows.sort((a,b)=>a.d.delta-b.d.delta);        // worst deterioration first — that's the actionable end
+  el.innerHTML='<div style="overflow-x:auto"><table><thead><tr>'+
+    '<th>Ticker</th><th>Then</th><th>Now</th><th>Change</th><th>Quality</th><th>Over</th><th>Reading</th>'+
+    '</tr></thead><tbody>'+rows.map(({sym,d})=>{
+      const cls=d.delta<0?'neg':d.delta>0?'pos':'muted';
+      const read=d.delta<=-2?'Deteriorating on your own criteria'
+        :d.delta<0?'Slightly weaker'
+        :d.delta===0?'Unchanged'
+        :d.delta>=2?'Improving'
+        :'Slightly stronger';
+      return '<tr>'+
+        '<td><b>'+esc(sym)+'</b></td>'+
+        '<td class="muted">'+d.from+'/'+d.max+'</td>'+
+        '<td>'+d.to+'/'+d.max+'</td>'+
+        '<td class="'+cls+'"><b>'+(d.delta>0?'+':'')+d.delta+'</b></td>'+
+        '<td class="'+(d.qDelta<0?'neg':d.qDelta>0?'pos':'muted')+'">'+d.fromQ+' → '+d.toQ+'</td>'+
+        '<td class="muted">'+d.spanDays+'d</td>'+
+        '<td class="'+(d.delta<=-2?'neg':'muted')+'" style="font-size:12.5px">'+read+'</td>'+
+      '</tr>';
+    }).join('')+'</tbody></table></div>';
+}
+
+/* ================= TRADE IMPACT =================
+   The app scored companies and never sized positions. This closes that gap, and it is the one panel
+   in PerceptFolio with no forecasting error in it at all — every number is arithmetic on holdings and
+   prices already stored. It cannot be wrong about the future because it says nothing about the future.
+   It only answers: if I do this, what do I own afterwards. */
+function betaOf(sym,type){
+  const sc=(D.analyses||{})[sym];
+  if(sc&&!sc.error&&isFinite(sc.riskBeta))return sc.riskBeta;
+  return type==='Fund'?0.9:1.0;     // honest placeholder, flagged in the output when it's used
+}
+function betaKnown(sym){
+  const sc=(D.analyses||{})[sym];
+  return !!(sc&&!sc.error&&isFinite(sc.riskBeta));
+}
+function portfolioRows(){
+  return (D.holdings||[]).map(h=>({sym:h.sym,type:h.type,val:(h.price??h.cost)*h.shares}));
+}
+/* Cash is deliberately IN the denominator. A book that is 30% cash genuinely carries less market
+   exposure than one fully invested, and excluding cash would overstate beta on exactly the portfolios
+   that are being cautious. */
+function portfolioBeta(rows,total){
+  if(!(total>0))return null;
+  return rows.reduce((a,r)=>a+(r.val/total)*betaOf(r.sym,r.type),0);
+}
+function concentration(rows,total){
+  if(!(total>0)||!rows.length)return{top:0,top3:0,topSym:''};
+  const sorted=[...rows].sort((a,b)=>b.val-a.val);
+  return{
+    top:sorted[0].val/total*100,
+    top3:sorted.slice(0,3).reduce((a,r)=>a+r.val,0)/total*100,
+    topSym:sorted[0].sym
+  };
+}
+/* Largest buy that still respects the single-position cap. Two different equations, because funding
+   from cash leaves the portfolio total unchanged while adding new money grows both sides of the
+   fraction — using the wrong one overstates the allowance on new money and understates it on cash. */
+function maxBuyWithinCap(sym,capPct,fromCash){
+  const rows=portfolioRows();
+  const total=rows.reduce((a,r)=>a+r.val,0)+(D.cash||0);
+  const v=rows.filter(r=>r.sym===sym).reduce((a,r)=>a+r.val,0);
+  const c=capPct/100;
+  if(!(total>0))return 0;
+  const x=fromCash?(c*total-v):((c*total-v)/(1-c));
+  return Math.max(0,x);
+}
+function tiUseMax(){
+  const sym=((document.getElementById('tiTicker')||{}).value||'').trim().toUpperCase();
+  if(!sym)return toast('Enter a ticker first.');
+  const fromCash=!!(document.getElementById('tiFromCash')||{}).checked;
+  const pol=policy();
+  let x=maxBuyWithinCap(sym,pol.maxPosition,fromCash);
+  if(fromCash)x=Math.min(x,D.cash||0);   // can't spend cash you don't have
+  const el=document.getElementById('tiAmount');
+  const side=document.getElementById('tiSide');
+  if(side)side.value='buy';
+  if(el)el.value=x>0?Math.floor(x*100)/100:0;
+  renderTradeImpact();
+  if(!(x>0))toast(sym+' is already at or over your '+pol.maxPosition+'% cap.');
+}
+function tiPrefill(sym){
+  showTab('portfolio');
+  const t=document.getElementById('tiTicker');
+  if(t)t.value=sym;
+  const s=document.getElementById('tiSide');
+  if(s)s.value='buy';
+  tiUseMax();
+  const card=document.getElementById('tradeImpact');
+  if(card&&card.scrollIntoView)card.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function renderTradeImpact(){
+  const el=document.getElementById('tradeImpact');
+  if(!el||!D)return;
+  const sym=((document.getElementById('tiTicker')||{}).value||'').trim().toUpperCase();
+  const side=((document.getElementById('tiSide')||{}).value)||'buy';
+  const amt=parseFloat((document.getElementById('tiAmount')||{}).value);
+  const fromCash=!!(document.getElementById('tiFromCash')||{}).checked;
+  if(!sym||!isFinite(amt)||amt<=0){
+    el.innerHTML='<div class="empty">Enter a ticker and a dollar amount. You\'ll get the position size, the cash left, the market exposure and the policy check — before the money moves, not after.</div>';
+    return;
+  }
+  const pol=policy();
+  const rows=portfolioRows();
+  const invested=rows.reduce((a,r)=>a+r.val,0);
+  const cash=D.cash||0;
+  const total=invested+cash;
+  if(!(total>0)){
+    el.innerHTML='<div class="empty">Add holdings or cash first — there is nothing to measure the trade against.</div>';
+    return;
+  }
+  const existingRow=rows.find(r=>r.sym===sym);
+  const held=rows.filter(r=>r.sym===sym).reduce((a,r)=>a+r.val,0);
+  const type=existingRow?existingRow.type:'Stock';
+
+  // A sell can't exceed the position. Clip it and say so rather than producing a negative holding.
+  const clipped=side==='sell'&&amt>held;
+  const size=side==='sell'?Math.min(amt,held):amt;
+  if(side==='sell'&&!(held>0)){
+    el.innerHTML='<div class="empty">You don\'t hold '+esc(sym)+', so there is nothing to sell.</div>';
+    return;
+  }
+  const delta=side==='buy'?size:-size;
+
+  /* A buy from cash and a sell both move money inside the portfolio, so the total is unchanged.
+     Only new money changes the total. */
+  const newMoney=(side==='buy'&&!fromCash)?size:0;
+  const totalAfter=total+newMoney;
+  const cashAfter=side==='buy'?(fromCash?cash-size:cash):cash+size;
+  const overdrawn=cashAfter<-0.005;
+
+  const rowsAfter=rows.map(r=>r.sym===sym?{...r,val:r.val+delta}:{...r}).filter(r=>r.val>0.005);
+  if(side==='buy'&&!existingRow)rowsAfter.push({sym,type:'Stock',val:size});
+
+  const posAfter=held+delta;
+  const pctBefore=held/total*100, pctAfter=posAfter/totalAfter*100;
+  const cashPctBefore=cash/total*100, cashPctAfter=cashAfter/totalAfter*100;
+  const bBefore=portfolioBeta(rows,total), bAfter=portfolioBeta(rowsAfter,totalAfter);
+  const cBefore=concentration(rows,total), cAfter=concentration(rowsAfter,totalAfter);
+  const b=betaOf(sym,type);
+  const riskWeight=pctAfter*b;      // dollar weight scaled by market sensitivity
+
+  const price=(existingRow&&isFinite((D.holdings.find(h=>h.sym===sym)||{}).price))
+    ? D.holdings.find(h=>h.sym===sym).price
+    : (((D.analyses||{})[sym]&&isFinite(D.analyses[sym].price))?D.analyses[sym].price:null);
+  const shares=(price>0)?size/price:null;
+
+  const breach=pctAfter>pol.maxPosition+1e-9;
+  const cashShort=cashPctAfter<pol.cashTarget-1e-9;
+  const excl=(pol.exclusions||'').split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).includes(sym);
+  const maxAllowed=maxBuyWithinCap(sym,pol.maxPosition,fromCash);
+
+  /* mode: 'upBad' — rising is the risky direction (concentration, beta).
+            'downBad' — falling is the risky direction (cash buffer).
+            'none' — no judgement; the position line just reports the fact, because deliberately
+                     buying more of something is not in itself a mistake. The flags below judge. */
+  const arrow=(from,to,fmtFn,mode)=>{
+    let cls='';
+    if(Math.abs(to-from)>=1e-9&&mode!=='none')cls=(mode==='upBad'?to>from:to<from)?'neg':'pos';
+    return fmtFn(from)+' <span class="muted">→</span> <b class="'+cls+'">'+fmtFn(to)+'</b>';
+  };
+  const pct=x=>x.toFixed(1)+'%';
+  const flags=[];
+  if(overdrawn)flags.push('<li class="neg"><b>You don\'t have the cash.</b> This spends '+fmt$(size)+' against a balance of '+fmt$(cash)+', leaving '+fmt$(cashAfter)+'. Either uncheck "funded from cash" because it\'s new money, or size it down.</li>');
+  if(breach)flags.push('<li class="neg"><b>Breaks your position cap.</b> '+esc(sym)+' would be '+pct(pctAfter)+' against your '+pol.maxPosition+'% limit. The largest size that stays inside it is <b>'+fmt$(maxAllowed)+'</b>.</li>');
+  if(excl)flags.push('<li class="neg"><b>'+esc(sym)+' is on your exclusion list</b> in the investment policy.</li>');
+  if(cashShort&&side==='buy')flags.push('<li class="warn"><b>Cash drops under target.</b> '+pct(cashPctAfter)+' against your '+pol.cashTarget+'% floor — that\'s the buffer you set for not being a forced seller.</li>');
+  /* The all-clear is judged on rule breaches only. An earlier version pushed the "beta unknown" note
+     into the same list and then suppressed the all-clear whenever the list was non-empty, so an
+     unanalyzed ticker looked like a failed trade when nothing was actually wrong with it. */
+  const breaks=overdrawn||breach||excl||(cashShort&&side==='buy');
+  if(!breaks)flags.push('<li class="pos"><b>Clears every rule you set.</b> Inside the position cap, cash stays above target, not excluded.</li>');
+  if(clipped)flags.push('<li class="warn">Sell size reduced to '+fmt$(size)+', the whole position.</li>');
+  if(!betaKnown(sym))flags.push('<li class="muted">Beta for '+esc(sym)+' isn\'t known yet, so 1.00 is assumed — the beta and risk-weight rows above are placeholders until you run <b>Refresh data</b> or analyze it. Everything else on this panel is exact.</li>');
+
+  el.innerHTML=
+    '<div style="overflow-x:auto"><table><tbody>'+
+      '<tr><td style="width:44%">'+esc(sym)+' position</td><td>'+arrow(pctBefore,pctAfter,pct,'none')+
+        ' <span class="muted">('+fmt$(held)+' → '+fmt$(posAfter)+(shares!=null?', about '+shares.toFixed(shares<10?3:2)+' shares':'')+')</span></td></tr>'+
+      '<tr><td>Cash</td><td>'+arrow(cashPctBefore,cashPctAfter,pct,'downBad')+' <span class="muted">('+fmt$(cash)+' → '+fmt$(cashAfter)+')</span></td></tr>'+
+      '<tr><td>Portfolio beta <span class="muted">market exposure per dollar</span></td><td>'+
+        (bBefore!=null&&bAfter!=null?arrow(bBefore,bAfter,x=>x.toFixed(2),'upBad'):'—')+'</td></tr>'+
+      '<tr><td>Largest single position</td><td>'+arrow(cBefore.top,cAfter.top,pct,'upBad')+' <span class="muted">('+esc(cAfter.topSym||'—')+')</span></td></tr>'+
+      '<tr><td>Top 3 combined</td><td>'+arrow(cBefore.top3,cAfter.top3,pct,'upBad')+'</td></tr>'+
+      '<tr><td>Risk weight of '+esc(sym)+' <span class="muted">size × beta</span></td><td><b>'+riskWeight.toFixed(1)+'</b> '+
+        '<span class="muted">vs '+pct(pctAfter)+' of your money — '+
+        (Math.abs(riskWeight-pctAfter)<0.5?'about what it looks like'
+          :riskWeight>pctAfter?'it punches <b>above</b> its size':'it punches <b>below</b> its size')+'</span></td></tr>'+
+      '<tr><td>Portfolio total</td><td>'+fmt$(total)+(newMoney?' <span class="muted">→</span> <b>'+fmt$(totalAfter)+'</b> <span class="muted">(new money in)</span>':' <span class="muted">unchanged — money moved inside it</span>')+'</td></tr>'+
+    '</tbody></table></div>'+
+    '<ul style="margin-top:14px;padding-left:20px;line-height:1.7;font-size:13.5px">'+flags.join('')+'</ul>'+
+    '<p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.6"><b>What risk weight does and doesn\'t tell you.</b> Size × beta is how much market movement this position contributes relative to its dollar share — a 6% stake in a 2.3-beta name behaves like a 14% stake in the index. It deliberately ignores how your holdings move against <i>each other</i>; a true risk contribution needs a full covariance matrix, which is what the <b>Risk</b> tab\'s correlation tool is for. Two names at 5% each that always move together are one 10% bet, and this number will not tell you that.</p>';
+}
+
 /* ================= COMMAND — the action queue =================
    One screen answering one question: what needs me today. It invents nothing — every row is a rule
    you already configured firing on data already collected. Priority 1 is money at risk, 2 is policy
@@ -4636,6 +5122,22 @@ function buildActionQueue(){
         evidence:th.scoreAtEntry&&tot?th.scoreAtEntry+'→'+tot.got+'/'+tot.max:'',
         action:'showTab(\'portfolio\')',actionLabel:'Open thesis'});
     }
+    /* 3b — the checklist score is falling, even though it hasn't hit the sell bar.
+       This is the only leading indicator in the app. A sell rule fires when a company is already bad;
+       a score sliding 10 → 8 → 7 over two quarters says it is GETTING bad, and it says so while the
+       position is still comfortably above every threshold. Costs nothing — the app was generating
+       these scores all along and throwing away everything but the latest one. */
+    const dr=h.type==='Stock'?scoreDrift(h.sym,180):null;
+    if(dr&&dr.delta<=-2&&(!v||v.key!=='sell')){
+      A.push({pri:2,kind:'DRIFT',sym:h.sym,
+        summary:'Score sliding — '+dr.from+'/'+dr.max+' → '+dr.to+'/'+dr.max+' over '+dr.spanDays+' days',
+        detail:h.sym+' has lost '+Math.abs(dr.delta)+' checklist point'+(Math.abs(dr.delta)===1?'':'s')+' since '+dr.fromDate+
+          ' ('+dr.from+'/'+dr.max+' down to '+dr.to+'/'+dr.max+(dr.qDelta?', quality '+dr.fromQ+' → '+dr.toQ:'')+'). '+
+          'It has not hit your sell bar and no rule has fired. That is the point — this is the business deteriorating on your own criteria before the sell rule catches up, and the price may not have noticed yet. Worth asking whether the reason you bought it still holds.',
+        evidence:dr.delta+' pts',
+        action:'analyzeStock(\''+esc(h.sym)+'\')',actionLabel:'Look at '+h.sym,
+        action2:'showTab(\'portfolio\')',actionLabel2:'Check the thesis'});
+    }
     // 4 — holding with no thesis at all
     if(!th&&h.type==='Stock'&&pct>=5){
       A.push({pri:3,kind:'REVIEW',sym:h.sym,
@@ -4652,11 +5154,17 @@ function buildActionQueue(){
     const v=verdictOf(sc,false);
     if(v.key!=='buy')return;
     const tot=scoreTotal(sc);
+    /* The size is stated, not left as an exercise. A BUY row that names a company and no amount is
+       half an instruction, and the half it leaves out is the half that decides the outcome. */
+    const room=Math.max(0,totalVal*pol.maxPosition/100);
+    const affordable=Math.min(room,D.cash||0);
     A.push({pri:1,kind:'BUY',sym:s,
       summary:'Crossed your buy bar — quality '+sc.qScore+'/'+sc.qTotal+', value '+sc.pScore+'/'+sc.pTotal,
-      detail:'Both quality ('+sc.qScore+'/'+sc.qTotal+') and value ('+sc.pScore+'/'+sc.pTotal+') are at or above the thresholds you set in Settings. You have '+fmt$(D.cash||0)+' in cash. Your policy caps a single position at '+pol.maxPosition+'%, which on this portfolio is '+fmt$(totalVal*pol.maxPosition/100)+'.',
+      detail:'Both quality ('+sc.qScore+'/'+sc.qTotal+') and value ('+sc.pScore+'/'+sc.pTotal+') are at or above the thresholds you set in Settings. Your policy caps a single position at '+pol.maxPosition+'%, which on this portfolio is '+fmt$(room)+'. You have '+fmt$(D.cash||0)+' in cash, so the most you could put in today without breaking your own rule is '+fmt$(affordable)+'.'+
+        (affordable<=0?' Which is nothing — you have no cash to deploy.':''),
       evidence:tot?tot.got+'/'+tot.max:'',
-      action:'analyzeStock(\''+esc(s)+'\')',actionLabel:'Review '+s});
+      action:'analyzeStock(\''+esc(s)+'\')',actionLabel:'Review '+s,
+      action2:'tiPrefill(\''+esc(s)+'\')',actionLabel2:'Size it'});
   });
 
   // Idle cash above target
@@ -4706,6 +5214,7 @@ function renderCommand(){
   const name=(D.displayName&&D.displayName.trim().split(' ')[0])||(USER?USER.split('@')[0]:'');
   if(g)g.textContent='Good '+period+(name?', '+name.charAt(0).toUpperCase()+name.slice(1):'');
 
+  renderRecordStrip();
   const q=buildActionQueue();
   const holdings=D.holdings||[];
   const totalVal=holdings.reduce((a,h)=>a+(h.price??h.cost)*h.shares,0)+(D.cash||0);
@@ -4747,7 +5256,10 @@ function renderCommand(){
       '</div>'+
       (open?'<div class="cmd-detail">'+
         '<p style="color:var(--muted)">'+esc(a.detail)+'</p>'+
-        '<button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="event.stopPropagation();'+a.action+'">'+esc(a.actionLabel)+'</button>'+
+        '<div class="row" style="margin-top:10px;gap:8px">'+
+          '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();'+a.action+'">'+esc(a.actionLabel)+'</button>'+
+          (a.action2?'<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();'+a.action2+'">'+esc(a.actionLabel2)+'</button>':'')+
+        '</div>'+
       '</div>':'');
   }).join('')+'</div>'+
   '<p class="muted" style="margin-top:14px;font-size:11.5px;line-height:1.55">Click any row for the reasoning. Nothing here places a trade — PerceptFolio has no broker connection and reports only what your own rules flagged.</p>';
@@ -5532,23 +6044,50 @@ function fillMacroInputs(){
 /* ---- Call scorecard ----
    Grades what the app said against what happened, measured against SPY over the identical window so
    a call that made 4% while the market made 6% is correctly shown as a loss in relative terms.
-   Only calls old enough for the chosen window are graded; younger ones are excluded rather than
-   flattered by a shorter holding period. */
+
+   TWO THINGS THAT WERE WRONG HERE AND ARE NOW FIXED.
+
+   1. Mixed holding periods. The window used to select calls OLDER than N days and then measure them
+      to today, so a two-year-old call sat in the "90 days" bucket carrying a two-year return. Fixed
+      windows now read the stamped mark taken on the call's actual anniversary (see markCalls). The
+      old behaviour is still available as "Since the call", correctly labelled as open-ended, with the
+      real holding period printed on every row.
+
+   2. SELL calls were graded upside-down. Alpha was computed identically for every verdict and the hit
+      rate counted alpha>0 as correct — so a SELL that correctly dodged a 30% collapse was filed as a
+      miss. A call's edge is now signed by its direction: for a SELL, being right means the thing
+      underperformed. */
+function callEdge(c,alpha){
+  if(alpha==null)return null;
+  if(c.verdict==='buy')return alpha;
+  if(c.verdict==='sell')return -alpha;
+  return null;                    // watch/hold/na make no directional claim; not scoreable either way
+}
 function scorecardRows(){
-  const days=parseInt((document.getElementById('scoreWindow')||{}).value||'90',10);
+  const winRaw=(document.getElementById('scoreWindow')||{}).value||'90';
   const want=(document.getElementById('scoreVerdict')||{}).value||'buy';
-  const cutoff=Date.now()-days*86400000;
+  const open=winRaw==='since';
+  const days=open?null:parseInt(winRaw,10);
   const spyNow=_spyPriceCache?_spyPriceCache.price:null;
   return (D.calls||[])
-    .filter(c=>c.ts<=cutoff)
     .filter(c=>want==='all'?true:c.verdict===want)
     .map(c=>{
-      const sc=D.analyses[c.sym];
-      const now=(sc&&isFinite(sc.price))?sc.price:null;
+      let now=null,bench=null,heldDays=null,pending=false,missed=false;
+      if(open){
+        const sc=D.analyses[c.sym];
+        now=(sc&&!sc.error&&isFinite(sc.price))?sc.price:null;
+        bench=spyNow;
+        heldDays=Math.round((Date.now()-c.ts)/86400000);
+      }else{
+        const mk=(c.marks||{})[days];
+        if(!mk)pending=true;
+        else if(mk.missed)missed=true;
+        else{now=mk.price;bench=mk.spy;heldDays=days+(mk.lag||0);}
+      }
       const stockRet=(c.price>0&&now!=null)?((now-c.price)/c.price*100):null;
-      const spyRet=(c.spy>0&&spyNow!=null)?((spyNow-c.spy)/c.spy*100):null;
+      const spyRet=(c.spy>0&&bench!=null)?((bench-c.spy)/c.spy*100):null;
       const alpha=(stockRet!=null&&spyRet!=null)?(stockRet-spyRet):null;
-      return{c,now,stockRet,spyRet,alpha};
+      return{c,now,stockRet,spyRet,alpha,edge:callEdge(c,alpha),heldDays,pending,missed};
     })
     .sort((a,b)=>b.c.ts-a.c.ts);
 }
@@ -5557,67 +6096,119 @@ function median(arr){
   const s=[...arr].sort((a,b)=>a-b),m=Math.floor(s.length/2);
   return s.length%2?s[m]:(s[m-1]+s[m])/2;
 }
+/* The one-line record. Deliberately reused on the Command screen so the app's track record is the
+   first thing visible every morning, whether or not it flatters the checklist. Returns null when
+   there is nothing honest to say yet. */
+function callRecord(days){
+  const marked=[];
+  (D.calls||[]).forEach(c=>{
+    if(c.verdict!=='buy'&&c.verdict!=='sell')return;
+    const mk=(c.marks||{})[days];
+    if(!mk||mk.missed||!(c.price>0)||!(c.spy>0))return;
+    const stockRet=(mk.price-c.price)/c.price*100;
+    const spyRet=(mk.spy-c.spy)/c.spy*100;
+    const edge=callEdge(c,stockRet-spyRet);
+    if(edge==null)return;
+    marked.push({c,edge});
+  });
+  if(!marked.length)return null;
+  const right=marked.filter(r=>r.edge>0).length;
+  return{n:marked.length,right,medEdge:median(marked.map(r=>r.edge))};
+}
+function renderRecordStrip(){
+  const el=document.getElementById('cmdRecord');
+  if(!el||!D)return;
+  const rec=callRecord(90);
+  if(!rec){
+    const total=(D.calls||[]).length;
+    const pending=(D.calls||[]).filter(c=>(c.verdict==='buy'||c.verdict==='sell')).length;
+    el.innerHTML='<span class="muted">Track record: <b>'+(total?pending+' call'+(pending===1?'':'s')+' logged, none marked at 90 days yet':'nothing logged yet')+
+      '</b> — the app cannot claim an edge it has not measured. <a href="#" onclick="showTab(\'market\');return false" style="color:var(--accent)">Scorecard</a></span>';
+    return;
+  }
+  const good=rec.medEdge>=0;
+  el.innerHTML='<span class="muted">90-day record: <b class="'+(good?'pos':'neg')+'">'+
+    rec.right+' of '+rec.n+' right</b>, median <b class="'+(good?'pos':'neg')+'">'+(good?'+':'')+rec.medEdge.toFixed(1)+'pts</b> vs SPY'+
+    (rec.n<20?' <span style="opacity:.7">(too few to mean much)</span>':'')+
+    ' · <a href="#" onclick="showTab(\'market\');return false" style="color:var(--accent)">see every call</a></span>';
+}
 function renderScorecard(){
   const tb=document.getElementById('scorecardBody');
   if(!tb)return;
+  const winRaw=(document.getElementById('scoreWindow')||{}).value||'90';
+  const open=winRaw==='since';
   const rows=scorecardRows();
   const graded=rows.filter(r=>r.alpha!=null);
+  const scored=graded.filter(r=>r.edge!=null);          // buy/sell only — the directional claims
+  const pending=rows.filter(r=>r.pending).length;
+  const missed=rows.filter(r=>r.missed).length;
   const emptyEl=document.getElementById('scorecardEmpty');
   const sumEl=document.getElementById('scorecardSummary');
   const cntEl=document.getElementById('scoreCount');
   const total=(D.calls||[]).length;
-  if(cntEl)cntEl.textContent=total?(total+' call'+(total===1?'':'s')+' recorded · '+graded.length+' old enough to grade'):'';
+  if(cntEl)cntEl.textContent=total?(total+' call'+(total===1?'':'s')+' recorded · '+graded.length+' gradeable'+
+    (pending?' · '+pending+' waiting':'')+(missed?' · '+missed+' unmarkable':'')):'';
 
   if(!graded.length){
     tb.innerHTML='';
     if(sumEl)sumEl.innerHTML='';
     if(emptyEl){
       emptyEl.style.display='block';
-      emptyEl.innerHTML=total
-        ? 'You have '+total+' recorded call'+(total===1?'':'s')+', but none are old enough for this window yet. Try a shorter window, or come back later.'
-        : 'No calls recorded yet. PerceptFolio starts logging every time its verdict on a ticker changes, from the next Refresh onward — it can\'t grade calls it never wrote down.';
+      emptyEl.innerHTML=!total
+        ? 'No calls recorded yet. PerceptFolio logs a call every time its verdict on a ticker changes, from the next Refresh onward — it can\'t grade calls it never wrote down.'
+        : (missed&&!pending
+          ? 'You have '+total+' recorded call'+(total===1?'':'s')+', but none could be marked at this horizon. Marks are taken when the app is open and a call crosses its anniversary; these ones passed theirs while the app was closed. They are excluded rather than counted with the wrong holding period. Newer calls will grade normally — or switch to <b>Since the call</b> for the open-ended view.'
+          : 'You have '+total+' recorded call'+(total===1?'':'s')+', none of which has reached this horizon yet. Try a shorter window or <b>Since the call</b>.');
     }
     return;
   }
   if(emptyEl)emptyEl.style.display='none';
 
-  const alphas=graded.map(r=>r.alpha);
-  const medAlpha=median(alphas);
-  const beat=graded.filter(r=>r.alpha>0).length;
-  const medStock=median(graded.map(r=>r.stockRet));
+  const medEdge=scored.length?median(scored.map(r=>r.edge)):null;
+  const right=scored.filter(r=>r.edge>0).length;
+  const medHeld=median(graded.filter(r=>r.heldDays!=null).map(r=>r.heldDays));
 
-  // Does requiring momentum actually help? Split the same set and compare.
-  const withM=graded.filter(r=>r.c.mOk),withoutM=graded.filter(r=>!r.c.mOk);
-  const mA=withM.length?median(withM.map(r=>r.alpha)):null;
-  const nA=withoutM.length?median(withoutM.map(r=>r.alpha)):null;
+  // Does requiring momentum actually help? Split the same set and compare — on edge, not raw alpha,
+  // so SELL calls contribute in the right direction.
+  const withM=scored.filter(r=>r.c.mOk),withoutM=scored.filter(r=>!r.c.mOk);
+  const mA=withM.length?median(withM.map(r=>r.edge)):null;
+  const nA=withoutM.length?median(withoutM.map(r=>r.edge)):null;
 
   if(sumEl){
-    const thin=graded.length<20;
+    const thin=scored.length<20;
     sumEl.innerHTML=
       '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
         '<div class="stat s-count"><span class="stat-label">Calls graded</span><span class="stat-value">'+graded.length+'</span></div>'+
-        '<div class="stat s-profit"><span class="stat-label">Median vs SPY</span><span class="stat-value '+(medAlpha>=0?'pos':'neg')+'">'+(medAlpha>=0?'+':'')+medAlpha.toFixed(2)+'pts</span></div>'+
-        '<div class="stat s-in"><span class="stat-label">Beat the market</span><span class="stat-value">'+beat+' / '+graded.length+'</span></div>'+
-        '<div class="stat s-income"><span class="stat-label">Median raw return</span><span class="stat-value '+(medStock>=0?'pos':'neg')+'">'+(medStock>=0?'+':'')+medStock.toFixed(2)+'%</span></div>'+
+        '<div class="stat s-profit"><span class="stat-label">Median edge vs SPY</span><span class="stat-value '+(medEdge==null?'':(medEdge>=0?'pos':'neg'))+'">'+(medEdge==null?'—':(medEdge>=0?'+':'')+medEdge.toFixed(2)+'pts')+'</span></div>'+
+        '<div class="stat s-in"><span class="stat-label">Called it right</span><span class="stat-value">'+(scored.length?right+' / '+scored.length:'—')+'</span></div>'+
+        '<div class="stat s-income"><span class="stat-label">Median holding</span><span class="stat-value">'+(medHeld!=null?Math.round(medHeld)+'d':'—')+'</span></div>'+
       '</div>'+
-      (mA!=null&&nA!=null
-        ? '<p class="muted" style="font-size:13px;margin-top:12px">Calls that cleared your momentum minimum ran <b class="'+(mA>=nA?'pos':'neg')+'">'+(mA-nA>=0?'+':'')+(mA-nA).toFixed(2)+'pts</b> '+(mA>=nA?'better':'worse')+' than those that didn\'t ('+withM.length+' vs '+withoutM.length+' calls).</p>'
+      '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.6"><b>Edge is signed by the call.</b> A BUY is right when the stock beats SPY; a SELL is right when it lags. '+
+        (open?'This view measures every call from its date to today, so holding periods differ — the <b>Held</b> column shows each one. Pick a fixed horizon for a like-for-like comparison.'
+             :'Every row here was marked on its own '+esc(winRaw)+'-day anniversary, so the holding periods match.')+
+        ' HOLD and WATCH calls make no directional claim and are shown but not scored.</p>'+
+      (mA!=null&&nA!=null&&withM.length>=5&&withoutM.length>=5
+        ? '<p class="muted" style="font-size:13px;margin-top:8px">Calls that cleared your momentum minimum ran <b class="'+(mA>=nA?'pos':'neg')+'">'+(mA-nA>=0?'+':'')+(mA-nA).toFixed(2)+'pts</b> '+(mA>=nA?'better':'worse')+' than those that didn\'t ('+withM.length+' vs '+withoutM.length+' calls).</p>'
         : '')+
-      (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+graded.length+' calls is not evidence.</b> Under roughly 20 this is noise and a couple of lucky picks will dominate the median. Treat it as a running tally, not a verdict on the checklist.</p>':'');
+      (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+scored.length+' scoreable call'+(scored.length===1?'':'s')+' is not evidence.</b> Under roughly 20, two lucky picks dominate the median. Treat it as a running tally, not a verdict on the checklist.</p>':'')+
+      (missed?'<p class="muted" style="font-size:12px;margin-top:8px">'+missed+' call'+(missed===1?' was':'s were')+' excluded: their anniversary passed while the app was closed, so no honest mark exists. Counting them at whatever price happened to be next would fake the holding period.</p>':'');
   }
 
-  tb.innerHTML=graded.map(({c,now,stockRet,spyRet,alpha})=>{
+  tb.innerHTML=graded.map(({c,now,stockRet,spyRet,alpha,edge,heldDays})=>{
     const pill=c.verdict==='buy'?'pill-buy':c.verdict==='sell'?'pill-sell':c.verdict==='watch'?'pill-watch':'pill-na';
     return '<tr>'+
       '<td><b>'+esc(c.sym)+'</b></td>'+
       '<td class="muted" style="white-space:nowrap">'+esc(c.date)+'</td>'+
       '<td><span class="pill '+pill+'">'+esc((c.verdict||'').toUpperCase())+'</span></td>'+
       '<td class="muted" style="font-size:12px;white-space:nowrap">'+(c.q!=null?c.q+'/12 · '+c.p+'/6 · '+c.m+'/4':'—')+'</td>'+
+      '<td class="muted">'+(heldDays!=null?heldDays+'d':'—')+'</td>'+
       '<td>'+(c.price!=null?fmt$(c.price):'—')+'</td>'+
       '<td>'+(now!=null?fmt$(now):'—')+'</td>'+
       '<td class="'+(stockRet>=0?'pos':'neg')+'">'+(stockRet>=0?'+':'')+stockRet.toFixed(2)+'%</td>'+
       '<td class="muted">'+(spyRet>=0?'+':'')+spyRet.toFixed(2)+'%</td>'+
-      '<td class="'+(alpha>=0?'pos':'neg')+'"><b>'+(alpha>=0?'+':'')+alpha.toFixed(2)+'</b></td>'+
+      '<td class="'+(alpha>=0?'pos':'neg')+'">'+(alpha>=0?'+':'')+alpha.toFixed(2)+'</td>'+
+      '<td>'+(edge==null?'<span class="muted">not scored</span>'
+        :'<b class="'+(edge>0?'pos':'neg')+'">'+(edge>0?'right':'wrong')+'</b>')+'</td>'+
     '</tr>';
   }).join('');
 }

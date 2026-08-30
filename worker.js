@@ -102,7 +102,12 @@ async function handle(request, env) {
       if (!/^[A-Za-z0-9_]{2,40}$/.test(series)) {
         return json({ error: 'Missing or malformed series parameter.' }, 400, env);
       }
-      const limit = Math.min(2000, Math.max(1, parseInt(url.searchParams.get('limit') || '1', 10) || 1));
+      /* 3000 rather than 2000: FRED's licence caps the S&P and Dow daily series at exactly 10 years of
+         history, which is about 2,520 trading days. The old 2000 ceiling silently threw away the
+         oldest two years of a series that is already short, and those are the years the drawdown
+         bootstrap most needs. Requests above the cap are clamped rather than rejected, so an app
+         asking for more than this still works. */
+      const limit = Math.min(3000, Math.max(1, parseInt(url.searchParams.get('limit') || '1', 10) || 1));
       const cacheKey = 'fred:' + series + ':' + limit;
 
       const cached = await env.PF_SYNC.get(cacheKey);
