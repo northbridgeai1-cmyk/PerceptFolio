@@ -754,6 +754,13 @@ small.src{color:var(--muted)}
     <div id="historyEmpty" class="empty">No transactions yet. Every buy, sell, and dividend you record from here on shows up in this ledger — including buying more of something you already own.</div>
     <p class="muted" style="margin-top:10px;font-size:12px">This ledger starts from the moment you record a trade in PerceptFolio — it can't reconstruct purchases you made before adding them here. Deleting a row only removes the history entry; it does not change your current holdings.</p>
   </div>
+
+  <!-- HOW YOU BEHAVE -->
+  <div class="section-title">How You Behave — the pattern in your own trading</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:14px">Everything else in PerceptFolio analyses companies. This analyses <b>you</b>. Anyone can get price history; nobody else has yours. These are the four questions the ledger can answer about your habits — how long you actually hold, whether you sell too early, whether you keep to your own cash rule, and whether you trade more when things get loud.</p>
+    <div id="behaviourBody"></div>
+  </div>
 </div>
 
 <!-- MAP (Layer Deep) -->
@@ -1395,7 +1402,13 @@ function recordHistorySnapshot(spyClose){
    answer "how did I get here". Deleting a holding does not erase its transaction history. */
 function recordTransaction(tx){
   if(!D.transactions)D.transactions=[];
-  D.transactions.push(Object.assign({ts:Date.now(),date:new Date().toISOString().slice(0,10)},tx));
+  /* SPY at the moment of the trade is stamped here so a sale can later be measured against the market
+     over the same window — the "do I sell winners too early" question. It is only available if a
+     refresh has run recently enough to have cached a SPY price; when it hasn't, the sale is still
+     gradeable on its own raw price, just not against the benchmark. */
+  const spy=(_spyPriceCache&&isFinite(_spyPriceCache.price)&&(Date.now()-_spyPriceCache.at)<MARK_FRESH_MS)
+    ? _spyPriceCache.price : null;
+  D.transactions.push(Object.assign({ts:Date.now(),date:new Date().toISOString().slice(0,10),spy},tx));
   if(D.transactions.length>1000)D.transactions=D.transactions.slice(D.transactions.length-1000);
 }
 /* ---- Dividend income, derived automatically ----
@@ -1603,6 +1616,7 @@ function resetTransientState(){
   const db=document.getElementById('driftBody');if(db)db.innerHTML='';
   const dc=document.getElementById('driftCount');if(dc)dc.textContent='';
   const ti=document.getElementById('tradeImpact');if(ti)ti.innerHTML='';
+  const bh=document.getElementById('behaviourBody');if(bh)bh.innerHTML='';
   const tit=document.getElementById('tiTicker');if(tit)tit.value='';
   const tia=document.getElementById('tiAmount');if(tia)tia.value='';
   const dd=document.getElementById('mcDrawdown');if(dd)dd.innerHTML='';
@@ -2803,8 +2817,11 @@ async function refreshAll(){
       }catch(e){handleApiErr(e,s);}
     }
     /* Marks are taken AFTER scoring, so they use this run's fresh prices rather than the previous
-       run's. A mark stamped with a stale price is worse than no mark. */
-    markCalls();
+       run's. A mark stamped with a stale price is worse than no mark. The extra fetch covers calls on
+       tickers that are no longer on any of your lists but still have an anniversary coming due. */
+    const markPrices=await fetchMarkPrices();
+    markCalls(markPrices);
+    markSells(markPrices);
     checkPriceAlerts();
     D.lastRefresh=Date.now();
     recordHistorySnapshot(spyClose);
@@ -2866,24 +2883,83 @@ function recordCall(sym,sc,verdictKey,verdictLabel){
    30-day mark is at day 70, and recording that as a clean 30-day result would be a lie. So a mark
    taken too late is stored as MISSED and excluded from grading rather than quietly counted. */
 const CALL_HORIZONS=[30,90,180,365];
-function markCalls(){
+/* Tolerance scales with the horizon: being 7 days late on a 30-day mark is a different sin to being
+   7 days late on a year. */
+function markTolerance(h){return Math.max(7,h*0.25);}
+
+/* A PRICE IS ONLY A MARK IF IT IS FRESH.
+   D.analyses is never pruned — removing a ticker from the watchlist leaves its last score sitting
+   there forever. The first version of this read sc.price unconditionally, which meant a call on a
+   ticker you stopped following would be stamped with a price from whenever you last scored it and
+   presented as a clean 90-day mark. That is worse than not marking at all: it is a fabricated
+   result wearing the same badge as a real one. scoreStock already stamps out.when, so freshness is
+   checkable; anything staler than a day and a half is refused. */
+const MARK_FRESH_MS=36*60*60*1000;
+function freshPriceFor(sym,extra){
+  if(extra&&isFinite(extra[sym])&&extra[sym]>0)return extra[sym];
+  const sc=(D.analyses||{})[sym];
+  if(sc&&!sc.error&&isFinite(sc.price)&&sc.price>0&&sc.when&&(Date.now()-sc.when)<MARK_FRESH_MS)return sc.price;
+  return null;
+}
+/* Does this call have a horizon that has come due and is still inside its tolerance window? If so it
+   needs a price NOW, whether or not the ticker is still on any of your lists. */
+function callNeedsMark(c,now){
+  if(!(c.price>0)||!(c.spy>0))return false;
+  const age=(now-c.ts)/86400000;
+  const marks=c.marks||{};
+  return CALL_HORIZONS.some(h=>!marks[h]&&age>=h&&age<=h+markTolerance(h));
+}
+function callsDueSoon(withinDays){
+  const now=Date.now();
+  let n=0;
+  (D.calls||[]).forEach(c=>{
+    if(!(c.price>0)||!(c.spy>0))return;
+    if(c.verdict!=='buy'&&c.verdict!=='sell')return;
+    const age=(now-c.ts)/86400000;
+    const marks=c.marks||{};
+    CALL_HORIZONS.forEach(h=>{if(!marks[h]&&age<h&&h-age<=withinDays)n++;});
+  });
+  return n;
+}
+/* THE SURVIVORSHIP HOLE, CLOSED.
+   Marking used to depend on the ticker still being scored each refresh, so the moment you dropped a
+   name from your watchlist its open calls stopped getting honest marks. The calls you delete in
+   disgust are disproportionately the ones the system got wrong, so letting them fall out of the
+   record quietly flatters the scorecard. This fetches a quote for any ticker with a call coming due,
+   list membership be damned. One API call each, capped so a pile of dead tickers can't turn a refresh
+   into a rate-limit. */
+async function fetchMarkPrices(){
+  const now=Date.now();
+  const need=[];
+  const want=s=>{if(freshPriceFor(s)==null&&!need.includes(s))need.push(s);};
+  (D.calls||[]).forEach(c=>{if(callNeedsMark(c,now))want(c.sym);});
+  // Sales get marked on the same anniversaries, and a sold-out position is by definition no longer
+  // in holdings — so without this it could never be marked at all.
+  (D.transactions||[]).forEach(tx=>{if(sellNeedsMark(tx,now))want(tx.sym);});
+  const out={};
+  for(const s of need.slice(0,15)){
+    try{const q=await getQuote(s);if(q&&isFinite(q.c)&&q.c>0)out[s]=q.c;}catch(e){}
+  }
+  return out;
+}
+function markCalls(extraPrices){
   if(!D.calls||!D.calls.length)return;
   const spyNow=(_spyPriceCache&&isFinite(_spyPriceCache.price))?_spyPriceCache.price:null;
   if(spyNow==null)return;                      // no benchmark this run; try again next refresh
   const now=Date.now();
   D.calls.forEach(c=>{
     if(!(c.price>0)||!(c.spy>0))return;        // call has no usable entry point, nothing to grade
-    const sc=D.analyses[c.sym];
-    const px=(sc&&!sc.error&&isFinite(sc.price)&&sc.price>0)?sc.price:null;
-    if(px==null)return;                        // ticker no longer scored (dropped from watchlist etc.)
     if(!c.marks)c.marks={};
     const ageDays=(now-c.ts)/86400000;
+    const px=freshPriceFor(c.sym,extraPrices);
     CALL_HORIZONS.forEach(h=>{
       if(c.marks[h]||ageDays<h)return;
       const lag=ageDays-h;
-      // Tolerance scales with the horizon: 7 days late on a 30-day mark is a different sin to 7 days
-      // late on a year.
-      if(lag>Math.max(7,h*0.25)){c.marks[h]={missed:true,lag:Math.round(lag)};return;}
+      /* Past tolerance is closed out as MISSED even when no price is available, so a dead ticker
+         stops being retried on every refresh forever. Inside tolerance with no fresh price, it is
+         left open — there is still time to catch it on the next run. */
+      if(lag>markTolerance(h)){c.marks[h]={missed:true,lag:Math.round(lag)};return;}
+      if(px==null)return;
       c.marks[h]={price:px,spy:spyNow,at:now,lag:Math.round(lag)};
     });
   });
@@ -4244,6 +4320,10 @@ function renderAll(){
   fillThesisPicker();
   renderDrift();
   renderTradeImpact();
+  renderBehaviour();
+  /* The scorecard used to redraw only on tab entry, so a refresh that landed new marks while you were
+     sitting on the Market tab left a stale table on screen. */
+  renderScorecard();
   renderCommand();
   if(DB.profiles[USER]&&DB.profiles[USER].accountType==='business')renderClientsList();
 
@@ -4857,6 +4937,201 @@ function savePolicy(){
   };
   saveDB();renderCommand();
   toast('Policy saved. Command will check against it.');
+}
+
+/* ================= HOW YOU BEHAVE =================
+   Every other analysis in this app is about companies. This one is about the person operating it, and
+   it is the only dataset here that genuinely cannot be bought: anyone can pull SPY's history, nobody
+   else has yours. Four questions, all answerable from the ledger and the daily snapshots that already
+   exist — no new data source, no forecast, no model. */
+
+/* FIFO lot matching. Each sell is filled from the oldest unsold buy first, which is both the standard
+   accounting convention and the one that answers "how long do I hold things" honestly — matching
+   against the newest lot would flatter the number on any position that was averaged into. */
+function roundTrips(){
+  const lots={},out=[];
+  [...(D.transactions||[])].sort((a,b)=>a.ts-b.ts).forEach(tx=>{
+    if(!(tx.shares>0))return;
+    if(tx.action==='buy'){
+      if(!lots[tx.sym])lots[tx.sym]=[];
+      lots[tx.sym].push({ts:tx.ts,shares:tx.shares,price:tx.price});
+    }else if(tx.action==='sell'){
+      let remaining=tx.shares;
+      const q=lots[tx.sym]||[];
+      while(remaining>1e-9&&q.length){
+        const lot=q[0];
+        const take=Math.min(lot.shares,remaining);
+        out.push({sym:tx.sym,days:(tx.ts-lot.ts)/86400000,shares:take,
+          boughtAt:lot.price,soldAt:tx.price,sellTs:tx.ts});
+        lot.shares-=take;remaining-=take;
+        if(lot.shares<=1e-9)q.shift();
+      }
+      // A sell with no matching buy means the position predates the ledger. Skipped, not guessed.
+    }
+  });
+  return out;
+}
+function openHoldingAges(){
+  const first={};
+  [...(D.transactions||[])].sort((a,b)=>a.ts-b.ts).forEach(tx=>{
+    if(tx.action==='buy'&&first[tx.sym]==null)first[tx.sym]=tx.ts;
+  });
+  return (D.holdings||[]).map(h=>({sym:h.sym,days:first[h.sym]!=null?(Date.now()-first[h.sym])/86400000:null}))
+    .filter(x=>x.days!=null);
+}
+/* Did the things you sold keep going up? Uses the same forward-marking machinery as the call
+   scorecard, for the same reason: there is no free historical price API, so the only honest way to
+   know what a stock did 90 days after you sold it is to look on the day. */
+const SELL_HORIZONS=[30,90];
+function markSells(extraPrices){
+  const now=Date.now();
+  const spyNow=(_spyPriceCache&&isFinite(_spyPriceCache.price))?_spyPriceCache.price:null;
+  (D.transactions||[]).forEach(tx=>{
+    if(tx.action!=='sell'||!(tx.price>0))return;
+    if(!tx.marks)tx.marks={};
+    const age=(now-tx.ts)/86400000;
+    const px=freshPriceFor(tx.sym,extraPrices);
+    SELL_HORIZONS.forEach(h=>{
+      if(tx.marks[h]||age<h)return;
+      const lag=age-h;
+      if(lag>markTolerance(h)){tx.marks[h]={missed:true,lag:Math.round(lag)};return;}
+      if(px==null)return;
+      tx.marks[h]={price:px,spy:spyNow,at:now,lag:Math.round(lag)};
+    });
+  });
+}
+function sellNeedsMark(tx,now){
+  if(tx.action!=='sell'||!(tx.price>0))return false;
+  const age=(now-tx.ts)/86400000;
+  const marks=tx.marks||{};
+  return SELL_HORIZONS.some(h=>!marks[h]&&age>=h&&age<=h+markTolerance(h));
+}
+function sellTiming(h){
+  const rows=[];
+  (D.transactions||[]).forEach(tx=>{
+    if(tx.action!=='sell'||!(tx.price>0))return;
+    const mk=(tx.marks||{})[h];
+    if(!mk||mk.missed||!(mk.price>0))return;
+    const after=(mk.price-tx.price)/tx.price*100;
+    const spyAfter=(tx.spy>0&&mk.spy>0)?((mk.spy-tx.spy)/tx.spy*100):null;
+    rows.push({tx,after,spyAfter,rel:spyAfter!=null?after-spyAfter:null});
+  });
+  return rows;
+}
+/* Cash against your own target, day by day. The daily snapshots store cash and total value, so this
+   is measurable historically. Position-cap compliance is NOT — per-holding weights were never
+   snapshotted — so only today's cap check is shown, and it is labelled as today's. */
+function cashDiscipline(){
+  const target=policy().cashTarget;
+  const rows=(D.history||[]).filter(r=>r.value>0&&r.cash!=null);
+  if(rows.length<5)return null;
+  const pcts=rows.map(r=>r.cash/r.value*100);
+  let mn=Infinity,mx=-Infinity;
+  pcts.forEach(p=>{if(p<mn)mn=p;if(p>mx)mx=p;});
+  return{n:rows.length,target,below:pcts.filter(p=>p<target).length,med:median(pcts),min:mn,max:mx};
+}
+function tradeCadence(){
+  const byMonth={};
+  (D.transactions||[]).forEach(tx=>{
+    if(tx.action!=='buy'&&tx.action!=='sell')return;
+    const k=(tx.date||'').slice(0,7);
+    if(k)byMonth[k]=(byMonth[k]||0)+1;
+  });
+  const keys=Object.keys(byMonth).sort();
+  if(keys.length<3)return null;
+  const counts=keys.map(k=>byMonth[k]);
+  let mx=-Infinity,mxKey='';
+  keys.forEach((k,i)=>{if(counts[i]>mx){mx=counts[i];mxKey=k;}});
+  return{keys,counts,med:median(counts),busiest:mxKey,busiestN:mx};
+}
+function renderBehaviour(){
+  const el=document.getElementById('behaviourBody');
+  if(!el||!D)return;
+  const blocks=[];
+  const box=(title,body)=>'<div style="padding:14px 0;border-top:1px solid var(--border)">'+
+    '<div style="font-weight:700;margin-bottom:6px">'+title+'</div>'+
+    '<div class="muted" style="font-size:13.5px;line-height:1.65">'+body+'</div></div>';
+
+  /* 1 — holding period */
+  const rt=roundTrips();
+  const open=openHoldingAges();
+  if(rt.length>=3){
+    const medDays=median(rt.map(r=>r.days));
+    const under90=rt.filter(r=>r.days<90).length;
+    const over365=rt.filter(r=>r.days>=365).length;
+    const openMed=open.length?median(open.map(r=>r.days)):null;
+    blocks.push(box('How long you actually hold',
+      'Median round trip: <b>'+Math.round(medDays)+' days</b> across '+rt.length+' closed lots. '+
+      under90+' lasted under three months'+(over365?', '+over365+' made it past a year':', none made it past a year')+'. '+
+      (openMed!=null?'Your open positions have been held <b>'+Math.round(openMed)+' days</b> at the median. ':'')+
+      (medDays<120
+        ? 'That is a trading cadence, not a holding one. Worth knowing if you tell yourself you invest for the long run — the ledger disagrees.'
+        : 'That is genuinely long-horizon behaviour, which is the harder thing to do and the thing most people only claim.')));
+  }else{
+    blocks.push(box('How long you actually hold',
+      'Needs at least three closed positions recorded in the ledger. You have '+rt.length+'. Sells of positions you added before the ledger existed can\'t be matched to a buy, so they don\'t count here.'));
+  }
+
+  /* 2 — sell timing */
+  const st90=sellTiming(90),st30=sellTiming(30);
+  const use=st90.length>=3?st90:(st30.length>=3?st30:null);
+  const hz=st90.length>=3?90:30;
+  if(use){
+    const medAfter=median(use.map(r=>r.after));
+    const withRel=use.filter(r=>r.rel!=null);
+    const medRel=withRel.length>=3?median(withRel.map(r=>r.rel)):null;
+    const kept=use.filter(r=>r.after>0).length;
+    blocks.push(box('Whether you sell too early',
+      'Across '+use.length+' sale'+(use.length===1?'':'s')+' marked '+hz+' days later, the median one was <b class="'+(medAfter>0?'neg':'pos')+'">'+
+      (medAfter>0?'+':'')+medAfter.toFixed(1)+'%</b> from where you sold. '+kept+' of '+use.length+' kept rising after you got out.'+
+      (medRel!=null?' Against SPY over the same windows: <b class="'+(medRel>0?'neg':'pos')+'">'+(medRel>0?'+':'')+medRel.toFixed(1)+'pts</b>.':'')+
+      ' '+(medAfter>3
+        ? 'The pattern says you cut winners early. That is the most common and most expensive habit in retail investing, and it is invisible without a ledger like this.'
+        : medAfter<-3
+          ? 'The pattern says your exits have been well timed — what you sold went on to fall.'
+          : 'No clear pattern either way yet, which at this sample size is the honest answer.')));
+  }else{
+    const pend=(D.transactions||[]).filter(t=>t.action==='sell').length;
+    blocks.push(box('Whether you sell too early',
+      pend?'You have '+pend+' recorded sale'+(pend===1?'':'s')+', but none marked at 30 or 90 days yet. Each sale gets stamped with the price on its anniversary, the same way calls do — so this fills in from here rather than being reconstructible backwards.'
+          :'Nothing to measure yet. Once you sell something through PerceptFolio, it gets checked 30 and 90 days later to see whether it kept going without you.'));
+  }
+
+  /* 3 — cash discipline */
+  const cd=cashDiscipline();
+  const pol=policy();
+  const rows=portfolioRows();
+  const totalNow=rows.reduce((a,r)=>a+r.val,0)+(D.cash||0);
+  const capNow=totalNow>0?concentration(rows,totalNow):null;
+  if(cd){
+    const pctBelow=cd.below/cd.n*100;
+    blocks.push(box('Whether you keep to your own rules',
+      'Over '+cd.n+' recorded days your cash ran between <b>'+cd.min.toFixed(1)+'%</b> and <b>'+cd.max.toFixed(1)+'%</b>, median '+cd.med.toFixed(1)+'%, against the '+cd.target+'% you set. '+
+      'You were below your own floor on <b class="'+(pctBelow>25?'neg':'pos')+'">'+Math.round(pctBelow)+'%</b> of those days.'+
+      (capNow?' Today your largest position is '+capNow.top.toFixed(1)+'% against a '+pol.maxPosition+'% cap'+
+        (capNow.top>pol.maxPosition?' — <b class="neg">over</b>.':' — inside it.'):'')+
+      ' Position weights were never snapshotted, so only the cash rule can be checked historically; the cap check is today only.'));
+  }else{
+    blocks.push(box('Whether you keep to your own rules',
+      'Needs at least five daily snapshots. Those accumulate every time you run a refresh.'+
+      (capNow?' Today your largest position is '+capNow.top.toFixed(1)+'% against your '+pol.maxPosition+'% cap.':'')));
+  }
+
+  /* 4 — trade cadence */
+  const tc=tradeCadence();
+  if(tc){
+    const spike=tc.busiestN>=Math.max(3,tc.med*2);
+    blocks.push(box('Whether you trade in bursts',
+      'Across '+tc.keys.length+' months you averaged <b>'+tc.med+'</b> trades a month. Busiest was '+esc(tc.busiest)+' at <b>'+tc.busiestN+'</b>.'+
+      (spike?' That is at least double your normal rate. Activity clustering into single months usually tracks market stress rather than opportunity — worth checking what the market was doing that month before concluding it was a good month for decisions.'
+            :' No month stands far out from the rest, which suggests your activity is driven by your process rather than by the news.')+
+      ' Overlaying VIX on this would answer it properly; that needs the FRED worker and is not built yet.'));
+  }else{
+    blocks.push(box('Whether you trade in bursts','Needs trades recorded across at least three different months.'));
+  }
+
+  el.innerHTML=blocks.join('')+
+    '<p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6"><b>Read the limits.</b> All of this measures only what is in the ledger, which starts when you began recording trades here — positions carried in from before are invisible to it. Sample sizes will be small for a long time, and a handful of trades cannot distinguish a habit from a coincidence. Nothing here is advice; it is a mirror.</p>';
 }
 
 /* ================= QUALITY DRIFT ================= */
@@ -6123,14 +6398,23 @@ function renderRecordStrip(){
     const total=(D.calls||[]).length;
     const pending=(D.calls||[]).filter(c=>(c.verdict==='buy'||c.verdict==='sell')).length;
     el.innerHTML='<span class="muted">Track record: <b>'+(total?pending+' call'+(pending===1?'':'s')+' logged, none marked at 90 days yet':'nothing logged yet')+
-      '</b> — the app cannot claim an edge it has not measured. <a href="#" onclick="showTab(\'market\');return false" style="color:var(--accent)">Scorecard</a></span>';
+      '</b> — the app cannot claim an edge it has not measured. <a href="#" onclick="showTab(\'market\');return false" style="color:var(--accent)">Scorecard</a>'+
+      dueSoonNote()+'</span>';
     return;
   }
   const good=rec.medEdge>=0;
   el.innerHTML='<span class="muted">90-day record: <b class="'+(good?'pos':'neg')+'">'+
     rec.right+' of '+rec.n+' right</b>, median <b class="'+(good?'pos':'neg')+'">'+(good?'+':'')+rec.medEdge.toFixed(1)+'pts</b> vs SPY'+
     (rec.n<20?' <span style="opacity:.7">(too few to mean much)</span>':'')+
-    ' · <a href="#" onclick="showTab(\'market\');return false" style="color:var(--accent)">see every call</a></span>';
+    ' · <a href="#" onclick="showTab(\'market\');return false" style="color:var(--accent)">see every call</a>'+
+    dueSoonNote()+'</span>';
+}
+/* A mark can only be taken while the app is open. Saying so in advance is the difference between a
+   record with a gap in it and a record with a gap you chose. */
+function dueSoonNote(){
+  const due=callsDueSoon(7);
+  if(!due)return '';
+  return ' · <span class="warn">'+due+' mark'+(due===1?'':'s')+' due within a week</span>';
 }
 function renderScorecard(){
   const tb=document.getElementById('scorecardBody');
