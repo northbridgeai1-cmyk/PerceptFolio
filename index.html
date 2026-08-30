@@ -797,6 +797,10 @@ small.src{color:var(--muted)}
       <input id="relWeight" type="number" step="1" min="1" max="100" placeholder="% of business" style="max-width:150px">
       <button class="btn" onclick="addRelation()">Add</button>
     </div>
+    <div class="row" style="margin-top:8px">
+      <input id="relNote" placeholder="What flows between them — e.g. &quot;EUV lithography machines, sole source worldwide&quot;" style="flex:1;min-width:260px">
+    </div>
+    <p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.55">The summary describes the <b>relationship</b>, not the company, so it reads correctly from both ends and is copied to the other company's map automatically. Edit it later on either side and the other side follows, unless you've already written something different there.</p>
     <div id="relList" style="margin-top:14px"></div>
   </div>
 
@@ -5692,11 +5696,15 @@ function drawMap(){
     s+=mapNode(p.x,p.y,p.r,x.ticker||x.name.slice(0,7),(x.weight?x.weight+'% · ':'')+(x.name||'').slice(0,18),grn,"showMapDetail('customer',"+i+")");
   });
 
-  // Centre
+  // Centre — clickable, same as every other bubble. It was the only node on the map you couldn't ask
+  // about, which is odd given it's the company you're actually researching.
+  s+='<g style="cursor:pointer" onclick="showCentreDetail()">';
   s+='<circle cx="'+cx+'" cy="'+cy+'" r="72" fill="var(--bg)"/>';
   s+='<circle cx="'+cx+'" cy="'+cy+'" r="72" fill="'+acc+'" fill-opacity=".18" stroke="'+acc+'" stroke-width="3"/>';
-  s+='<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="21" font-weight="700" fill="var(--text)">'+esc(mapSym)+'</text>';
-  s+='<text x="'+cx+'" y="'+(cy+17)+'" text-anchor="middle" font-size="10" fill="var(--muted)">'+esc(((mapProfile&&mapProfile.finnhubIndustry)||'').slice(0,24))+'</text>';
+  s+='<text x="'+cx+'" y="'+(cy-6)+'" text-anchor="middle" font-size="21" font-weight="700" fill="var(--text)">'+esc(mapSym)+'</text>';
+  s+='<text x="'+cx+'" y="'+(cy+12)+'" text-anchor="middle" font-size="10" fill="var(--muted)">'+esc(((mapProfile&&mapProfile.finnhubIndustry)||'').slice(0,24))+'</text>';
+  s+='<text x="'+cx+'" y="'+(cy+28)+'" text-anchor="middle" font-size="9" fill="'+acc+'">click for summary</text>';
+  s+='</g>';
 
   if(mapPeers.length){
     const py=H-FOOT+30;
@@ -5715,26 +5723,82 @@ function drawMap(){
   s+='</svg>';
   el.innerHTML=s;
 
-  // Concentration risk is the single most decision-relevant thing this map can tell you.
-  const top=[...cus].sort((a,b)=>(b.weight||0)-(a.weight||0))[0];
+  showCentreDetail();
+}
+/* The summary for the company in the middle. Previously the detail pane showed either a bare profile
+   line OR a concentration warning, never both, and there was no way to get back to it once you'd
+   clicked a supplier. Now it's a proper card and the centre bubble is the way back. */
+function showCentreDetail(){
   const d=document.getElementById('mapDetail');
-  if(d&&top&&top.weight>=20){
-    d.innerHTML='<div class="card" style="border-left:4px solid var(--red)">'+
-      '<h3 class="neg">Customer concentration</h3>'+
-      '<p style="font-size:14px;line-height:1.6"><b>'+esc(top.name)+'</b> accounts for about <b>'+top.weight+'%</b> of '+esc(mapSym)+'\'s business. '+
-      'A single customer at that weight is a real risk: if they switch supplier, insource, or simply have a bad year, it lands directly on '+esc(mapSym)+'\'s revenue. '+
-      'Worth sizing the position with that in mind.</p></div>';
-  }else if(d&&!mapProfile){d.innerHTML='';}
-  else if(d&&mapProfile){
-    d.innerHTML='<div class="card"><h3>'+esc(mapProfile.name||mapSym)+'</h3>'+
-      '<div class="row" style="gap:20px;flex-wrap:wrap;font-size:13px">'+
-        (mapProfile.finnhubIndustry?'<span class="muted">Industry: <b style="color:var(--text)">'+esc(mapProfile.finnhubIndustry)+'</b></span>':'')+
-        (mapProfile.country?'<span class="muted">Country: <b style="color:var(--text)">'+esc(mapProfile.country)+'</b></span>':'')+
-        (mapProfile.marketCapitalization?'<span class="muted">Market cap: <b style="color:var(--text)">$'+Math.round(mapProfile.marketCapitalization/1000)+'bn</b></span>':'')+
-        (mapProfile.weburl?'<a href="'+esc(mapProfile.weburl)+'" target="_blank" rel="noopener" style="color:var(--accent)">Website</a>':'')+
-      '</div>'+
-      '<button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="analyzeStock(\''+esc(mapSym)+'\')">Analyze '+esc(mapSym)+'</button></div>';
+  if(!d||!mapSym)return;
+  const rel=relationsFor(mapSym);
+  const sup=rel.suppliers,cus=rel.customers;
+  const p=mapProfile||{};
+  const sc=(D.analyses||{})[mapSym];
+  const held=(D.holdings||[]).filter(h=>h.sym===mapSym);
+  const heldVal=held.reduce((a,h)=>a+(h.price??h.cost)*h.shares,0);
+  const rows=portfolioRows();
+  const totalVal=rows.reduce((a,r)=>a+r.val,0)+(D.cash||0);
+
+  const facts=[];
+  if(p.finnhubIndustry)facts.push('Industry: <b style="color:var(--text)">'+esc(p.finnhubIndustry)+'</b>');
+  if(p.country)facts.push('Country: <b style="color:var(--text)">'+esc(p.country)+'</b>');
+  if(p.marketCapitalization)facts.push('Market cap: <b style="color:var(--text)">$'+Math.round(p.marketCapitalization/1000)+'bn</b>');
+  if(p.exchange)facts.push('Listed: <b style="color:var(--text)">'+esc(String(p.exchange).slice(0,28))+'</b>');
+
+  // Scores, if it has been analyzed. Saves a trip to the Analyzer to answer "is this any good".
+  let scoreLine='';
+  if(sc&&!sc.error){
+    const v=verdictOf(sc,held.length>0,mapSym);
+    const tot=scoreTotal(sc);
+    scoreLine='<div class="row" style="gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">'+
+      '<span class="pill '+v.cls+'">'+esc(v.label)+'</span>'+
+      (tot?'<span class="muted" style="font-size:13px">'+tot.got+'/'+tot.max+' overall · quality '+sc.qScore+'/'+sc.qTotal+' · value '+sc.pScore+'/'+sc.pTotal+' · momentum '+sc.mScore+'/'+sc.mTotal+'</span>':'')+
+      (isFinite(sc.price)?'<span class="muted" style="font-size:13px">· '+fmt$(sc.price)+'</span>':'')+
+    '</div>';
+  }else{
+    scoreLine='<p class="muted" style="font-size:13px;margin-top:12px">Not scored yet — run the Analyzer to see whether the business itself clears your bar.</p>';
   }
+
+  // What the map itself says. This is the part no other screen can tell you.
+  const topCus=[...cus].sort((a,b)=>(b.weight||0)-(a.weight||0))[0];
+  const topSup=[...sup].sort((a,b)=>(b.weight||0)-(a.weight||0))[0];
+  const mapBits=[];
+  mapBits.push(sup.length+' supplier'+(sup.length===1?'':'s')+' and '+cus.length+' customer'+(cus.length===1?'':'s')+' mapped');
+  if(topCus&&topCus.weight)mapBits.push('biggest customer <b style="color:var(--text)">'+esc(topCus.name)+'</b> at '+topCus.weight+'%');
+  if(topSup&&topSup.weight)mapBits.push('biggest dependency <b style="color:var(--text)">'+esc(topSup.name)+'</b> at '+topSup.weight+'%');
+
+  let warn='';
+  if(topCus&&topCus.weight>=20){
+    warn='<div style="border-left:3px solid var(--red);padding:10px 14px;margin-top:14px;background:var(--bg);border-radius:6px">'+
+      '<b class="neg">Customer concentration</b>'+
+      '<p style="font-size:13.5px;line-height:1.6;margin-top:5px">'+esc(topCus.name)+' is about <b>'+topCus.weight+'%</b> of '+esc(mapSym)+'\'s business. '+
+      'If they switch supplier, insource, or just have a bad year, it lands straight on '+esc(mapSym)+'\'s revenue. Size the position with that in mind.</p></div>';
+  }
+  if(topSup&&topSup.weight>=25){
+    warn+='<div style="border-left:3px solid var(--yellow);padding:10px 14px;margin-top:10px;background:var(--bg);border-radius:6px">'+
+      '<b class="warn">Supplier dependency</b>'+
+      '<p style="font-size:13.5px;line-height:1.6;margin-top:5px">'+esc(topSup.name)+' supplies about <b>'+topSup.weight+'%</b> of what '+esc(mapSym)+' needs. '+
+      'A single point of failure upstream is the same risk as a single customer downstream, just harder to see in the financials.</p></div>';
+  }
+
+  const ownLine=heldVal>0&&totalVal>0
+    ? '<p class="muted" style="font-size:13px;margin-top:10px">You own '+pmask(fmt$(heldVal))+' of this — <b style="color:var(--text)">'+(heldVal/totalVal*100).toFixed(1)+'%</b> of your portfolio.</p>'
+    : '';
+
+  d.innerHTML='<div class="card" style="border-left:4px solid var(--accent)">'+
+    '<h3 style="margin-bottom:4px">'+esc(p.name||mapSym)+' <span class="muted" style="font-weight:400">('+esc(mapSym)+')</span></h3>'+
+    (facts.length?'<div class="row" style="gap:18px;flex-wrap:wrap;font-size:13px">'+facts.map(f=>'<span class="muted">'+f+'</span>').join('')+'</div>':
+      '<p class="muted" style="font-size:13px">No company profile loaded — add a Finnhub key in Settings, or this ticker isn\'t covered by the free tier.</p>')+
+    scoreLine+
+    '<p class="muted" style="font-size:13px;margin-top:10px">'+mapBits.join(' · ')+'.</p>'+
+    ownLine+
+    warn+
+    '<div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">'+
+      '<button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(mapSym)+'\')">Analyze '+esc(mapSym)+'</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="tiPrefill(\''+esc(mapSym)+'\')">Size a trade</button>'+
+      (p.weburl?'<a class="btn btn-ghost btn-sm" href="'+esc(p.weburl)+'" target="_blank" rel="noopener">Website</a>':'')+
+    '</div></div>';
 }
 function showMapDetail(side,i){
   const rel=relationsFor(mapSym);
@@ -5748,9 +5812,10 @@ function showMapDetail(side,i){
       (side==='supplier'?esc(mapSym)+' buys from them':esc(mapSym)+' sells to them')+
       (x.weight?' · about <b style="color:var(--text)">'+x.weight+'%</b> of the relationship':'')+'</p>'+
     (x.note?'<p style="font-size:14px;line-height:1.6;margin-bottom:10px">'+esc(x.note)+'</p>':'<p class="muted" style="font-size:13px;margin-bottom:10px">No summary saved. Add one in the list below to remember what they do.</p>')+
-    '<div class="row">'+
+    '<div class="row" style="gap:8px;flex-wrap:wrap">'+
       (x.ticker?'<button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(x.ticker)+'\')">Analyze '+esc(x.ticker)+'</button>':'')+
       (x.ticker?'<button class="btn btn-ghost btn-sm" onclick="mapTo(\''+esc(x.ticker)+'\')">Map '+esc(x.ticker)+'</button>':'')+
+      '<button class="btn btn-ghost btn-sm" onclick="showCentreDetail()">← Back to '+esc(mapSym)+'</button>'+
     '</div></div>';
 }
 function mapTo(t){
@@ -5769,23 +5834,28 @@ function addRelation(){
   const name=(document.getElementById('relName').value||'').trim();
   const ticker=(document.getElementById('relTicker').value||'').trim().toUpperCase();
   const weight=parseFloat(document.getElementById('relWeight').value);
+  const note=((document.getElementById('relNote')||{}).value||'').trim();
   if(!name&&!ticker)return toast('Enter at least a company name or a ticker.');
   const w=isFinite(weight)?Math.max(1,Math.min(100,weight)):10;
   const rel=relationsFor(mapSym);
   if(ticker&&rel[side].some(x=>x.ticker===ticker))return toast(ticker+' is already on '+mapSym+'\'s map.');
-  rel[side].push({name:name||ticker,ticker:ticker||'',weight:w,note:''});
+  rel[side].push({name:name||ticker,ticker:ticker||'',weight:w,note});
 
-  // Mirror onto the other company, but only when there's a ticker to hang it on.
+  /* Mirror onto the other company, but only when there's a ticker to hang it on.
+     THE NOTE TRAVELS WITH THE LINK. It used to be dropped — every mirrored entry was created with an
+     empty note, so the thing that made the map worth reading ("EUV machines, sole source") existed on
+     one company's map and nowhere else. The note describes what flows between the two, which is the
+     same fact from either end, so it belongs on both. */
   let mirrored=false;
   if(ticker&&ticker!==mapSym){
     const other=relationsFor(ticker);
     const otherSide=OPPOSITE[side];
     if(!other[otherSide].some(x=>x.ticker===mapSym)){
-      other[otherSide].push({name:(mapProfile&&mapProfile.name)||mapSym,ticker:mapSym,weight:w,note:'',linked:true});
+      other[otherSide].push({name:(mapProfile&&mapProfile.name)||mapSym,ticker:mapSym,weight:w,note,linked:true});
       mirrored=true;
     }
   }
-  ['relName','relTicker','relWeight'].forEach(id=>document.getElementById(id).value='');
+  ['relName','relTicker','relWeight','relNote'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   saveDB();drawMap();renderRelList();
   toast('Added to '+mapSym+'\'s map.'+(mirrored?' Also added '+mapSym+' to '+ticker+'\'s map.':''));
 }
@@ -5799,7 +5869,7 @@ function relinkAll(){
   if(!D.relations)D.relations={};
   const syms=Object.keys(D.relations);
   if(!syms.length)return toast('Nothing mapped yet — add some relationships first.');
-  let created=0,noTicker=0;
+  let created=0,noTicker=0,filled=0;
   syms.forEach(sym=>{
     ['suppliers','customers'].forEach(side=>{
       const list=(D.relations[sym]&&D.relations[sym][side])||[];
@@ -5807,15 +5877,23 @@ function relinkAll(){
         if(!x.ticker||x.ticker===sym){noTicker++;return;}
         const other=relationsFor(x.ticker);
         const otherSide=OPPOSITE[side];
-        if(other[otherSide].some(y=>y.ticker===sym))return;   // already linked
-        other[otherSide].push({name:x.linkName||sym,ticker:sym,weight:x.weight||10,note:'',linked:true});
+        const existing=(other[otherSide]||[]).find(y=>y.ticker===sym);
+        if(existing){
+          // Already linked, but back-fill the summary if this end has one and that end doesn't.
+          if(x.note&&!existing.note){existing.note=x.note;filled++;}
+          return;
+        }
+        other[otherSide].push({name:x.linkName||sym,ticker:sym,weight:x.weight||10,note:x.note||'',linked:true});
         created++;
       });
     });
   });
   saveDB();drawMap();renderRelList();
-  toast(created
-    ? 'Linked '+created+' relationship'+(created===1?'':'s')+' across '+Object.keys(D.relations).length+' companies.'+(noTicker?' '+noTicker+' skipped — no ticker to link to.':'')
+  const bits=[];
+  if(created)bits.push('Linked '+created+' relationship'+(created===1?'':'s'));
+  if(filled)bits.push('copied '+filled+' summar'+(filled===1?'y':'ies')+' across');
+  toast(bits.length
+    ? bits.join(', ')+' across '+Object.keys(D.relations).length+' companies.'+(noTicker?' '+noTicker+' skipped — no ticker to link to.':'')
     : 'Everything is already linked'+(noTicker?'. '+noTicker+' entries have no ticker, so they can\'t be linked.':'.'));
 }
 function removeRelation(side,i){
@@ -5833,9 +5911,21 @@ function removeRelation(side,i){
   rel[side].splice(i,1);
   saveDB();drawMap();renderRelList();
 }
+/* Editing a summary updates the mirrored entry on the other company too — but only when that side is
+   still empty or still holds the old text. If you've deliberately written something different over
+   there, that edit is yours and this leaves it alone. */
 function setRelNote(side,i,v){
   const rel=relationsFor(mapSym);
-  if(rel[side][i]){rel[side][i].note=v;saveDB();}
+  const x=rel[side][i];
+  if(!x)return;
+  const prev=x.note||'';
+  x.note=v;
+  if(x.ticker&&D.relations&&D.relations[x.ticker]){
+    const other=D.relations[x.ticker],otherSide=OPPOSITE[side];
+    const twin=(other[otherSide]||[]).find(y=>y.ticker===mapSym);
+    if(twin&&(!twin.note||twin.note===prev))twin.note=v;
+  }
+  saveDB();
 }
 function setRelWeight(side,i,v){
   const rel=relationsFor(mapSym);
