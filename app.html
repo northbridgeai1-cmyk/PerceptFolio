@@ -703,12 +703,18 @@ small.src{color:var(--muted)}
     <div class="field"><label>What must stay true?</label><textarea id="thesisMust" rows="2" placeholder="Margins stay above X. Revenue growth stays above Y. No major competitor displacement." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
     <div class="field"><label>What would make us sell?</label><textarea id="thesisInvalid" rows="2" placeholder="Quality score drops below 8. Margins compress two quarters running. Valuation exceeds X." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
     <div class="row">
+      <div class="field" style="max-width:200px;margin-bottom:0"><label>Target price ($)</label><input id="thesisTarget" type="number" step="any" min="0" placeholder="where you think it goes" oninput="updatePlannedRR()"></div>
+      <div class="field" style="max-width:200px;margin-bottom:0"><label>Stop price ($) — sell below</label><input id="thesisStop" type="number" step="any" min="0" placeholder="where you're wrong" oninput="updatePlannedRR()"></div>
+      <div class="field" style="max-width:200px;margin-bottom:0"><label>Deadline — exit if it hasn't worked</label><input id="thesisDeadline" type="date"></div>
+    </div>
+    <div class="muted" id="plannedRR" style="font-size:12.5px;margin:10px 0 4px"></div>
+    <div class="row">
       <div class="field" style="max-width:250px;margin-bottom:0"><label>Sell if quality drops below (of 12)</label><input id="thesisSellBelow" type="number" min="0" max="12" step="1" placeholder="e.g. 8"></div>
       <div class="field" style="max-width:220px;margin-bottom:0"><label>Next review</label><input id="thesisReview" type="date"></div>
       <button class="btn" style="align-self:flex-end" onclick="saveThesis()">Save thesis</button>
       <button class="btn-danger btn btn-ghost" style="align-self:flex-end" onclick="deleteThesis()">Delete</button>
     </div>
-    <p class="muted" style="margin-top:10px;font-size:11.5px;line-height:1.55">The quality threshold is the part the app can act on — free text it can store but not read. Set it and this stock gets <b>its own sell trigger</b>, checked ahead of the global one in Settings. A company you bought for its balance sheet can be held to a different standard than one you bought cheap.</p>
+    <p class="muted" style="margin-top:10px;font-size:11.5px;line-height:1.55"><b>Four of these the app can act on:</b> the target, the stop, the deadline and the quality threshold. The free text it can store but never read. The stop is what actually limits a loss — it turns "how often am I right" into "how much do I make when I'm right versus lose when I'm wrong", which is the number that decides whether the account grows. The deadline handles the third outcome nobody plans for: the thesis was neither right nor wrong, it just never happened, and the money sat there.</p>
   </div>
 
   <div class="section-title">Your Holdings</div>
@@ -1221,6 +1227,8 @@ small.src{color:var(--muted)}
       </select></div>
       <div class="field"><label>Max single position (% of portfolio)</label><input id="polMaxPos" type="number" min="1" max="100" step="1"></div>
       <div class="field"><label>Cash target (%) — flags idle cash above this</label><input id="polCash" type="number" min="0" max="100" step="1"></div>
+      <div class="field"><label>Risk budget per position (%)</label><input id="polRiskPerTrade" type="number" min="0.1" max="25" step="0.5">
+        <span class="muted" style="font-size:11.5px;line-height:1.5;display:block;margin-top:4px">How much of the whole portfolio a single position is allowed to put at risk. With a stop set, this is the most you lose if it hits. Without one, it sizes by volatility instead. A flat cap treats a quiet utility and a violent semiconductor as the same bet; this doesn't.</span></div>
       <div class="field"><label>Exclusions (tickers or sectors, comma separated)</label><input id="polExclusions" placeholder="e.g. XOM, tobacco, defense"></div>
     </div>
     <button class="btn" onclick="savePolicy()">Save policy</button>
@@ -1235,6 +1243,13 @@ small.src{color:var(--muted)}
       <div class="field"><label>Auto-refresh on page load</label><select id="setAutoRefresh"><option value="yes">Yes</option><option value="no">No</option></select></div>
     </div>
     <button class="btn" onclick="saveRules()">Save Rules</button>
+    <p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Changing a buy or sell bar creates a <b>different system</b>. Every call graded before the change was made by one that no longer exists, so you'll be asked what you expect the change to do and what result would prove it wrong — before you see any data. That's the only defence against searching a small sample until something looks significant.</p>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Rule Change Log</h3>
+    <p class="muted" style="margin-bottom:12px">Every change to the buy or sell bars, with the prediction you made at the time. Read it back when a change is a few months old and check whether what you expected is what happened.</p>
+    <div id="ruleLog"></div>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Copy Holdings / Watchlist to Another Account</h3>
@@ -1408,7 +1423,8 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   macro:{cape:null,capeAsOf:'',margin:null,marginAsOf:'',marginPrev:null,buffett:null,buffettAsOf:''},
   relations:{},                                 // ticker -> {suppliers:[],customers:[]} for the Map tab
   theses:{},                                    // ticker -> {why,mustBeTrue,invalidIf,reviewDate,created,scoreAtEntry}
-  policy:{maxPosition:10,cashTarget:3,risk:'moderate',exclusions:''},
+  policy:{maxPosition:10,cashTarget:3,risk:'moderate',exclusions:'',riskPerTrade:2},
+  ruleChanges:[],                               // every change to the buy/sell rules, pre-registered
   rules:{qBuy:9,pBuy:4,qSell:6,mBuy:0,autoRefresh:'yes'},lastRefresh:0};}
 /* Your own manual call per ticker (Buy/Hold/Sell/Watching) — independent of the app's computed verdict above.
    Defensive lazy-init so profiles saved before this feature still work. */
@@ -1713,6 +1729,8 @@ function resetTransientState(){
   const dc=document.getElementById('driftCount');if(dc)dc.textContent='';
   const ti=document.getElementById('tradeImpact');if(ti)ti.innerHTML='';
   const bh=document.getElementById('behaviourBody');if(bh)bh.innerHTML='';
+  const rl2=document.getElementById('ruleLog');if(rl2)rl2.innerHTML='';
+  const prr=document.getElementById('plannedRR');if(prr)prr.innerHTML='';
   const tit=document.getElementById('tiTicker');if(tit)tit.value='';
   const tia=document.getElementById('tiAmount');if(tia)tia.value='';
   const dd=document.getElementById('mcDrawdown');if(dd)dd.innerHTML='';
@@ -2089,7 +2107,7 @@ function showTab(t){
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
-  if(t==='settings')fillPolicyInputs();
+  if(t==='settings'){fillPolicyInputs();renderRuleLog();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -4434,6 +4452,7 @@ function renderAll(){
   renderDrift();
   renderTradeImpact();
   renderBehaviour();
+  renderRuleLog();
   /* The scorecard used to redraw only on tab entry, so a refresh that landed new marks while you were
      sitting on the Market tab left a stale table on screen. */
   renderScorecard();
@@ -4936,13 +4955,97 @@ async function saveApiKey(){
   try{await getQuote('AAPL');st.textContent='✔ Key works';st.className='pos';}
   catch(e){st.textContent='✘ Key failed ('+e.message+')';st.className='neg';}
 }
+/* ================= PRE-REGISTRATION =================
+   Changing the buy or sell bar is not a settings tweak. It creates a different system, and every
+   call graded before the change was made by a system that no longer exists. Averaging the two
+   together produces a track record for something that never ran.
+
+   Worse is the failure mode this guards against directly. There are 22 checks, 4 horizons and
+   several regimes to slice by, which is a few hundred ways to cut one small dataset. At a 5%
+   threshold roughly one slice in twenty looks significant by pure chance, so a determined search
+   will always find something. The defence against fooling yourself that way is not more analysis.
+   It is writing down what you expect BEFORE you look, and what result would prove you wrong.
+
+   So: state the expected effect and the failure test, or the change doesn't save. */
+function ruleSnapshot(){
+  const r=D.rules||{};
+  return{qBuy:r.qBuy,pBuy:r.pBuy,mBuy:r.mBuy,qSell:r.qSell};
+}
+function rulesDiffer(a,b){
+  return a.qBuy!==b.qBuy||a.pBuy!==b.pBuy||a.mBuy!==b.mBuy||a.qSell!==b.qSell;
+}
+function describeRules(r){
+  return 'quality≥'+r.qBuy+', value≥'+r.pBuy+', momentum≥'+r.mBuy+', sell at≤'+r.qSell;
+}
+/* How many distinct rule-sets does the current graded record actually span? If the answer is more
+   than one, the headline expectancy is an average across different systems and should not be read
+   as the performance of any of them. */
+function ruleChangeWarning(){
+  const changes=D.ruleChanges||[];
+  if(!changes.length)return '';
+  const calls=(D.calls||[]).filter(c=>c.verdict==='buy'||c.verdict==='sell');
+  if(!calls.length)return '';
+  const oldest=Math.min(...calls.map(c=>c.ts));
+  const since=changes.filter(ch=>ch.ts>oldest).length;
+  if(!since)return '';
+  return '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65"><b class="warn">This record spans '+(since+1)+' different rule-sets.</b> '+
+    'You changed the buy or sell bar '+since+' time'+(since===1?'':'s')+' after the oldest call above was made, so the numbers average together systems that were not the same system. '+
+    'Treat the figures as indicative until enough calls accumulate under the current rules alone.</p>';
+}
 function saveRules(){
-  D.rules.qBuy=Math.min(12,Math.max(1,parseInt(document.getElementById('setQBuy').value)||9));
-  D.rules.pBuy=Math.min(6,Math.max(1,parseInt(document.getElementById('setPBuy').value)||4));
-  D.rules.mBuy=Math.min(4,Math.max(0,parseInt(document.getElementById('setMBuy').value)||0));
-  D.rules.qSell=Math.min(12,Math.max(0,parseInt(document.getElementById('setQSell').value)||6));
-  D.rules.autoRefresh=document.getElementById('setAutoRefresh').value;
-  saveDB();renderAll();toast('Rules saved.');
+  const before=ruleSnapshot();
+  const after={
+    qBuy:Math.min(12,Math.max(1,parseInt(document.getElementById('setQBuy').value)||9)),
+    pBuy:Math.min(6,Math.max(1,parseInt(document.getElementById('setPBuy').value)||4)),
+    mBuy:Math.min(4,Math.max(0,parseInt(document.getElementById('setMBuy').value)||0)),
+    qSell:Math.min(12,Math.max(0,parseInt(document.getElementById('setQSell').value)||6))
+  };
+  const autoRefresh=document.getElementById('setAutoRefresh').value;
+
+  if(rulesDiffer(before,after)){
+    const expect=(prompt(
+      'You are changing the system, not adjusting a setting.\n\n'+
+      'From: '+describeRules(before)+'\n'+
+      'To:   '+describeRules(after)+'\n\n'+
+      'What do you expect this change to do? Write it down BEFORE you see the result — afterwards you will explain whatever happened.'
+    )||'').trim();
+    if(!expect)return toast('Change cancelled. A rule change needs a stated expectation.');
+    const detect=(prompt(
+      'And how would you know it FAILED?\n\n'+
+      'Name the result that would make you undo this. If you cannot state one, the change is unfalsifiable and should not ship.'
+    )||'').trim();
+    if(!detect)return toast('Change cancelled. A rule change needs a failure test.');
+
+    if(!D.ruleChanges)D.ruleChanges=[];
+    D.ruleChanges.push({
+      ts:Date.now(),date:new Date().toISOString().slice(0,10),
+      from:before,to:after,expect,detect,
+      callsBefore:(D.calls||[]).filter(c=>c.verdict==='buy'||c.verdict==='sell').length
+    });
+    if(D.ruleChanges.length>200)D.ruleChanges=D.ruleChanges.slice(D.ruleChanges.length-200);
+  }
+
+  D.rules.qBuy=after.qBuy;D.rules.pBuy=after.pBuy;D.rules.mBuy=after.mBuy;D.rules.qSell=after.qSell;
+  D.rules.autoRefresh=autoRefresh;
+  saveDB();renderAll();renderRuleLog();
+  toast(rulesDiffer(before,after)?'Rules changed and logged. The scorecard now spans more than one system.':'Rules saved.');
+}
+function renderRuleLog(){
+  const el=document.getElementById('ruleLog');
+  if(!el||!D)return;
+  const changes=[...(D.ruleChanges||[])].reverse();
+  if(!changes.length){
+    el.innerHTML='<div class="empty">No rule changes recorded. Every call in your scorecard was made by the same system, which is the cleanest a record can be.</div>';
+    return;
+  }
+  el.innerHTML='<div style="overflow-x:auto"><table><thead><tr>'+
+    '<th>When</th><th>From → To</th><th>What you expected</th><th>How you\'d know it failed</th>'+
+    '</tr></thead><tbody>'+changes.map(ch=>
+      '<tr><td class="muted" style="white-space:nowrap">'+esc(ch.date)+'</td>'+
+      '<td class="muted" style="font-size:12px;min-width:190px">'+esc(describeRules(ch.from))+'<br>→ '+esc(describeRules(ch.to))+'</td>'+
+      '<td style="font-size:13px">'+esc(ch.expect||'')+'</td>'+
+      '<td style="font-size:13px" class="muted">'+esc(ch.detect||'')+'</td></tr>').join('')+
+    '</tbody></table></div>';
 }
 function exportData(){
   const blob=new Blob([JSON.stringify({profile:USER,data:D},null,2)],{type:'application/json'});
@@ -4968,6 +5071,46 @@ function importData(ev){
    price moves — afterwards you'll construct a reason for whatever happened, and won't notice you're
    doing it. The review date is what makes it a live document rather than a note nobody reopens. */
 function thesisFor(sym){return (D.theses||{})[sym]||null;}
+/* Planned reward-to-risk, computed from the target and stop at the moment they are written.
+   This is the pre-registration the Council demanded, applied to a single position: a target and a
+   stop together are a falsifiable prediction, where "I like this company" is not. It also surfaces
+   the arithmetic most people never do — at a 1.5:1 payoff you need to be right 40% of the time just
+   to break even, and almost nobody checks whether the trade they are about to take clears that bar. */
+function plannedRR(entry,target,stop){
+  if(!(entry>0)||!(target>0)||!(stop>0))return null;
+  const reward=target-entry, risk=entry-stop;
+  if(!(risk>0)||!(reward>0))return null;
+  const rr=reward/risk;
+  return{rr,reward,risk,
+    rewardPct:reward/entry*100,riskPct:risk/entry*100,
+    breakeven:100/(1+rr)};   // hit rate needed just to break even at this payoff
+}
+function updatePlannedRR(){
+  const el=document.getElementById('plannedRR');
+  if(!el||!D)return;
+  const sym=(document.getElementById('thesisSym')||{}).value;
+  const num=id=>{const v=parseFloat((document.getElementById(id)||{}).value);return isFinite(v)?v:null;};
+  const target=num('thesisTarget'),stop=num('thesisStop');
+  const sc=(D.analyses||{})[sym];
+  const h=(D.holdings||[]).find(x=>x.sym===sym);
+  const entry=(h&&isFinite(h.price)&&h.price>0)?h.price
+    :(sc&&!sc.error&&isFinite(sc.price)&&sc.price>0?sc.price:null);
+  if(!entry){el.innerHTML=target||stop?'<span class="warn">No current price for '+esc(sym||'this ticker')+' — run a refresh and the payoff ratio will calculate.</span>':'';return;}
+  const p=plannedRR(entry,target,stop);
+  if(!p){
+    el.innerHTML=(target||stop)
+      ? 'Price now '+fmt$(entry)+'. Set a target <b>above</b> it and a stop <b>below</b> it to see the payoff ratio.'
+      : 'Price now '+fmt$(entry)+'. Add a target and a stop to see what payoff you are actually planning for.';
+    return;
+  }
+  const good=p.rr>=2;
+  el.innerHTML='At '+fmt$(entry)+': risking <b class="neg">'+p.riskPct.toFixed(1)+'%</b> to make <b class="pos">'+p.rewardPct.toFixed(1)+'%</b> — '+
+    'payoff <b class="'+(good?'pos':(p.rr>=1?'warn':'neg'))+'">'+p.rr.toFixed(2)+'×</b>. '+
+    'You need to be right <b>'+p.breakeven.toFixed(0)+'%</b> of the time just to break even'+
+    (p.rr<1?' — <span class="neg">worse than a coin flip, so this needs an unusually high hit rate to work.</span>'
+           :good?' — a comfortable margin.'
+           :'.');
+}
 function fillThesisPicker(){
   const sel=document.getElementById('thesisSym');
   if(!sel)return;
@@ -4989,6 +5132,10 @@ function loadThesis(){
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
   set('thesisWhy',t.why);set('thesisMust',t.mustBeTrue);set('thesisInvalid',t.invalidIf);set('thesisReview',t.reviewDate);
   set('thesisSellBelow',isFinite(t.sellBelow)?t.sellBelow:'');
+  set('thesisTarget',isFinite(t.target)?t.target:'');
+  set('thesisStop',isFinite(t.stop)?t.stop:'');
+  set('thesisDeadline',t.deadline);
+  updatePlannedRR();
   const st=document.getElementById('thesisStatus');
   if(st){
     if(!sym)st.textContent='';
@@ -5009,9 +5156,18 @@ function saveThesis(){
   const sc=D.analyses[sym];
   const tot=scoreTotal(sc);
   const sb=parseFloat(val('thesisSellBelow'));
+  const tg=parseFloat(val('thesisTarget'));
+  const sp=parseFloat(val('thesisStop'));
   D.theses[sym]={
     why:val('thesisWhy'),mustBeTrue:val('thesisMust'),invalidIf:val('thesisInvalid'),
     reviewDate:val('thesisReview'),
+    target:(isFinite(tg)&&tg>0)?tg:null,
+    stop:(isFinite(sp)&&sp>0)?sp:null,
+    deadline:val('thesisDeadline'),
+    /* The price when the thesis was written, so the planned payoff ratio can be reconstructed later
+       and compared against what actually happened. Without it, "was the plan any good" is
+       unanswerable after the fact. */
+    entryPrice:(existing&&existing.entryPrice)||(sc&&!sc.error&&isFinite(sc.price)?sc.price:null),
     sellBelow:(isFinite(sb)&&sb>0)?Math.min(12,sb):null,
     created:(existing&&existing.created)||new Date().toISOString().slice(0,10),
     // Snapshot the score at the time of writing, so drift since is visible later.
@@ -5033,12 +5189,14 @@ function policy(){
   const p=D.policy||{};
   return{maxPosition:isFinite(p.maxPosition)?p.maxPosition:10,
     cashTarget:isFinite(p.cashTarget)?p.cashTarget:3,
+    riskPerTrade:isFinite(p.riskPerTrade)?p.riskPerTrade:2,
     risk:p.risk||'moderate',exclusions:p.exclusions||''};
 }
 function fillPolicyInputs(){
   const p=policy();
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
   set('polRisk',p.risk);set('polMaxPos',p.maxPosition);set('polCash',p.cashTarget);set('polExclusions',p.exclusions);
+  set('polRiskPerTrade',p.riskPerTrade);
 }
 function savePolicy(){
   const num=(id,d)=>{const v=parseFloat((document.getElementById(id)||{}).value);return isFinite(v)?v:d;};
@@ -5046,6 +5204,7 @@ function savePolicy(){
     risk:(document.getElementById('polRisk')||{}).value||'moderate',
     maxPosition:Math.max(1,Math.min(100,num('polMaxPos',10))),
     cashTarget:Math.max(0,Math.min(100,num('polCash',3))),
+    riskPerTrade:Math.max(0.1,Math.min(25,num('polRiskPerTrade',2))),
     exclusions:(document.getElementById('polExclusions')||{}).value||''
   };
   saveDB();renderCommand();
@@ -5330,19 +5489,70 @@ function maxBuyWithinCap(sym,capPct,fromCash){
   const x=fromCash?(c*total-v):((c*total-v)/(1-c));
   return Math.max(0,x);
 }
+/* ================= RISK-BASED SIZING =================
+   The flat percentage cap was the crudest thing in the app. Ten percent in a 0.6-beta utility and ten
+   percent in a 2.4-beta semiconductor are not the same bet; treating them as one is how a portfolio
+   that looks diversified on paper behaves like a single position in practice.
+
+   Three limits are computed and the SMALLEST binds. Showing all three matters as much as applying
+   them, because knowing which constraint is binding tells you what to change if you want more.
+
+     1. Policy cap        — the flat maximum you already set.
+     2. Volatility budget — size so a one-standard-deviation annual move in this name costs no more
+                            than your risk budget. Position = total × budget ÷ σ. Quiet names get
+                            more room, violent ones less, automatically.
+     3. Stop distance     — if a thesis stop exists, size so hitting it costs exactly the budget.
+                            Dollars = risk ÷ (distance to stop, as a fraction). This is the only one
+                            of the three that truncates the loss rather than estimating it. */
+function sizingLimits(sym,fromCash){
+  const pol=policy();
+  const rows=portfolioRows();
+  const total=rows.reduce((a,r)=>a+r.val,0)+(D.cash||0);
+  const out={total,budgetPct:pol.riskPerTrade,budget:total*pol.riskPerTrade/100,
+    cap:null,vol:null,stop:null,sigma:null,stopPrice:null,stopDistPct:null,binding:null,limit:null};
+  if(!(total>0))return out;
+
+  out.cap=maxBuyWithinCap(sym,pol.maxPosition,fromCash);
+
+  const sc=(D.analyses||{})[sym];
+  const sigma=(sc&&!sc.error&&isFinite(sc.riskSigma)&&sc.riskSigma>0)?sc.riskSigma:null;
+  if(sigma){out.sigma=sigma;out.vol=out.budget/sigma;}
+
+  const th=thesisFor(sym);
+  const price=(()=>{
+    const h=(D.holdings||[]).find(x=>x.sym===sym);
+    if(h&&isFinite(h.price)&&h.price>0)return h.price;
+    return (sc&&!sc.error&&isFinite(sc.price)&&sc.price>0)?sc.price:null;
+  })();
+  if(th&&isFinite(th.stop)&&th.stop>0&&price>0&&th.stop<price){
+    const dist=(price-th.stop)/price;          // fraction of the position lost if the stop hits
+    out.stopPrice=th.stop;out.stopDistPct=dist*100;
+    out.stop=out.budget/dist;
+  }
+
+  const candidates=[['policy cap',out.cap],['volatility budget',out.vol],['stop distance',out.stop]]
+    .filter(c=>isFinite(c[1])&&c[1]>=0);
+  if(candidates.length){
+    candidates.sort((a,b)=>a[1]-b[1]);
+    out.binding=candidates[0][0];
+    out.limit=candidates[0][1];
+  }
+  return out;
+}
 function tiUseMax(){
   const sym=((document.getElementById('tiTicker')||{}).value||'').trim().toUpperCase();
   if(!sym)return toast('Enter a ticker first.');
   const fromCash=!!(document.getElementById('tiFromCash')||{}).checked;
-  const pol=policy();
-  let x=maxBuyWithinCap(sym,pol.maxPosition,fromCash);
+  const L=sizingLimits(sym,fromCash);
+  let x=isFinite(L.limit)?L.limit:0;
   if(fromCash)x=Math.min(x,D.cash||0);   // can't spend cash you don't have
   const el=document.getElementById('tiAmount');
   const side=document.getElementById('tiSide');
   if(side)side.value='buy';
   if(el)el.value=x>0?Math.floor(x*100)/100:0;
   renderTradeImpact();
-  if(!(x>0))toast(sym+' is already at or over your '+pol.maxPosition+'% cap.');
+  if(!(x>0))toast(sym+' has no room left under your limits.');
+  else toast('Sized to '+fmt$(x)+' — bound by your '+L.binding+'.');
 }
 function tiPrefill(sym){
   showTab('portfolio');
@@ -5353,6 +5563,45 @@ function tiPrefill(sym){
   tiUseMax();
   const card=document.getElementById('tradeImpact');
   if(card&&card.scrollIntoView)card.scrollIntoView({behavior:'smooth',block:'center'});
+}
+/* The three limits, side by side, with the binding one marked. Showing all three is the point: if
+   the volatility budget is what's stopping you, the answer is a smaller position or a calmer stock,
+   not a bigger cap. */
+function sizingPanel(sym,fromCash,proposed){
+  const L=sizingLimits(sym,fromCash);
+  if(!(L.total>0))return '';
+  const pol=policy();
+  const row=(name,val,note,isBinding)=>{
+    if(!isFinite(val))return '<tr><td class="muted">'+name+'</td><td class="muted">—</td><td class="muted" style="font-size:12px">'+note+'</td></tr>';
+    return '<tr'+(isBinding?' style="background:rgba(59,130,246,.07)"':'')+'>'+
+      '<td>'+name+(isBinding?' <span class="pill pill-buy" style="font-size:10px">binding</span>':'')+'</td>'+
+      '<td><b>'+fmt$(val)+'</b> <span class="muted">'+(val/L.total*100).toFixed(1)+'%</span></td>'+
+      '<td class="muted" style="font-size:12px">'+note+'</td></tr>';
+  };
+  const over=isFinite(L.limit)&&proposed>L.limit+0.005;
+  return '<div style="margin-top:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+    '<div style="padding:11px 16px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
+      'How big should this be? <span class="muted" style="font-weight:400">Risk budget '+pol.riskPerTrade+'% of '+fmt$(L.total)+' = '+fmt$(L.budget)+'</span></div>'+
+    '<div style="overflow-x:auto"><table><tbody>'+
+      row('Policy cap',L.cap,'Your flat '+pol.maxPosition+'% limit',L.binding==='policy cap')+
+      row('Volatility budget',L.vol,
+        L.sigma?'This name runs '+(L.sigma*100).toFixed(0)+'%/yr volatility — a 1σ move costs your budget at this size'
+               :'Needs a volatility reading. Run Refresh data or analyze the ticker.',
+        L.binding==='volatility budget')+
+      row('Stop distance',L.stop,
+        L.stopPrice?'Your thesis stop at '+fmt$(L.stopPrice)+' is '+L.stopDistPct.toFixed(1)+'% away — this size loses exactly the budget if it hits'
+                   :'No stop set. Write one in the thesis and this becomes the real limit.',
+        L.binding==='stop distance')+
+    '</tbody></table></div>'+
+    (over
+      ? '<div style="padding:11px 16px;border-top:1px solid var(--border);background:rgba(229,83,75,.07);font-size:13px;line-height:1.6" class="neg">'+
+        '<b>'+fmt$(proposed)+' is over your smallest limit of '+fmt$(L.limit)+'</b> <span class="muted">('+L.binding+')</span>.</div>'
+      : (isFinite(L.limit)?'<div style="padding:11px 16px;border-top:1px solid var(--border);font-size:12.5px;line-height:1.6" class="muted">'+
+        'The <b>'+L.binding+'</b> is what limits you here at '+fmt$(L.limit)+'. '+
+        (L.binding==='volatility budget'?'To go bigger you need a calmer stock, not a bigger cap.'
+         :L.binding==='stop distance'?'A tighter stop would allow a larger position for the same risk — but only if the tighter stop is genuinely where your thesis breaks, not where you want it to be.'
+         :'Your flat cap binds before risk does, which means the cap is doing the work rather than the risk budget.')+'</div>':''))+
+  '</div>';
 }
 function renderTradeImpact(){
   const el=document.getElementById('tradeImpact');
@@ -5453,6 +5702,7 @@ function renderTradeImpact(){
           :riskWeight>pctAfter?'it punches <b>above</b> its size':'it punches <b>below</b> its size')+'</span></td></tr>'+
       '<tr><td>Portfolio total</td><td>'+fmt$(total)+(newMoney?' <span class="muted">→</span> <b>'+fmt$(totalAfter)+'</b> <span class="muted">(new money in)</span>':' <span class="muted">unchanged — money moved inside it</span>')+'</td></tr>'+
     '</tbody></table></div>'+
+    sizingPanel(sym,fromCash,side==='buy'?size:0)+
     '<ul style="margin-top:14px;padding-left:20px;line-height:1.7;font-size:13.5px">'+flags.join('')+'</ul>'+
     '<p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.6"><b>What risk weight does and doesn\'t tell you.</b> Size × beta is how much market movement this position contributes relative to its dollar share — a 6% stake in a 2.3-beta name behaves like a 14% stake in the index. It deliberately ignores how your holdings move against <i>each other</i>; a true risk contribution needs a full covariance matrix, which is what the <b>Risk</b> tab\'s correlation tool is for. Two names at 5% each that always move together are one 10% bet, and this number will not tell you that.</p>';
 }
@@ -5477,6 +5727,9 @@ function buildActionQueue(){
     const sc=h.type==='Stock'?D.analyses[h.sym]:null;
     const v=sc&&!sc.error?verdictOf(sc,true,h.sym):null;
     const tot=scoreTotal(sc);
+    // Declared up here because the stop and deadline checks below both need it, and a const read
+    // before its declaration is a ReferenceError that would take the whole Command screen down.
+    const th=thesisFor(h.sym);
 
     // 1 — sell signal on something you own. A thesis condition ranks above the global rule and says so.
     if(v&&v.key==='sell'){
@@ -5492,6 +5745,35 @@ function buildActionQueue(){
         evidence:byThesis?'thesis':(tot?tot.got+'/'+tot.max:''),
         action:'analyzeStock(\''+esc(h.sym)+'\')',actionLabel:'Review '+h.sym});
     }
+    /* 1b — PRICE STOP. The left tail is what kills an account, and it is the only part of the
+       distribution you can truncate by rule. A sell rule keyed to the quality score fires when the
+       business deteriorates; it will not save you from a position that simply falls 40% while the
+       fundamentals still read fine. This one will. It ranks with the other priority-1 items because
+       it is the difference between a bounded loss and an unbounded one. */
+    const px=(h.price??h.cost);
+    if(th&&isFinite(th.stop)&&th.stop>0&&isFinite(px)&&px<=th.stop){
+      const lossPct=th.entryPrice>0?((px-th.entryPrice)/th.entryPrice*100):null;
+      A.push({pri:1,kind:'STOP',sym:h.sym,
+        summary:'Through your stop — '+fmt$(px)+' vs '+fmt$(th.stop),
+        detail:'When you wrote the thesis for '+h.sym+' you named '+fmt$(th.stop)+' as the price at which you would be wrong. It is now '+fmt$(px)+'.'+
+          (lossPct!=null?' That is '+lossPct.toFixed(1)+'% from where you wrote it.':'')+
+          ' The position is worth '+fmt$(val)+'. This is your own line, set before the price moved and before you had a reason to argue with it.'+
+          (th.why?' You bought it because: "'+th.why.slice(0,160)+(th.why.length>160?'…':'')+'"':''),
+        evidence:'stop hit',
+        action:'analyzeStock(\''+esc(h.sym)+'\')',actionLabel:'Review '+h.sym,
+        action2:'showTab(\'portfolio\')',actionLabel2:'Open thesis'});
+    }
+    /* 1c — TIME STOP. The outcome nobody plans for is neither right nor wrong: the thesis just never
+       happened and the money sat there for a year doing nothing while the index compounded. */
+    if(th&&th.deadline&&th.deadline<=today){
+      A.push({pri:2,kind:'EXPIRED',sym:h.sym,
+        summary:'Past its deadline of '+th.deadline+' — thesis never played out',
+        detail:'You gave '+h.sym+' until '+th.deadline+' to do what you expected. That date has passed.'+
+          (th.target>0&&isFinite(px)?' Your target was '+fmt$(th.target)+'; it is at '+fmt$(px)+'.':'')+
+          ' A thesis that has not been proved right or wrong within the window you set is dead money — it costs you whatever the alternative would have returned. Either write a new deadline with a new reason, or close it.',
+        evidence:'expired',
+        action:'showTab(\'portfolio\')',actionLabel:'Rewrite or close'});
+    }
     // 2 — position exceeds policy
     if(pct>pol.maxPosition){
       A.push({pri:2,kind:'RISK',sym:h.sym,
@@ -5501,7 +5783,6 @@ function buildActionQueue(){
         action:'showTab(\'portfolio\')',actionLabel:'Open Portfolio'});
     }
     // 3 — thesis review overdue
-    const th=thesisFor(h.sym);
     if(th&&th.reviewDate&&th.reviewDate<=today){
       A.push({pri:3,kind:'REVIEW',sym:h.sym,
         summary:'Thesis review was due '+th.reviewDate,
@@ -5629,8 +5910,8 @@ function renderCommand(){
     return;
   }
 
-  const colour=k=>k==='SELL'?'var(--red)':k==='BUY'?'var(--green)':k==='CASH'?'var(--accent)':k==='DATA'?'var(--muted)':'var(--yellow)';
-  const kindCls=k=>k==='SELL'?'neg':k==='BUY'?'pos':k==='DATA'?'muted':'warn';
+  const colour=k=>(k==='SELL'||k==='STOP')?'var(--red)':k==='BUY'?'var(--green)':k==='CASH'?'var(--accent)':k==='DATA'?'var(--muted)':'var(--yellow)';
+  const kindCls=k=>(k==='SELL'||k==='STOP')?'neg':k==='BUY'?'pos':k==='DATA'?'muted':'warn';
 
   el.innerHTML='<div class="cmd-list">'+q.map((a,i)=>{
     const open=cmdOpen===i;
@@ -6531,6 +6812,49 @@ function fillMacroInputs(){
       rate counted alpha>0 as correct — so a SELL that correctly dodged a 30% collapse was filed as a
       miss. A call's edge is now signed by its direction: for a SELL, being right means the thing
       underperformed. */
+/* ---- EXPECTANCY, not hit rate ----
+   Hit rate was the headline number here and it was the wrong one. Two reasons.
+
+   1. It is not the objective. A system right 40% of the time whose winners run 3x its losers earns
+      +0.60 per unit risked. One right 60% of the time whose losers run 2x its winners loses 0.20.
+      The second is right half again as often and still goes broke. What you want to maximise is
+      average outcome per call, not the fraction that are positive.
+
+   2. It is the slowest thing here to measure. A proportion throws away the size of every observation
+      and keeps one bit, so distinguishing a true 55% from a coin flip takes on the order of eight
+      hundred graded calls. A mean uses the magnitude of every observation and converges far sooner.
+
+   And the practical danger: the easiest way to raise a hit rate is to book winners early and hold
+   losers hoping they recover, which converts a good system into the losing one above. The behaviour
+   panel exists to catch exactly that, so making hit rate the headline was pointing the app at the
+   disease it was built to detect. */
+function expectancyStats(edges){
+  const n=edges.length;
+  if(!n)return null;
+  const wins=edges.filter(e=>e>0),losses=edges.filter(e=>e<=0);
+  const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const expectancy=mean(edges);
+  const avgWin=wins.length?mean(wins):null;
+  const avgLoss=losses.length?Math.abs(mean(losses)):null;
+  /* Sample standard deviation, then the standard error of the mean. Printing the interval rather
+     than the point estimate is the honest move: at small n it is wide, and the reader should see
+     that instead of being handed a number that looks decided. */
+  let sd=0;
+  if(n>1){
+    const v=edges.reduce((a,e)=>a+(e-expectancy)*(e-expectancy),0)/(n-1);
+    sd=Math.sqrt(v);
+  }
+  const se=n>1?sd/Math.sqrt(n):null;
+  return{
+    n,wins:wins.length,losses:losses.length,
+    hitRate:wins.length/n*100,
+    avgWin,avgLoss,
+    payoff:(avgWin!=null&&avgLoss>0)?avgWin/avgLoss:null,
+    expectancy,sd,se,
+    lo:se!=null?expectancy-1.96*se:null,
+    hi:se!=null?expectancy+1.96*se:null
+  };
+}
 function callEdge(c,alpha){
   if(alpha==null)return null;
   if(c.verdict==='buy')return alpha;
@@ -6647,8 +6971,7 @@ function renderScorecard(){
   }
   if(emptyEl)emptyEl.style.display='none';
 
-  const medEdge=scored.length?median(scored.map(r=>r.edge)):null;
-  const right=scored.filter(r=>r.edge>0).length;
+  const st=expectancyStats(scored.map(r=>r.edge));
   const medHeld=median(graded.filter(r=>r.heldDays!=null).map(r=>r.heldDays));
 
   // Does requiring momentum actually help? Split the same set and compare — on edge, not raw alpha,
@@ -6659,21 +6982,40 @@ function renderScorecard(){
 
   if(sumEl){
     const thin=scored.length<20;
+    const pts=x=>(x>=0?'+':'')+x.toFixed(2)+'pts';
+    /* The confidence interval straddling zero is the single most useful thing on this screen and the
+       one every other tool hides. If it does, the honest reading is "no measurable edge yet" — not
+       "a small edge". Saying so out loud is the whole point of the scorecard. */
+    const straddles=st&&st.lo!=null&&st.lo<0&&st.hi>0;
     sumEl.innerHTML=
       '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
-        '<div class="stat s-count"><span class="stat-label">Calls graded</span><span class="stat-value">'+graded.length+'</span></div>'+
-        '<div class="stat s-profit"><span class="stat-label">Median edge vs SPY</span><span class="stat-value '+(medEdge==null?'':(medEdge>=0?'pos':'neg'))+'">'+(medEdge==null?'—':(medEdge>=0?'+':'')+medEdge.toFixed(2)+'pts')+'</span></div>'+
-        '<div class="stat s-in"><span class="stat-label">Called it right</span><span class="stat-value">'+(scored.length?right+' / '+scored.length:'—')+'</span></div>'+
-        '<div class="stat s-income"><span class="stat-label">Median holding</span><span class="stat-value">'+(medHeld!=null?Math.round(medHeld)+'d':'—')+'</span></div>'+
+        '<div class="stat s-profit"><span class="stat-label">Expectancy per call</span><span class="stat-value '+(!st?'':(st.expectancy>=0?'pos':'neg'))+'">'+(st?pts(st.expectancy):'—')+'</span></div>'+
+        '<div class="stat s-in"><span class="stat-label">Average win</span><span class="stat-value pos">'+(st&&st.avgWin!=null?'+'+st.avgWin.toFixed(2):'—')+'</span></div>'+
+        '<div class="stat s-out"><span class="stat-label">Average loss</span><span class="stat-value neg">'+(st&&st.avgLoss!=null?'−'+st.avgLoss.toFixed(2):'—')+'</span></div>'+
+        '<div class="stat s-count"><span class="stat-label">Payoff ratio</span><span class="stat-value '+(st&&st.payoff!=null?(st.payoff>=1?'pos':'neg'):'')+'">'+(st&&st.payoff!=null?st.payoff.toFixed(2)+'×':'—')+'</span></div>'+
       '</div>'+
-      '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.6"><b>Edge is signed by the call.</b> A BUY is right when the stock beats SPY; a SELL is right when it lags. '+
+      '<div class="stat-row" style="margin-bottom:0">'+
+        '<div class="stat"><span class="stat-label">Calls graded</span><span class="stat-value">'+graded.length+'</span></div>'+
+        '<div class="stat"><span class="stat-label">Hit rate</span><span class="stat-value">'+(st?st.hitRate.toFixed(0)+'%':'—')+' <span class="muted" style="font-size:12px;font-weight:400">'+(st?st.wins+'/'+st.n:'')+'</span></span></div>'+
+        '<div class="stat"><span class="stat-label">Median holding</span><span class="stat-value">'+(medHeld!=null?Math.round(medHeld)+'d':'—')+'</span></div>'+
+        '<div class="stat"><span class="stat-label">95% range</span><span class="stat-value" style="font-size:15px">'+(st&&st.lo!=null?pts(st.lo)+' to '+pts(st.hi):'needs 2+')+'</span></div>'+
+      '</div>'+
+      '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65"><b>Expectancy is the number that matters, not hit rate.</b> '+
+        'A system right 40% of the time whose winners run three times its losers earns more than one right 60% of the time whose losers run twice its winners. '+
+        'Hit rate is shown because you asked for it, but it is deliberately not the headline: the easiest way to raise it is to book winners early and hold losers, which is how a good system becomes a losing one.</p>'+
+      (straddles
+        ? '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65"><b class="warn">The 95% range crosses zero.</b> On this sample the honest reading is <b>no measurable edge yet</b> — not a small edge. '+
+          'Distinguishing a real 55% hit rate from a coin flip takes roughly eight hundred graded calls; an average converges faster than that, but not from '+st.n+'.</p>'
+        : (st&&st.lo!=null?'<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65">The 95% range sits entirely '+(st.lo>0?'<b class="pos">above</b>':'<b class="neg">below</b>')+' zero. On this sample that is a real signal, though '+st.n+' observations is still a small number to bet a process on.</p>':''))+
+      '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.6"><b>Edge is signed by the call.</b> A BUY is right when the stock beats SPY; a SELL is right when it lags. '+
         (open?'This view measures every call from its date to today, so holding periods differ — the <b>Held</b> column shows each one. Pick a fixed horizon for a like-for-like comparison.'
              :'Every row here was marked on its own '+esc(winRaw)+'-day anniversary, so the holding periods match.')+
         ' HOLD and WATCH calls make no directional claim and are shown but not scored.</p>'+
       (mA!=null&&nA!=null&&withM.length>=5&&withoutM.length>=5
         ? '<p class="muted" style="font-size:13px;margin-top:8px">Calls that cleared your momentum minimum ran <b class="'+(mA>=nA?'pos':'neg')+'">'+(mA-nA>=0?'+':'')+(mA-nA).toFixed(2)+'pts</b> '+(mA>=nA?'better':'worse')+' than those that didn\'t ('+withM.length+' vs '+withoutM.length+' calls).</p>'
         : '')+
-      (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+scored.length+' scoreable call'+(scored.length===1?'':'s')+' is not evidence.</b> Under roughly 20, two lucky picks dominate the median. Treat it as a running tally, not a verdict on the checklist.</p>':'')+
+      ruleChangeWarning()+
+      (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+scored.length+' scoreable call'+(scored.length===1?'':'s')+' is not evidence.</b> Under roughly 20, two lucky picks dominate every number above. Treat it as a running tally, not a verdict on the checklist.</p>':'')+
       (missed?'<p class="muted" style="font-size:12px;margin-top:8px">'+missed+' call'+(missed===1?' was':'s were')+' excluded: their anniversary passed while the app was closed, so no honest mark exists. Counting them at whatever price happened to be next would fake the holding period.</p>':'');
   }
 
