@@ -87,48 +87,47 @@ footer{border-top:1px solid var(--border);padding:24px 0;font-size:12.5px;color:
 /* =====================================================================
    Two pages in one file, switched by ?type=
 
-     thanks.html?type=paid      after a successful subscription
-     thanks.html?type=enquiry   after someone sends an enquiry
+     thanks.html?type=access    after credentials are issued to new staff
+     thanks.html?type=request   after someone submits an access request
 
-   Point your Stripe/PayPal "success URL" at the first one. Anything else
-   falls back to the payment view, since that is the one people reach by
-   accident least often and the copy still reads sensibly.
+   Anything unrecognised falls back to the access view, since that is the
+   one people are sent to deliberately and the copy still reads sensibly.
    ===================================================================== */
 const CONTACT = 'northbridgeai1@gmail.com';
-const type = (new URLSearchParams(location.search).get('type') || 'paid').toLowerCase();
+const type = (new URLSearchParams(location.search).get('type') || 'access').toLowerCase();
 
 const views = {
-  paid: {
-    eyebrow: 'Subscription active',
-    title: 'You\'re in.',
-    lede: 'Payment received and your access is live. There are three short steps before the terminal is useful, and the whole thing takes about ten minutes. Do them once and you never touch them again.',
+  access: {
+    eyebrow: 'Credentials issued',
+    title: 'You\'re set up.',
+    lede: 'Your terminal access is live. Three short steps before it is useful — about ten minutes in total. Do them once and you never touch them again.',
     wait: false,
     stepsHead: 'Setup — about 10 minutes',
     steps: [
-      ['1','Get a free Finnhub key','PerceptFolio doesn\'t resell market data — you connect your own free feed. Sign up at <a href="https://finnhub.io" target="_blank" rel="noopener">finnhub.io</a>, copy the key, and paste it into Settings. Two minutes, no card.'],
-      ['2','Enter what you own','Portfolio → Add Holding. Enter shares or dollars, whichever you have to hand. Then set your cash. This is what every other screen calculates from.'],
-      ['3','Set your rules and run a review','Settings holds six numbers: your buy bar, your sell bar, your position cap, your cash floor. Change them to what you actually believe, then hit Run review on Command. The whole terminal runs off those six numbers.']
+      ['1','Connect a data key','The terminal does not resell market data; you bring your own free feed. Sign up at <a href="https://finnhub.io" target="_blank" rel="noopener">finnhub.io</a>, copy the key, and paste it into Settings. Two minutes, no card.'],
+      ['2','Load the book','Portfolio → Add Holding. Shares or dollars, whichever you have to hand, then set the cash balance. Every other screen calculates from this. Client work goes in its own profile, never yours.'],
+      ['3','Set the rules and run a review','Settings holds the numbers the whole system runs on: buy bar, sell bar, position cap, cash floor. Set them to what you actually believe, then hit Run review on Command.']
     ],
-    cta: [['Open the terminal','./app.html',true],['Read the guide','./#faq',false]],
-    aside: 'One thing to expect, so it isn\'t a surprise: <b>the Call Scorecard will be empty for about ninety days.</b> A fixed-horizon record can\'t be reconstructed backwards — the app has to be there on the anniversary to mark the price. Yours starts building the day you begin.'
+    cta: [['Open the terminal','./app.html',true],['Read the FAQ','./#faq',false]],
+    aside: 'One thing to expect so it is not a surprise: <b>the Call Scorecard will be empty for about ninety days.</b> A fixed-horizon record cannot be reconstructed backwards — the terminal has to be open on the anniversary to mark the price. Yours starts building the day you begin.'
   },
-  enquiry: {
-    eyebrow: 'Message received',
+  request: {
+    eyebrow: 'Request received',
     title: 'Got it — thank you.',
-    lede: 'Your message is in. You\'ll get a reply from a person, usually within two working days. If it\'s urgent, reply to the confirmation email and it moves up the pile.',
+    lede: 'Your access request is in. Someone from the financial branch will reply, usually within two working days. Credentials are issued per person, so expect a short exchange before anything is provisioned.',
     wait: true,
     stepsHead: 'What happens next',
     steps: [
-      ['1','Someone reads it','Not a queue system and not an autoresponder. NorthBridge is small enough that your message is read by someone who can act on it.'],
-      ['2','You get a real answer','If you asked about pricing, access or whether PerceptFolio fits what you\'re doing, you\'ll get a straight answer — including "this isn\'t right for you" where that\'s true.'],
-      ['3','No follow-up sequence','You won\'t be added to a mailing list, drip campaign, or anything else you didn\'t ask for. One question, one reply.']
+      ['1','Someone reads it','Not a queue and not an autoresponder. NorthBridge is small enough that your request is read by someone who can act on it.'],
+      ['2','Role is confirmed','Access is granted per person and tied to what you will actually be doing with it. If the terminal is not the right tool for your work, you will be told that plainly.'],
+      ['3','Credentials are issued','You will get a sign-in and a link back here with setup instructions. Credentials are individual and are not to be shared or reused across a team.']
     ],
-    cta: [['Back to the front page','./',true],['Look around the terminal','./app.html',false]],
-    aside: 'While you wait, the <a href="./#faq" style="color:var(--accent)">FAQ</a> covers the questions that come up most: what the data limits are, where your portfolio is stored, and why this isn\'t investment advice.'
+    cta: [['Back to the front page','./',true]],
+    aside: 'While you wait, the <a href="./#faq" style="color:var(--accent)">FAQ</a> covers what comes up most: where data is stored, what the market-data limits are, and why nothing the terminal outputs is investment advice.'
   }
 };
 
-const v = views[type] || views.paid;
+const v = views[type] || views.access;
 
 document.getElementById('eyebrow').textContent = v.eyebrow;
 document.getElementById('title').textContent = v.title;
@@ -144,7 +143,7 @@ document.getElementById('steps').innerHTML =
 
 document.getElementById('cta').innerHTML =
   v.cta.map(c => '<a class="btn' + (c[2] ? ' btn-p' : '') + '" href="' + c[1] + '">' + c[0] + '</a>').join('') +
-  '<a class="btn" href="mailto:' + CONTACT + '">Email us</a>';
+  '<a class="btn" href="mailto:' + CONTACT + '">Email the branch</a>';
 
 document.getElementById('aside').innerHTML = v.aside;
 </script>
