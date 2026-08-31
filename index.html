@@ -170,6 +170,40 @@ tr:last-child td{border-bottom:none}
 .alert-item{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;background:var(--panel)}
 .alert-dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex-shrink:0}
 .disclaimer{font-size:12px;color:var(--muted);border-top:1px solid var(--border);margin-top:40px;padding:20px 0;text-align:center;line-height:1.6}
+/* ---- SIGN-IN ----
+   A split front door: what this is on the left, the form on the right. The old version stacked the
+   log-in form and the create-account form on top of each other, so the screen you use every day was
+   half-filled with a form you use once. They're a toggle now.
+   Deliberately the same palette and type as the app, executed with more room — clicking through
+   should feel continuous, not like arriving somewhere else. */
+.auth{min-height:100vh;display:grid;grid-template-columns:1.05fr .95fr}
+.auth-brand{position:relative;overflow:hidden;background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;justify-content:center;padding:56px 60px}
+/* Faint blueprint grid, faded out at the edges with a mask so it never competes with the text. */
+.auth-grid{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:44px 44px;opacity:.25;
+  -webkit-mask-image:radial-gradient(ellipse 75% 65% at 32% 42%,#000,transparent 78%);
+  mask-image:radial-gradient(ellipse 75% 65% at 32% 42%,#000,transparent 78%)}
+.auth-brand-inner{position:relative;max-width:470px}
+.auth-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--brand2);margin-bottom:24px}
+.auth-h1{font-size:40px;line-height:1.12;letter-spacing:-.022em;font-weight:700;margin-bottom:16px}
+.auth-sub{color:var(--muted);font-size:15.5px;line-height:1.65;margin-bottom:34px;max-width:430px}
+.auth-points{list-style:none;display:flex;flex-direction:column;gap:15px}
+.auth-points li{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:1.5}
+.auth-points b{display:block;margin-bottom:3px;font-weight:600}
+.auth-points span{color:var(--muted)}
+.auth-dot{width:6px;height:6px;border-radius:50%;background:var(--brand2);margin-top:7px;flex-shrink:0}
+.auth-foot{margin-top:40px;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.auth-panel{display:flex;align-items:center;justify-content:center;padding:40px 32px}
+.auth-card{width:100%;max-width:380px}
+.auth-title{font-size:23px;font-weight:700;letter-spacing:-.012em;margin-bottom:7px}
+.auth-note{color:var(--muted);font-size:13.5px;line-height:1.55;margin-bottom:24px}
+.auth-switch{display:flex;gap:3px;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:3px;margin-bottom:22px}
+.auth-switch button{flex:1;background:transparent;border:none;color:var(--muted);font-family:var(--mono);
+  font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:9px 0;border-radius:6px;transition:background .12s ease,color .12s ease}
+.auth-switch button.on{background:var(--text);color:var(--bg)}
+.auth-legal{margin-top:22px;padding-top:18px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);line-height:1.65}
 .login-wrap{max-width:380px;margin:9vh auto;padding:20px}
 .login-wrap .card{padding:28px;border-radius:var(--radius)}
 .field{margin-bottom:12px}
@@ -333,44 +367,102 @@ small.src{color:var(--muted)}
   .chart-box{height:210px}
 }
 
+/* Sign-in on small screens: stack the two panels, and drop the feature list.
+   On a phone this is a screen you use every day, not a pitch — scrolling past four selling points to
+   reach a password field you've typed a hundred times is the wrong trade. The headline stays so it
+   still looks like something; the argument goes. */
+@media (max-width:900px){
+  .auth{grid-template-columns:1fr;min-height:0}
+  .auth-brand{padding:38px 24px 30px;border-right:none;border-bottom:1px solid var(--border);justify-content:flex-start}
+  .auth-h1{font-size:29px}
+  .auth-sub{font-size:14.5px;margin-bottom:0}
+  .auth-points{display:none}
+  .auth-foot{display:none}
+  .auth-panel{padding:26px 24px calc(44px + env(safe-area-inset-bottom))}
+  .auth-card{max-width:none}
+}
+
 /* Very narrow phones (SE, mini): one stat per row rather than two cramped ones. */
 @media (max-width:400px){
   .stat{min-width:100%}
   .hero-value{font-size:29px}
   .fc-grid-2,.fc-grid-3{grid-template-columns:1fr}
+  .auth-h1{font-size:26px}
 }
 </style>
 </head>
 <body>
 
 <!-- ============ LOGIN SCREEN ============ -->
-<div id="loginScreen" class="login-wrap">
-  <div style="text-align:center;margin-bottom:28px">
-    <div class="logo" style="font-size:20px"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
-    <p class="muted" style="margin-top:8px">Know what to buy. Know what to sell.</p>
+<div id="loginScreen" class="auth">
+  <!-- Left: what this is. Deliberately no performance claims of any kind — PerceptFolio is not a
+       registered investment adviser and this page is publicly reachable, so every line here describes
+       what the software DOES, never what it earns. -->
+  <div class="auth-brand">
+    <div class="auth-grid"></div>
+    <div class="auth-brand-inner">
+      <div class="logo" style="font-size:19px;margin-bottom:26px"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
+      <div class="auth-eyebrow">NorthBridge · Financial</div>
+      <h1 class="auth-h1">Know what to buy.<br>Know what to sell.</h1>
+      <p class="auth-sub">A private research terminal. You set the rules once; it applies them to every position, every day, and shows its working.</p>
+      <ul class="auth-points">
+        <li><span class="auth-dot"></span><div><b>A checklist, not a hunch</b><span>Twenty-two checks across quality, value and momentum. Every verdict shows which ones it passed.</span></div></li>
+        <li><span class="auth-dot"></span><div><b>It grades itself</b><span>Every call is recorded and marked against the S&amp;P on a fixed horizon — displayed whether or not it flatters the system.</span></div></li>
+        <li><span class="auth-dot"></span><div><b>Size, not just selection</b><span>What a trade does to your concentration, cash and market exposure, before the money moves.</span></div></li>
+        <li><span class="auth-dot"></span><div><b>Nothing is hidden</b><span>No black box, no broker connection, no trade placed on your behalf. It tells you; you decide.</span></div></li>
+      </ul>
+      <div class="auth-foot">Access by invitation</div>
+    </div>
   </div>
-  <div class="card">
-    <div class="field">
-      <label>Email</label>
-      <input type="email" id="loginEmail" placeholder="you@gmail.com" autocomplete="username">
+
+  <!-- Right: the form. -->
+  <div class="auth-panel">
+    <div class="auth-card">
+      <div id="authIn">
+        <div class="auth-title">Sign in</div>
+        <p class="auth-note">Welcome back.</p>
+        <div class="auth-switch">
+          <button class="on" id="authTabIn" onclick="setAuthMode('in')">Sign in</button>
+          <button id="authTabUp" onclick="setAuthMode('up')">Create account</button>
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="loginEmail" placeholder="you@gmail.com" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn" style="width:100%" onclick="doLogin()">Sign in</button>
+      </div>
+
+      <div id="authUp" style="display:none">
+        <div class="auth-title">Create account</div>
+        <p class="auth-note">Sets up a new profile in this browser.</p>
+        <div class="auth-switch">
+          <button id="authTabIn2" onclick="setAuthMode('in')">Sign in</button>
+          <button class="on" id="authTabUp2" onclick="setAuthMode('up')">Create account</button>
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="newEmail" placeholder="you@gmail.com" autocomplete="username" onkeydown="if(event.key==='Enter')createProfile()">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="newPassword" placeholder="Choose a password" autocomplete="new-password" onkeydown="if(event.key==='Enter')createProfile()">
+        </div>
+        <div class="field">
+          <label>Account type</label>
+          <select id="newAccountType">
+            <option value="personal">Personal — my own portfolio</option>
+            <option value="business">Business — I manage client portfolios too</option>
+          </select>
+        </div>
+        <button class="btn" style="width:100%" onclick="createProfile()">Create account</button>
+      </div>
+
+      <p class="auth-legal">Sign-in is local to this browser — your email and password are hashed and stored here, never sent to a server, so there is no account to recover if you lose them. Use <b>Settings → Export</b> to back up or move devices, and <b>Sync</b> to keep two of your own devices in step.<br><br>PerceptFolio is research software, not investment advice, and is not a registered investment adviser.</p>
     </div>
-    <div class="field">
-      <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
-    </div>
-    <button class="btn" style="width:100%" onclick="doLogin()">Log in</button>
-    <div style="text-align:center;margin:16px 0;color:var(--muted);font-size:13px">New here?</div>
-    <div class="field"><input type="email" id="newEmail" placeholder="Email" autocomplete="username"></div>
-    <div class="field"><input type="password" id="newPassword" placeholder="Password" autocomplete="new-password"></div>
-    <div class="field">
-      <label>Account type</label>
-      <select id="newAccountType">
-        <option value="personal">Personal — my own portfolio</option>
-        <option value="business">Business — I manage client portfolios too</option>
-      </select>
-    </div>
-    <button class="btn btn-ghost" style="width:100%" onclick="createProfile()">Create account</button>
-    <p class="muted" style="margin-top:16px;font-size:12px">This is a local-only sign-in — your email/password are checked and stored only in this browser (hashed), not on a server. Use Settings → Export to back up or move devices.</p>
   </div>
 </div>
 
@@ -1634,6 +1726,18 @@ function resetTransientState(){
      whatever D happens to be bound to by then, which is a separate, narrower race worth revisiting. */
   refreshing=false;
 }
+/* Sign in / Create account are two views of one card rather than two stacked forms. The duplicated
+   switch markup is intentional — each view carries its own copy so the toggle sits in the same place
+   whichever one is showing, instead of jumping as the form below it changes height. */
+function setAuthMode(m){
+  const inEl=document.getElementById('authIn'),upEl=document.getElementById('authUp');
+  if(!inEl||!upEl)return;
+  const up=(m==='up');
+  inEl.style.display=up?'none':'block';
+  upEl.style.display=up?'block':'none';
+  const focus=document.getElementById(up?'newEmail':'loginEmail');
+  if(focus&&focus.focus)focus.focus();
+}
 function enterSession(){
   resetTransientState();
   const acctEl=document.getElementById('acctEmail');if(acctEl)acctEl.textContent=USER;
@@ -1958,9 +2062,14 @@ function switchAccount(){
   USER=null;D=null;bizContext=null;
   const menu=document.getElementById('accountMenu');if(menu)menu.style.display='none';
   document.getElementById('app').style.display='none';
-  document.getElementById('loginScreen').style.display='block';
+  /* Empty string, NOT 'block'. The sign-in screen is a CSS grid and its layout is controlled by the
+     stylesheet, including the media query that stacks it on a phone. Writing an inline display:block
+     here would beat both and flatten the two panels into one column on every screen size, for the
+     rest of the session. Clearing the inline value hands control back to the stylesheet. */
+  document.getElementById('loginScreen').style.display='';
   document.getElementById('loginEmail').value='';
   document.getElementById('loginPassword').value='';
+  setAuthMode('in');
 }
 
 function deleteProfile(){
