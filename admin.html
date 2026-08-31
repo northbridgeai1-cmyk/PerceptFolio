@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Access queue — PerceptFolio</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0b0c0f">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#0b0c0f;--panel:#131519;--panel2:#1a1d23;--line:#24272f;--line2:#2f333c;
+  --text:#eef0f3;--dim:#8d939f;--faint:#5d636e;
+  --accent:#3b82f6;--green:#2ea043;--red:#e5534b;--amber:#d9a441;--violet:#8b5cf6;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);min-height:100vh;
+  font:14.5px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+nav{border-bottom:1px solid var(--line);background:var(--panel)}
+.nav-in{display:flex;align-items:center;gap:12px;height:56px}
+.logo{font-weight:700;font-size:15.5px;display:flex;align-items:center;gap:9px}
+.mark{width:24px;height:24px;border-radius:5px;background:linear-gradient(140deg,var(--accent),#1b56b8);
+  display:grid;place-items:center;font:700 10px/1 var(--mono);color:#fff}
+.chip{font:9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:4px 8px;border-radius:3px;
+  background:rgba(217,164,65,.13);color:#e0bc72;border:1px solid rgba(217,164,65,.3)}
+main{padding:34px 0 70px}
+h1{font-size:24px;letter-spacing:-.02em;font-weight:700;margin-bottom:6px}
+.lede{color:var(--dim);font-size:14px;max-width:70ch;line-height:1.62}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:6px;
+  font-size:13px;font-weight:600;border:1px solid var(--line2);background:var(--panel);color:var(--text);
+  cursor:pointer;transition:.14s;font-family:inherit}
+.btn:hover{border-color:#3d434f;background:var(--panel2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-g{background:var(--green);border-color:var(--green);color:#fff}
+.btn-v{background:var(--violet);border-color:var(--violet);color:#fff}
+.btn-r{background:transparent;border-color:rgba(229,83,75,.45);color:#ef8b85}
+.btn-sm{padding:6px 11px;font-size:12px}
+label{display:block;font:10.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+input,textarea{width:100%;background:var(--bg);border:1px solid var(--line2);color:var(--text);
+  border-radius:6px;padding:9px 11px;font:13.5px/1.5 inherit}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+.card{border:1px solid var(--line);border-radius:9px;background:var(--panel);overflow:hidden;margin-top:18px}
+.card-h{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel2);
+  font:10.5px/1 var(--mono);letter-spacing:.1em;color:var(--faint);text-transform:uppercase;
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.card-b{padding:16px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.pill{font:9.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;font-weight:700;padding:4px 7px;border-radius:3px}
+.p-pend{background:rgba(217,164,65,.14);color:#e0bc72}
+.p-personal{background:rgba(46,160,67,.14);color:#5fc275}
+.p-business{background:rgba(139,92,246,.14);color:#a98bf3}
+.p-denied{background:rgba(229,83,75,.14);color:#ef8b85}
+.req{border:1px solid var(--line);border-radius:9px;background:var(--panel);margin-bottom:14px;overflow:hidden}
+.req-h{padding:13px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.req-em{font-family:var(--mono);font-size:13.5px;font-weight:600}
+.req-dt{font:11px/1 var(--mono);color:var(--faint)}
+.req-b{padding:16px}
+.who{font-size:14px;line-height:1.65;color:var(--text);white-space:pre-wrap;
+  border-left:2px solid var(--line2);padding-left:14px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font:12.5px/1 var(--mono)}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line)}
+th{font-size:9.5px;letter-spacing:.09em;color:var(--faint);text-transform:uppercase;font-weight:600}
+tr:last-child td{border-bottom:none}
+.calls-w{border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-bottom:16px}
+.rr{font-weight:700}
+.pos{color:var(--green)}.neg{color:var(--red)}.warn{color:var(--amber)}.dim{color:var(--faint)}
+.decide{border-top:1px solid var(--line);padding:14px 16px;background:var(--panel2)}
+.code{font:15px/1 var(--mono);letter-spacing:.12em;font-weight:700;color:var(--green);
+  background:rgba(46,160,67,.08);border:1px solid rgba(46,160,67,.3);border-radius:6px;padding:11px 14px;display:inline-block}
+.msg{padding:12px 15px;border-radius:7px;font-size:13.5px;line-height:1.6;margin-top:14px;display:none}
+.msg.ok{display:block;background:rgba(46,160,67,.09);border:1px solid rgba(46,160,67,.3);color:#7fd28f}
+.msg.err{display:block;background:rgba(229,83,75,.08);border:1px solid rgba(229,83,75,.3);color:#ef8b85}
+.empty{padding:30px;text-align:center;color:var(--faint);font-size:13.5px}
+.tabs{display:flex;gap:2px;margin:20px 0 4px}
+.tab{font:11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:8px 12px;border-radius:5px;
+  color:var(--faint);cursor:pointer;border:1px solid transparent;background:none;font-family:var(--mono)}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--text);background:var(--panel);border-color:var(--line)}
+@media(max-width:640px){.req-h{gap:6px}}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap nav-in">
+  <a href="./" class="logo"><span class="mark">PF</span>PerceptFolio</a>
+  <span class="chip">Admin</span>
+  <div class="spacer"></div>
+  <a class="btn btn-sm" href="./app.html">Terminal</a>
+</div></nav>
+
+<main><div class="wrap">
+  <h1>Access queue</h1>
+  <p class="lede">Every application, with the three calls it was submitted against. Decide personal, business or denied. Approving mints a single-use code valid for thirty days.</p>
+
+  <!-- connection -->
+  <div class="card" id="connCard">
+    <div class="card-h"><span id="connDot" style="width:6px;height:6px;border-radius:50%;background:var(--red)"></span> connection</div>
+    <div class="card-b">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:640px">
+        <div><label for="wkUrl">Worker URL</label><input id="wkUrl" placeholder="https://xxxx.workers.dev"></div>
+        <div><label for="wkKey">Sync key</label><input id="wkKey" type="password" placeholder="SYNC_SECRET"></div>
+      </div>
+      <div class="row" style="margin-top:13px">
+        <button class="btn btn-p" onclick="connect()">Connect</button>
+        <button class="btn" onclick="load()" id="reloadBtn" disabled>Reload queue</button>
+        <span class="dim" style="font-size:12px" id="connNote"></span>
+      </div>
+      <div class="msg" id="connMsg"></div>
+      <p class="dim" style="font-size:11.5px;margin-top:12px;line-height:1.55">
+        Both values are stored in this browser only, under a separate key from the terminal's own sync settings.
+        This page is publicly reachable like every other file here — it is useless without the secret, but do not
+        treat the URL as private.</p>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs" style="display:none">
+    <button class="tab on" data-f="pending" onclick="setFilter('pending')">Pending</button>
+    <button class="tab" data-f="decided" onclick="setFilter('decided')">Decided</button>
+    <button class="tab" data-f="all" onclick="setFilter('all')">All</button>
+  </div>
+
+  <div id="queue"></div>
+</div></main>
+
+<script>
+const CFG='pf_admin_cfg';
+let cfg=null, requests=[], filter='pending';
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function $(id){return document.getElementById(id);}
+function show(el,kind,text){const m=$(el);m.className='msg '+kind;m.innerHTML=text;}
+function base(){return (cfg.url||'').replace(/\/+$/,'');}
+function hdrs(){return{'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json'};}
+
+(function boot(){
+  try{cfg=JSON.parse(localStorage.getItem(CFG))||null;}catch(e){cfg=null;}
+  if(cfg){$('wkUrl').value=cfg.url||'';$('wkKey').value=cfg.key||'';connect();}
+})();
+
+async function connect(){
+  const url=$('wkUrl').value.trim(), key=$('wkKey').value.trim();
+  if(!url||!key)return show('connMsg','err','Both the worker URL and the sync key are needed.');
+  cfg={url,key};
+  try{
+    const r=await fetch(base()+'/requests',{headers:hdrs()});
+    if(r.status===401)throw new Error('Key rejected. Check it matches SYNC_SECRET exactly.');
+    if(!r.ok){let d='';try{d=(await r.json()).error||'';}catch(e){}throw new Error(d||('HTTP '+r.status));}
+    localStorage.setItem(CFG,JSON.stringify(cfg));
+    $('connDot').style.background='var(--green)';
+    $('reloadBtn').disabled=false;
+    $('tabs').style.display='flex';
+    show('connMsg','ok','Connected.');
+    const j=await r.json();
+    requests=j.requests||[];
+    render();
+  }catch(e){
+    $('connDot').style.background='var(--red)';
+    show('connMsg','err','Could not connect: '+esc(e.message));
+  }
+}
+
+async function load(){
+  try{
+    const r=await fetch(base()+'/requests',{headers:hdrs()});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    requests=j.requests||[];
+    render();
+    show('connMsg','ok','Queue reloaded — '+requests.length+' record'+(requests.length===1?'':'s')+'.');
+  }catch(e){show('connMsg','err','Reload failed: '+esc(e.message));}
+}
+
+function setFilter(f){
+  filter=f;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.f===f));
+  render();
+}
+
+/* Reward-to-risk on each submitted call, computed the same way the terminal does it. This is the
+   whole reason the form asks for a target and a stop: a claim with both is checkable, and the
+   breakeven hit rate tells you whether the applicant has thought about payoff at all or just
+   picked a number they like. */
+function rr(c){
+  const isBuy=c.dir!=='SELL';
+  const reward=isBuy?(c.target-c.stop):(c.stop-c.target);
+  if(!(c.target>0)||!(c.stop>0))return null;
+  const spread=Math.abs(c.target-c.stop);
+  if(!(spread>0))return null;
+  return{spread,ok:reward>0};
+}
+
+function render(){
+  const q=$('queue');
+  const rows=requests.filter(r=>
+    filter==='all'?true:filter==='pending'?r.status==='pending':r.status!=='pending');
+  if(!rows.length){
+    q.innerHTML='<div class="card"><div class="empty">'+
+      (requests.length?'Nothing in this view.':'No requests yet. They arrive here the moment someone submits the form on the front page.')+
+      '</div></div>';
+    return;
+  }
+  q.innerHTML=rows.map(r=>{
+    const st=r.status||'pending';
+    const calls=(r.calls||[]).map((c,i)=>{
+      const m=rr(c);
+      return '<tr>'+
+        '<td class="dim">'+(i+1)+'</td>'+
+        '<td><b>'+esc(c.sym)+'</b></td>'+
+        '<td class="'+(c.dir==='SELL'?'neg':'pos')+'">'+esc(c.dir)+'</td>'+
+        '<td>'+Number(c.target).toFixed(2)+'</td>'+
+        '<td>'+Number(c.stop).toFixed(2)+'</td>'+
+        '<td class="dim">'+esc(c.by)+'</td>'+
+        '<td class="'+(m&&m.ok?'':'warn')+'">'+(m?(m.ok?'coherent':'target on wrong side of stop'):'—')+'</td>'+
+      '</tr>';
+    }).join('');
+    return '<div class="req" id="r-'+esc(r.id)+'">'+
+      '<div class="req-h">'+
+        '<span class="pill p-'+esc(st)+'">'+esc(st)+'</span>'+
+        '<span class="req-em">'+esc(r.email)+'</span>'+
+        '<span class="spacer"></span>'+
+        '<span class="req-dt">'+esc(r.date||'')+'</span>'+
+      '</div>'+
+      '<div class="req-b">'+
+        '<div class="who">'+esc(r.who)+'</div>'+
+        '<div class="calls-w"><table>'+
+          '<thead><tr><th></th><th>Ticker</th><th>Dir</th><th>Target</th><th>Stop</th><th>By</th><th>Check</th></tr></thead>'+
+          '<tbody>'+calls+'</tbody></table></div>'+
+        (r.note?'<p class="dim" style="font-size:12.5px">Note: '+esc(r.note)+'</p>':'')+
+        (r.code?'<div style="margin-top:12px"><label>Invite code issued</label><span class="code">'+esc(r.code)+'</span></div>':'')+
+      '</div>'+
+      (st==='pending'
+        ? '<div class="decide">'+
+            '<label for="n-'+esc(r.id)+'">Note (optional, stored with the decision)</label>'+
+            '<input id="n-'+esc(r.id)+'" placeholder="Why you decided this way">'+
+            '<div class="row" style="margin-top:11px">'+
+              '<button class="btn btn-g btn-sm" onclick="decide(\''+esc(r.id)+'\',\'personal\')">Grant personal</button>'+
+              '<button class="btn btn-v btn-sm" onclick="decide(\''+esc(r.id)+'\',\'business\')">Grant business</button>'+
+              '<button class="btn btn-r btn-sm" onclick="decide(\''+esc(r.id)+'\',\'denied\')">Deny</button>'+
+              '<span class="spacer"></span>'+
+              '<span class="dim" style="font-size:11.5px" id="s-'+esc(r.id)+'"></span>'+
+            '</div>'+
+          '</div>'
+        : '<div class="decide"><div class="row">'+
+            '<button class="btn btn-sm" onclick="mailReply(\''+esc(r.id)+'\')">Draft the reply</button>'+
+            '<button class="btn btn-r btn-sm" onclick="wipe(\''+esc(r.id)+'\')">Remove record</button>'+
+            '<span class="spacer"></span>'+
+            '<span class="dim" style="font-size:11.5px" id="s-'+esc(r.id)+'"></span>'+
+          '</div></div>')+
+    '</div>';
+  }).join('');
+}
+
+async function decide(id,decision){
+  const note=($('n-'+id)||{}).value||'';
+  const st=$('s-'+id);
+  if(decision==='denied'&&!confirm('Deny this request? The record is kept but no code is issued.'))return;
+  if(st)st.textContent='Saving…';
+  try{
+    const r=await fetch(base()+'/decide',{method:'POST',headers:hdrs(),body:JSON.stringify({id,decision,note})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    await load();
+    if(j.code)show('connMsg','ok','Granted <b>'+esc(decision)+'</b>. Code <b>'+esc(j.code)+'</b> — single use, expires in 30 days. Send it with the sign-in link.');
+    else show('connMsg','ok','Request denied and recorded.');
+  }catch(e){if(st)st.textContent='';show('connMsg','err','Failed: '+esc(e.message));}
+}
+
+async function wipe(id){
+  if(!confirm('Remove this record permanently? The invite code, if one was issued, stays valid.'))return;
+  try{
+    const r=await fetch(base()+'/requests?id='+encodeURIComponent(id),{method:'DELETE',headers:hdrs()});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    await load();
+  }catch(e){show('connMsg','err','Delete failed: '+esc(e.message));}
+}
+
+/* The reply is drafted rather than sent. There is no mail service wired in here, and pretending
+   otherwise would mean silently dropping messages you thought had gone out. */
+function mailReply(id){
+  const r=requests.find(x=>x.id===id);
+  if(!r)return;
+  const origin=location.origin;
+  const body=r.status==='denied'
+    ? 'Thanks for applying to PerceptFolio.\n\nWe are not able to grant access at this time.\n\n'+
+      'Your three calls are still logged and will be marked on the dates you set. We will send you the results either way.\n\n— NorthBridge, financial branch'
+    : 'Your PerceptFolio access has been approved.\n\n'+
+      'Account type: '+r.status+'\n'+
+      'Invite code: '+(r.code||'')+'  (single use, expires in 30 days)\n'+
+      'Sign in: '+origin+'/app.html\n\n'+
+      'Setup takes about ten minutes:\n'+
+      '1. Get a free Finnhub key at finnhub.io and paste it into Settings.\n'+
+      '2. Enter your holdings and cash in Portfolio.\n'+
+      '3. Set your rules in Settings, then run a review from Command.\n\n'+
+      'One thing to expect: the Call Scorecard is empty for about ninety days. A fixed-horizon record cannot be built backwards.\n\n'+
+      '— NorthBridge, financial branch';
+  location.href='mailto:'+encodeURIComponent(r.email)+
+    '?subject='+encodeURIComponent('PerceptFolio access')+'&body='+encodeURIComponent(body);
+}
+</script>
+</body>
+</html>
