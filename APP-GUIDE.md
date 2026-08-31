@@ -1,192 +1,306 @@
-# Turning PerceptFolio into an app
+# PerceptFolio — how to actually use it
 
-Two stages. Stage 1 is done and costs nothing. Stage 2 is optional, costs $25 once, and takes about
-three weeks of calendar time (mostly waiting).
+Plain steps. No theory. Each section is a recipe: do this, then this, then this.
+
+Read section 0 once. After that you'll mostly live in sections 1, 2 and 3.
 
 ---
 
-## Stage 1 — The installable app (done, free)
+## 0. Set it up (once, 10 minutes)
 
-These files are already in place:
+**Get the data working.**
 
-| File | What it does |
+1. Go to **finnhub.io**, make a free account, copy your API key.
+2. In PerceptFolio, click your **circle avatar** (top right) → **Settings**.
+3. Paste the key into **API key**. Save.
+
+Without this key nothing scores. Every other feature will just tell you to come back here.
+
+**Tell it what you own.**
+
+4. **Portfolio** tab → **Add Holding**. Ticker, type, shares (or switch the dropdown to *Enter dollars*), price you paid, broker. Hit **Add**.
+5. Repeat for everything you own.
+6. **Cash Available to Invest** → type what's sitting uninvested → **Update Cash**.
+
+**Set your rules** (avatar → Settings). These are the lines the app holds you to:
+
+| Setting | Default | What it means |
+|---|---|---|
+| Quality to buy | 9 | Won't call BUY unless quality is 9/12 or better |
+| Value to buy | 4 | And the price is 4/6 or better |
+| Momentum to buy | 0 | Off. Raise it if you want price strength required too |
+| Quality to sell | 6 | Flags SELL when quality falls to 6/12 or below |
+| Max position | 10% | No single stock should be more than this |
+| Cash target | 3% | Keep at least this much in cash |
+| Exclusions | — | Tickers you never want to own, comma separated |
+
+Change these to whatever you actually believe. The whole app runs off them.
+
+7. Last step: **Command** tab → **Run review**. This pulls prices and scores everything. Takes a few seconds per stock.
+
+---
+
+## 1. Every morning (2 minutes)
+
+1. Open the app. It lands on **Dashboard** — glance at the value and today's move.
+2. Click **Command**.
+3. Read the **grey strip at the top**. That's the app's track record — how often its own calls have been right. If it says it hasn't measured anything yet, that's honest, not broken.
+4. Click **Run review**.
+5. Read the list.
+
+Each row is one thing that needs you. Colour tells you what kind:
+
+- 🔴 **SELL** — something you own broke a rule
+- 🟢 **BUY** — something on your watchlist crossed your bar
+- 🟡 **DRIFT** — a company you own is getting worse, slowly
+- 🟡 **RISK** — you've broken your own policy
+- 🟡 **REVIEW** — a thesis is due
+- 🔵 **CASH** — too much money sitting idle
+- ⚪ **DATA** — prices are stale, refresh before trusting anything
+
+**Click any row** to see the reasoning and the numbers behind it.
+
+If it says *"Nothing needs you"* — close the app. That's most days. That's correct.
+
+---
+
+## 2. Should I buy this stock?
+
+This is the main recipe. Five steps.
+
+### Step 1 — Score the company
+
+**Analyzer** tab → type the ticker → **Run Quality + Price Check**.
+
+You get three numbers:
+
+- **Quality /12** — is this a good business? (margins, cash flow, debt, returns)
+- **Value /6** — is the price sensible? (P/E vs its own history, DCF, etc.)
+- **Momentum /4** — is the price already moving? (6- and 12-month returns, near highs)
+
+And a **Verdict** pill:
+
+| Verdict | Means |
 |---|---|
-| `manifest.json` | Name, colours, icons, and the fact that it opens without browser chrome |
-| `sw.js` | Service worker — caches the app so it opens offline |
-| `icon.svg` | App icon |
-| `icon-maskable.svg` | Android version, padded so it isn't clipped into a circle |
+| **BUY candidate** | Cleared both your bars |
+| **Great biz, pricey — WATCH** | Good company, bad price. Wait |
+| **Good price, weak momentum — WATCH** | Cheap but falling. Wait |
+| **Doesn't qualify yet** | Doesn't clear your bar |
+| **HOLD** | You own it, nothing's wrong |
+| **Consider SELLING** | You own it, quality has dropped |
 
-### Deploy it
+**Scroll down** and read the individual checks — each one shows what passed and what failed and why. Don't just read the score. The score is a summary of those rows.
 
-1. Put all the files (`index.html`, `manifest.json`, `sw.js`, `icon.svg`, `icon-maskable.svg`,
-   `favicon.svg`) in a GitHub repo.
-2. Repo → **Settings** → **Pages** → Source: `main` branch, `/ (root)` → **Save**.
-3. Wait ~1 minute. Your URL will be `https://<your-username>.github.io/<repo-name>/`.
+> If the verdict isn't BUY, you can stop here. That's the point of having a bar.
 
-**HTTPS is mandatory.** Service workers and install prompts refuse to run over plain HTTP. GitHub
-Pages gives you HTTPS automatically, so this is handled — but it does mean you can't test the install
-flow by double-clicking `index.html` on your desktop. Opening it via `file://` skips the service
-worker entirely (the code checks for this and degrades quietly).
+### Step 2 — Check what kind of ride it is
 
-### Install it
+**Risk** tab → **Check any stock's risk** → type the ticker → **Calculate**.
 
-- **Android / Chrome / Edge desktop** — open the URL, then go to **Settings → Install PerceptFolio**
-  inside the app. The button only appears when the browser says installing is possible.
-- **iPhone / iPad** — you must use **Safari**. Chrome on iOS cannot install web apps, it's an Apple
-  restriction, not a bug. Tap **Share** → scroll → **Add to Home Screen**. The Settings tab shows
-  these instructions automatically when it detects iOS, since there's no API to trigger it for you.
+This gives you the volatility and a one-year range. A stock can pass every quality check and still swing 40% a year. This is where you find that out before you're in it.
 
-### Why installing actually matters on iPhone
+### Step 3 — Decide how much (this is the important one)
 
-Safari deletes localStorage for any site you haven't opened in **7 days**. Your entire portfolio
-lives in localStorage. Web apps added to the home screen are exempt from this — they track their own
-usage and their first-party data isn't purged. So on iOS, installing isn't cosmetic, it's what keeps
-your data from silently vanishing after a week away.
+**Portfolio** tab → scroll to **Before You Trade**.
 
-This does **not** make your data safe. Read the warning at the bottom of this file.
+1. Type the ticker
+2. Leave it on **Buy**
+3. Click **Largest size your policy allows** — it fills in the biggest amount that keeps you inside your own 10% cap
+4. Type a smaller number if you want less
 
-### When you change the app
+Now read the table:
 
-Edit `sw.js` and bump the version string:
+- **Position** — how big this becomes as a % of everything you own
+- **Cash** — what's left afterwards
+- **Portfolio beta** — how much the whole portfolio moves with the market. Higher = wilder
+- **Largest single position / Top 3** — how concentrated you're becoming
+- **Risk weight** — position size × how jumpy the stock is. A 6% stake in a very jumpy stock behaves like a 14% stake in a calm one. This is the number people miss.
 
-```js
-const CACHE_VERSION = 'perceptfolio-v2';   // was v1
-```
+And the bullet list underneath:
 
-Without this, installed copies keep serving the old cached `index.html`. Navigation requests are
-network-first so most updates land anyway, but bumping the version is what reliably clears out old
-icons and the cached Chart.js bundle.
+- ✅ green — clears every rule you set
+- 🔴 red — breaks one. It tells you which and by how much
 
-### Optional: PNG icons
+> **Being right about the company and wrong about the size is how people lose money.** Don't skip this step.
 
-The manifest points at SVG icons, which Chrome accepts. Some Android launchers and the Play Store
-packaging step in Stage 2 prefer PNG. To upgrade:
+### Step 4 — Buy it
 
-1. Open `icon.svg` and `icon-maskable.svg` in any converter (or your OS preview → Export).
-2. Export at **192×192** and **512×512**, giving you four files:
-   `icon-192.png`, `icon-512.png`, `icon-maskable-192.png`, `icon-maskable-512.png`.
-3. Replace the `icons` array in `manifest.json` with:
+Do the actual trade **in your broker**. PerceptFolio has no broker connection and never will — it's a static web page.
 
-```json
-"icons": [
-  { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-  { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-  { "src": "./icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-  { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-]
-```
+Then come back: **Portfolio** → **Add Holding** → enter what you actually bought. Tick *"Take this out of my cash"* if you paid from cash.
 
-4. Add the four PNG filenames to the `SHELL` array in `sw.js` and bump `CACHE_VERSION`.
+### Step 5 — Write down why (do it now, not later)
+
+**Portfolio** tab → **Investment Thesis** card.
+
+1. Pick the ticker from the dropdown
+2. **Why do we own it?** — one or two sentences
+3. **What must stay true?** — the thing that would change your mind
+4. **What would make us sell?** — free text
+5. **Sell if quality drops below (of 12)** — ⭐ *this is the one the app can act on.* Type a number, say 8. Now if quality drops under 8, Command will flag this specific stock — using **your** rule, not the global one
+6. **Next review** — pick a date a few months out
+7. **Save thesis**
+
+Six months from now the price will have moved and you'll invent a reason for whatever it did. A thesis written *before* is the only thing that stops that.
 
 ---
 
-## Stage 2 — Google Play ($25 one-time)
+## 3. Should I sell this?
 
-You're wrapping the PWA as a **Trusted Web Activity** (TWA) — a real Android app that renders your
-site full-screen with no browser UI. Google actively supports this pattern, unlike Apple.
+**Command** tab. If it's not on the list, no rule fired. That's your answer.
 
-### 1. Create a Play Console account — $25, paid once
+If it *is* on the list, click the row and read which of these happened:
 
-<https://play.google.com/console> — one-time $25 registration fee, no annual renewal.
+**"Your own thesis condition broke"** — the number you set in your thesis was crossed. It quotes back what you wrote when you bought it. This ranks above everything else, because you set it deliberately for this company.
 
-**Choose "Organization" if you have a registered business entity.** This matters enormously — see
-step 4. If NorthBridge is a registered entity, register the account under it, not under your personal
-name.
+**"Quality fell to X, at your sell bar"** — the global rule in Settings fired.
 
-### 2. Generate the Android package
+**"Score sliding"** (a DRIFT row) — ⚠️ **this is the early warning.** Nothing has broken yet. The company has just been getting worse for months. A sell rule fires when a company is *already* bad; this fires while it's *becoming* bad. Read it and ask whether the reason you bought it still holds.
 
-Install Bubblewrap (Google's official TWA tool). Needs Node.js and a JDK.
+To see all of them at once: **Portfolio** tab → **Quality Drift** table. Worst deterioration is at the top.
 
-```bash
-npm install -g @bubblewrap/cli
-bubblewrap init --manifest https://<your-username>.github.io/<repo-name>/manifest.json
-bubblewrap build
-```
-
-It asks for a package name — use reverse-domain form, e.g. `ai.northbridge.perceptfolio`. This is
-permanent and cannot be changed after your first upload. It outputs `app-release-bundle.aab`, which
-is what you upload.
-
-Bubblewrap generates a **signing keystore**. Back it up somewhere you will not lose it. Lose that
-file and you can never update the app again under the same listing — you'd have to publish a new one
-and every user would have to reinstall.
-
-### 3. Verify you own the site (Digital Asset Links)
-
-Without this, your app opens with a browser address bar visible, which looks broken.
-
-Bubblewrap prints an `assetlinks.json`. Put it at:
-
-```
-/.well-known/assetlinks.json
-```
-
-on your GitHub Pages site, so it resolves at
-`https://<your-username>.github.io/<repo-name>/.well-known/assetlinks.json`.
-
-> **Note:** on a project-subpath GitHub Pages site, Android looks for `assetlinks.json` at the
-> **domain root**, not your subpath. Since you don't control the root of `github.io`, this is the
-> point where a real custom domain (e.g. `perceptfolio.com`) stops being optional. Buy the domain,
-> point it at GitHub Pages, and host `assetlinks.json` at its root.
-
-### 4. The 12 testers / 14 days rule
-
-If your Play account is a **personal** account created after 13 November 2023, Google requires a
-closed test with **at least 12 real testers, opted in continuously for 14 days**, before you can
-apply for production access.
-
-- The 14 days start only once the release is approved **and** 12 testers have opted in.
-- They must be 12 distinct Google accounts on real devices. Emulators and accounts you batch-create
-  don't count.
-- **Organization accounts registered to a legal business entity are exempt from this entirely.**
-
-That exemption is the single biggest reason to register the account under NorthBridge rather than
-your own name.
-
-### 5. Store listing
-
-You'll need: app name, short description (80 chars), full description (4000), a 512×512 icon, a
-1024×500 feature graphic, and at least two phone screenshots. Plus a privacy policy URL — required
-for all apps.
-
-Your privacy policy is unusually easy to write honestly: the app has no server, collects nothing,
-transmits nothing except your own Finnhub API calls, and stores everything in the browser on the
-user's device.
-
-### 6. Financial app declarations
-
-Play has a **Financial Features** declaration section. PerceptFolio does not handle payments, hold
-funds, or execute trades, so most of it won't apply — but answer it, don't skip it. Misdeclaring is a
-faster route to suspension than declaring accurately.
+**To sell:** do it in your broker, then record it in PerceptFolio so the ledger stays honest.
 
 ---
 
-## Why not the Apple App Store
+## 4. Finding stocks you don't already know about
 
-Apple's **Guideline 4.2 (Minimum Functionality)** rejects apps that are essentially web wrappers.
-A webview shell around a site is precisely the pattern reviewers bounce. To pass you'd need genuine
-native behaviour — push notifications, native navigation, real offline handling — none of which you
-currently need for the app to be good.
+**Screener** tab. Four ways to fill the box:
 
-Cost is $99/year, renewing, versus Google's $25 once. My honest read: skip Apple. iPhone users can
-install the PWA from Safari in three taps and get an experience that is nearly identical. Revisit
-only if enough people ask that the $99 and the rework are obviously worth it.
+- **Dow 30** / **Mega-cap tech** — preset lists
+- **Search by sector** — type "water", "healthcare", "energy" → loads a curated list
+- **This week's picks (20)** — a rotating batch from the built-in universe, skipping anything you already own
+- **Paste your own list** — comma separated
+
+Then hit **Run screen**. It scores a few seconds per stock (free-tier rate limit), so leave the tab and come back.
+
+Results sort best-first. Use the filter dropdowns to show only **System: BUY**. Anything interesting → send it to the Analyzer (step 2 above) for the full breakdown.
+
+> It does **not** scan the whole market. Nobody's free tier does. It scores the list you give it.
 
 ---
 
-## The thing none of this fixes
+## 5. Is the whole market expensive right now?
 
-**Every account's data lives in localStorage, in one browser, on one device.**
+**Market** tab.
 
-- Clear your browser data and it's all gone.
-- It does not sync between your phone and your laptop. They are separate, unrelated copies.
-- There is no backup unless you make one.
-- Installing as a PWA protects against Safari's 7-day eviction. It protects against nothing else.
+**The Move, In Context** — is today's move normal or unusual?
 
-**Use Settings → Export regularly**, and keep the JSON somewhere real. That file is your only
-recovery path.
+- **Today** — live, right now, from the SPY quote
+- **Yesterday** — the previous close
+- **Tomorrow** — two guesses side by side:
+  - **Implied** — what options traders expect (from VIX)
+  - **Realized** — what actually happened the last 20 days
 
-If PerceptFolio ever becomes something other people genuinely depend on, this is the problem to
-solve — not distribution. Real multi-device sync needs a backend and an account system, which is a
-different project with a different budget. Packaging it as an app makes it feel more permanent than
-it actually is, and that gap is worth keeping in mind.
+  When they agree, the number is solid. When they disagree, the app says which way and by how much. *That gap is itself the information.*
+
+**Market Weather** — the long-run valuation picture. CAPE, Buffett indicator, margin debt.
+
+⚠️ **These do not time the market.** The Buffett indicator has said "expensive" since about 2013 and CAPE has been over 30 since 2017, through years of big gains. Use them to decide *how much* to put in, never *when* to get out.
+
+Some of these have no free feed, so you type them in monthly. The links to look them up are right there next to each box.
+
+---
+
+## 6. How risky is my whole portfolio?
+
+**Risk** tab → **Calculate risk**.
+
+- **Sector concentration** — are you accidentally all-in on one industry?
+- **Correlation** — owning 5 stocks that all move together isn't 5 bets, it's 1
+- **Portfolio beta** — how hard you get hit when the market drops
+- **Beta drift** — is this still the stock you bought?
+
+**Then the projection:**
+
+**Risk** tab → **Monte Carlo projection**
+
+1. Leave the ticker box **blank** to simulate your real portfolio (or type tickers to test a hypothetical)
+2. Set years and monthly contribution
+3. **Run simulation**
+
+Read the **box & whisker** chart — that's your range. Middle line is the median, box is where a typical year lands, whiskers are the good and bad ends.
+
+**Then, the part everyone skips:**
+
+Scroll to **The hole on the way there** → **Model the drawdown**.
+
+The projection above tells you where you might *end up*. This tells you the worst point you pass through — which is what actually decides whether you're still holding when the recovery comes.
+
+It gives you three numbers: the typical worst drop, the one-in-ten, and the one-in-a-hundred, in both percent and dollars. It also shows the same figure calculated the naive way (bell curve) so you can see how much that method understates it.
+
+> Ask yourself honestly: **if my account showed that one-in-ten number, would I still be holding?** If the answer is no, you're too big. Go back to section 2, step 3.
+
+---
+
+## 7. Am I any good at this?
+
+Two screens. Both start empty and fill in over months. Nothing here can be faked backwards.
+
+**Market** tab → **Your Call Scorecard** — is the *checklist* working?
+
+Every time the app changes its verdict on a stock, it writes that down with the price and SPY at that moment. Then on the call's 30/90/180/365-day anniversary it stamps what happened.
+
+- **Median edge vs SPY** — did the calls beat the market
+- **Called it right** — a BUY is right if it beat SPY; a SELL is right if it *lagged*
+- Under about 20 calls, it tells you the number means nothing. Believe it
+
+**History** tab → **How You Behave** — is *your* judgement working?
+
+- **How long you actually hold** — the median, not what you tell yourself
+- **Whether you sell too early** — what your sales did in the 90 days after you got out. If the median is up 5%, you cut winners early
+- **Whether you keep to your own rules** — what share of days your cash was under your own floor
+- **Whether you trade in bursts** — activity clustering usually tracks stress, not opportunity
+
+---
+
+## 8. The Map (who a company depends on)
+
+**Map** tab → type a ticker → **Map it**.
+
+- Left = suppliers (who they buy from)
+- Right = customers (who they sell to)
+- Bottom = similar companies
+
+Supplier and customer data isn't on any free API — you type those in yourself, and adding a link on one company automatically adds the reverse on the other.
+
+Use it for one thing: **finding hidden overlap.** If four of your holdings all depend on the same supplier, you own one bet, not four.
+
+**All maps (N)** button shows everything you've mapped.
+
+---
+
+## Cheat sheet
+
+| I want to… | Go to |
+|---|---|
+| See what needs me today | **Command** → Run review |
+| Score one stock | **Analyzer** |
+| Compare two stocks | **Analyzer** → Compare Two Stocks |
+| Work out how much to buy | **Portfolio** → Before You Trade |
+| Write down why I own something | **Portfolio** → Investment Thesis |
+| See which holdings are decaying | **Portfolio** → Quality Drift |
+| Find new stocks | **Screener** |
+| Check if the market is expensive | **Market** |
+| See how bad a crash could get | **Risk** → Monte Carlo → Model the drawdown |
+| Check if the app's calls work | **Market** → Call Scorecard |
+| Check if *my* habits work | **History** → How You Behave |
+| Change my rules | Avatar → **Settings** |
+| Quick maths | The **calculator icon**, top right |
+| Jump to any ticker | **Jump to ticker** box, top right |
+
+---
+
+## What this app cannot do
+
+Worth knowing so you never rely on it for these:
+
+- **It cannot trade.** No broker connection. It tells you; you decide; you execute.
+- **It cannot scan the whole market.** It scores lists you give it.
+- **It cannot see the future.** Every projection is a range under stated assumptions, not a forecast.
+- **It cannot grade calls it never wrote down.** The scorecard starts today and builds forward. There's no free historical price API to reconstruct it backwards.
+- **It only knows US stocks.** Finnhub's free tier is US-only.
+- **It cannot price mutual funds.** Add them as *Mutual Fund* and type the NAV yourself.
+- **It is not advice.** It's your own rules, applied consistently, with the arithmetic done for you.
+
+The last one matters most. Every verdict in this app is your Settings numbers firing on public data. When it says BUY, that means *"this cleared the bar you set"* — not *"this will go up."*

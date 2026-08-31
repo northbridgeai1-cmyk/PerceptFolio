@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PerceptFolio — the terminal that grades its own calls</title>
+<meta name="description" content="A portfolio terminal that scores stocks against your own written rules, sizes the position before you trade, and keeps a public record of how often it was right. Built by NorthBridge.">
+<meta name="theme-color" content="#0e0f12">
+<link rel="canonical" href="https://perceptfolio.com/">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:title" content="PerceptFolio — the terminal that grades its own calls">
+<meta property="og:description" content="Most tools tell you what to buy. This one tells you how often it has been right.">
+<meta property="og:url" content="https://perceptfolio.com/">
+<style>
+:root{
+  --bg:#0e0f12; --panel:#16181d; --panel2:#1e2128; --border:#2b2f38;
+  --text:#f2f3f5; --muted:#949aa6; --accent:#3b82f6; --green:#2ea043;
+  --red:#e5534b; --yellow:#d9a441; --amber:#c98a3f;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--text);
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1140px;margin:0 auto;padding:0 24px}
+
+/* ---- ticker strip: the actual checks the terminal runs, not fake prices ---- */
+.tape{border-bottom:1px solid var(--border);background:#0a0b0e;overflow:hidden;height:34px;display:flex;align-items:center}
+.tape-inner{display:flex;white-space:nowrap;animation:slide 64s linear infinite;font:11px/1 var(--mono);color:var(--muted);letter-spacing:.06em}
+.tape-inner span{padding:0 22px;display:inline-flex;align-items:center;gap:7px}
+.tape-inner b{color:var(--text);font-weight:600}
+.dot{width:5px;height:5px;border-radius:50%;flex:none}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.tape-inner{animation:none}}
+
+/* ---- nav ---- */
+nav{position:sticky;top:0;z-index:50;background:rgba(14,15,18,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.nav-in{display:flex;align-items:center;gap:26px;height:60px}
+.logo{font-weight:800;font-size:17px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
+.logo-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--accent),#1e5fc4);display:grid;place-items:center;font:700 11px/1 var(--mono);color:#fff}
+.nav-links{display:flex;gap:22px;margin-left:auto;font-size:13.5px;color:var(--muted)}
+.nav-links a:hover{color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 17px;border-radius:8px;font-size:13.5px;font-weight:600;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;transition:.15s}
+.btn:hover{border-color:#3d434f;background:var(--panel2)}
+.btn-p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-p:hover{background:#2f6fd8;border-color:#2f6fd8}
+.btn-lg{padding:13px 24px;font-size:15px;border-radius:9px}
+
+/* ---- hero ---- */
+header{padding:86px 0 70px;border-bottom:1px solid var(--border);position:relative}
+header:before{content:"";position:absolute;inset:0;background:radial-gradient(900px 380px at 22% -10%,rgba(59,130,246,.13),transparent 70%);pointer-events:none}
+.eyebrow{font:11px/1 var(--mono);letter-spacing:.16em;color:var(--accent);text-transform:uppercase;margin-bottom:20px}
+h1{font-size:clamp(33px,5.2vw,56px);line-height:1.08;letter-spacing:-.028em;font-weight:800;max-width:16ch}
+.sub{color:var(--muted);font-size:clamp(15.5px,2vw,19px);line-height:1.62;max-width:60ch;margin-top:22px}
+.cta{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap}
+.note{font-size:12.5px;color:var(--muted);margin-top:16px}
+
+/* ---- stat band ---- */
+.band{border-bottom:1px solid var(--border);background:var(--panel);}
+.band-grid{display:grid;grid-template-columns:repeat(4,1fr)}
+.band-cell{padding:24px;border-right:1px solid var(--border)}
+.band-cell:last-child{border-right:none}
+.band-n{font:700 25px/1 var(--mono);letter-spacing:-.02em}
+.band-l{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.45}
+
+/* ---- sections ---- */
+section{padding:78px 0;border-bottom:1px solid var(--border)}
+.kicker{font:11px/1 var(--mono);letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-bottom:16px}
+h2{font-size:clamp(25px,3.4vw,35px);line-height:1.16;letter-spacing:-.022em;font-weight:750;max-width:20ch}
+.lede{color:var(--muted);font-size:16.5px;line-height:1.68;max-width:64ch;margin-top:18px}
+
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:42px}
+.card{background:var(--panel);padding:26px 24px}
+.card h3{font-size:16px;font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:9px}
+.card p{color:var(--muted);font-size:14px;line-height:1.62}
+.tag{font:10px/1 var(--mono);letter-spacing:.09em;padding:4px 7px;border-radius:4px;text-transform:uppercase;font-weight:600}
+.t-cmd{background:rgba(59,130,246,.15);color:#7aa9f5}
+.t-rec{background:rgba(46,160,67,.15);color:#5fc275}
+.t-risk{background:rgba(229,83,75,.15);color:#f08a84}
+.t-map{background:rgba(139,92,246,.15);color:#a98bf3}
+.t-you{background:rgba(217,164,65,.16);color:#e0bc72}
+.t-priv{background:rgba(148,154,166,.15);color:#b3b9c4}
+
+/* ---- honesty block ---- */
+.quote{border-left:3px solid var(--accent);padding:4px 0 4px 26px;margin-top:38px;max-width:66ch}
+.quote p{font-size:19px;line-height:1.58;font-weight:500}
+.quote cite{display:block;margin-top:14px;font-size:13px;color:var(--muted);font-style:normal}
+
+.ledger{margin-top:40px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel)}
+.ledger-head{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--border);background:var(--panel2);font:11px/1 var(--mono);letter-spacing:.09em;color:var(--muted);text-transform:uppercase}
+.ledger table{width:100%;border-collapse:collapse;font:13px/1 var(--mono)}
+.ledger td,.ledger th{padding:12px 18px;text-align:left;border-bottom:1px solid var(--border)}
+.ledger th{font-size:10.5px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;font-weight:600}
+.ledger tr:last-child td{border-bottom:none}
+.pos{color:var(--green)}.neg{color:var(--red)}.mut{color:var(--muted)}
+.ledger-foot{padding:13px 18px;font-size:12px;color:var(--muted);border-top:1px solid var(--border);background:#0a0b0e;line-height:1.55}
+
+/* ---- pricing ---- */
+.prices{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:42px;max-width:760px}
+.price{border:1px solid var(--border);border-radius:12px;padding:28px 26px;background:var(--panel);position:relative}
+.price.best{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.price-badge{position:absolute;top:-10px;left:26px;background:var(--accent);color:#fff;font:10px/1 var(--mono);letter-spacing:.09em;padding:5px 9px;border-radius:4px;text-transform:uppercase;font-weight:700}
+.price h3{font-size:14px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+.price .amt{font:800 40px/1 var(--mono);letter-spacing:-.03em;margin:14px 0 4px}
+.price .amt small{font-size:15px;color:var(--muted);font-weight:500;letter-spacing:0}
+.price .save{font-size:12.5px;color:var(--green);margin-bottom:18px}
+.price ul{list-style:none;margin:20px 0 24px;font-size:13.5px;color:var(--muted)}
+.price li{padding:6px 0 6px 22px;position:relative;line-height:1.5}
+.price li:before{content:"";position:absolute;left:0;top:12px;width:11px;height:2px;background:var(--accent);border-radius:2px}
+.price .btn{width:100%}
+
+/* ---- faq ---- */
+details{border-bottom:1px solid var(--border);padding:18px 0}
+summary{cursor:pointer;font-weight:650;font-size:15.5px;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px}
+summary::-webkit-details-marker{display:none}
+summary:after{content:"+";color:var(--muted);font:400 20px/1 var(--mono);flex:none}
+details[open] summary:after{content:"\2212"}
+details p{color:var(--muted);font-size:14.5px;line-height:1.68;margin-top:12px;max-width:70ch}
+
+/* ---- footer ---- */
+footer{padding:52px 0 62px;font-size:13px;color:var(--muted)}
+.foot-top{display:flex;gap:40px;flex-wrap:wrap;justify-content:space-between;margin-bottom:34px}
+.foot-links{display:flex;gap:28px;flex-wrap:wrap}
+.foot-links a:hover{color:var(--text)}
+.legal{border-top:1px solid var(--border);padding-top:26px;line-height:1.7;font-size:12px;max-width:88ch}
+
+@media (max-width:860px){
+  .cards{grid-template-columns:1fr}
+  .band-grid{grid-template-columns:repeat(2,1fr)}
+  .band-cell:nth-child(2){border-right:none}
+  .band-cell:nth-child(1),.band-cell:nth-child(2){border-bottom:1px solid var(--border)}
+  .prices{grid-template-columns:1fr}
+  .nav-links{display:none}
+  header{padding:58px 0 50px}
+  section{padding:56px 0}
+}
+</style>
+</head>
+<body>
+
+<!-- The tape shows what the terminal actually checks. Deliberately not fake live prices —
+     a marketing page that invents market data is the fastest way to lose a serious reader. -->
+<div class="tape" aria-hidden="true">
+  <div class="tape-inner" id="tape"></div>
+</div>
+
+<nav>
+  <div class="wrap nav-in">
+    <a href="./" class="logo"><span class="logo-mark">PF</span>PerceptFolio</a>
+    <div class="nav-links">
+      <a href="#what">What it does</a>
+      <a href="#record">The record</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="btn" href="./app.html" style="margin-left:auto">Sign in</a>
+  </div>
+</nav>
+
+<header>
+  <div class="wrap" style="position:relative">
+    <div class="eyebrow">A NorthBridge company</div>
+    <h1>The terminal that grades its own calls.</h1>
+    <p class="sub">PerceptFolio scores companies against rules <em>you</em> set, tells you how much to buy before you buy it, and keeps a permanent record of how often it was right. Everything else in this category tells you what to do and never checks.</p>
+    <div class="cta">
+      <a class="btn btn-p btn-lg" href="#pricing">See pricing</a>
+      <a class="btn btn-lg" href="./app.html">Open the terminal</a>
+    </div>
+    <p class="note">Runs entirely in your browser. Your positions never leave your device.</p>
+  </div>
+</header>
+
+<div class="band">
+  <div class="wrap">
+    <div class="band-grid">
+      <div class="band-cell"><div class="band-n">22</div><div class="band-l">checks per company — 12 quality, 6 value, 4 momentum</div></div>
+      <div class="band-cell"><div class="band-n">0</div><div class="band-l">of your data sent to a server you don't control</div></div>
+      <div class="band-cell"><div class="band-n">4</div><div class="band-l">fixed horizons every call is marked against</div></div>
+      <div class="band-cell"><div class="band-n">1</div><div class="band-l">file. No install, no login to a database, no lock-in</div></div>
+    </div>
+  </div>
+</div>
+
+<section id="what">
+  <div class="wrap">
+    <div class="kicker">What it does</div>
+    <h2>Eleven screens. One question each.</h2>
+    <p class="lede">Most portfolio tools are a wall of numbers with no opinion. PerceptFolio is the opposite: every screen exists to answer one decision, and every verdict shows the arithmetic behind it.</p>
+    <div class="cards">
+      <div class="card">
+        <h3><span class="tag t-cmd">Command</span></h3>
+        <p>One list, every morning: what actually needs you today. Sell signals, breached limits, reviews falling due, idle cash. Most days it says nothing needs you, and that is the correct answer.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag t-rec">Scorecard</span></h3>
+        <p>Every verdict it has ever issued, marked against the S&amp;P at 30, 90, 180 and 365 days. A BUY is right if it beat the index. A SELL is right if it lagged. You see the record whether or not it flatters the system.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag t-risk">Sizing</span></h3>
+        <p>Before you trade: what this does to your concentration, your cash buffer, your market exposure, and your own written limits. Being right about the company and wrong about the size is how the money goes.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag t-risk">Drawdown</span></h3>
+        <p>Not where you might end up — the hole you pass through on the way. Modelled from real market history rather than a bell curve, because crashes cluster and a normal distribution can't represent that.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag t-map">Supply map</span></h3>
+        <p>Map who a company depends on, upstream and down. Five holdings that all rely on the same supplier are one bet, not five. No other screen in any tool will show you that.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag t-you">Your habits</span></h3>
+        <p>How long you actually hold. Whether the things you sell keep rising without you. Whether you break your own cash rule. Anyone can buy price history; nobody else has yours.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="record">
+  <div class="wrap">
+    <div class="kicker">The difference</div>
+    <h2>It writes down what it said, then checks.</h2>
+    <p class="lede">Every stock tool on earth will give you a signal. Almost none will tell you how those signals performed, because the honest answer is usually uncomfortable. PerceptFolio logs each verdict the moment it changes, stamps the price and the index alongside it, and marks the result on fixed anniversaries it cannot move.</p>
+
+    <div class="quote">
+      <p>“You do not get to forecast more until you can prove you forecast well.”</p>
+      <cite>The design rule the scorecard was built to enforce</cite>
+    </div>
+
+    <div class="ledger">
+      <div class="ledger-head"><span class="dot" style="background:var(--green)"></span> Call scorecard — illustrative layout</div>
+      <table>
+        <thead><tr><th>Ticker</th><th>Call</th><th>Held</th><th>vs S&amp;P</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>—</td><td class="mut">BUY</td><td class="mut">90d</td><td class="mut">—</td><td class="mut">awaiting mark</td></tr>
+          <tr><td>—</td><td class="mut">SELL</td><td class="mut">90d</td><td class="mut">—</td><td class="mut">awaiting mark</td></tr>
+          <tr><td>—</td><td class="mut">BUY</td><td class="mut">30d</td><td class="mut">—</td><td class="mut">awaiting mark</td></tr>
+        </tbody>
+      </table>
+      <div class="ledger-foot">Empty on purpose. A fixed-horizon record cannot be reconstructed backwards, so yours starts the day you begin and fills in from there. Any tool showing you a glowing back-test on day one is showing you something it did not have to live through.</div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="kicker">Pricing</div>
+    <h2>One price. Everything included.</h2>
+    <p class="lede">No tiers, no seat counts, no feature held back. You get the whole terminal, and you keep your data if you ever leave.</p>
+    <div class="prices">
+      <div class="price">
+        <h3>Monthly</h3>
+        <div class="amt" id="pmMonthly">$39<small>/mo</small></div>
+        <div class="save">&nbsp;</div>
+        <ul>
+          <li>The full terminal, every screen</li>
+          <li>Cross-device sync</li>
+          <li>Installs to your phone home screen</li>
+          <li>Cancel any time</li>
+        </ul>
+        <a class="btn btn-lg" id="buyMonthly" href="#contact">Request access</a>
+      </div>
+      <div class="price best">
+        <div class="price-badge">Best value</div>
+        <h3>Annual</h3>
+        <div class="amt" id="pmAnnual">$390<small>/yr</small></div>
+        <div class="save" id="pmSave">Two months free</div>
+        <ul>
+          <li>Everything in monthly</li>
+          <li>Priority on new features</li>
+          <li>Direct line for questions</li>
+          <li>Your data exports on request, always</li>
+        </ul>
+        <a class="btn btn-p btn-lg" id="buyAnnual" href="#contact">Request access</a>
+      </div>
+    </div>
+    <p class="note" style="margin-top:22px;max-width:66ch">You will also need a free Finnhub API key for market data — it takes about two minutes and costs nothing. PerceptFolio does not resell market data.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="kicker">Questions</div>
+    <h2>The ones worth answering.</h2>
+    <div style="margin-top:34px;max-width:860px">
+      <details open>
+        <summary>Is this investment advice?</summary>
+        <p>No, and it is important that you understand why. PerceptFolio applies rules <em>you</em> configure to public data and shows you the arithmetic. When it says BUY, that means "this cleared the bar you set" — not "this will go up". It knows nothing about your circumstances, it has no view on what you should own, and nobody at NorthBridge sees your positions. It is a calculator with an opinion you wrote yourself.</p>
+      </details>
+      <details>
+        <summary>Where does my data go?</summary>
+        <p>Nowhere by default. Your holdings, prices, notes and history live in your own browser's storage. If you turn on sync, it goes to a private storage box on infrastructure you set up and control, protected by a key only you hold. There is no PerceptFolio account database holding your portfolio.</p>
+      </details>
+      <details>
+        <summary>What market data does it use?</summary>
+        <p>Live US quotes and company fundamentals from Finnhub's free tier, and US macro series from the St. Louis Fed. It is honest about the limits: no international coverage, no intraday history, no institutional supply-chain feed. Where a number cannot be sourced for free, the app says so and lets you type it in rather than inventing it.</p>
+      </details>
+      <details>
+        <summary>Why is the scorecard empty when I start?</summary>
+        <p>Because a fixed-horizon track record cannot be faked backwards. To know what a stock did ninety days after a call, something has to look on the day. PerceptFolio marks each call on its own anniversary going forward. That means the first meaningful reading is three months away, and we would rather tell you that than show you a back-test.</p>
+      </details>
+      <details>
+        <summary>Does it place trades?</summary>
+        <p>No, and it never will. There is no broker connection. It tells you what your rules flagged and shows the numbers; you decide, and you execute in your own brokerage.</p>
+      </details>
+      <details>
+        <summary>Who builds this?</summary>
+        <p>NorthBridge, a holding company. PerceptFolio sits in its financial branch and was built as internal infrastructure before it was offered to anyone else. It is still the tool we use ourselves, which is the main reason it refuses to flatter its own output.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div>
+        <div class="logo" style="margin-bottom:10px"><span class="logo-mark">PF</span>PerceptFolio</div>
+        <div style="max-width:34ch;line-height:1.6">Know what to buy. Know what to sell. Know whether it worked.</div>
+      </div>
+      <div class="foot-links">
+        <a href="#what">What it does</a>
+        <a href="#record">The record</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+        <a href="./app.html">Open terminal</a>
+        <a id="contact" href="mailto:northbridgeai1@gmail.com?subject=PerceptFolio%20access">Contact</a>
+      </div>
+    </div>
+    <div class="legal">
+      © <span id="yr">2026</span> NorthBridge. PerceptFolio is software for organising your own research and applying your own rules. It is not investment advice, it does not take custody of assets, and it does not execute trades. NorthBridge is not a registered investment adviser and nothing here is a recommendation to buy or sell any security. Investing carries risk, including loss of principal. Past performance — including any record shown inside the product — does not predict future results.
+    </div>
+  </div>
+</footer>
+
+<script>
+/* =====================================================================
+   CONFIG — the only part you need to edit.
+
+   checkoutMonthly / checkoutAnnual: paste your Stripe Payment Link or
+   PayPal subscription URL. While these are blank, both buttons say
+   "Request access" and open your email instead, so nothing on this page
+   is ever a dead end. Set them and the buttons become real checkout.
+   ===================================================================== */
+const PF = {
+  monthly: 39,
+  annual: 390,
+  currency: '$',
+  checkoutMonthly: '',
+  checkoutAnnual: '',
+  contact: 'northbridgeai1@gmail.com'
+};
+
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+/* Prices are rendered from config so you change one number, not four places. */
+(function price(){
+  const m = PF.currency + PF.monthly, a = PF.currency + PF.annual;
+  document.getElementById('pmMonthly').innerHTML = m + '<small>/mo</small>';
+  document.getElementById('pmAnnual').innerHTML  = a + '<small>/yr</small>';
+  const months = PF.monthly > 0 ? (PF.monthly * 12 - PF.annual) / PF.monthly : 0;
+  document.getElementById('pmSave').textContent =
+    months >= 1 ? Math.round(months) + ' month' + (Math.round(months) === 1 ? '' : 's') + ' free' : '';
+})();
+
+/* Buttons only claim to be checkout when checkout actually exists. */
+(function buttons(){
+  const set = (id, url, label) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (url) { el.href = url; el.textContent = label; }
+    else {
+      el.href = 'mailto:' + PF.contact + '?subject=' + encodeURIComponent('PerceptFolio access — ' + label);
+      el.textContent = 'Request access';
+    }
+  };
+  set('buyMonthly', PF.checkoutMonthly, 'Subscribe monthly');
+  set('buyAnnual',  PF.checkoutAnnual,  'Subscribe annually');
+})();
+
+/* The scrolling tape lists real checks the terminal runs. Duplicated once so the
+   CSS translate(-50%) loop is seamless. */
+(function tape(){
+  const items = [
+    ['Gross Margin','g'],['Operating Margin','g'],['Free Cash Flow','g'],['Return on Equity','g'],
+    ['Debt to Equity','y'],['Current Ratio','y'],['Interest Cover','y'],['Revenue Growth','g'],
+    ['Insider Buying','b'],['Earnings Surprise','b'],['Moat','b'],['Guidance','b'],
+    ['P/E vs Own History','a'],['DCF Fair Value','a'],['Price to Book','a'],['Free Cash Flow Yield','a'],
+    ['6-Month Return','p'],['12-Month Return','p'],['Near 52-Week High','p'],['Beating the Market','p'],
+    ['Position vs Cap','r'],['Cash vs Target','r'],['Thesis Review Due','r'],['Quality Drift','r']
+  ];
+  const colour = { g:'var(--green)', y:'var(--yellow)', b:'var(--accent)', a:'var(--amber)', p:'#8b5cf6', r:'var(--red)' };
+  const html = items.map(([t,c]) =>
+    '<span><i class="dot" style="background:' + colour[c] + '"></i><b>' + t + '</b></span>').join('');
+  document.getElementById('tape').innerHTML = html + html;
+})();
+
+/* Returning users skip the pitch.
+   If this browser already holds a PerceptFolio profile, go straight to the terminal —
+   nobody who already pays for a thing should have to read the advert for it every time.
+   Escape hatches: any link with ?stay, or a hash target, keeps you here. */
+(function forward(){
+  try {
+    if (location.search.indexOf('stay') > -1 || location.hash) return;
+    const db = localStorage.getItem('quantfolio_v1');
+    if (!db) return;
+    const parsed = JSON.parse(db);
+    if (parsed && parsed.profiles && Object.keys(parsed.profiles).length) {
+      location.replace('./app.html');
+    }
+  } catch (e) { /* corrupt or blocked storage: show the landing page, never trap the user */ }
+})();
+</script>
+</body>
+</html>

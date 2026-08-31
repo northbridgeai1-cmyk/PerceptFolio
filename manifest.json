@@ -2,7 +2,7 @@
   "name": "PerceptFolio",
   "short_name": "PerceptFolio",
   "description": "Know what to buy. Know what to sell. A private, offline-first portfolio tracker and stock checklist scorer.",
-  "start_url": "./index.html",
+  "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
@@ -42,13 +42,13 @@
       "name": "Dashboard",
       "short_name": "Dashboard",
       "description": "Portfolio value, growth, and today's signals",
-      "url": "./index.html#dashboard"
+      "url": "./app.html#dashboard"
     },
     {
       "name": "Screener",
       "short_name": "Screener",
       "description": "Score a list of tickers against your checklist",
-      "url": "./index.html#screener"
+      "url": "./app.html#screener"
     }
   ]
 }

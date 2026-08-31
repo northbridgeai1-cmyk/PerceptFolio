@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Thank you | PerceptFolio</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0e0f12">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#0e0f12;--panel:#16181d;--panel2:#1e2128;--border:#2b2f38;
+  --text:#f2f3f5;--muted:#949aa6;--accent:#3b82f6;--green:#2ea043;--yellow:#d9a441;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:780px;margin:0 auto;padding:0 24px;width:100%}
+nav{border-bottom:1px solid var(--border)}
+.nav-in{display:flex;align-items:center;height:60px;gap:10px}
+.logo{font-weight:800;font-size:17px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
+.logo-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--accent),#1e5fc4);display:grid;place-items:center;font:700 11px/1 var(--mono);color:#fff}
+main{flex:1;padding:64px 0 78px}
+.check{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;margin-bottom:24px;
+  background:rgba(46,160,67,.14);border:1px solid rgba(46,160,67,.4)}
+.check.wait{background:rgba(217,164,65,.14);border-color:rgba(217,164,65,.4)}
+.check svg{width:24px;height:24px;stroke:var(--green);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.check.wait svg{stroke:var(--yellow)}
+.eyebrow{font:11px/1 var(--mono);letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-bottom:14px}
+h1{font-size:clamp(26px,4.4vw,38px);line-height:1.14;letter-spacing:-.024em;font-weight:780}
+.lede{color:var(--muted);font-size:16.5px;line-height:1.68;max-width:60ch;margin-top:18px}
+.steps{margin-top:38px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel)}
+.steps-head{padding:13px 20px;border-bottom:1px solid var(--border);background:var(--panel2);
+  font:11px/1 var(--mono);letter-spacing:.09em;color:var(--muted);text-transform:uppercase}
+.step{display:flex;gap:16px;padding:18px 20px;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.step-n{flex:none;width:26px;height:26px;border-radius:7px;background:var(--panel2);border:1px solid var(--border);
+  display:grid;place-items:center;font:700 12px/1 var(--mono);color:var(--accent)}
+.step h3{font-size:15px;font-weight:650;margin-bottom:5px}
+.step p{color:var(--muted);font-size:14px;line-height:1.6}
+.step a{color:var(--accent)}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:32px}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 22px;border-radius:9px;
+  font-size:14.5px;font-weight:600;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;transition:.15s}
+.btn:hover{border-color:#3d434f;background:var(--panel2)}
+.btn-p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-p:hover{background:#2f6fd8;border-color:#2f6fd8}
+.aside{margin-top:32px;border-left:3px solid var(--border);padding:2px 0 2px 20px;color:var(--muted);font-size:14px;line-height:1.66;max-width:64ch}
+footer{border-top:1px solid var(--border);padding:24px 0;font-size:12.5px;color:var(--muted)}
+.links{display:flex;gap:22px;flex-wrap:wrap}
+.links a:hover{color:var(--text)}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap nav-in"><a href="./" class="logo"><span class="logo-mark">PF</span>PerceptFolio</a></div></nav>
+
+<main>
+  <div class="wrap">
+    <div class="check" id="mark">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="eyebrow" id="eyebrow">Confirmed</div>
+    <h1 id="title">Thank you.</h1>
+    <p class="lede" id="lede"></p>
+
+    <div class="steps" id="steps"></div>
+
+    <div class="cta" id="cta"></div>
+
+    <div class="aside" id="aside"></div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap links">
+    <a href="./">Home</a>
+    <a href="./app.html">Terminal</a>
+    <a href="./#faq">FAQ</a>
+    <a href="mailto:northbridgeai1@gmail.com">Contact</a>
+  </div>
+</footer>
+
+<script>
+/* =====================================================================
+   Two pages in one file, switched by ?type=
+
+     thanks.html?type=paid      after a successful subscription
+     thanks.html?type=enquiry   after someone sends an enquiry
+
+   Point your Stripe/PayPal "success URL" at the first one. Anything else
+   falls back to the payment view, since that is the one people reach by
+   accident least often and the copy still reads sensibly.
+   ===================================================================== */
+const CONTACT = 'northbridgeai1@gmail.com';
+const type = (new URLSearchParams(location.search).get('type') || 'paid').toLowerCase();
+
+const views = {
+  paid: {
+    eyebrow: 'Subscription active',
+    title: 'You\'re in.',
+    lede: 'Payment received and your access is live. There are three short steps before the terminal is useful, and the whole thing takes about ten minutes. Do them once and you never touch them again.',
+    wait: false,
+    stepsHead: 'Setup — about 10 minutes',
+    steps: [
+      ['1','Get a free Finnhub key','PerceptFolio doesn\'t resell market data — you connect your own free feed. Sign up at <a href="https://finnhub.io" target="_blank" rel="noopener">finnhub.io</a>, copy the key, and paste it into Settings. Two minutes, no card.'],
+      ['2','Enter what you own','Portfolio → Add Holding. Enter shares or dollars, whichever you have to hand. Then set your cash. This is what every other screen calculates from.'],
+      ['3','Set your rules and run a review','Settings holds six numbers: your buy bar, your sell bar, your position cap, your cash floor. Change them to what you actually believe, then hit Run review on Command. The whole terminal runs off those six numbers.']
+    ],
+    cta: [['Open the terminal','./app.html',true],['Read the guide','./#faq',false]],
+    aside: 'One thing to expect, so it isn\'t a surprise: <b>the Call Scorecard will be empty for about ninety days.</b> A fixed-horizon record can\'t be reconstructed backwards — the app has to be there on the anniversary to mark the price. Yours starts building the day you begin.'
+  },
+  enquiry: {
+    eyebrow: 'Message received',
+    title: 'Got it — thank you.',
+    lede: 'Your message is in. You\'ll get a reply from a person, usually within two working days. If it\'s urgent, reply to the confirmation email and it moves up the pile.',
+    wait: true,
+    stepsHead: 'What happens next',
+    steps: [
+      ['1','Someone reads it','Not a queue system and not an autoresponder. NorthBridge is small enough that your message is read by someone who can act on it.'],
+      ['2','You get a real answer','If you asked about pricing, access or whether PerceptFolio fits what you\'re doing, you\'ll get a straight answer — including "this isn\'t right for you" where that\'s true.'],
+      ['3','No follow-up sequence','You won\'t be added to a mailing list, drip campaign, or anything else you didn\'t ask for. One question, one reply.']
+    ],
+    cta: [['Back to the front page','./',true],['Look around the terminal','./app.html',false]],
+    aside: 'While you wait, the <a href="./#faq" style="color:var(--accent)">FAQ</a> covers the questions that come up most: what the data limits are, where your portfolio is stored, and why this isn\'t investment advice.'
+  }
+};
+
+const v = views[type] || views.paid;
+
+document.getElementById('eyebrow').textContent = v.eyebrow;
+document.getElementById('title').textContent = v.title;
+document.getElementById('lede').textContent = v.lede;
+document.title = v.title.replace(/[.']/g,'') + ' | PerceptFolio';
+if (v.wait) document.getElementById('mark').classList.add('wait');
+
+document.getElementById('steps').innerHTML =
+  '<div class="steps-head">' + v.stepsHead + '</div>' +
+  v.steps.map(s =>
+    '<div class="step"><div class="step-n">' + s[0] + '</div>' +
+    '<div><h3>' + s[1] + '</h3><p>' + s[2] + '</p></div></div>').join('');
+
+document.getElementById('cta').innerHTML =
+  v.cta.map(c => '<a class="btn' + (c[2] ? ' btn-p' : '') + '" href="' + c[1] + '">' + c[0] + '</a>').join('') +
+  '<a class="btn" href="mailto:' + CONTACT + '">Email us</a>';
+
+document.getElementById('aside').innerHTML = v.aside;
+</script>
+</body>
+</html>

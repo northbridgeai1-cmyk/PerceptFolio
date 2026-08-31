@@ -1,15 +1,22 @@
 /* PerceptFolio service worker.
-   Bump CACHE_VERSION whenever index.html changes, otherwise installed copies keep serving the old
+   Bump CACHE_VERSION whenever app.html changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v7';
+const CACHE_VERSION = 'perceptfolio-v8';
 
-/* Only these two are genuinely required for the app to open offline. */
-const REQUIRED = ['./', './index.html'];
+/* THE TERMINAL is what has to work offline — and since the split it lives at app.html, not at the
+   root. The landing page is marketing: nobody needs to read a sales pitch on a plane, and listing it
+   as required would let a failed fetch of the page nobody opens break the install for the page
+   everybody opens. */
+const REQUIRED = ['./app.html'];
 
 /* Everything else is cached best-effort. cache.addAll() is atomic — a single 404 anywhere in the
    list aborts the whole install and you silently get no offline support at all. So optional assets
    are added one at a time and allowed to fail individually. */
 const OPTIONAL = [
+  './',
+  './index.html',
+  './404.html',
+  './thanks.html',
   './manifest.json',
   './apple-touch-icon.png',
   './icon-192.png',
@@ -59,18 +66,24 @@ self.addEventListener('fetch', event => {
   if (hasAuth) return;
   if (!sameOrigin && !isChartCdn) return;
 
-  /* Navigations: network-first so a redeployed index.html is picked up as soon as there's a
-     connection, with the cached shell as the offline fallback. */
+  /* Navigations: network-first so a redeployed page is picked up as soon as there's a connection,
+     with the cached copy as the offline fallback.
+
+     THE FALLBACK IS NOW PER-PAGE. The old version cached every navigation under './index.html' and
+     served that back for any offline navigation — which was fine when there was only one page, and
+     became a bug the moment there were four: opening the terminal offline would have handed you the
+     marketing page. Each page is cached under its own URL, and only if nothing matches do we fall
+     back to the terminal, because that's the page someone offline actually wanted. */
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
         const cache = await caches.open(CACHE_VERSION);
-        cache.put('./index.html', fresh.clone());
+        cache.put(req, fresh.clone());
         return fresh;
       } catch (e) {
-        const cached = await caches.match('./index.html');
-        return cached || Response.error();
+        const cached = await caches.match(req, { ignoreSearch: true });
+        return cached || (await caches.match('./app.html')) || Response.error();
       }
     })());
     return;

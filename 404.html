@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>404 — no data for that symbol | PerceptFolio</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0e0f12">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#0e0f12;--panel:#16181d;--panel2:#1e2128;--border:#2b2f38;
+  --text:#f2f3f5;--muted:#949aa6;--accent:#3b82f6;--red:#e5534b;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:760px;margin:0 auto;padding:0 24px;width:100%}
+nav{border-bottom:1px solid var(--border)}
+.nav-in{display:flex;align-items:center;height:60px;gap:10px}
+.logo{font-weight:800;font-size:17px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
+.logo-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--accent),#1e5fc4);display:grid;place-items:center;font:700 11px/1 var(--mono);color:#fff}
+main{flex:1;display:flex;align-items:center;padding:70px 0}
+.code{font:800 clamp(70px,15vw,132px)/1 var(--mono);letter-spacing:-.05em;color:var(--panel2);
+  -webkit-text-stroke:1px var(--border)}
+h1{font-size:clamp(24px,4vw,33px);line-height:1.16;letter-spacing:-.022em;font-weight:750;margin:8px 0 16px}
+p{color:var(--muted);font-size:16px;line-height:1.66;max-width:56ch}
+.term{margin:32px 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel)}
+.term-head{padding:11px 16px;border-bottom:1px solid var(--border);background:var(--panel2);
+  font:11px/1 var(--mono);letter-spacing:.09em;color:var(--muted);text-transform:uppercase;display:flex;align-items:center;gap:9px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--red);flex:none}
+.term-body{padding:16px;font:12.5px/1.9 var(--mono);color:var(--muted)}
+.term-body b{color:var(--text);font-weight:600}
+.term-body .er{color:var(--red)}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 22px;border-radius:9px;
+  font-size:14.5px;font-weight:600;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;transition:.15s}
+.btn:hover{border-color:#3d434f;background:var(--panel2)}
+.btn-p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-p:hover{background:#2f6fd8;border-color:#2f6fd8}
+footer{border-top:1px solid var(--border);padding:24px 0;font-size:12.5px;color:var(--muted)}
+.links{display:flex;gap:22px;flex-wrap:wrap}
+.links a:hover{color:var(--text)}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap nav-in"><a href="./" class="logo"><span class="logo-mark">PF</span>PerceptFolio</a></div></nav>
+
+<main>
+  <div class="wrap">
+    <div class="code">404</div>
+    <h1>No data for that symbol.</h1>
+    <p>The page you asked for doesn't exist. Either the link is wrong, or it pointed at something that has since moved.</p>
+
+    <div class="term">
+      <div class="term-head"><span class="dot"></span> request log</div>
+      <div class="term-body">
+        <div>GET <b id="path">/unknown</b></div>
+        <div class="er">→ 404 NOT_FOUND</div>
+        <div>→ no redirect rule matched</div>
+        <div>→ your data is untouched <span style="opacity:.6">(it never left your browser)</span></div>
+      </div>
+    </div>
+
+    <div class="cta">
+      <a class="btn btn-p" href="./app.html">Open the terminal</a>
+      <a class="btn" href="./">Back to the front page</a>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap links">
+    <a href="./">Home</a>
+    <a href="./app.html">Terminal</a>
+    <a href="./#pricing">Pricing</a>
+    <a href="./#faq">FAQ</a>
+    <a href="mailto:northbridgeai1@gmail.com?subject=Broken%20link%20on%20perceptfolio.com">Report a broken link</a>
+  </div>
+</footer>
+
+<script>
+/* Show what was actually requested — makes a mistyped URL obvious at a glance, and makes
+   a genuinely broken link something the person can quote back to you in an email. */
+document.getElementById('path').textContent =
+  (location.pathname + location.search).slice(0, 120) || '/';
+</script>
+</body>
+</html>
