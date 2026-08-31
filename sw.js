@@ -1,7 +1,7 @@
 /* PerceptFolio service worker.
    Bump CACHE_VERSION whenever app.html changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v8';
+const CACHE_VERSION = 'perceptfolio-v9';
 
 /* THE TERMINAL is what has to work offline — and since the split it lives at app.html, not at the
    root. The landing page is marketing: nobody needs to read a sales pitch on a plane, and listing it
