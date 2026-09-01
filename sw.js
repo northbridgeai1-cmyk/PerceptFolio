@@ -1,13 +1,15 @@
 /* PerceptFolio service worker.
-   Bump CACHE_VERSION whenever app.html changes, otherwise installed copies keep serving the old
+   Bump CACHE_VERSION whenever the terminal changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v10';
+const CACHE_VERSION = 'perceptfolio-v12';
 
-/* THE TERMINAL is what has to work offline — and since the split it lives at app.html, not at the
-   root. The landing page is marketing: nobody needs to read a sales pitch on a plane, and listing it
-   as required would let a failed fetch of the page nobody opens break the install for the page
-   everybody opens. */
-const REQUIRED = ['./app.html'];
+/* THE TERMINAL is what has to work offline — and it lives at /app/, not at the root. The landing
+   page is the front door: nobody needs to read it on a plane, and listing it as required would let
+   a failed fetch of the page nobody opens break the install for the page everybody opens.
+
+   Note the trailing slash. The terminal is app/index.html on disk, but the URL it is fetched by is
+   /app/ — cache keys are URLs, so this must match what the browser actually requests. */
+const REQUIRED = ['/app/'];
 
 /* Everything else is cached best-effort. cache.addAll() is atomic — a single 404 anywhere in the
    list aborts the whole install and you silently get no offline support at all. So optional assets
@@ -84,7 +86,7 @@ self.addEventListener('fetch', event => {
         return fresh;
       } catch (e) {
         const cached = await caches.match(req, { ignoreSearch: true });
-        return cached || (await caches.match('./app.html')) || Response.error();
+        return cached || (await caches.match('/app/')) || Response.error();
       }
     })());
     return;

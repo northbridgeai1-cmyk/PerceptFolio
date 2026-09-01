@@ -4,9 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>PerceptFolio — Your Portfolio Quant</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<!-- Root-absolute, not relative. This file lives at /app/index.html so that the URL reads
+     perceptfolio.com/app — a relative "favicon.svg" would resolve to /app/favicon.svg and 404. -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <!-- ---- Installable app (PWA) ---- -->
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0e0f12">
 <meta name="description" content="Know what to buy. Know what to sell. A private, offline-first portfolio tracker and stock checklist scorer.">
 <!-- iOS doesn't read manifest.json for these, so they have to be declared separately. -->
@@ -15,7 +17,7 @@
 <meta name="apple-mobile-web-app-title" content="PerceptFolio">
 <!-- MUST be a PNG. iOS silently ignores an SVG apple-touch-icon and falls back to a screenshot of
      the page, which is what you get if this line ever points at icon.svg again. -->
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
@@ -240,6 +242,37 @@ small.src{color:var(--muted)}
 .cmd-detail{padding:0 16px 16px 60px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:13.5px;line-height:1.6}
 .cmd-detail:last-child{border-bottom:none}
 .cmd-empty{padding:26px 16px;text-align:center}
+
+/* ---------- first-run walkthrough ---------- */
+.tour-wrap{display:none;position:fixed;inset:0;z-index:200;background:rgba(6,7,9,.72);
+  backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:20px}
+.tour-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:470px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
+.tour-head{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--border);background:var(--panel2)}
+.tour-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand2)}
+.tour-count{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.tour-x{background:none;border:none;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;padding:0 2px}
+.tour-x:hover{color:var(--text)}
+.tour-body{padding:24px 22px 20px;min-height:172px}
+.tour-tag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:700;padding:4px 8px;border-radius:4px;margin-bottom:13px}
+.t-blue{background:rgba(59,130,246,.15);color:#79a8f4}
+.t-green{background:rgba(46,160,67,.15);color:#5fc275}
+.t-violet{background:rgba(139,92,246,.15);color:#a98bf3}
+.t-amber{background:rgba(217,164,65,.16);color:#e0bc72}
+.t-red{background:rgba(229,83,75,.15);color:#ef8b85}
+.tour-q{font-size:19px;line-height:1.28;font-weight:700;letter-spacing:-.015em;margin-bottom:11px}
+.tour-p{color:var(--muted);font-size:14px;line-height:1.66}
+.tour-foot{display:flex;align-items:center;gap:8px;padding:13px 18px;border-top:1px solid var(--border);background:var(--panel2)}
+.tour-dots{display:flex;gap:5px}
+.tour-dot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:background .18s}
+.tour-dot.on{background:var(--brand2)}
+/* The nav button being described gets a ring, so the copy attaches to a place on screen.
+   The header is position:sticky with z-index:50, which makes it its OWN stacking context — a child
+   with z-index:201 is confined to that context and would render behind the overlay at 200 no matter
+   how high its number went. So the header itself is lifted while the tour runs. */
+body.touring header{z-index:201}
+.tour-lit{position:relative;box-shadow:0 0 0 2px var(--brand2),0 0 0 7px rgba(31,158,140,.22);border-radius:8px}
 @media (max-width:768px){
   .cmd-why{white-space:normal;font-size:12.5px}
   .cmd-row{align-items:flex-start;flex-wrap:wrap;padding:12px}
@@ -467,6 +500,25 @@ small.src{color:var(--muted)}
 </div>
 
 <!-- ============ APP ============ -->
+<!-- FIRST-RUN WALKTHROUGH. Sits above everything, shown once to genuinely new accounts. -->
+<div id="tourWrap" class="tour-wrap">
+  <div class="tour-card" role="dialog" aria-modal="true" aria-label="Getting started">
+    <div class="tour-head">
+      <span class="tour-eyebrow">Getting started</span>
+      <span class="spacer"></span>
+      <span class="tour-count" id="tourCount">1 / 6</span>
+      <button class="tour-x" onclick="endTour(false)" title="Skip" aria-label="Skip">&times;</button>
+    </div>
+    <div class="tour-body" id="tourBody"></div>
+    <div class="tour-foot">
+      <div class="tour-dots" id="tourDots"></div>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="tourBack" onclick="tourBack()">Back</button>
+      <button class="btn btn-sm" id="tourNext" onclick="tourNext()">Next</button>
+    </div>
+  </div>
+</div>
+
 <div id="app" style="display:none">
 <header>
   <div class="logo"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
@@ -1199,6 +1251,12 @@ small.src{color:var(--muted)}
     <p class="muted" id="installHint" style="margin-top:10px;font-size:12.5px;line-height:1.55"></p>
   </div>
   <div class="card" style="margin-top:16px">
+    <h3>Getting Started</h3>
+    <p class="muted" style="margin-bottom:12px">Six cards covering what each screen is for and the three things to do first. Shown automatically on a new account; replay it any time.</p>
+    <button class="btn btn-ghost" onclick="replayTour()">Run the walkthrough</button>
+  </div>
+
+  <div class="card" style="margin-top:16px">
     <h3>Appearance</h3>
     <label class="muted" style="display:block;font-size:13px;margin-bottom:8px">Theme</label>
     <div class="theme-switch" id="themeSwitch" onclick="toggleTheme()" title="Click to switch between light and dark">
@@ -1420,6 +1478,7 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   syncedAt:0,lastLocalEdit:0,
   calls:[],                                     // graded in the Market tab's scorecard
   scoreLog:{},                                  // ticker -> [{d,q,p,m,t,mx}] one row per day, for quality drift
+  tourSeen:false,                               // first-run walkthrough; shown once per account
   macro:{cape:null,capeAsOf:'',margin:null,marginAsOf:'',marginPrev:null,buffett:null,buffettAsOf:''},
   relations:{},                                 // ticker -> {suppliers:[],customers:[]} for the Map tab
   theses:{},                                    // ticker -> {why,mustBeTrue,invalidIf,reviewDate,created,scoreAtEntry}
@@ -1778,7 +1837,92 @@ function enterSession(){
   renderAll();
   const p=DB.profiles[USER];
   if(p&&p.accountType==='business'&&!bizContext)showTab('dashboard');
+  maybeStartTour();
 }
+/* ================= FIRST-RUN WALKTHROUGH =================
+   Eleven tabs is a lot to meet at once. This is six cards explaining which question each screen
+   answers, shown once, to accounts that are genuinely new.
+
+   "Genuinely new" means no holdings, no watchlist AND no transactions — not merely tourSeen being
+   unset. Without that second test, every existing account would be handed a beginner's tour the
+   first time it loaded a build containing this code, which is a bad way to greet someone who has
+   been using the thing for months. */
+function accountLooksNew(){
+  return (D.holdings||[]).length===0
+      && (D.watchlist||[]).length===0
+      && (D.transactions||[]).length===0;
+}
+function maybeStartTour(){
+  if(!D||D.tourSeen)return;
+  if(!accountLooksNew()){ D.tourSeen=true; saveDB(); return; }   // quietly mark, don't nag
+  if(isBizOwnView())return;                                      // business own-view has 2 tabs, not 11
+  setTimeout(()=>startTour(),450);                               // let the first render settle
+}
+
+const TOUR=[
+  { tab:'dashboard', tag:'Dashboard', cls:'t-blue',
+    q:'What am I worth, and what changed?',
+    body:'Value, cash, today\'s move and total gain. The graph starts empty because the app has no record of your portfolio before today — it fills in from here.' },
+  { tab:'command', tag:'Command', cls:'t-blue',
+    q:'What needs me today?',
+    body:'One list each morning: sell signals, stops hit, breached limits, reviews due. Hit <b>Run review</b> to build it. Most days it says nothing needs you, and that is the correct answer, not a bug.' },
+  { tab:'portfolio', tag:'Portfolio', cls:'t-green',
+    q:'What do I own, and how much should I buy?',
+    body:'Add holdings here. <b>Before You Trade</b> shows what a purchase does to your concentration and cash before the money moves — being right about the company and wrong about the size is how accounts end.' },
+  { tab:'analyzer', tag:'Analyzer', cls:'t-violet',
+    q:'Is this company any good, and is the price sensible?',
+    body:'Type a ticker, get 22 checks: 12 quality, 6 value, 4 momentum. Read the rows that failed, not just the score — the score is only a summary of them.' },
+  { tab:'market', tag:'Market', cls:'t-amber',
+    q:'Was the checklist actually right?',
+    body:'The <b>Call Scorecard</b> marks every verdict against the S&amp;P on a fixed horizon. It will be empty for about ninety days — a record like that cannot be built backwards, only forwards.' },
+  { tab:'settings', tag:'Settings', cls:'t-red',
+    q:'Where do I start?',
+    body:'Three things, ten minutes: paste a free <b>Finnhub key</b>, enter what you own in Portfolio, then set your buy and sell bars. Those numbers are what the whole terminal runs on. Settings lives behind your avatar, top right.' }
+];
+let tourAt=0;
+function startTour(){
+  tourAt=0;
+  const el=document.getElementById('tourWrap');
+  if(!el)return;
+  el.style.display='flex';
+  document.body.classList.add('touring');
+  renderTour();
+}
+function renderTour(){
+  const s=TOUR[tourAt];
+  if(!s)return endTour(true);
+  const body=document.getElementById('tourBody');
+  if(!body)return;
+  document.getElementById('tourDots').innerHTML=
+    TOUR.map((_,i)=>'<span class="tour-dot'+(i===tourAt?' on':'')+'"></span>').join('');
+  document.getElementById('tourCount').textContent=(tourAt+1)+' / '+TOUR.length;
+  body.innerHTML=
+    '<span class="tour-tag '+s.cls+'">'+esc(s.tag)+'</span>'+
+    '<h3 class="tour-q">'+esc(s.q)+'</h3>'+
+    '<p class="tour-p">'+s.body+'</p>';
+  document.getElementById('tourNext').textContent=(tourAt===TOUR.length-1)?'Finish':'Next';
+  document.getElementById('tourBack').style.visibility=tourAt?'visible':'hidden';
+  /* Highlight the nav button being described, so the words attach to a place on screen rather than
+     floating free. Settings has no nav button — the avatar gets the glow instead. */
+  document.querySelectorAll('.tour-lit').forEach(n=>n.classList.remove('tour-lit'));
+  const target=s.tab==='settings'
+    ? document.getElementById('avatarInitial')
+    : document.querySelector('nav button[data-tab="'+s.tab+'"]');
+  if(target)target.classList.add('tour-lit');
+}
+function tourNext(){ tourAt++; if(tourAt>=TOUR.length)return endTour(true); renderTour(); }
+function tourBack(){ if(tourAt>0){tourAt--;renderTour();} }
+function endTour(complete){
+  const el=document.getElementById('tourWrap');
+  if(el)el.style.display='none';
+  document.body.classList.remove('touring');
+  document.querySelectorAll('.tour-lit').forEach(n=>n.classList.remove('tour-lit'));
+  if(D){ D.tourSeen=true; saveDB(); }
+  if(complete)showTab('dashboard');
+}
+/* Re-runnable from Settings. Someone who skipped it on day one should not have to delete their
+   profile to see it again. */
+function replayTour(){ startTour(); }
 function updateAccountTypeUI(){
   const p=DB.profiles[USER];
   const isBiz=!!(p&&p.accountType==='business');
@@ -7256,7 +7400,11 @@ updateInstallCard();
    and the app simply runs without offline support. */
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW registration failed:',e));
+    /* Root-absolute. This page is served from /app/, and a relative 'sw.js' would look for
+       /app/sw.js and fail. Registering /sw.js from here is allowed and gives the worker scope over
+       the whole site — a service worker's maximum scope is set by where the SCRIPT lives, not by
+       which page registered it. */
+    navigator.serviceWorker.register('/sw.js').catch(e=>console.warn('SW registration failed:',e));
   });
 }
 (function(){

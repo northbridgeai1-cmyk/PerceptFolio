@@ -12,6 +12,7 @@
   --bg:#0b0c0f;--panel:#131519;--panel2:#1a1d23;--line:#24272f;--line2:#2f333c;
   --text:#eef0f3;--dim:#8d939f;--faint:#5d636e;
   --accent:#3b82f6;--green:#2ea043;--red:#e5534b;--amber:#d9a441;--violet:#8b5cf6;
+  --brand2:#1f9e8c;   /* the teal in the logo — same value the terminal uses */
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -21,9 +22,13 @@ a{color:inherit;text-decoration:none}
 .wrap{max-width:1060px;margin:0 auto;padding:0 24px}
 nav{border-bottom:1px solid var(--line);background:var(--panel)}
 .nav-in{display:flex;align-items:center;gap:12px;height:56px}
-.logo{font-weight:700;font-size:15.5px;display:flex;align-items:center;gap:9px}
-.mark{width:24px;height:24px;border-radius:5px;background:linear-gradient(140deg,var(--accent),#1b56b8);
-  display:grid;place-items:center;font:700 10px/1 var(--mono);color:#fff}
+/* Same logo construction as the terminal and the front page. One mark everywhere. */
+.logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  display:inline-flex;align-items:center;gap:7px}
+.logo-mark{flex-shrink:0}
+.logo-word{display:inline-flex;letter-spacing:-.01em}
+.logo .c1{color:var(--text)}
+.logo .c2{color:var(--brand2)}
 .chip{font:9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:4px 8px;border-radius:3px;
   background:rgba(217,164,65,.13);color:#e0bc72;border:1px solid rgba(217,164,65,.3)}
 main{padding:34px 0 70px}
@@ -87,10 +92,10 @@ tr:last-child td{border-bottom:none}
 <body>
 
 <nav><div class="wrap nav-in">
-  <a href="./" class="logo"><span class="mark">PF</span>PerceptFolio</a>
+  <a href="./" class="logo"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--line2)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></a>
   <span class="chip">Admin</span>
   <div class="spacer"></div>
-  <a class="btn btn-sm" href="./app.html">Terminal</a>
+  <a class="btn btn-sm" href="/app/">Terminal</a>
 </div></nav>
 
 <main><div class="wrap">
@@ -292,7 +297,7 @@ function mailReply(id){
     : 'Your PerceptFolio access has been approved.\n\n'+
       'Account type: '+r.status+'\n'+
       'Invite code: '+(r.code||'')+'  (single use, expires in 30 days)\n'+
-      'Sign in: '+origin+'/app.html\n\n'+
+      'Sign in: '+origin+'/app\n\n'+
       'Setup takes about ten minutes:\n'+
       '1. Get a free Finnhub key at finnhub.io and paste it into Settings.\n'+
       '2. Enter your holdings and cash in Portfolio.\n'+

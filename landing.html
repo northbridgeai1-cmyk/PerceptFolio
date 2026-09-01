@@ -13,6 +13,7 @@
   --bg:#0b0c0f; --panel:#131519; --panel2:#1a1d23; --line:#24272f; --line2:#2f333c;
   --text:#eef0f3; --dim:#8d939f; --faint:#5d636e;
   --accent:#3b82f6; --green:#2ea043; --red:#e5534b; --amber:#d9a441; --violet:#8b5cf6;
+  --brand2:#1f9e8c;   /* the teal in the logo — same value the terminal uses */
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   --bar:30px;
 }
@@ -40,8 +41,18 @@ a{color:inherit;text-decoration:none}
 /* ---------- nav ---------- */
 nav{position:sticky;top:0;z-index:60;background:rgba(11,12,15,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .nav-in{display:flex;align-items:center;gap:14px;height:56px}
-.logo{font-weight:700;font-size:15.5px;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
-.mark{width:24px;height:24px;border-radius:5px;background:linear-gradient(140deg,var(--accent),#1b56b8);display:grid;place-items:center;font:700 10px/1 var(--mono);color:#fff}
+/* THE LOGO. Identical construction to the terminal's header mark so the two cannot drift apart:
+   a bordered square, P in the text colour, F in the brand teal, wordmark split the same way.
+   An earlier version drew a blue gradient box with "PF" in it, which was not the logo at all —
+   it was a placeholder that survived into three pages. */
+.logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  display:inline-flex;align-items:center;gap:7px}
+.logo-mark{flex-shrink:0}
+/* The wordmark is ONE flex child. Without this wrapper the .logo gap pushes the two coloured halves
+   apart and renders "Percept Folio" — it is one word, so they must sit flush. */
+.logo-word{display:inline-flex;letter-spacing:-.01em}
+.logo .c1{color:var(--text)}
+.logo .c2{color:var(--brand2)}
 .chip{font:9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:4px 8px;border-radius:3px;
   background:rgba(229,83,75,.12);color:#ef8b85;border:1px solid rgba(229,83,75,.3)}
 .nav-links{display:flex;gap:2px;margin-left:auto}
@@ -203,7 +214,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
 
 <nav>
   <div class="wrap nav-in">
-    <a href="./" class="logo"><span class="mark">PF</span>PerceptFolio</a>
+    <a href="./" class="logo"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--line2)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></a>
     <span class="chip">Restricted</span>
     <div class="nav-links">
       <a href="#terminal">Terminal</a>
@@ -211,7 +222,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       <a href="#access">Access</a>
       <a href="#faq">FAQ</a>
     </div>
-    <a class="btn btn-p" href="./app.html">Sign in</a>
+    <a class="btn btn-p" href="/app/">Sign in</a>
   </div>
 </nav>
 
@@ -221,7 +232,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
     <h1>Internal investment terminal.</h1>
     <p class="sub">The system NorthBridge's financial branch runs on. It scores companies against written rules, sizes positions before they are taken, and marks every call it makes against the index on a fixed horizon it cannot move afterwards.</p>
     <div class="cta">
-      <a class="btn btn-p btn-lg" href="./app.html">Sign in to the terminal</a>
+      <a class="btn btn-p btn-lg" href="/app/">Sign in to the terminal</a>
       <a class="btn btn-lg" href="#access">Request access</a>
     </div>
     <div class="notice">
@@ -358,12 +369,12 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
   <div class="wrap">
     <div class="foot-t">
       <div>
-        <div class="logo" style="margin-bottom:9px"><span class="mark">PF</span>PerceptFolio</div>
+        <div class="logo" style="margin-bottom:9px"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--line2)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
         <div style="max-width:34ch;line-height:1.6">Know what to buy. Know what to sell. Know whether it worked.</div>
       </div>
       <div class="foot-l">
         <a href="#terminal">Terminal</a><a href="#record">Record</a><a href="#access">Access</a>
-        <a href="#faq">FAQ</a><a href="./app.html">Sign in</a>
+        <a href="#faq">FAQ</a><a href="/app/">Sign in</a>
       </div>
     </div>
     <div class="legal">
@@ -490,15 +501,22 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
   }finally{ btn.disabled=false; }
 });
 
-/* Staff already signed in on this device skip the front door.
-   Escape hatches: ?stay in the query string, or any hash target. */
-(function forward(){
+/* THE AUTO-FORWARD IS GONE, DELIBERATELY.
+   An earlier version checked localStorage for an existing profile and redirected straight to the
+   terminal, reasoning that staff shouldn't have to read the front door every morning. In practice
+   it meant the owner of the site could never see his own landing page without knowing a secret
+   query string, and a page that silently navigates elsewhere reads as broken rather than clever.
+   The Sign in button sits top right on every screen size. That is enough.
+
+   Signed-in users get a quiet relabel instead — a hint, not a navigation. */
+(function nudge(){
   try{
-    if(location.search.indexOf('stay')>-1||location.hash)return;
     const db=localStorage.getItem('quantfolio_v1');
     if(!db)return;
     const p=JSON.parse(db);
-    if(p&&p.profiles&&Object.keys(p.profiles).length)location.replace('./app.html');
+    if(!(p&&p.profiles&&Object.keys(p.profiles).length))return;
+    const b=document.querySelector('nav a.btn-p');
+    if(b)b.textContent='Resume session';
   }catch(e){}
 })();
 </script>
