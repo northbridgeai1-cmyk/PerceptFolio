@@ -1381,6 +1381,12 @@ body.touring header,body.touring #sidebar{z-index:201}
     </div>
   </div>
 
+  <div class="section-title">Crash replay — what six real declines would do to this book</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:12px">Six documented peak-to-trough index falls, applied to what you hold <b>right now</b>. This is the one projection that needs no accumulated history — it reads your composition, not your past — so it works the day you enter a portfolio.</p>
+    <div id="scenarioBody"></div>
+  </div>
+
   <div class="section-title">Monte Carlo projection</div>
   <div class="card">
     <p class="muted" style="margin-bottom:12px">Simulates thousands of random possible futures based on estimated return and volatility, to show a realistic range of outcomes instead of a single guess. The return/volatility inputs below are assumptions you're setting — adjust them to match your own view, they're not guaranteed numbers.</p>
@@ -2078,6 +2084,7 @@ function resetTransientState(){
   const shb=document.getElementById('sharpeBody');if(shb)shb.innerHTML='';
   const rcb=document.getElementById('riskContribBody');if(rcb)rcb.innerHTML='';
   const vb=document.getElementById('varBody');if(vb)vb.innerHTML='';
+  const sb2=document.getElementById('scenarioBody');if(sb2)sb2.innerHTML='';
   const gs=document.getElementById('globalSearch');if(gs)gs.value='';
   if(typeof closePalette==='function')closePalette();
 
@@ -2545,7 +2552,7 @@ function showTab(t){
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
-  if(t==='projections')renderHerizen();
+  if(t==='projections'){renderScenarios();renderHerizen();}
   if(t==='risk'){renderRiskContrib();renderSharpe();renderVaR();}
   if(t==='settings'){fillPolicyInputs();renderRuleLog();}
 }
@@ -3724,6 +3731,160 @@ function renderSharpe(){
     (bench?'<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.6">Against the index over the same days: <b>'+f(bench.sharpe)+'</b> versus your <b>'+f(me.sharpe)+'</b>. '+
       (me.sharpe>bench.sharpe?'You are being paid more per unit of risk — on this sample.':'The index is being paid more per unit of risk on this sample, which is the outcome most active books produce.')+'</p>':'')+
     '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Returns are computed from <b>gain</b>, not portfolio value, so money you deposit is not counted as a return. Cash is in the denominator, so holding a large idle balance correctly drags this down. Sortino uses downside deviation only, since Sharpe penalises upside volatility just as hard — which punishes exactly the outcome you want.</p>';
+}
+
+/* ================= SCENARIO REPLAY & TOLERANCE FINDER =================
+   The one projection that works on day one. Everything else in this app measures YOUR history —
+   snapshots, marked calls, logged prices — and on a new account there isn't any. This is computed
+   from COMPOSITION instead: what you hold right now, which is known this second.
+
+   Six documented peak-to-trough index declines, applied to today's book.
+
+   WHY EVERY NUMBER IS A RANGE. Beta is estimated in ordinary markets and would be applied here to
+   extraordinary ones. In a real panic correlations converge toward one — the diversification the
+   beta calculation assumes stops existing, because people sell what they can rather than what they
+   want to. So a beta-scaled estimate systematically under-reports crash losses, and a stress test
+   that flatters you is worse than no stress test at all. Both ends are shown and the worse one is
+   labelled as the likelier. */
+const CRASHES=[
+  {name:'Global financial crisis', period:'Oct 2007 – Mar 2009', drop:-56.8, months:17},
+  {name:'Dot-com collapse',        period:'Mar 2000 – Oct 2002', drop:-49.1, months:31},
+  {name:'COVID crash',             period:'Feb – Mar 2020',      drop:-33.9, months:1},
+  {name:'Rate shock',              period:'Jan – Oct 2022',      drop:-25.4, months:9},
+  {name:'Q4 selloff',              period:'Sep – Dec 2018',      drop:-19.8, months:3},
+  {name:'US downgrade',            period:'Apr – Oct 2011',      drop:-19.4, months:5}
+];
+function crashScenario(indexDropPct){
+  const rows=portfolioRows();
+  const cash=D.cash||0;
+  const invested=rows.reduce((a,r)=>a+r.val,0);
+  const total=invested+cash;
+  if(!(total>0)||!rows.length)return null;
+  let betaLoss=0;
+  rows.forEach(r=>{
+    const b=betaOf(r.sym,r.type);
+    betaLoss+=r.val*Math.max(-1,b*indexDropPct/100);   // a position cannot lose beyond 100%
+  });
+  const fullLoss=invested*(indexDropPct/100);          // correlations converge to one
+  // Cash does not fall, so it cushions the percentage. That is real and worth seeing.
+  return{total,invested,cash,
+    betaPct:betaLoss/total*100, fullPct:fullLoss/total*100,
+    betaDollars:betaLoss, fullDollars:fullLoss};
+}
+/* The climb back. Everyone models the fall; almost nobody models the recovery, and the recovery is
+   what actually costs you — not in money, in years. */
+function recoveryFrom(lossPct,annual){
+  const L=Math.abs(lossPct)/100;
+  if(!(L>0)||L>=1)return null;
+  const r=annual||0.08;
+  return{gain:L/(1-L)*100, yrs:Math.log(1/(1-L))/Math.log(1+r)};
+}
+/* THE INVERSION. Rather than picking a crisis and asking what it costs, walk the decline downward
+   and find the depth at which things you wrote down actually break. You do not have to guess which
+   crash comes next — only how deep you personally stop being able to hold on. */
+function toleranceLadder(){
+  const hs=(D.holdings||[]).filter(h=>h.shares>0).map(h=>({
+    sym:h.sym,type:h.type,shares:h.shares,cost:h.cost,
+    px:(h.price??h.cost), val:(h.price??h.cost)*h.shares
+  }));
+  if(!hs.length)return null;
+  const cash=D.cash||0;
+  const total=hs.reduce((a,h)=>a+h.val,0)+cash;
+  if(!(total>0))return null;
+  const at=d=>{
+    let loss=0,under=0,stops=0,stopFirst=null;
+    hs.forEach(h=>{
+      const b=betaOf(h.sym,h.type);
+      const newPx=h.px*(1+Math.max(-1,b*d/100));
+      loss+=h.val*Math.max(-1,b*d/100);
+      if(newPx<h.cost)under++;
+      const th=thesisFor(h.sym);
+      if(th&&isFinite(th.stop)&&th.stop>0&&newPx<=th.stop){stops++;if(!stopFirst)stopFirst=h.sym;}
+    });
+    return{d,loss,lossPct:loss/total*100,under,stops,stopFirst,n:hs.length};
+  };
+  const ladder=[];
+  for(let d=-5;d>=-50;d-=5)ladder.push(at(d));
+  // First triggers, found at 1% resolution so the answer is a usable number rather than a bucket.
+  let firstStop=null,allUnder=null;
+  for(let d=-1;d>=-60;d--){
+    const s=at(d);
+    if(!firstStop&&s.stops>0)firstStop=s;
+    if(!allUnder&&s.under===s.n)allUnder=s;
+    if(firstStop&&allUnder)break;
+  }
+  return{ladder,firstStop,allUnder,total,n:hs.length,
+    hasStops:hs.some(h=>{const t=thesisFor(h.sym);return t&&isFinite(t.stop)&&t.stop>0;})};
+}
+function renderScenarios(){
+  const el=document.getElementById('scenarioBody');
+  if(!el||!D)return;
+  const probe=crashScenario(-20);
+  if(!probe){
+    el.innerHTML='<div class="empty">Add holdings and run <b>Refresh data</b>. This one needs no history at all — only what you own and how each name moves with the market — so it works the moment there is a portfolio to test.</div>';
+    return;
+  }
+  const anyBeta=portfolioRows().some(r=>betaKnown(r.sym));
+  const T=toleranceLadder();
+
+  const rows=CRASHES.map(c=>{
+    const s=crashScenario(c.drop);
+    const worst=Math.min(s.betaPct,s.fullPct);     // more negative is worse
+    const best=Math.max(s.betaPct,s.fullPct);
+    const rec=recoveryFrom(worst,0.08);
+    const worst$=Math.min(s.betaDollars,s.fullDollars);
+    return '<tr>'+
+      '<td><b>'+esc(c.name)+'</b><br><span class="muted" style="font-size:11px">'+esc(c.period)+'</span></td>'+
+      '<td class="neg">'+c.drop.toFixed(1)+'%</td>'+
+      '<td><span class="muted">'+best.toFixed(1)+'% to</span> <b class="neg">'+worst.toFixed(1)+'%</b></td>'+
+      '<td class="neg">'+pmask(fmt$(worst$))+'</td>'+
+      '<td>'+(rec?'<b class="pos">+'+rec.gain.toFixed(0)+'%</b>':'—')+'</td>'+
+      '<td class="'+(rec&&rec.yrs>5?'neg':'muted')+'">'+(rec?rec.yrs.toFixed(1)+' yrs':'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  const gfc=crashScenario(-56.8);
+  const gfcWorst=Math.min(gfc.betaPct,gfc.fullPct);
+  const gfcRec=recoveryFrom(gfcWorst,0.08);
+
+  el.innerHTML=
+    '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+      '<div class="stat s-out"><span class="stat-label">Worst case modelled</span><span class="stat-value neg">'+gfcWorst.toFixed(1)+'%</span></div>'+
+      '<div class="stat s-count"><span class="stat-label">In dollars</span><span class="stat-value neg">'+pmask(fmt$(Math.min(gfc.betaDollars,gfc.fullDollars)))+'</span></div>'+
+      '<div class="stat s-profit"><span class="stat-label">Needed to recover</span><span class="stat-value pos">'+(gfcRec?'+'+gfcRec.gain.toFixed(0)+'%':'—')+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Years at 8%/yr</span><span class="stat-value">'+(gfcRec?gfcRec.yrs.toFixed(1):'—')+'</span></div>'+
+    '</div>'+
+    '<div style="overflow-x:auto;margin-top:16px"><table><thead><tr>'+
+      '<th>Episode</th><th>Index fell</th><th>Your book</th><th>Dollars</th><th>To get back</th><th>At 8%/yr</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65"><b>Read the right-hand end of each range, not the left.</b> '+
+      'The lower figure scales each holding by its beta; the higher one assumes correlations go to one, which is what happens in a real panic — people sell what they can, not what they want to, and the diversification beta assumes stops existing exactly when it was supposed to help. '+
+      (probe.cash>0?'Your '+pmask(fmt$(probe.cash))+' of cash does not fall, which is why the percentage is milder than the index move. ':'')+
+      'These are historical depths, not forecasts. The next one will have its own number.</p>'+
+    '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65"><b>The recovery column is the one that hurts.</b> '+
+      'A 30% fall needs +43% to break even; a 50% fall needs +100%. The money comes back eventually. The years do not.</p>'+
+    (!anyBeta?'<p class="muted" style="font-size:12px;margin-top:8px">No measured betas yet, so 1.00 is assumed for every holding. Run <b>Refresh data</b> and these tighten up.</p>':'')+
+
+    (T?'<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:16px">'+
+      '<div class="row" style="margin-bottom:4px"><b style="font-size:14px">How far can it fall before something breaks?</b></div>'+
+      '<p class="muted" style="font-size:12.5px;margin-bottom:12px;line-height:1.6">Rather than picking a crisis, this walks the decline downward and finds the depth at which the things you wrote down actually trigger. You do not need to know which crash comes next — only how deep you stop being able to hold on.</p>'+
+      (T.firstStop
+        ? '<div style="border-left:3px solid var(--red);padding:10px 14px;margin-bottom:12px;background:var(--bg);border-radius:6px">'+
+          '<b class="neg">First stop triggers at an index decline of '+Math.abs(T.firstStop.d)+'%</b>'+
+          '<p style="font-size:13px;line-height:1.6;margin-top:4px" class="muted">'+esc(T.firstStop.stopFirst)+' hits the stop you wrote for it. Your book would be down '+T.firstStop.lossPct.toFixed(1)+'% at that point.</p></div>'
+        : (T.hasStops?'':'<div style="border-left:3px solid var(--yellow);padding:10px 14px;margin-bottom:12px;background:var(--bg);border-radius:6px">'+
+          '<b class="warn">No stops written</b><p style="font-size:13px;line-height:1.6;margin-top:4px" class="muted">Nothing in this book has a price at which you have decided you are wrong. That is the line this table cannot draw for you.</p></div>'))+
+      '<div style="overflow-x:auto"><table><thead><tr>'+
+        '<th>If the index falls</th><th>Your book</th><th>Loss</th><th>Positions underwater</th><th>Stops hit</th>'+
+      '</tr></thead><tbody>'+T.ladder.map(s=>
+        '<tr><td class="muted">'+s.d+'%</td>'+
+        '<td class="neg"><b>'+s.lossPct.toFixed(1)+'%</b></td>'+
+        '<td class="neg">'+pmask(fmt$(s.loss))+'</td>'+
+        '<td class="'+(s.under===s.n&&s.n?'neg':'muted')+'">'+s.under+' of '+s.n+'</td>'+
+        '<td class="'+(s.stops?'neg':'muted')+'">'+(s.stops||'—')+'</td></tr>').join('')+
+      '</tbody></table></div>'+
+      (T.allUnder?'<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.6">Every position is below what you paid once the index falls <b class="neg">'+Math.abs(T.allUnder.d)+'%</b>. That is the point at which there is nothing green left on the screen to reassure you, which is when most people sell.</p>':'')+
+    '</div>':'');
 }
 
 /* ================= VaR, EXPECTED SHORTFALL, GARCH =================
