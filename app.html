@@ -74,14 +74,59 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .logo-word{display:inline-flex;letter-spacing:-.01em}
 .logo .c1{color:var(--text)}
 .logo .c2{color:var(--brand2)}
-nav{display:flex;gap:1px;height:100%}
-nav button{background:transparent;border:none;color:var(--muted);padding:0 16px;height:100%;font-family:var(--mono);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;position:relative;transition:background .1s ease,color .1s ease}
-nav button.active{color:#000;background:var(--text)}
-nav button:hover{color:var(--text)}
-.badge{position:absolute;top:14px;right:2px;background:var(--red);color:#fff;border-radius:9px;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px}
+/* ---------- SIDEBAR ----------
+   Thirteen destinations do not fit across a top bar without shrinking every label to the point of
+   uselessness. Down the side there is room, and collapsed it costs 56px while every icon stays
+   clickable. The width lives in a custom property so main's offset and the sidebar itself can never
+   disagree about how wide it is. */
+:root{--side:214px;--side-collapsed:56px}
+#shell{display:flex;align-items:flex-start;min-height:calc(100vh - 56px)}
+#sidebar{
+  width:var(--side);flex:none;position:sticky;top:calc(56px + env(safe-area-inset-top));
+  height:calc(100vh - 56px - env(safe-area-inset-top));
+  border-right:1px solid var(--border);background:var(--panel);
+  display:flex;flex-direction:column;padding:10px 8px 8px;
+  transition:width .16s ease;overflow:hidden;overflow-y:auto;
+  padding-left:calc(8px + env(safe-area-inset-left));
+}
+body.side-collapsed #sidebar{width:var(--side-collapsed)}
+#sidebar nav{display:flex;flex-direction:column;gap:2px;flex:1}
+#sidebar nav button{
+  background:transparent;border:none;color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;gap:11px;width:100%;
+  padding:9px 11px;border-radius:7px;position:relative;
+  font-family:var(--mono);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+  text-align:left;transition:background .12s ease,color .12s ease;white-space:nowrap;
+}
+#sidebar nav button .ico{
+  font-size:15px;line-height:1;width:20px;flex:none;text-align:center;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Symbol",sans-serif;
+}
+#sidebar nav button:hover{color:var(--text);background:var(--panel2)}
+#sidebar nav button.active{color:var(--text);background:var(--panel2)}
+/* A left rule rather than a full inversion — at this size a solid block of --text was shouting. */
+#sidebar nav button.active:before{
+  content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--brand2)}
+.nav-sep{height:1px;background:var(--border);margin:7px 6px}
+#sideToggle{
+  background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;gap:11px;padding:8px 11px;border-radius:7px;margin-top:8px;
+  font-family:var(--mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+  transition:.12s;flex:none}
+#sideToggle:hover{color:var(--text);border-color:var(--text)}
+#sideToggle .ico{font-size:14px;width:20px;flex:none;text-align:center;transition:transform .16s ease}
+body.side-collapsed #sideToggle .ico{transform:rotate(180deg)}
+/* Collapsed: labels and the badge count vanish, icons centre themselves. */
+body.side-collapsed #sidebar .lbl,
+body.side-collapsed #sidebar .badge{display:none}
+body.side-collapsed #sidebar nav button,
+body.side-collapsed #sideToggle{justify-content:center;padding-left:0;padding-right:0}
+body.side-collapsed .nav-sep{margin:7px 10px}
+
+.badge{background:var(--red);color:#fff;border-radius:9px;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;margin-left:auto;flex:none}
 .avatar{width:30px;height:30px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--text);flex-shrink:0}
-main{max-width:1100px;margin:0 auto;padding:32px 24px;
-  padding-left:calc(24px + env(safe-area-inset-left));padding-right:calc(24px + env(safe-area-inset-right));
+main{flex:1;min-width:0;max-width:1180px;padding:28px 26px;
+  padding-right:calc(26px + env(safe-area-inset-right));
   padding-bottom:calc(32px + env(safe-area-inset-bottom))}
 .grid{display:grid;gap:14px}
 .grid-2{grid-template-columns:1fr 1fr}
@@ -275,7 +320,9 @@ small.src{color:var(--muted)}
    The header is position:sticky with z-index:50, which makes it its OWN stacking context — a child
    with z-index:201 is confined to that context and would render behind the overlay at 200 no matter
    how high its number went. So the header itself is lifted while the tour runs. */
-body.touring header{z-index:201}
+/* Both, now that the nav moved: header holds the avatar (the Settings step) and the sidebar holds
+   every other target. Each is position:sticky, so each is its own stacking context. */
+body.touring header,body.touring #sidebar{z-index:201}
 .tour-lit{position:relative;box-shadow:0 0 0 2px var(--brand2),0 0 0 7px rgba(31,158,140,.22);border-radius:8px}
 @media (max-width:768px){
   .cmd-why{white-space:normal;font-size:12.5px}
@@ -344,12 +391,19 @@ body.touring header{z-index:201}
     padding-right:calc(12px + env(safe-area-inset-right))}
   header>.row{flex:1;min-width:0;justify-content:flex-end;gap:6px;flex-wrap:nowrap}
   #globalSearch{max-width:none!important;min-width:0;flex:1}
-  nav{order:3;width:100%;height:auto;overflow-x:auto;overflow-y:hidden;
-    border-top:1px solid var(--border);margin:0 -12px;padding:0 12px;
-    scrollbar-width:none;-webkit-overflow-scrolling:touch}
-  nav::-webkit-scrollbar{display:none}
-  nav button{height:auto;padding:13px 13px;white-space:nowrap;flex-shrink:0;font-size:11px}
-  .badge{top:7px;right:-2px}
+  /* On a phone the sidebar becomes a rail: icons only, always, no labels and no toggle. A 214px
+     drawer would eat more than half a phone screen, and a hamburger that hides navigation behind a
+     tap is worse than a rail you can always see. */
+  #shell{min-height:0}
+  #sidebar{width:52px!important;padding:8px 4px;
+    top:0;height:auto;position:sticky;align-self:stretch;
+    padding-left:calc(4px + env(safe-area-inset-left))}
+  #sidebar .lbl{display:none}
+  #sidebar nav button{justify-content:center;padding:11px 0}
+  #sidebar nav button .ico{font-size:17px}
+  #sideToggle{display:none}
+  .nav-sep{margin:6px 8px}
+  .badge{position:absolute;top:5px;right:5px;margin-left:0}
 
   main{padding:18px 12px;
     padding-left:calc(12px + env(safe-area-inset-left));
@@ -526,21 +580,6 @@ body.touring header{z-index:201}
 <div id="app" style="display:none">
 <header>
   <div class="logo"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
-  <nav>
-    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')">Dashboard</button>
-    <button data-tab="command" id="navCommand" onclick="showTab('command')">Command</button>
-    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')">Portfolio</button>
-    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')">Watchlist</button>
-    <button data-tab="history" id="navHistory" onclick="showTab('history')">History</button>
-    <button data-tab="market" id="navMarket" onclick="showTab('market')">Market</button>
-    <button data-tab="map" id="navMap" onclick="showTab('map')">Map</button>
-    <button data-tab="screener" id="navScreener" onclick="showTab('screener')">Screener</button>
-    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')">Analyzer</button>
-    <button data-tab="risk" id="navRisk" onclick="showTab('risk')">Risk</button>
-    <button data-tab="projections" id="navProjections" onclick="showTab('projections')">Projections</button>
-    <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')">Alerts <span id="alertBadge" class="badge" style="display:none">0</span></button>
-    <button data-tab="clients" id="navClients" onclick="showTab('clients')" style="display:none">Clients</button>
-  </nav>
   <div class="row" style="position:relative">
     <button class="icon-btn" id="calcToggleBtn" onclick="toggleCalc(event)" title="Calculator" aria-label="Calculator">
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -592,10 +631,36 @@ body.touring header{z-index:201}
   </div>
 </header>
 <div id="bizBanner" class="row" style="display:none;background:var(--panel2);border-bottom:1px solid var(--border);padding:8px 24px;font-size:13px;color:var(--muted)">
-  <span>Working on <b id="bizBannerClient" style="color:var(--text)"></b>'s account</span>
+  <span>Working on <b id="bizBannerClient" style="color:var(--text)"></b>&#39;s account</span>
   <div class="spacer"></div>
   <button class="btn btn-ghost btn-sm" onclick="returnToBusinessAccount()">Return to my account</button>
 </div>
+
+<!-- SIDEBAR. Thirteen destinations across a top bar squeezed every label; down the side there is
+     room for all of them, and collapsed to icons it costs 56px. -->
+<div id="shell">
+<aside id="sidebar">
+  <nav>
+    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')"><span class="ico" aria-hidden="true">▤</span><span class="lbl">Dashboard</span></button>
+    <button data-tab="command" id="navCommand" onclick="showTab('command')"><span class="ico" aria-hidden="true">⌘</span><span class="lbl">Command</span></button>
+    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')"><span class="ico" aria-hidden="true">◈</span><span class="lbl">Portfolio</span></button>
+    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')"><span class="ico" aria-hidden="true">☆</span><span class="lbl">Watchlist</span></button>
+    <button data-tab="history" id="navHistory" onclick="showTab('history')"><span class="ico" aria-hidden="true">↻</span><span class="lbl">History</span></button>
+    <div class="nav-sep"></div>
+    <button data-tab="market" id="navMarket" onclick="showTab('market')"><span class="ico" aria-hidden="true">◉</span><span class="lbl">Market</span></button>
+    <button data-tab="map" id="navMap" onclick="showTab('map')"><span class="ico" aria-hidden="true">⛓</span><span class="lbl">Map</span></button>
+    <button data-tab="screener" id="navScreener" onclick="showTab('screener')"><span class="ico" aria-hidden="true">⚟</span><span class="lbl">Screener</span></button>
+    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')"><span class="ico" aria-hidden="true">⌕</span><span class="lbl">Analyzer</span></button>
+    <div class="nav-sep"></div>
+    <button data-tab="risk" id="navRisk" onclick="showTab('risk')"><span class="ico" aria-hidden="true">⚠</span><span class="lbl">Risk</span></button>
+    <button data-tab="projections" id="navProjections" onclick="showTab('projections')"><span class="ico" aria-hidden="true">◑</span><span class="lbl">Projections</span></button>
+    <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')"><span class="ico" aria-hidden="true">◔</span><span class="lbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
+    <button data-tab="clients" id="navClients" onclick="showTab('clients')" style="display:none"><span class="ico" aria-hidden="true">◇</span><span class="lbl">Clients</span></button>
+  </nav>
+  <button id="sideToggle" onclick="toggleSidebar()" title="Collapse or expand (press [)" aria-label="Toggle sidebar">
+    <span class="ico" aria-hidden="true">«</span><span class="lbl">Collapse</span>
+  </button>
+</aside>
 <main>
 
 <!-- COMMAND — the morning screen -->
@@ -1145,6 +1210,12 @@ body.touring header{z-index:201}
   </div>
   <div id="riskResults"></div>
 
+  <div class="section-title">Where your risk actually sits</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:12px">Every holding's share of the portfolio's <b>variance</b>, against its share of the <b>money</b>. A 6% position in a violent name can own 20% of your risk, and no position-size percentage will ever show you that.</p>
+    <div id="riskContribBody"></div>
+  </div>
+
   <div class="section-title">Check any stock's risk</div>
   <div class="card">
     <p class="muted" style="margin-bottom:12px">Doesn't need to be in your Portfolio or Watchlist — just check the risk/volatility profile of any ticker before you decide whether to add it.</p>
@@ -1203,12 +1274,6 @@ body.touring header{z-index:201}
     <div id="sharpeBody"></div>
   </div>
 
-  <div class="section-title">Where your risk actually sits</div>
-  <div class="card">
-    <p class="muted" style="margin-bottom:12px">Every holding's share of the portfolio's <b>variance</b>, against its share of the <b>money</b>. A 6% position in a violent name can own 20% of your risk, and no position-size percentage will ever show you that.</p>
-    <div id="riskContribBody"></div>
-  </div>
-
   <div class="section-title">Monte Carlo projection</div>
   <div class="card">
     <p class="muted" style="margin-bottom:12px">Simulates thousands of random possible futures based on estimated return and volatility, to show a realistic range of outcomes instead of a single guess. The return/volatility inputs below are assumptions you're setting — adjust them to match your own view, they're not guaranteed numbers.</p>
@@ -1251,27 +1316,6 @@ body.touring header{z-index:201}
     <div id="herizenBody"></div>
     <p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6">
       <b>Four segments, not four lookbacks.</b> The strategy as described draws lines from one week, two weeks, one month and two months ago to today — but those windows are <i>nested</i>, so the same recent days are counted in all four and a single sharp move pushes every line at once. A +4 built that way is one observation counted four times. This uses <b>non-overlapping</b> segments instead — two months to one month, one month to two weeks, two weeks to one week, one week to today — so a +4 means four separate stretches each rose, which is a genuinely stronger statement.</p>
-  </div>
-
-  <div class="section-title">Strategy Registry</div>
-  <div class="card">
-    <div class="row" style="margin-bottom:12px">
-      <p class="muted" style="margin:0;max-width:64ch;font-size:13px;line-height:1.6">Every strategy enters the same way: a claim, an expectation written before any result is seen, and the result that would switch it off. Live tracks are capped at three — a new idea has to <b>displace</b> a losing one, not join it.</p>
-      <div class="spacer"></div>
-      <span class="muted" id="regSlots" style="font-size:12px;white-space:nowrap"></span>
-    </div>
-    <div id="registryBody"></div>
-    <div style="border-top:1px solid var(--border);margin-top:18px;padding-top:16px">
-      <h3 style="font-size:14px;margin-bottom:12px">Propose a strategy</h3>
-      <div class="grid grid-2">
-        <div class="field"><label>Name</label><input id="stName" placeholder="e.g. 200-day breakout"></div>
-        <div class="field"><label>What it claims — in one falsifiable sentence</label><input id="stClaim" placeholder="Stocks closing above their 200-day high beat the index over 90 days."></div>
-      </div>
-      <div class="field"><label>What you expect it to do — write this before you see any result</label><input id="stExpect" placeholder="Small positive edge, mostly in trending markets."></div>
-      <div class="field"><label>Kill criterion — what result would make you switch it off</label><input id="stKill" placeholder="Interval below zero after 40 marked calls, or worse than the checklist."></div>
-      <button class="btn" onclick="addStrategy()">Add as proposed</button>
-      <p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">Proposed strategies record nothing. Writing the expectation and the kill criterion first is the only defence against searching a small sample until something looks significant — with seven tracks at a 5% threshold, roughly a 30% chance one looks like a winner by pure luck.</p>
-    </div>
   </div>
 
   <div class="card" style="margin-top:16px;border-left:3px solid var(--red)">
@@ -1546,8 +1590,40 @@ body.touring header{z-index:201}
 </div>
 </main>
 </div>
+</div>
 
 <script>
+/* ================= SIDEBAR =================
+   Collapsed state is per-device, not per-account — it is a preference about this screen's width, so
+   it lives in localStorage rather than in the synced profile. Syncing it would mean collapsing the
+   sidebar on a laptop also collapsed it on the desktop, which is not what anyone means. */
+const SIDE_KEY='pf_side_collapsed';
+function applySidebar(){
+  let c=false;
+  try{c=localStorage.getItem(SIDE_KEY)==='1';}catch(e){}
+  document.body.classList.toggle('side-collapsed',c);
+  const t=document.getElementById('sideToggle');
+  if(t){
+    const lbl=t.querySelector('.lbl');
+    if(lbl)lbl.textContent=c?'Expand':'Collapse';
+    t.title=(c?'Expand':'Collapse')+' the sidebar (press [)';
+  }
+}
+function toggleSidebar(){
+  const now=document.body.classList.contains('side-collapsed');
+  try{localStorage.setItem(SIDE_KEY,now?'0':'1');}catch(e){}
+  applySidebar();
+}
+applySidebar();
+/* [ toggles it, the way most editors do. Ignored while typing, or the key would never reach a
+   ticker box. */
+document.addEventListener('keydown',e=>{
+  if(e.key!=='['||e.metaKey||e.ctrlKey||e.altKey)return;
+  const t=e.target,tag=t&&t.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable))return;
+  e.preventDefault();toggleSidebar();
+});
+
 /* ================= STORAGE & AUTH ================= */
 const STORE_KEY='quantfolio_v1';
 let DB={profiles:{}}, USER=null, D=null; // D = current user's data
@@ -1890,7 +1966,6 @@ function resetTransientState(){
   const ht=document.getElementById('hzTicker');if(ht)ht.value='';
   const shb=document.getElementById('sharpeBody');if(shb)shb.innerHTML='';
   const rcb=document.getElementById('riskContribBody');if(rcb)rcb.innerHTML='';
-  const rgb=document.getElementById('registryBody');if(rgb)rgb.innerHTML='';
 
   sellingIndex=null;
   openClientReport=null;
@@ -2008,8 +2083,11 @@ function renderTour(){
   document.querySelectorAll('.tour-lit').forEach(n=>n.classList.remove('tour-lit'));
   const target=s.tab==='settings'
     ? document.getElementById('avatarInitial')
-    : document.querySelector('nav button[data-tab="'+s.tab+'"]');
-  if(target)target.classList.add('tour-lit');
+    : document.querySelector('#sidebar nav button[data-tab="'+s.tab+'"]');
+  if(target){
+    target.classList.add('tour-lit');
+    if(target.scrollIntoView)target.scrollIntoView({block:'nearest'});
+  }
 }
 function tourNext(){ tourAt++; if(tourAt>=TOUR.length)return endTour(true); renderTour(); }
 function tourBack(){ if(tourAt>0){tourAt--;renderTour();} }
@@ -2352,7 +2430,8 @@ function showTab(t){
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
-  if(t==='projections'){renderSharpe();renderRiskContrib();renderHerizen();renderRegistry();}
+  if(t==='projections'){renderSharpe();renderHerizen();}
+  if(t==='risk')renderRiskContrib();
   if(t==='settings'){fillPolicyInputs();renderRuleLog();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
@@ -3536,123 +3615,17 @@ function renderRiskContrib(){
       (R.measured?'Correlations are measured from your holdings.':'Correlations are a '+R.avgCorr.toFixed(2)+' assumption — run <b>Calculate risk</b> on the Risk tab to measure them.')+'</p>';
 }
 
-/* ================= THE STRATEGY REGISTRY =================
-   Every strategy enters the same way: a name, a falsifiable claim, an expectation written BEFORE any
-   result is seen, and the result that would make you switch it off. Live tracks are capped, so a new
-   idea cannot be added — it has to displace one that is already losing.
+/* ================= WHICH TRACKS RECORD =================
+   Four systems log in parallel against the same tickers and dates, and are compared on the Market
+   tab. They do not affect each other and only Herizen touches sizing.
 
-   Two reasons the cap exists, and both are arithmetic rather than taste.
-
-   1. The tracks all eat the same food. They are fed by one watchlist, so seven systems do not produce
-      seven times the evidence — they divide one thin stream seven ways, and every track added makes
-      every existing track slower to resolve.
-   2. With seven tracks tested at a five percent threshold, the chance at least one looks significant
-      by pure luck is about thirty percent. Capping the count is the cheapest defence against
-      manufacturing a winner out of noise.
-
-   The graveyard is kept forever and shown next to the live list. Nobody records what they tried and
-   abandoned, so everyone re-tries the same dead ideas every eighteen months having forgotten they
-   already disproved them. The dead list is the part nobody else has. */
-const MAX_LIVE_TRACKS=3;
-const SEED_STRATEGIES=[
-  {id:'checklist',name:'Checklist',status:'live',builtin:true,
-   claim:'Companies passing my quality and value bars beat the index over 90 days.',
-   expect:'Positive expectancy vs SPY, with the interval eventually clearing zero.',
-   kill:'Expectancy interval sits entirely below zero across 40+ marked calls.'},
-  {id:'herizen',name:'Herizen momentum',status:'live',builtin:true,
-   claim:'Four non-overlapping up-segments predict continuation over 90 days.',
-   expect:'Honestly, negative or nothing — three of its four windows sit in the documented short-term reversal band.',
-   kill:'Interval below zero, or measurably worse than the checklist alone.'},
-  {id:'gated',name:'Checklist + momentum',status:'live',builtin:true,
-   claim:'Filtering checklist BUYs through the momentum score beats the checklist alone.',
-   expect:'Slightly better than checklist alone if the gate removes weak entries; worse if it just removes trades.',
-   kill:'Fails to beat the checklist track once both have 40+ marked calls.'},
-  {id:'ewma',name:'EWMA 50/200 crossover',status:'proposed',builtin:true,
-   claim:'Fast EWMA above slow EWMA predicts continuation over 90 days.',
-   expect:'Better prior than Herizen — a 50/200 span covers roughly 2.5 to 10 months, which is where time-series momentum is actually documented, rather than the reversal band.',
-   kill:'Interval below zero, or fails to beat whichever track it displaced.'}
-];
-function strategies(){
-  if(!Array.isArray(D.strategies))D.strategies=[];
-  // Seed once. Existing accounts already have the three tracks running; this just names them.
-  if(!D.strategies.length){
-    D.strategies=SEED_STRATEGIES.map(s=>Object.assign({created:new Date().toISOString().slice(0,10)},s));
-    saveDB();
-  }
-  return D.strategies;
-}
-function strategyById(id){return strategies().find(s=>s.id===id)||null;}
-function liveTracks(){return strategies().filter(s=>s.status==='live').map(s=>s.id);}
-function trackIsLive(id){const s=strategyById(id);return !!(s&&s.status==='live');}
-function retireStrategy(id){
-  const s=strategyById(id);
-  if(!s)return;
-  const why=(prompt('Retiring "'+s.name+'".\n\nWhy? This goes in the graveyard permanently, and it is the note that stops you rebuilding this in a year having forgotten.')||'').trim();
-  if(!why)return toast('Cancelled. A retirement needs a reason.');
-  s.status='dead';s.killedAt=new Date().toISOString().slice(0,10);s.killReason=why;
-  saveDB();renderRegistry();renderScorecard();
-  toast(s.name+' retired. A slot is free.');
-}
-function promoteStrategy(id){
-  const s=strategyById(id);
-  if(!s)return;
-  if(liveTracks().length>=MAX_LIVE_TRACKS){
-    return toast('Three tracks are already live. Retire one first — a new idea has to displace a losing one, not join it.');
-  }
-  s.status='live';s.promotedAt=new Date().toISOString().slice(0,10);
-  saveDB();renderRegistry();renderScorecard();
-  toast(s.name+' is live. It starts recording on the next refresh, and its record starts today.');
-}
-function addStrategy(){
-  const v=id=>((document.getElementById(id)||{}).value||'').trim();
-  const name=v('stName'),claim=v('stClaim'),expect=v('stExpect'),kill=v('stKill');
-  if(!name||!claim)return toast('A strategy needs a name and a claim.');
-  if(!expect)return toast('Write what you expect it to do — before you see any result, or you will explain whatever happens.');
-  if(!kill)return toast('Write the result that would make you switch it off. If you cannot state one, it is unfalsifiable and should not enter.');
-  strategies().push({
-    id:'u'+Date.now().toString(36),name,claim,expect,kill,
-    status:'proposed',builtin:false,created:new Date().toISOString().slice(0,10)
-  });
-  ['stName','stClaim','stExpect','stKill'].forEach(i=>{const e=document.getElementById(i);if(e)e.value='';});
-  saveDB();renderRegistry();
-  toast('Added as proposed. It records nothing until it displaces a live track.');
-}
-function renderRegistry(){
-  const el=document.getElementById('registryBody');
-  if(!el||!D)return;
-  const all=strategies();
-  const live=all.filter(s=>s.status==='live');
-  const prop=all.filter(s=>s.status==='proposed');
-  const dead=all.filter(s=>s.status==='dead');
-  const slot=document.getElementById('regSlots');
-  if(slot){
-    slot.textContent=live.length+' / '+MAX_LIVE_TRACKS+' slots used';
-    slot.className=live.length>=MAX_LIVE_TRACKS?'warn':'muted';
-  }
-  const card=(s,kind)=>'<div style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;'+
-      (kind==='dead'?'opacity:.62;':'')+'background:var(--panel)">'+
-    '<div class="row" style="gap:9px;align-items:center;margin-bottom:7px;flex-wrap:wrap">'+
-      '<b style="font-size:14.5px">'+esc(s.name)+'</b>'+
-      '<span class="pill '+(kind==='live'?'pill-buy':kind==='proposed'?'pill-watch':'pill-na')+'" style="font-size:10px">'+kind+'</span>'+
-      '<div class="spacer"></div>'+
-      (kind==='live'?'<button class="btn btn-ghost btn-sm" onclick="retireStrategy(\''+esc(s.id)+'\')">Retire</button>':'')+
-      (kind==='proposed'?'<button class="btn btn-sm" onclick="promoteStrategy(\''+esc(s.id)+'\')">Make it live</button>':'')+
-    '</div>'+
-    '<div style="font-size:13px;line-height:1.6"><span class="muted">Claims:</span> '+esc(s.claim)+'</div>'+
-    (s.expect?'<div style="font-size:13px;line-height:1.6;margin-top:4px"><span class="muted">Expected:</span> '+esc(s.expect)+'</div>':'')+
-    (s.kill?'<div style="font-size:13px;line-height:1.6;margin-top:4px"><span class="muted">Kill if:</span> '+esc(s.kill)+'</div>':'')+
-    (kind==='dead'?'<div style="font-size:12.5px;line-height:1.6;margin-top:7px" class="neg"><b>Retired '+esc(s.killedAt||'')+':</b> '+esc(s.killReason||'')+'</div>':'')+
-  '</div>';
-  el.innerHTML=
-    '<div class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">Live — recording and graded</div>'+
-    (live.length?live.map(s=>card(s,'live')).join(''):'<div class="empty" style="margin-bottom:14px">Nothing live.</div>')+
-    '<div class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;margin:18px 0 9px">Proposed — records nothing yet</div>'+
-    (prop.length?prop.map(s=>card(s,'proposed')).join(''):'<div class="empty" style="margin-bottom:14px">Nothing waiting.</div>')+
-    (dead.length
-      ? '<div class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;margin:18px 0 9px">Graveyard — kept on purpose</div>'+
-        dead.map(s=>card(s,'dead')).join('')
-      : '');
-}
+   This replaced a formal registry with slots, proposals and a graveyard. It was bureaucracy for a
+   tool with one operator. The thing the registry was defending against is real though, so it is
+   worth stating plainly rather than enforcing: every track added divides the same thin stream of
+   tickers further, and with enough tracks sliced enough ways one of them looks like a winner by
+   luck. Four is fine. Twelve would not be. */
+const ACTIVE_TRACKS=['checklist','herizen','gated','ewma'];
+function trackIsLive(id){return ACTIVE_TRACKS.includes(id);}
 
 /* ================= EWMA 50/200 =================
    Exponentially weighted moving averages of the price log. Fast above slow is the classic trend
@@ -3769,6 +3742,68 @@ async function backfillPrices(sym){
     D.priceLog[sym]=Object.keys(merged).sort().map(d=>({d,p:merged[d]})).slice(-300);
   }catch(e){/* candle endpoint refused; the log fills forward from here instead */}
 }
+/* ================= PRICE CHART =================
+   Drawn from D.priceLog, which is the app's own daily close history. That log is backfilled from
+   Finnhub candles when that endpoint cooperates and filled forward from every refresh when it
+   doesn't, so the chart works either way and needs no new API, no new key, and no third-party
+   source to go down.
+
+   The tradeoff, stated rather than hidden: if the candle backfill is refused, the chart starts the
+   day you first refreshed that ticker and grows from there. It cannot draw history it was never
+   given. */
+let pxCharts={};
+function drawPriceChart(canvasId,sym,opts){
+  if(typeof Chart==='undefined')return false;
+  const el=document.getElementById(canvasId);
+  if(!el)return false;
+  const arr=(D.priceLog||{})[sym];
+  if(!arr||arr.length<3)return false;
+  opts=opts||{};
+  const days=opts.days||0;
+  const rows=days?arr.filter(r=>Date.parse(r.d+'T12:00:00')>=Date.now()-days*86400000):arr;
+  if(rows.length<3)return false;
+
+  if(pxCharts[canvasId]){pxCharts[canvasId].destroy();delete pxCharts[canvasId];}
+  const cs=getComputedStyle(document.body);
+  const line=cs.getPropertyValue('--brand2').trim()||'#1f9e8c';
+  const grid=cs.getPropertyValue('--border').trim()||'#2b2f38';
+  const dim=cs.getPropertyValue('--muted').trim()||'#949aa6';
+  const up=rows[rows.length-1].p>=rows[0].p;
+  const stroke=up?(cs.getPropertyValue('--green').trim()||'#2ea043'):(cs.getPropertyValue('--red').trim()||'#e5534b');
+
+  const datasets=[{
+    label:sym,data:rows.map(r=>r.p),borderColor:stroke,backgroundColor:'transparent',
+    borderWidth:2,pointRadius:0,pointHoverRadius:4,tension:.15
+  }];
+  // Optional EWMA overlays, so the crossover is visible rather than described.
+  if(opts.ewma){
+    const px=rows.map(r=>r.p);
+    const run=(span)=>{const k=2/(span+1);let e=px[0];return px.map(p=>(e=p*k+e*(1-k)));};
+    if(px.length>=30){
+      datasets.push({label:'EWMA 50',data:run(50),borderColor:line,borderWidth:1.4,
+        pointRadius:0,borderDash:[],tension:.2,backgroundColor:'transparent'});
+      datasets.push({label:'EWMA 200',data:run(200),borderColor:dim,borderWidth:1.4,
+        pointRadius:0,borderDash:[5,4],tension:.2,backgroundColor:'transparent'});
+    }
+  }
+  pxCharts[canvasId]=new Chart(el.getContext('2d'),{
+    type:'line',
+    data:{labels:rows.map(r=>r.d),datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:!!opts.ewma,labels:{color:dim,boxWidth:12,font:{size:10}}},
+        tooltip:{callbacks:{label:c=>' '+c.dataset.label+' '+fmt$(c.parsed.y)}}
+      },
+      scales:{
+        x:{ticks:{color:dim,maxTicksLimit:6,font:{size:10}},grid:{color:grid,display:false}},
+        y:{ticks:{color:dim,font:{size:10},callback:v=>fmt$(v)},grid:{color:grid}}
+      }
+    }
+  });
+  return true;
+}
 function renderHerizen(){
   const el=document.getElementById('herizenBody');
   if(!el||!D)return;
@@ -3805,6 +3840,7 @@ function renderHerizen(){
       '<td class="'+(l.ret>=0?'pos':'neg')+'">'+(l.ret>=0?'+':'')+l.ret.toFixed(2)+'%</td>'+
       '<td class="'+(l.pt>0?'pos':'neg')+'"><b>'+(l.pt>0?'+1':'−1')+'</b></td></tr>').join('')+
     '</tbody></table></div>'+
+    '<div class="chart-box" style="height:240px;margin-top:16px"><canvas id="hzChart"></canvas></div>'+
     '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.6">'+
       'A score of <b>'+(h.score>0?'+':'')+h.score+'</b> permits at most <b>'+h.size+'%</b> of the size your other limits allow. '+
       (h.size===0
@@ -3813,6 +3849,12 @@ function renderHerizen(){
           ? 'All four segments rose, so this places no restriction beyond your policy cap and volatility budget.'
           : 'It will bind only if it is smaller than your policy cap, volatility budget and stop distance.')+
     '</p>';
+  // Chart.js needs the canvas in the DOM, so this runs after innerHTML rather than inside it.
+  const ok=drawPriceChart('hzChart',sym,{ewma:true});
+  if(!ok){
+    const box=document.querySelector('#herizenBody .chart-box');
+    if(box)box.innerHTML='<div class="empty" style="height:100%;display:flex;align-items:center;justify-content:center">Not enough logged closes to draw a chart yet.</div>';
+  }
 }
 
 /* ---- Checklist score, logged over time ----
@@ -3925,7 +3967,13 @@ async function analyzeStock(symArg){
   document.getElementById('aTicker').value=sym;
   document.getElementById('analyzerResult').innerHTML='<div class="empty">Analyzing '+esc(sym)+'…</div>';
   const sc=await scoreStock(sym);
-  D.analyses[sym]=sc;saveDB();
+  D.analyses[sym]=sc;
+  /* Log the close and try a backfill here too, not only during a full refresh — otherwise looking a
+     stock up in the Analyzer would never build it any price history and the chart would stay empty
+     for anything you hadn't added to a list. */
+  await backfillPrices(sym);
+  if(isFinite(sc.price))logPrice(sym,sc.price);
+  saveDB();
   renderAnalysis(sym,sc);renderAll();
 }
 function renderAnalysis(sym,sc){
@@ -3956,6 +4004,7 @@ function renderAnalysis(sym,sc){
     '<button class="btn btn-ghost btn-sm" onclick="toggleFavorite(\''+sym+'\');renderAnalysis(\''+sym+'\',D.analyses[\''+sym+'\'])" title="'+(isFavorite(sym)?'Remove from Favorites':'Add to Favorites')+'">'+(isFavorite(sym)?'★ Favorited':'☆ Favorite')+'</button> '+
     '<span class="pill '+v.cls+'">'+v.label+'</span> '+
     '<span class="muted" style="font-size:12px">Your call:</span> '+myTagSelect(sym)+'</div>'+
+    '<div class="chart-box" style="height:200px;margin-top:14px"><canvas id="anChart"></canvas></div>'+
     (isEtf?'<p class="muted" style="margin-top:10px">This is an ETF in your Portfolio — it has a live price, but the 12-point quality checklist below is built for individual companies (revenue growth, margins, moat, etc.), so most of those rows will show no data. That\'s expected, not a bug.</p>':'')+
     '<div class="verdict-box '+vCls+'" style="margin-top:14px"><b>Quality: '+sc.qScore+'/12 ('+sc.qTotal+' had data) &nbsp;|&nbsp; Price: '+sc.pScore+'/6 ('+sc.pTotal+' had data) &nbsp;|&nbsp; Momentum: '+sc.mScore+'/4 ('+sc.mTotal+' had data)'+(sc.wsTotal?' &nbsp;|&nbsp; Wall Street: '+sc.wsScore+'/'+sc.wsTotal+' positive':'')+'</b><br>'+
     '<span class="muted">Buy rule: quality ≥ '+D.rules.qBuy+' AND price ≥ '+D.rules.pBuy+(D.rules.mBuy>0?' AND momentum ≥ '+D.rules.mBuy:'')+'. Checks with no data don\'t count as passes — fill in the manual ones below to complete the picture.</span></div>'+
@@ -4020,6 +4069,10 @@ function renderAnalysis(sym,sc){
     '</div>'+
   '</div>';
   if(sc.riskRange)drawBoxWhisker('anBoxCanvas',sc.riskRange.p5,sc.riskRange.p25,sc.riskRange.p50,sc.riskRange.p75,sc.riskRange.p95);
+  if(!drawPriceChart('anChart',sym,{})){
+    const box=document.querySelector('#analyzerResult .chart-box');
+    if(box)box.innerHTML='<div class="empty" style="height:100%;display:flex;align-items:center;justify-content:center;font-size:12.5px">No price history logged for '+esc(sym)+' yet. It builds from here — and backfills further if Finnhub\'s candle endpoint is open on your plan.</div>';
+  }
 }
 async function compareStocks(){
   const s1=document.getElementById('cmpTicker1').value.trim().toUpperCase();
