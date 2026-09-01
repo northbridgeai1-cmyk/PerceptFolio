@@ -242,6 +242,10 @@ small.src{color:var(--muted)}
 .cmd-detail{padding:0 16px 16px 60px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:13.5px;line-height:1.6}
 .cmd-detail:last-child{border-bottom:none}
 .cmd-empty{padding:26px 16px;text-align:center}
+/* Section lead-ins on the Projections tab, separating ranges from signals. */
+.sec-lead{display:flex;gap:16px;align-items:flex-start;margin:4px 0 20px}
+.sec-lead .sec-no{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid var(--border);border-radius:5px;padding:6px 9px;flex-shrink:0;margin-top:2px}
 
 /* ---------- first-run walkthrough ---------- */
 .tour-wrap{display:none;position:fixed;inset:0;z-index:200;background:rgba(6,7,9,.72);
@@ -506,7 +510,7 @@ body.touring header{z-index:201}
     <div class="tour-head">
       <span class="tour-eyebrow">Getting started</span>
       <span class="spacer"></span>
-      <span class="tour-count" id="tourCount">1 / 6</span>
+      <span class="tour-count" id="tourCount">1 / 7</span>
       <button class="tour-x" onclick="endTour(false)" title="Skip" aria-label="Skip">&times;</button>
     </div>
     <div class="tour-body" id="tourBody"></div>
@@ -533,6 +537,7 @@ body.touring header{z-index:201}
     <button data-tab="screener" id="navScreener" onclick="showTab('screener')">Screener</button>
     <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')">Analyzer</button>
     <button data-tab="risk" id="navRisk" onclick="showTab('risk')">Risk</button>
+    <button data-tab="projections" id="navProjections" onclick="showTab('projections')">Projections</button>
     <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')">Alerts <span id="alertBadge" class="badge" style="display:none">0</span></button>
     <button data-tab="clients" id="navClients" onclick="showTab('clients')" style="display:none">Clients</button>
   </nav>
@@ -1023,6 +1028,12 @@ body.touring header{z-index:201}
         <option value="sell">SELL calls only</option>
         <option value="all">All calls</option>
       </select>
+      <select id="scoreTrack" style="max-width:210px" onchange="renderScorecard()" title="Which system's calls to grade">
+        <option value="checklist">System: checklist</option>
+        <option value="herizen">System: Herizen momentum</option>
+        <option value="gated">System: checklist + momentum</option>
+        <option value="ewma">System: EWMA 50/200</option>
+      </select>
       <div class="spacer"></div>
       <span class="muted" id="scoreCount" style="font-size:12px"></span>
     </div>
@@ -1170,6 +1181,34 @@ body.touring header{z-index:201}
     </div>
   </div>
 
+</div>
+
+<!-- PROJECTIONS
+     Two sections, deliberately separated. A projection is a DISTRIBUTION of outcomes given
+     assumptions. A signal is a RULE that reads today and emits a position. Filing the second under
+     the first teaches you to read an instruction as a forecast, which is how people end up believing
+     a trading rule knows the future. -->
+<div id="tab-projections" class="tabs-hidden">
+  <div class="sec-lead">
+    <div class="sec-no">01</div>
+    <div>
+      <div class="section-title" style="margin-top:0">Ranges — what the spread of outcomes looks like</div>
+      <p class="muted" style="font-size:13px;max-width:70ch;line-height:1.6">These answer "where might this end up", not "what should I do today". Every one is a distribution under stated assumptions, and every one is wrong in a way the assumptions decide.</p>
+    </div>
+  </div>
+
+  <div class="section-title">Risk-adjusted return</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:12px">Return per unit of volatility, from your own daily snapshots. Shown with its confidence interval, because a Sharpe ratio computed on a few months of data carries an error bar usually wider than the number itself — and a point estimate without one is the same false precision as a hit rate without a sample size.</p>
+    <div id="sharpeBody"></div>
+  </div>
+
+  <div class="section-title">Where your risk actually sits</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:12px">Every holding's share of the portfolio's <b>variance</b>, against its share of the <b>money</b>. A 6% position in a violent name can own 20% of your risk, and no position-size percentage will ever show you that.</p>
+    <div id="riskContribBody"></div>
+  </div>
+
   <div class="section-title">Monte Carlo projection</div>
   <div class="card">
     <p class="muted" style="margin-bottom:12px">Simulates thousands of random possible futures based on estimated return and volatility, to show a realistic range of outcomes instead of a single guess. The return/volatility inputs below are assumptions you're setting — adjust them to match your own view, they're not guaranteed numbers.</p>
@@ -1192,6 +1231,58 @@ body.touring header{z-index:201}
     <span class="muted" id="mcStatus"></span>
   </div>
   <div id="mcResults"></div>
+
+  <div class="sec-lead" style="margin-top:34px">
+    <div class="sec-no" style="color:var(--yellow)">02</div>
+    <div>
+      <div class="section-title" style="margin-top:0">Signals — rules that emit a position today</div>
+      <p class="muted" style="font-size:13px;max-width:70ch;line-height:1.6">Not forecasts. A signal reads the prices in front of it and tells you how much to hold right now. It says nothing about where the price is going, and it is separated from the section above for exactly that reason.</p>
+    </div>
+  </div>
+
+  <div class="section-title">Herizen momentum score</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <input id="hzTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')renderHerizen()">
+      <button class="btn" onclick="renderHerizen()">Score it</button>
+      <div class="spacer"></div>
+      <span class="muted" id="hzCount" style="font-size:12px"></span>
+    </div>
+    <div id="herizenBody"></div>
+    <p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6">
+      <b>Four segments, not four lookbacks.</b> The strategy as described draws lines from one week, two weeks, one month and two months ago to today — but those windows are <i>nested</i>, so the same recent days are counted in all four and a single sharp move pushes every line at once. A +4 built that way is one observation counted four times. This uses <b>non-overlapping</b> segments instead — two months to one month, one month to two weeks, two weeks to one week, one week to today — so a +4 means four separate stretches each rose, which is a genuinely stronger statement.</p>
+  </div>
+
+  <div class="section-title">Strategy Registry</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <p class="muted" style="margin:0;max-width:64ch;font-size:13px;line-height:1.6">Every strategy enters the same way: a claim, an expectation written before any result is seen, and the result that would switch it off. Live tracks are capped at three — a new idea has to <b>displace</b> a losing one, not join it.</p>
+      <div class="spacer"></div>
+      <span class="muted" id="regSlots" style="font-size:12px;white-space:nowrap"></span>
+    </div>
+    <div id="registryBody"></div>
+    <div style="border-top:1px solid var(--border);margin-top:18px;padding-top:16px">
+      <h3 style="font-size:14px;margin-bottom:12px">Propose a strategy</h3>
+      <div class="grid grid-2">
+        <div class="field"><label>Name</label><input id="stName" placeholder="e.g. 200-day breakout"></div>
+        <div class="field"><label>What it claims — in one falsifiable sentence</label><input id="stClaim" placeholder="Stocks closing above their 200-day high beat the index over 90 days."></div>
+      </div>
+      <div class="field"><label>What you expect it to do — write this before you see any result</label><input id="stExpect" placeholder="Small positive edge, mostly in trending markets."></div>
+      <div class="field"><label>Kill criterion — what result would make you switch it off</label><input id="stKill" placeholder="Interval below zero after 40 marked calls, or worse than the checklist."></div>
+      <button class="btn" onclick="addStrategy()">Add as proposed</button>
+      <p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">Proposed strategies record nothing. Writing the expectation and the kill criterion first is the only defence against searching a small sample until something looks significant — with seven tracks at a 5% threshold, roughly a 30% chance one looks like a winner by pure luck.</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;border-left:3px solid var(--red)">
+    <h3 class="neg">Read this before you trust it</h3>
+    <p class="muted" style="font-size:13.5px;line-height:1.68;margin-top:8px">
+      The published evidence on price trends splits sharply by horizon. Momentum — winners keep winning — is documented at roughly <b>three to twelve months</b>. At <b>one week and one month</b> the documented effect is the opposite: <b>short-term reversal</b>, where recent winners give it back. Three of this rule's four windows sit in that reversal band, which means the honest prior on it is somewhere between "no edge" and "negative edge", before costs.
+      <br><br>
+      That is why it is wired in as a <b>position cap and nothing else</b>. It can shrink a position the checklist already cleared. It cannot create a buy, block a sell, or change a verdict. A wrong cap costs you upside; a wrong verdict costs you capital, and this rule has not earned the right to cost you capital.
+      <br><br>
+      It is also being <b>graded against two alternatives</b> from today — checklist alone, this alone, and the two combined — on the Market tab. In ninety days that argument settles itself with numbers instead of citations.</p>
+  </div>
 </div>
 
 <!-- ALERTS -->
@@ -1252,7 +1343,7 @@ body.touring header{z-index:201}
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Getting Started</h3>
-    <p class="muted" style="margin-bottom:12px">Six cards covering what each screen is for and the three things to do first. Shown automatically on a new account; replay it any time.</p>
+    <p class="muted" style="margin-bottom:12px">A short pass over what each screen is for and the three things to do first. Shown automatically on a new account; replay it any time.</p>
     <button class="btn btn-ghost" onclick="replayTour()">Run the walkthrough</button>
   </div>
 
@@ -1478,6 +1569,8 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   syncedAt:0,lastLocalEdit:0,
   calls:[],                                     // graded in the Market tab's scorecard
   scoreLog:{},                                  // ticker -> [{d,q,p,m,t,mx}] one row per day, for quality drift
+  priceLog:{},                                  // ticker -> [{d,p}] daily closes, for the momentum score
+  strategies:[],                                // the registry: what is being graded, and what died
   tourSeen:false,                               // first-run walkthrough; shown once per account
   macro:{cape:null,capeAsOf:'',margin:null,marginAsOf:'',marginPrev:null,buffett:null,buffettAsOf:''},
   relations:{},                                 // ticker -> {suppliers:[],customers:[]} for the Map tab
@@ -1793,6 +1886,11 @@ function resetTransientState(){
   const tit=document.getElementById('tiTicker');if(tit)tit.value='';
   const tia=document.getElementById('tiAmount');if(tia)tia.value='';
   const dd=document.getElementById('mcDrawdown');if(dd)dd.innerHTML='';
+  const hb=document.getElementById('herizenBody');if(hb)hb.innerHTML='';
+  const ht=document.getElementById('hzTicker');if(ht)ht.value='';
+  const shb=document.getElementById('sharpeBody');if(shb)shb.innerHTML='';
+  const rcb=document.getElementById('riskContribBody');if(rcb)rcb.innerHTML='';
+  const rgb=document.getElementById('registryBody');if(rgb)rgb.innerHTML='';
 
   sellingIndex=null;
   openClientReport=null;
@@ -1872,9 +1970,12 @@ const TOUR=[
   { tab:'analyzer', tag:'Analyzer', cls:'t-violet',
     q:'Is this company any good, and is the price sensible?',
     body:'Type a ticker, get 22 checks: 12 quality, 6 value, 4 momentum. Read the rows that failed, not just the score — the score is only a summary of them.' },
+  { tab:'projections', tag:'Projections', cls:'t-amber',
+    q:'What range of outcomes am I looking at?',
+    body:'Monte Carlo and the drawdown model, which give ranges rather than answers. Below them, separated on purpose, sit <b>signals</b> — rules that emit a position today. A range is not an instruction, and mixing the two is how people come to believe a trading rule knows the future.' },
   { tab:'market', tag:'Market', cls:'t-amber',
     q:'Was the checklist actually right?',
-    body:'The <b>Call Scorecard</b> marks every verdict against the S&amp;P on a fixed horizon. It will be empty for about ninety days — a record like that cannot be built backwards, only forwards.' },
+    body:'The <b>Call Scorecard</b> marks every verdict against the S&amp;P on a fixed horizon, and compares three systems side by side. It will be empty for about ninety days — a record like that cannot be built backwards, only forwards.' },
   { tab:'settings', tag:'Settings', cls:'t-red',
     q:'Where do I start?',
     body:'Three things, ten minutes: paste a free <b>Finnhub key</b>, enter what you own in Portfolio, then set your buy and sell bars. Those numbers are what the whole terminal runs on. Settings lives behind your avatar, top right.' }
@@ -1936,7 +2037,7 @@ function updateAccountTypeUI(){
   // the business account doesn't hold investments of its own — it exists to manage client books.
   // Switching into a client (bizContext set) restores the full nav, since that's the client's money.
   const hideOwnInvesting=isBiz&&!bizContext;
-  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navMarket','navMap','navCommand'].forEach(id=>{
+  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navProjections','navMarket','navMap','navCommand'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display=hideOwnInvesting?'none':'';
   });
@@ -2251,6 +2352,7 @@ function showTab(t){
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
+  if(t==='projections'){renderSharpe();renderRiskContrib();renderHerizen();renderRegistry();}
   if(t==='settings'){fillPolicyInputs();renderRuleLog();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
@@ -3087,6 +3189,10 @@ async function refreshAll(){
         const prev=D.analyses[s];
         const sc=await scoreStock(s);
         D.analyses[s]=sc;
+        /* Price history before signals: the momentum track needs the log populated before
+           evaluateSignals asks it for a verdict, or the first run silently records nothing. */
+        await backfillPrices(s);
+        if(isFinite(sc.price))logPrice(s,sc.price);
         evaluateSignals(s,sc,prev);
         logScore(s,sc);
       }catch(e){handleApiErr(e,s);}
@@ -3130,11 +3236,20 @@ function pushAlert(type,sym,msg){
 
    Only changes are recorded. Appending on every refresh would produce hundreds of duplicate rows
    for one unchanged opinion and make the hit rate meaningless. */
-function recordCall(sym,sc,verdictKey,verdictLabel){
+/* track: 'checklist' | 'herizen' | 'gated'. Three systems logged side by side so the question of
+   whether the momentum rule adds anything gets answered by measurement rather than by argument.
+   Dedup is per track — the checklist changing its mind must not suppress a herizen entry. */
+function recordCall(sym,sc,verdictKey,verdictLabel,track){
   if(!D.calls)D.calls=[];
-  const last=[...D.calls].reverse().find(c=>c.sym===sym);
+  track=track||'checklist';
+  /* THE CAP IS ENFORCED HERE, not in the UI. A retired strategy stops recording immediately, and a
+     proposed one records nothing at all — otherwise the registry would be decoration and the track
+     count would drift right back up. */
+  if(!trackIsLive(track))return;
+  const last=[...D.calls].reverse().find(c=>c.sym===sym&&(c.track||'checklist')===track);
   if(last&&last.verdict===verdictKey)return;      // unchanged opinion, nothing new to grade
   D.calls.push({
+    track,
     sym,verdict:verdictKey,label:verdictLabel,
     ts:Date.now(),date:new Date().toISOString().slice(0,10),
     price:(sc&&isFinite(sc.price))?sc.price:null,
@@ -3239,6 +3354,467 @@ function markCalls(extraPrices){
     });
   });
 }
+/* ================= SHARPE, WITH ITS ERROR BAR =================
+   Return over volatility, from the daily snapshots already kept. Two things make this honest rather
+   than decorative.
+
+   1. RETURNS ARE MEASURED ON GAIN, NOT ON VALUE. Depositing cash raises portfolio value without
+      earning anything; using value would book every deposit as a return. Gain moves only when
+      positions move, so the change in gain over the prior total value is return on capital, with
+      cash drag correctly included in the denominator.
+
+   2. THE INTERVAL IS PRINTED. For IID returns the standard error of a Sharpe ratio is roughly
+      sqrt((1 + S²/2) / n) in the same period units (Lo, 2002). On a few months of daily data that
+      interval is enormous — often wider than the estimate itself. A Sharpe without its error bar is
+      the same false precision as a hit rate without a sample size, and this app has already made
+      that mistake once. */
+function portfolioReturns(){
+  const h=(D.history||[]).filter(r=>isFinite(r.value)&&r.value>0&&isFinite(r.gain));
+  const out=[];
+  for(let i=1;i<h.length;i++){
+    const prev=h[i-1],cur=h[i];
+    if(!(prev.value>0))continue;
+    out.push({d:cur.date,r:(cur.gain-prev.gain)/prev.value,
+      spy:(isFinite(prev.spy)&&isFinite(cur.spy)&&prev.spy>0)?(cur.spy-prev.spy)/prev.spy:null});
+  }
+  return out;
+}
+function sharpeOf(dailyRets,rfAnnual){
+  const n=dailyRets.length;
+  if(n<20)return null;
+  const rfD=(rfAnnual||0.045)/TRADING_DAYS;
+  const mean=dailyRets.reduce((a,b)=>a+b,0)/n;
+  const varD=dailyRets.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(n-1);
+  const sd=Math.sqrt(varD);
+  if(!(sd>0))return null;
+  const srD=(mean-rfD)/sd;
+  // Downside deviation for Sortino — Sharpe punishes upside volatility identically to downside,
+  // which penalises exactly the outcome you want.
+  const down=dailyRets.filter(r=>r<rfD).map(r=>r-rfD);
+  const dsd=down.length>1?Math.sqrt(down.reduce((a,b)=>a+b*b,0)/down.length):null;
+  const rt=Math.sqrt(TRADING_DAYS);
+  const seD=Math.sqrt((1+srD*srD/2)/n);
+  return{
+    n, sharpe:srD*rt,
+    lo:(srD-1.96*seD)*rt, hi:(srD+1.96*seD)*rt,
+    sortino:dsd>0?((mean-rfD)/dsd)*rt:null,
+    volAnnual:sd*rt, retAnnual:mean*TRADING_DAYS
+  };
+}
+function renderSharpe(){
+  const el=document.getElementById('sharpeBody');
+  if(!el||!D)return;
+  const rows=portfolioReturns();
+  const rf=(parseFloat((document.getElementById('mcRf')||{}).value)||4.5)/100;
+  const me=sharpeOf(rows.map(r=>r.r),rf);
+  if(!me){
+    el.innerHTML='<div class="empty">Needs about a month of daily snapshots. These accumulate every time you run a refresh — there are '+rows.length+' so far.</div>';
+    return;
+  }
+  const bench=sharpeOf(rows.filter(r=>r.spy!=null).map(r=>r.spy),rf);
+  const straddles=me.lo<0&&me.hi>0;
+  const f=x=>(x>=0?'+':'')+x.toFixed(2);
+  el.innerHTML=
+    '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+      '<div class="stat s-profit"><span class="stat-label">Sharpe (annualised)</span><span class="stat-value '+(me.sharpe>=0?'pos':'neg')+'">'+f(me.sharpe)+'</span></div>'+
+      '<div class="stat s-in"><span class="stat-label">95% range</span><span class="stat-value" style="font-size:15px">'+f(me.lo)+' to '+f(me.hi)+'</span></div>'+
+      '<div class="stat s-count"><span class="stat-label">Sortino</span><span class="stat-value '+(me.sortino==null?'':(me.sortino>=0?'pos':'neg'))+'">'+(me.sortino==null?'—':f(me.sortino))+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Days measured</span><span class="stat-value">'+me.n+'</span></div>'+
+    '</div>'+
+    '<div class="stat-row" style="margin-bottom:0">'+
+      '<div class="stat"><span class="stat-label">Return (annualised)</span><span class="stat-value '+(me.retAnnual>=0?'pos':'neg')+'">'+(me.retAnnual*100).toFixed(1)+'%</span></div>'+
+      '<div class="stat"><span class="stat-label">Volatility</span><span class="stat-value">'+(me.volAnnual*100).toFixed(1)+'%</span></div>'+
+      '<div class="stat"><span class="stat-label">Index Sharpe</span><span class="stat-value">'+(bench?f(bench.sharpe):'—')+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Risk-free used</span><span class="stat-value">'+(rf*100).toFixed(1)+'%</span></div>'+
+    '</div>'+
+    (straddles
+      ? '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65"><b class="warn">The range crosses zero.</b> On '+me.n+' days of data this Sharpe is indistinguishable from no risk-adjusted return at all. That is not a criticism of the portfolio — it is what a few months of data can support. Distinguishing a Sharpe of 0.5 from 1.0 with confidence takes closer to a decade.</p>'
+      : '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">The range sits entirely '+(me.lo>0?'above':'below')+' zero across '+me.n+' days. That is a real reading, though '+me.n+' days is still a short window to judge a process by.</p>')+
+    (bench?'<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.6">Against the index over the same days: <b>'+f(bench.sharpe)+'</b> versus your <b>'+f(me.sharpe)+'</b>. '+
+      (me.sharpe>bench.sharpe?'You are being paid more per unit of risk — on this sample.':'The index is being paid more per unit of risk on this sample, which is the outcome most active books produce.')+'</p>':'')+
+    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Returns are computed from <b>gain</b>, not portfolio value, so money you deposit is not counted as a return. Cash is in the denominator, so holding a large idle balance correctly drags this down. Sortino uses downside deviation only, since Sharpe penalises upside volatility just as hard — which punishes exactly the outcome you want.</p>';
+}
+
+/* ================= RISK CONTRIBUTION =================
+   Deliberately NOT an efficient frontier. Mean-variance optimisation needs expected returns and is
+   pathologically sensitive to them — it systematically overweights whatever holding has estimation
+   error in its favour, which is why Michaud called it an estimation-error maximiser and why
+   DeMiguel, Garlappi and Uppal found naive equal weighting beat it out of sample across many
+   datasets. Handing over an allocation built on that would be false authority.
+
+   What survives is the half that needs no expected returns: how much of the portfolio's variance
+   each holding is actually responsible for, versus how much of the money it holds. That is
+   measurement. It cannot be wrong about the future because it makes no claim about it. */
+function covMatrix(rows,avgCorr){
+  const n=rows.length,S=[];
+  for(let i=0;i<n;i++){
+    S.push([]);
+    for(let j=0;j<n;j++){
+      const pc=i===j?1:pairCorr(rows[i].sym,rows[j].sym);
+      const rho=(pc==null)?avgCorr:pc;
+      S[i].push(rows[i].sigma*rows[j].sigma*rho);
+    }
+  }
+  return S;
+}
+/* The correlation cache stores pairs as {s1,s2,c}. Reading p.a/p.b here would match nothing and fall
+   through to the average correlation for every pair — a wrong answer with no error, which is the
+   worst failure mode available. */
+function pairCorr(a,b){
+  if(!lastRiskCorrPairs)return null;
+  const hit=lastRiskCorrPairs.find(p=>(p.s1===a&&p.s2===b)||(p.s1===b&&p.s2===a));
+  return hit?hit.c:null;
+}
+function portVol(w,S){
+  let v=0;
+  for(let i=0;i<w.length;i++)for(let j=0;j<w.length;j++)v+=w[i]*w[j]*S[i][j];
+  return Math.sqrt(Math.max(v,0));
+}
+function riskContributions(){
+  const hs=(D.holdings||[]).filter(h=>['Stock','ETF'].includes(h.type));
+  const rows=[];
+  hs.forEach(h=>{
+    const sc=(D.analyses||{})[h.sym];
+    const sigma=(sc&&!sc.error&&isFinite(sc.riskSigma)&&sc.riskSigma>0)?sc.riskSigma
+      :(h.type==='ETF'?0.15:null);
+    const val=(h.price??h.cost)*h.shares;
+    if(sigma&&val>0)rows.push({sym:h.sym,val,sigma,assumed:!(sc&&isFinite(sc.riskSigma))});
+  });
+  if(rows.length<2)return null;
+  const total=rows.reduce((a,r)=>a+r.val,0);
+  const w=rows.map(r=>r.val/total);
+  const avgCorr=(lastRiskCorrPairs&&lastRiskCorrPairs.length)
+    ? lastRiskCorrPairs.reduce((s,p)=>s+p.c,0)/lastRiskCorrPairs.length : 0.5;
+  const measured=!!(lastRiskCorrPairs&&lastRiskCorrPairs.length);
+  const S=covMatrix(rows,avgCorr);
+  const vol=portVol(w,S);
+  if(!(vol>0))return null;
+  // Marginal contribution to risk, then the share each holding owns of total variance.
+  const contrib=rows.map((r,i)=>{
+    let mc=0;
+    for(let j=0;j<rows.length;j++)mc+=w[j]*S[i][j];
+    return{...r,weight:w[i]*100,rc:(w[i]*mc)/(vol*vol)*100};
+  });
+  const eqW=rows.map(()=>1/rows.length);
+  return{rows:contrib,vol,eqVol:portVol(eqW,S),avgCorr,measured,n:rows.length};
+}
+function renderRiskContrib(){
+  const el=document.getElementById('riskContribBody');
+  if(!el||!D)return;
+  const R=riskContributions();
+  if(!R){
+    el.innerHTML='<div class="empty">Needs at least two analysed stock or ETF holdings with a volatility reading. Run <b>Refresh data</b>, then <b>Calculate risk</b> on the Risk tab for measured correlations.</div>';
+    return;
+  }
+  const sorted=[...R.rows].sort((a,b)=>b.rc-a.rc);
+  const worst=sorted[0];
+  const eqBetter=R.eqVol<R.vol;
+  el.innerHTML=
+    '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+      '<div class="stat s-profit"><span class="stat-label">Portfolio volatility</span><span class="stat-value">'+(R.vol*100).toFixed(1)+'%</span></div>'+
+      '<div class="stat s-in"><span class="stat-label">If equally weighted</span><span class="stat-value '+(eqBetter?'neg':'pos')+'">'+(R.eqVol*100).toFixed(1)+'%</span></div>'+
+      '<div class="stat s-count"><span class="stat-label">Biggest risk source</span><span class="stat-value" style="font-size:16px">'+esc(worst.sym)+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Correlation used</span><span class="stat-value" style="font-size:15px">'+R.avgCorr.toFixed(2)+'</span></div>'+
+    '</div>'+
+    '<div style="overflow-x:auto;margin-top:14px"><table><thead><tr>'+
+      '<th>Ticker</th><th>Share of money</th><th>Share of risk</th><th>Ratio</th><th>Volatility</th>'+
+    '</tr></thead><tbody>'+sorted.map(r=>{
+      const ratio=r.weight>0?r.rc/r.weight:null;
+      return '<tr><td><b>'+esc(r.sym)+'</b></td>'+
+        '<td class="muted">'+r.weight.toFixed(1)+'%</td>'+
+        '<td class="'+(ratio>1.15?'neg':ratio<0.85?'pos':'')+'"><b>'+r.rc.toFixed(1)+'%</b></td>'+
+        '<td class="'+(ratio>1.15?'neg':ratio<0.85?'pos':'muted')+'">'+(ratio!=null?ratio.toFixed(2)+'×':'—')+'</td>'+
+        '<td class="muted">'+(r.sigma*100).toFixed(0)+'%'+(r.assumed?' <span style="font-size:11px">assumed</span>':'')+'</td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.65"><b>'+esc(worst.sym)+' holds '+worst.weight.toFixed(1)+'% of the money and '+worst.rc.toFixed(1)+'% of the risk.</b> '+
+      'A ratio above 1 means a holding punches above its size; below 1 means it is dampening the book. This is the number a position-size percentage cannot show you.</p>'+
+    '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65">'+
+      (eqBetter
+        ? 'Splitting the same holdings equally would run at <b class="neg">'+(R.eqVol*100).toFixed(1)+'%</b> volatility against your <b>'+(R.vol*100).toFixed(1)+'%</b> — your weighting is carrying more risk than dividing evenly would. That is worth a reason.'
+        : 'Splitting the same holdings equally would run at <b>'+(R.eqVol*100).toFixed(1)+'%</b> against your <b class="pos">'+(R.vol*100).toFixed(1)+'%</b>, so your weighting is genuinely reducing risk versus naive diversification.')+'</p>'+
+    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6"><b>There is no efficient frontier here, on purpose.</b> Optimising a frontier needs expected returns, and mean-variance is notoriously unstable in them — it overweights whatever holding has estimation error in its favour, and equal weighting has beaten it out of sample in published tests. So this shows where your risk actually sits and compares against equal weight, and stops there. '+
+      (R.measured?'Correlations are measured from your holdings.':'Correlations are a '+R.avgCorr.toFixed(2)+' assumption — run <b>Calculate risk</b> on the Risk tab to measure them.')+'</p>';
+}
+
+/* ================= THE STRATEGY REGISTRY =================
+   Every strategy enters the same way: a name, a falsifiable claim, an expectation written BEFORE any
+   result is seen, and the result that would make you switch it off. Live tracks are capped, so a new
+   idea cannot be added — it has to displace one that is already losing.
+
+   Two reasons the cap exists, and both are arithmetic rather than taste.
+
+   1. The tracks all eat the same food. They are fed by one watchlist, so seven systems do not produce
+      seven times the evidence — they divide one thin stream seven ways, and every track added makes
+      every existing track slower to resolve.
+   2. With seven tracks tested at a five percent threshold, the chance at least one looks significant
+      by pure luck is about thirty percent. Capping the count is the cheapest defence against
+      manufacturing a winner out of noise.
+
+   The graveyard is kept forever and shown next to the live list. Nobody records what they tried and
+   abandoned, so everyone re-tries the same dead ideas every eighteen months having forgotten they
+   already disproved them. The dead list is the part nobody else has. */
+const MAX_LIVE_TRACKS=3;
+const SEED_STRATEGIES=[
+  {id:'checklist',name:'Checklist',status:'live',builtin:true,
+   claim:'Companies passing my quality and value bars beat the index over 90 days.',
+   expect:'Positive expectancy vs SPY, with the interval eventually clearing zero.',
+   kill:'Expectancy interval sits entirely below zero across 40+ marked calls.'},
+  {id:'herizen',name:'Herizen momentum',status:'live',builtin:true,
+   claim:'Four non-overlapping up-segments predict continuation over 90 days.',
+   expect:'Honestly, negative or nothing — three of its four windows sit in the documented short-term reversal band.',
+   kill:'Interval below zero, or measurably worse than the checklist alone.'},
+  {id:'gated',name:'Checklist + momentum',status:'live',builtin:true,
+   claim:'Filtering checklist BUYs through the momentum score beats the checklist alone.',
+   expect:'Slightly better than checklist alone if the gate removes weak entries; worse if it just removes trades.',
+   kill:'Fails to beat the checklist track once both have 40+ marked calls.'},
+  {id:'ewma',name:'EWMA 50/200 crossover',status:'proposed',builtin:true,
+   claim:'Fast EWMA above slow EWMA predicts continuation over 90 days.',
+   expect:'Better prior than Herizen — a 50/200 span covers roughly 2.5 to 10 months, which is where time-series momentum is actually documented, rather than the reversal band.',
+   kill:'Interval below zero, or fails to beat whichever track it displaced.'}
+];
+function strategies(){
+  if(!Array.isArray(D.strategies))D.strategies=[];
+  // Seed once. Existing accounts already have the three tracks running; this just names them.
+  if(!D.strategies.length){
+    D.strategies=SEED_STRATEGIES.map(s=>Object.assign({created:new Date().toISOString().slice(0,10)},s));
+    saveDB();
+  }
+  return D.strategies;
+}
+function strategyById(id){return strategies().find(s=>s.id===id)||null;}
+function liveTracks(){return strategies().filter(s=>s.status==='live').map(s=>s.id);}
+function trackIsLive(id){const s=strategyById(id);return !!(s&&s.status==='live');}
+function retireStrategy(id){
+  const s=strategyById(id);
+  if(!s)return;
+  const why=(prompt('Retiring "'+s.name+'".\n\nWhy? This goes in the graveyard permanently, and it is the note that stops you rebuilding this in a year having forgotten.')||'').trim();
+  if(!why)return toast('Cancelled. A retirement needs a reason.');
+  s.status='dead';s.killedAt=new Date().toISOString().slice(0,10);s.killReason=why;
+  saveDB();renderRegistry();renderScorecard();
+  toast(s.name+' retired. A slot is free.');
+}
+function promoteStrategy(id){
+  const s=strategyById(id);
+  if(!s)return;
+  if(liveTracks().length>=MAX_LIVE_TRACKS){
+    return toast('Three tracks are already live. Retire one first — a new idea has to displace a losing one, not join it.');
+  }
+  s.status='live';s.promotedAt=new Date().toISOString().slice(0,10);
+  saveDB();renderRegistry();renderScorecard();
+  toast(s.name+' is live. It starts recording on the next refresh, and its record starts today.');
+}
+function addStrategy(){
+  const v=id=>((document.getElementById(id)||{}).value||'').trim();
+  const name=v('stName'),claim=v('stClaim'),expect=v('stExpect'),kill=v('stKill');
+  if(!name||!claim)return toast('A strategy needs a name and a claim.');
+  if(!expect)return toast('Write what you expect it to do — before you see any result, or you will explain whatever happens.');
+  if(!kill)return toast('Write the result that would make you switch it off. If you cannot state one, it is unfalsifiable and should not enter.');
+  strategies().push({
+    id:'u'+Date.now().toString(36),name,claim,expect,kill,
+    status:'proposed',builtin:false,created:new Date().toISOString().slice(0,10)
+  });
+  ['stName','stClaim','stExpect','stKill'].forEach(i=>{const e=document.getElementById(i);if(e)e.value='';});
+  saveDB();renderRegistry();
+  toast('Added as proposed. It records nothing until it displaces a live track.');
+}
+function renderRegistry(){
+  const el=document.getElementById('registryBody');
+  if(!el||!D)return;
+  const all=strategies();
+  const live=all.filter(s=>s.status==='live');
+  const prop=all.filter(s=>s.status==='proposed');
+  const dead=all.filter(s=>s.status==='dead');
+  const slot=document.getElementById('regSlots');
+  if(slot){
+    slot.textContent=live.length+' / '+MAX_LIVE_TRACKS+' slots used';
+    slot.className=live.length>=MAX_LIVE_TRACKS?'warn':'muted';
+  }
+  const card=(s,kind)=>'<div style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;'+
+      (kind==='dead'?'opacity:.62;':'')+'background:var(--panel)">'+
+    '<div class="row" style="gap:9px;align-items:center;margin-bottom:7px;flex-wrap:wrap">'+
+      '<b style="font-size:14.5px">'+esc(s.name)+'</b>'+
+      '<span class="pill '+(kind==='live'?'pill-buy':kind==='proposed'?'pill-watch':'pill-na')+'" style="font-size:10px">'+kind+'</span>'+
+      '<div class="spacer"></div>'+
+      (kind==='live'?'<button class="btn btn-ghost btn-sm" onclick="retireStrategy(\''+esc(s.id)+'\')">Retire</button>':'')+
+      (kind==='proposed'?'<button class="btn btn-sm" onclick="promoteStrategy(\''+esc(s.id)+'\')">Make it live</button>':'')+
+    '</div>'+
+    '<div style="font-size:13px;line-height:1.6"><span class="muted">Claims:</span> '+esc(s.claim)+'</div>'+
+    (s.expect?'<div style="font-size:13px;line-height:1.6;margin-top:4px"><span class="muted">Expected:</span> '+esc(s.expect)+'</div>':'')+
+    (s.kill?'<div style="font-size:13px;line-height:1.6;margin-top:4px"><span class="muted">Kill if:</span> '+esc(s.kill)+'</div>':'')+
+    (kind==='dead'?'<div style="font-size:12.5px;line-height:1.6;margin-top:7px" class="neg"><b>Retired '+esc(s.killedAt||'')+':</b> '+esc(s.killReason||'')+'</div>':'')+
+  '</div>';
+  el.innerHTML=
+    '<div class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">Live — recording and graded</div>'+
+    (live.length?live.map(s=>card(s,'live')).join(''):'<div class="empty" style="margin-bottom:14px">Nothing live.</div>')+
+    '<div class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;margin:18px 0 9px">Proposed — records nothing yet</div>'+
+    (prop.length?prop.map(s=>card(s,'proposed')).join(''):'<div class="empty" style="margin-bottom:14px">Nothing waiting.</div>')+
+    (dead.length
+      ? '<div class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;margin:18px 0 9px">Graveyard — kept on purpose</div>'+
+        dead.map(s=>card(s,'dead')).join('')
+      : '');
+}
+
+/* ================= EWMA 50/200 =================
+   Exponentially weighted moving averages of the price log. Fast above slow is the classic trend
+   signal, and unlike Herizen its span sits in the horizon band where momentum is actually
+   documented — roughly two and a half to ten months rather than one week to two.
+
+   It is registered as PROPOSED. It records nothing and sizes nothing until it displaces one of the
+   three live tracks, because the cap is what stops the track count outrunning the evidence. */
+function ewmaOf(series,span){
+  if(!series||series.length<2)return null;
+  const k=2/(span+1);
+  let e=series[0];
+  for(let i=1;i<series.length;i++)e=series[i]*k+e*(1-k);
+  return e;
+}
+function ewmaCross(sym,fast,slow){
+  fast=fast||50;slow=slow||200;
+  const arr=(D.priceLog||{})[sym];
+  if(!arr||arr.length<Math.min(60,slow/3))return null;   // needs real depth to mean anything
+  const px=arr.map(r=>r.p).filter(p=>p>0);
+  if(px.length<30)return null;
+  const f=ewmaOf(px,fast),s=ewmaOf(px,slow);
+  if(f==null||s==null||!(s>0))return null;
+  return{fast:f,slow:s,gapPct:(f-s)/s*100,up:f>s,n:px.length,thin:px.length<slow};
+}
+function ewmaVerdict(sym){
+  const c=ewmaCross(sym,50,200);
+  if(!c)return null;
+  return c.up?'buy':'sell';
+}
+
+/* ================= HERIZEN MOMENTUM SCORE =================
+   Four segments. Each asks one question: did the price rise across this stretch. Plus one if yes,
+   minus one if no. Sum the four for a score from -4 to +4, then map to a position size.
+
+   TWO DELIBERATE DEPARTURES FROM THE RULE AS DESCRIBED.
+
+   1. The segments are NON-OVERLAPPING. Drawing all four lines back from today means the one-week
+      return sits inside the two-week return, which sits inside the one-month, which sits inside the
+      two-month. One sharp move three days ago lifts every line at once, so a +4 is one observation
+      counted four times and the score piles up at the extremes while the middle stays empty. Cutting
+      the same span into four separate stretches makes each point independent evidence.
+
+   2. It caps position size. It does NOT vote on buy, sell or hold. The published evidence puts
+      momentum at three to twelve months and REVERSAL at one week to one month, which is where three
+      of these four windows sit — so the honest prior on this rule is between nothing and negative.
+      As a cap, being wrong costs upside. As a verdict, being wrong costs capital. It has not earned
+      the right to cost capital. */
+const HZ_LEGS=[
+  [61,30,'2 months → 1 month'],
+  [30,14,'1 month → 2 weeks'],
+  [14,7, '2 weeks → 1 week'],
+  [7,  0,'1 week → today']
+];
+/* Calendar days, not log positions. Indexing by position would mean "5 entries back" equals a week
+   only if the app is opened daily — open it twice a week and the same index reaches back a month
+   without saying so. */
+function priceAt(arr,daysAgo){
+  if(!arr||!arr.length)return null;
+  if(daysAgo===0)return arr[arr.length-1];
+  const target=Date.now()-daysAgo*86400000;
+  let best=null;
+  for(const r of arr){
+    if(Date.parse(r.d+'T12:00:00')<=target)best=r; else break;   // arr is sorted ascending
+  }
+  if(!best)return null;
+  // Reject a match that is far older than asked for; a stale point silently changes the window.
+  const drift=(target-Date.parse(best.d+'T12:00:00'))/86400000;
+  return drift>12?null:best;
+}
+function herizen(sym){
+  const arr=(D.priceLog||{})[sym];
+  if(!arr||arr.length<8)return null;
+  const legs=[];
+  for(const [from,to,label] of HZ_LEGS){
+    const a=priceAt(arr,from), b=priceAt(arr,to);
+    if(!a||!b||!(a.p>0)||!(b.p>0)||a.d===b.d)return null;
+    legs.push({label,from:a,to:b,ret:(b.p-a.p)/a.p*100,pt:b.p>a.p?1:-1});
+  }
+  const score=legs.reduce((s,l)=>s+l.pt,0);
+  return{score,legs,size:Math.max(0,score)*25,span:arr.length,first:arr[0].d};
+}
+/* Herizen's own verdict, used ONLY for its graded track. Never reaches the terminal's verdict. */
+function herizenVerdict(sym){
+  const h=herizen(sym);
+  if(!h)return null;
+  return h.score>=2?'buy':h.score<=0?'sell':'hold';
+}
+/* Daily closes per ticker. The momentum score needs price history and Finnhub's free candle endpoint
+   is unreliable, so the app keeps its own log and backfills from candles opportunistically. */
+function logPrice(sym,price){
+  if(!(price>0))return;
+  if(!D.priceLog)D.priceLog={};
+  if(!Array.isArray(D.priceLog[sym]))D.priceLog[sym]=[];
+  const arr=D.priceLog[sym];
+  const d=new Date().toISOString().slice(0,10);
+  const last=arr[arr.length-1];
+  if(last&&last.d===d)last.p=price; else arr.push({d,p:price});
+  if(arr.length>300)D.priceLog[sym]=arr.slice(arr.length-300);
+}
+async function backfillPrices(sym){
+  if(!D.priceLog)D.priceLog={};
+  const have=(D.priceLog[sym]||[]).length;
+  if(have>=50)return;                       // already deep enough for the longest segment
+  try{
+    const c=await getCandles(sym,100);
+    if(!c||!Array.isArray(c.c)||!Array.isArray(c.t))return;
+    const merged={};
+    (D.priceLog[sym]||[]).forEach(r=>merged[r.d]=r.p);
+    for(let i=0;i<c.t.length;i++){
+      const d=new Date(c.t[i]*1000).toISOString().slice(0,10);
+      if(isFinite(c.c[i])&&c.c[i]>0)merged[d]=c.c[i];
+    }
+    D.priceLog[sym]=Object.keys(merged).sort().map(d=>({d,p:merged[d]})).slice(-300);
+  }catch(e){/* candle endpoint refused; the log fills forward from here instead */}
+}
+function renderHerizen(){
+  const el=document.getElementById('herizenBody');
+  if(!el||!D)return;
+  const sym=((document.getElementById('hzTicker')||{}).value||'').trim().toUpperCase();
+  const cnt=document.getElementById('hzCount');
+  const logged=Object.keys(D.priceLog||{}).length;
+  if(cnt)cnt.textContent=logged?logged+' ticker'+(logged===1?'':'s')+' with price history':'';
+  if(!sym){
+    el.innerHTML='<div class="empty">Enter a ticker. It needs about two months of daily closes — the app backfills from Finnhub where the endpoint allows and otherwise builds the history forward from your refreshes.</div>';
+    return;
+  }
+  const h=herizen(sym);
+  if(!h){
+    const arr=(D.priceLog||{})[sym];
+    el.innerHTML='<div class="empty">'+(arr&&arr.length
+      ? 'Only '+arr.length+' day'+(arr.length===1?'':'s')+' of history for '+esc(sym)+', going back to '+esc(arr[0].d)+'. The two-month segment needs more. Keep running refreshes and this fills in.'
+      : 'No price history for '+esc(sym)+' yet. Add it to your Watchlist or Portfolio and run <b>Refresh data</b>.')+'</div>';
+    return;
+  }
+  const band=h.score>=2?'pos':h.score<=0?'neg':'warn';
+  el.innerHTML=
+    '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+      '<div class="stat s-profit"><span class="stat-label">Score</span><span class="stat-value '+band+'">'+(h.score>0?'+':'')+h.score+' <span class="muted" style="font-size:13px;font-weight:400">of 4</span></span></div>'+
+      '<div class="stat s-in"><span class="stat-label">Position cap</span><span class="stat-value '+band+'">'+h.size+'%</span></div>'+
+      '<div class="stat s-count"><span class="stat-label">Segments up</span><span class="stat-value">'+h.legs.filter(l=>l.pt>0).length+' / 4</span></div>'+
+      '<div class="stat"><span class="stat-label">History</span><span class="stat-value" style="font-size:15px">'+h.span+'d</span></div>'+
+    '</div>'+
+    '<div style="overflow-x:auto;margin-top:14px"><table><thead><tr>'+
+      '<th>Segment</th><th>From</th><th>To</th><th>Move</th><th>Point</th>'+
+    '</tr></thead><tbody>'+h.legs.map(l=>
+      '<tr><td>'+esc(l.label)+'</td>'+
+      '<td class="muted">'+fmt$(l.from.p)+' <span style="font-size:11px">'+esc(l.from.d)+'</span></td>'+
+      '<td class="muted">'+fmt$(l.to.p)+' <span style="font-size:11px">'+esc(l.to.d)+'</span></td>'+
+      '<td class="'+(l.ret>=0?'pos':'neg')+'">'+(l.ret>=0?'+':'')+l.ret.toFixed(2)+'%</td>'+
+      '<td class="'+(l.pt>0?'pos':'neg')+'"><b>'+(l.pt>0?'+1':'−1')+'</b></td></tr>').join('')+
+    '</tbody></table></div>'+
+    '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.6">'+
+      'A score of <b>'+(h.score>0?'+':'')+h.score+'</b> permits at most <b>'+h.size+'%</b> of the size your other limits allow. '+
+      (h.size===0
+        ? 'At zero it blocks the position entirely — not because the company is bad, but because nothing here is trending.'
+        : h.size===100
+          ? 'All four segments rose, so this places no restriction beyond your policy cap and volatility budget.'
+          : 'It will bind only if it is smaller than your policy cap, volatility budget and stop distance.')+
+    '</p>';
+}
+
 /* ---- Checklist score, logged over time ----
    D.analyses holds only the latest score, so a company quietly rotting from 10/12 to 7/12 across three
    quarters looked identical to one that had always been 7/12. One row per ticker per day, which is the
@@ -3285,7 +3861,21 @@ function evaluateSignals(sym,sc,prev){
      different opinions from one system, only one of them ever checked. */
   const v=verdictOf(sc,isHolding,sym);
   const prevV=prev?verdictOf(prev,isHolding,sym).key:null;
-  if(!sc.error)recordCall(sym,sc,v.key,v.label);
+  if(!sc.error){
+    recordCall(sym,sc,v.key,v.label,'checklist');
+    /* THE THREE TRACKS. The terminal's verdict is unchanged and unaffected by momentum — these two
+       extra rows exist purely so that in ninety days the comparison is a number rather than a
+       debate. If the herizen track's interval sits below zero, it gets deleted having cost nothing. */
+    const hv=herizenVerdict(sym);
+    if(hv){
+      recordCall(sym,sc,hv,'Herizen '+hv.toUpperCase(),'herizen');
+      // Gated: the checklist's opinion, but a BUY is only allowed through if momentum agrees.
+      const gated=(v.key==='buy'&&hv!=='buy')?'hold':v.key;
+      recordCall(sym,sc,gated,'Gated '+gated.toUpperCase(),'gated');
+    }
+    const ev=ewmaVerdict(sym);
+    if(ev)recordCall(sym,sc,ev,'EWMA '+ev.toUpperCase(),'ewma');   // no-ops unless promoted to live
+  }
   if(v.key==='buy'&&prevV!=='buy')pushAlert('buy',sym,'Now a BUY candidate — quality '+sc.qScore+'/12, price '+sc.pScore+'/6. Review before acting.');
   if(v.key==='sell'&&prevV!=='sell')pushAlert('sell',sym,'Quality dropped to '+sc.qScore+'/'+sc.qTotal+' — review whether to sell.');
 }
@@ -5674,7 +6264,15 @@ function sizingLimits(sym,fromCash){
     out.stop=out.budget/dist;
   }
 
-  const candidates=[['policy cap',out.cap],['volatility budget',out.vol],['stop distance',out.stop]]
+  /* Fourth limit: the momentum gate. Expressed as a fraction of the policy cap, because the rule's
+     own language is "100% / 50% / 0% of a position" — it describes size, not direction, and this is
+     the only place it is allowed to touch anything. */
+  // Only a LIVE strategy may cap a position. Retire it in the registry and it stops touching sizing.
+  const hz=trackIsLive('herizen')?herizen(sym):null;
+  if(hz&&isFinite(out.cap)){ out.hz=hz; out.gate=out.cap*(hz.size/100); }
+
+  const candidates=[['policy cap',out.cap],['volatility budget',out.vol],
+                    ['stop distance',out.stop],['momentum gate',out.gate]]
     .filter(c=>isFinite(c[1])&&c[1]>=0);
   if(candidates.length){
     candidates.sort((a,b)=>a[1]-b[1]);
@@ -5736,6 +6334,10 @@ function sizingPanel(sym,fromCash,proposed){
         L.stopPrice?'Your thesis stop at '+fmt$(L.stopPrice)+' is '+L.stopDistPct.toFixed(1)+'% away — this size loses exactly the budget if it hits'
                    :'No stop set. Write one in the thesis and this becomes the real limit.',
         L.binding==='stop distance')+
+      row('Momentum gate',L.gate,
+        L.hz?('Herizen score '+(L.hz.score>0?'+':'')+L.hz.score+' of 4 permits '+L.hz.size+'% of the cap — caps size only, never the verdict')
+            :'Needs about two months of daily closes for this ticker.',
+        L.binding==='momentum gate')+
     '</tbody></table></div>'+
     (over
       ? '<div style="padding:11px 16px;border-top:1px solid var(--border);background:rgba(229,83,75,.07);font-size:13px;line-height:1.6" class="neg">'+
@@ -5744,6 +6346,7 @@ function sizingPanel(sym,fromCash,proposed){
         'The <b>'+L.binding+'</b> is what limits you here at '+fmt$(L.limit)+'. '+
         (L.binding==='volatility budget'?'To go bigger you need a calmer stock, not a bigger cap.'
          :L.binding==='stop distance'?'A tighter stop would allow a larger position for the same risk — but only if the tighter stop is genuinely where your thesis breaks, not where you want it to be.'
+         :L.binding==='momentum gate'?'Momentum is what is holding you back, not risk. Worth knowing this rule is unproven and sits in a horizon band where the evidence points the other way — if you disagree with it, the checklist verdict is unaffected and you can size past it deliberately.'
          :'Your flat cap binds before risk does, which means the cap is doing the work rather than the risk budget.')+'</div>':''))+
   '</div>';
 }
@@ -7008,10 +7611,13 @@ function callEdge(c,alpha){
 function scorecardRows(){
   const winRaw=(document.getElementById('scoreWindow')||{}).value||'90';
   const want=(document.getElementById('scoreVerdict')||{}).value||'buy';
+  const track=(document.getElementById('scoreTrack')||{}).value||'checklist';
   const open=winRaw==='since';
   const days=open?null:parseInt(winRaw,10);
   const spyNow=_spyPriceCache?_spyPriceCache.price:null;
   return (D.calls||[])
+    // Calls recorded before tracks existed are checklist calls; that is what they were.
+    .filter(c=>(c.track||'checklist')===track)
     .filter(c=>want==='all'?true:c.verdict===want)
     .map(c=>{
       let now=null,bench=null,heldDays=null,pending=false,missed=false;
@@ -7082,6 +7688,62 @@ function dueSoonNote(){
   const due=callsDueSoon(7);
   if(!due)return '';
   return ' · <span class="warn">'+due+' mark'+(due===1?'':'s')+' due within a week</span>';
+}
+/* THE HEAD-TO-HEAD. Three systems, same tickers, same dates, same marking — the only honest way to
+   answer whether the momentum rule adds anything. Argument does not settle this. Error bars do. */
+const TRACK_NAMES={checklist:'Checklist alone',herizen:'Herizen alone',gated:'Checklist + momentum',ewma:'EWMA 50/200'};
+function trackStats(track,winRaw){
+  const open=winRaw==='since';
+  const days=open?null:parseInt(winRaw,10);
+  const spyNow=_spyPriceCache?_spyPriceCache.price:null;
+  const edges=[];
+  (D.calls||[]).forEach(c=>{
+    if((c.track||'checklist')!==track)return;
+    if(c.verdict!=='buy'&&c.verdict!=='sell')return;
+    if(!(c.price>0)||!(c.spy>0))return;
+    let now=null,bench=null;
+    if(open){
+      const sc=D.analyses[c.sym];
+      now=(sc&&!sc.error&&isFinite(sc.price))?sc.price:null; bench=spyNow;
+    }else{
+      const mk=(c.marks||{})[days];
+      if(!mk||mk.missed)return;
+      now=mk.price; bench=mk.spy;
+    }
+    if(now==null||bench==null)return;
+    const e=callEdge(c,((now-c.price)/c.price*100)-((bench-c.spy)/c.spy*100));
+    if(e!=null)edges.push(e);
+  });
+  return expectancyStats(edges);
+}
+function trackComparison(winRaw){
+  const rows=['checklist','herizen','gated'].map(t=>({t,s:trackStats(t,winRaw)}));
+  const any=rows.filter(r=>r.s);
+  if(any.length<2)return '';   // nothing to compare against yet
+  const best=any.slice().sort((a,b)=>b.s.expectancy-a.s.expectancy)[0];
+  return '<div style="margin-top:16px;border:1px solid var(--border);border-radius:9px;overflow:hidden">'+
+    '<div style="padding:11px 15px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
+      'Three systems, same calls, same marks</div>'+
+    '<div style="overflow-x:auto"><table><thead><tr>'+
+      '<th>System</th><th>Calls</th><th>Expectancy</th><th>95% range</th><th>Reading</th>'+
+    '</tr></thead><tbody>'+rows.map(({t,s})=>{
+      if(!s)return '<tr><td>'+TRACK_NAMES[t]+'</td><td colspan="4" class="muted">nothing marked yet</td></tr>';
+      const straddles=s.lo!=null&&s.lo<0&&s.hi>0;
+      const pts=x=>(x>=0?'+':'')+x.toFixed(2);
+      return '<tr'+(t===best.t?' style="background:rgba(59,130,246,.07)"':'')+'>'+
+        '<td><b>'+TRACK_NAMES[t]+'</b>'+(t===best.t&&any.length>1?' <span class="pill pill-buy" style="font-size:10px">ahead</span>':'')+'</td>'+
+        '<td class="muted">'+s.n+'</td>'+
+        '<td class="'+(s.expectancy>=0?'pos':'neg')+'"><b>'+pts(s.expectancy)+'</b></td>'+
+        '<td class="muted" style="font-size:12px">'+(s.lo!=null?pts(s.lo)+' to '+pts(s.hi):'needs 2+')+'</td>'+
+        '<td class="'+(straddles?'muted':(s.expectancy>0?'pos':'neg'))+'" style="font-size:12.5px">'+
+          (straddles?'indistinguishable from zero':(s.expectancy>0?'measurably positive':'measurably negative'))+'</td>'+
+      '</tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<div style="padding:12px 15px;border-top:1px solid var(--border);background:var(--bg);font-size:12px;color:var(--muted);line-height:1.6">'+
+      'The momentum rule caps position size and never touches the verdict, so these three are logged in parallel rather than one overriding another. '+
+      'If Herizen\'s range sits below zero it should be switched off; if the gated row leads with a range clear of zero, the gate is earning its place. '+
+      '<b>Until an interval excludes zero, none of these rows is evidence of anything.</b></div>'+
+  '</div>';
 }
 function renderScorecard(){
   const tb=document.getElementById('scorecardBody');
@@ -7158,6 +7820,7 @@ function renderScorecard(){
       (mA!=null&&nA!=null&&withM.length>=5&&withoutM.length>=5
         ? '<p class="muted" style="font-size:13px;margin-top:8px">Calls that cleared your momentum minimum ran <b class="'+(mA>=nA?'pos':'neg')+'">'+(mA-nA>=0?'+':'')+(mA-nA).toFixed(2)+'pts</b> '+(mA>=nA?'better':'worse')+' than those that didn\'t ('+withM.length+' vs '+withoutM.length+' calls).</p>'
         : '')+
+      trackComparison(winRaw)+
       ruleChangeWarning()+
       (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+scored.length+' scoreable call'+(scored.length===1?'':'s')+' is not evidence.</b> Under roughly 20, two lucky picks dominate every number above. Treat it as a running tally, not a verdict on the checklist.</p>':'')+
       (missed?'<p class="muted" style="font-size:12px;margin-top:8px">'+missed+' call'+(missed===1?' was':'s were')+' excluded: their anniversary passed while the app was closed, so no honest mark exists. Counting them at whatever price happened to be next would fake the holding period.</p>':'');
