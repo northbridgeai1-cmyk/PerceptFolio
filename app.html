@@ -64,7 +64,7 @@ input::placeholder{color:var(--muted)}
 .btn-sm{padding:7px 6px;font-size:12px}
 /* Installed on iOS the status bar is translucent and content runs under the notch, so the header
    pads itself by whatever the device reports as its safe area. On desktop these insets are 0. */
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:50;
+header{display:flex;align-items:center;gap:10px;padding:0 16px 0 12px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:50;
   padding-top:env(safe-area-inset-top);height:calc(56px + env(safe-area-inset-top));
   padding-left:calc(24px + env(safe-area-inset-left));padding-right:calc(24px + env(safe-area-inset-right))}
 .logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;display:inline-flex;align-items:center;gap:7px}
@@ -79,49 +79,133 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
    uselessness. Down the side there is room, and collapsed it costs 56px while every icon stays
    clickable. The width lives in a custom property so main's offset and the sidebar itself can never
    disagree about how wide it is. */
-:root{--side:214px;--side-collapsed:56px}
+:root{--side:222px;--side-collapsed:60px;--ease:cubic-bezier(.32,.72,0,1)}
+/* Header spans the full width, sidebar hangs beneath it — so the sidebar sticks at the header's
+   height, not at 0. Sticking at 0 would make it slide up under the header on the first scroll. */
 #shell{display:flex;align-items:flex-start;min-height:calc(100vh - 56px)}
 #sidebar{
-  width:var(--side);flex:none;position:sticky;top:calc(56px + env(safe-area-inset-top));
+  width:var(--side);flex:none;position:sticky;
+  top:calc(56px + env(safe-area-inset-top));
   height:calc(100vh - 56px - env(safe-area-inset-top));
   border-right:1px solid var(--border);background:var(--panel);
-  display:flex;flex-direction:column;padding:10px 8px 8px;
-  transition:width .16s ease;overflow:hidden;overflow-y:auto;
-  padding-left:calc(8px + env(safe-area-inset-left));
+  display:flex;flex-direction:column;padding:12px 10px 10px;
+  transition:width .22s var(--ease);overflow:hidden;
+  padding-left:calc(10px + env(safe-area-inset-left));
 }
-body.side-collapsed #sidebar{width:var(--side-collapsed)}
-#sidebar nav{display:flex;flex-direction:column;gap:2px;flex:1}
+body.side-collapsed #sidebar{width:var(--side-collapsed);padding-left:calc(6px + env(safe-area-inset-left));padding-right:6px}
+
+/* The collapse control lives in the header beside the wordmark — top of the screen, first thing
+   the eye reaches, and it doesn't cost the sidebar a row. */
+#sideToggle{
+  background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;
+  width:28px;height:28px;border-radius:7px;flex:none;display:grid;place-items:center;
+  transition:color .14s,background .14s,border-color .14s,transform .22s var(--ease)}
+#sideToggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#sideToggle:hover{color:var(--text);background:var(--panel2);border-color:var(--border)}
+body.side-collapsed #sideToggle{transform:rotate(180deg)}
+.hd-div{width:1px;height:20px;background:var(--border);flex:none;margin:0 2px}
+header>.logo{text-decoration:none;flex:none}
+
+#sidebar nav{display:flex;flex-direction:column;gap:1px;flex:1;overflow-y:auto;overflow-x:hidden;margin:0 -2px;padding:0 2px}
 #sidebar nav button{
   background:transparent;border:none;color:var(--muted);cursor:pointer;
-  display:flex;align-items:center;gap:11px;width:100%;
-  padding:9px 11px;border-radius:7px;position:relative;
-  font-family:var(--mono);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
-  text-align:left;transition:background .12s ease,color .12s ease;white-space:nowrap;
+  display:flex;align-items:center;gap:12px;width:100%;
+  padding:9px 10px;border-radius:8px;position:relative;
+  font-family:var(--mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+  text-align:left;transition:background .14s,color .14s;white-space:nowrap;
 }
-#sidebar nav button .ico{
-  font-size:15px;line-height:1;width:20px;flex:none;text-align:center;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI Symbol",sans-serif;
-}
+#sidebar nav button .ico{width:19px;height:19px;flex:none;display:grid;place-items:center}
+#sidebar nav button .ico svg{
+  width:17px;height:17px;fill:none;stroke:currentColor;
+  stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;
+  transition:stroke-width .14s}
 #sidebar nav button:hover{color:var(--text);background:var(--panel2)}
 #sidebar nav button.active{color:var(--text);background:var(--panel2)}
-/* A left rule rather than a full inversion — at this size a solid block of --text was shouting. */
+#sidebar nav button.active .ico{color:var(--brand2)}
+#sidebar nav button.active .ico svg{stroke-width:2}
+/* A left rule rather than a full inversion — a solid block of --text was shouting at this size. */
 #sidebar nav button.active:before{
-  content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--brand2)}
-.nav-sep{height:1px;background:var(--border);margin:7px 6px}
-#sideToggle{
-  background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;
-  display:flex;align-items:center;gap:11px;padding:8px 11px;border-radius:7px;margin-top:8px;
-  font-family:var(--mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
-  transition:.12s;flex:none}
-#sideToggle:hover{color:var(--text);border-color:var(--text)}
-#sideToggle .ico{font-size:14px;width:20px;flex:none;text-align:center;transition:transform .16s ease}
-body.side-collapsed #sideToggle .ico{transform:rotate(180deg)}
-/* Collapsed: labels and the badge count vanish, icons centre themselves. */
+  content:"";position:absolute;left:-2px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--brand2)}
+#sidebar nav button:active{transform:translateY(.5px)}
+.nav-sep{height:1px;background:var(--border);margin:8px 8px;flex:none}
+.side-foot{flex:none;padding:10px 10px 2px;font:10px/1.4 var(--mono);color:var(--muted);opacity:.5;letter-spacing:.05em}
+.side-foot b{color:var(--text);font-weight:600}
+
+/* Collapsed: labels, badge and footer hint vanish; icons centre. */
 body.side-collapsed #sidebar .lbl,
-body.side-collapsed #sidebar .badge{display:none}
-body.side-collapsed #sidebar nav button,
-body.side-collapsed #sideToggle{justify-content:center;padding-left:0;padding-right:0}
-body.side-collapsed .nav-sep{margin:7px 10px}
+body.side-collapsed #sidebar .badge,
+body.side-collapsed .side-foot{display:none}
+body.side-collapsed #sidebar nav button{justify-content:center;padding-left:0;padding-right:0;gap:0}
+body.side-collapsed .nav-sep{margin:8px 12px}
+
+/* TOOLTIPS. Icons with no labels is guesswork, so the collapsed rail names everything on hover.
+   Pure CSS — no positioning library, and it cannot desync from the button it belongs to. */
+body.side-collapsed #sidebar nav button:after{
+  content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%) translateX(-4px);
+  background:var(--panel2);color:var(--text);border:1px solid var(--border);
+  padding:6px 10px;border-radius:6px;font-size:10.5px;letter-spacing:.06em;
+  white-space:nowrap;pointer-events:none;opacity:0;z-index:120;
+  box-shadow:0 6px 20px rgba(0,0,0,.45);transition:opacity .13s,transform .13s var(--ease)}
+body.side-collapsed #sidebar nav button:hover:after{opacity:1;transform:translateY(-50%) translateX(0)}
+body.side-collapsed #sidebar{overflow:visible}
+body.side-collapsed #sidebar nav{overflow:visible}
+
+/* ---------- feel ----------
+   Small things, but they are the difference between a page and an instrument. */
+::selection{background:rgba(31,158,140,.3);color:var(--text)}
+*{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;border:3px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#3d434f}
+/* Keyboard focus gets a real ring; mouse clicks do not. :focus-visible is what separates them. */
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--brand2);outline-offset:2px;border-radius:6px}
+button{-webkit-tap-highlight-color:transparent}
+.btn:active{transform:translateY(1px)}
+/* Panels lift very slightly under the cursor — enough to read as interactive, not enough to bounce. */
+.card{transition:border-color .16s,box-shadow .16s}
+.card:hover{border-color:#343945}
+/* Tab changes fade rather than snap. 140ms is below the threshold where it feels like waiting. */
+main>div:not(.tabs-hidden){animation:tabIn .16s var(--ease)}
+@keyframes tabIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  main>div:not(.tabs-hidden){animation:none}
+  #sidebar,#sideToggle{transition:none}
+}
+/* Where you are, in the header. Cheap orientation once the sidebar labels can be hidden. */
+.hd-where{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header>.row{margin-left:auto;flex:none}
+
+/* ---------- ticker command palette ---------- */
+.hd-search{position:relative;flex:1;max-width:420px;margin:0 auto;display:flex;align-items:center}
+.hd-search-ico{position:absolute;left:11px;width:15px;height:15px;fill:none;stroke:var(--muted);
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;transition:stroke .14s}
+.hd-search:focus-within .hd-search-ico{stroke:var(--brand2)}
+#globalSearch{width:100%;max-width:none;background:var(--panel);border:1px solid var(--border);
+  border-radius:9px;padding:8px 12px 8px 34px;font-size:13px;color:var(--text);
+  transition:border-color .14s,background .14s}
+#globalSearch::placeholder{color:var(--muted);opacity:.75}
+#globalSearch:focus{outline:none;border-color:var(--brand2);background:var(--panel2)}
+.gs-panel{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:80;display:none;
+  background:var(--panel);border:1px solid var(--border);border-radius:11px;overflow:hidden;
+  box-shadow:0 16px 44px rgba(0,0,0,.55)}
+.gs-panel.on{display:block;animation:tabIn .13s var(--ease)}
+.gs-head{padding:11px 14px;border-bottom:1px solid var(--border);background:var(--panel2);
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.gs-sym{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.03em}
+.gs-meta{font-size:11.5px;color:var(--muted);margin-left:auto;text-align:right;line-height:1.4}
+.gs-act{display:flex;align-items:center;gap:11px;padding:10px 14px;width:100%;cursor:pointer;
+  background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);
+  font-size:13.5px;text-align:left;font-family:inherit;transition:background .12s}
+.gs-act:last-child{border-bottom:none}
+.gs-act:hover,.gs-act.sel{background:var(--panel2)}
+.gs-act .gi{width:17px;height:17px;flex:none;fill:none;stroke:var(--muted);stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.gs-act:hover .gi,.gs-act.sel .gi{stroke:var(--brand2)}
+.gs-act small{color:var(--muted);font-size:11.5px;margin-left:auto;white-space:nowrap}
+.gs-empty{padding:16px 14px;color:var(--muted);font-size:13px;line-height:1.6}
 
 .badge{background:var(--red);color:#fff;border-radius:9px;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;margin-left:auto;flex:none}
 .avatar{width:30px;height:30px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--text);flex-shrink:0}
@@ -389,8 +473,11 @@ body.touring header,body.touring #sidebar{z-index:201}
     padding-top:calc(8px + env(safe-area-inset-top));
     padding-left:calc(12px + env(safe-area-inset-left));
     padding-right:calc(12px + env(safe-area-inset-right))}
-  header>.row{flex:1;min-width:0;justify-content:flex-end;gap:6px;flex-wrap:nowrap}
+  header>.row{flex:1;min-width:0;justify-content:flex-end;gap:6px;flex-wrap:nowrap;margin-left:auto}
   #globalSearch{max-width:none!important;min-width:0;flex:1}
+  /* No room for the section name or the collapse control on a phone — the rail never expands there. */
+  .hd-where,.hd-div,#sideToggle{display:none}
+  header>.logo .logo-word{display:none}
   /* On a phone the sidebar becomes a rail: icons only, always, no labels and no toggle. A 214px
      drawer would eat more than half a phone screen, and a hamburger that hides navigation behind a
      tap is worse than a rail you can always see. */
@@ -577,9 +664,48 @@ body.touring header,body.touring #sidebar{z-index:201}
   </div>
 </div>
 
+<!-- ICON SPRITE. Defined once, referenced by <use> everywhere. This replaced unicode glyphs
+     (▤ ⌘ ◈ ☆) which rendered as a different shape, weight and baseline on every platform and
+     occasionally as a blank box. These are identical everywhere and inherit currentColor. -->
+<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true"><defs>
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></symbol>
+  <symbol id="i-portfolio" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+  <symbol id="i-watch" viewBox="0 0 24 24"><polygon points="12 2.6 15 8.7 21.7 9.7 16.8 14.4 18 21 12 17.9 6 21 7.2 14.4 2.3 9.7 9 8.7 12 2.6"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 6.8 12 12 15.6 14"/></symbol>
+  <symbol id="i-market" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><line x1="8.5" y1="10.6" x2="15.5" y2="6.4"/><line x1="8.5" y1="13.4" x2="15.5" y2="17.6"/></symbol>
+  <symbol id="i-screener" viewBox="0 0 24 24"><polygon points="21.5 3.5 2.5 3.5 10 12.4 10 19 14 21 14 12.4 21.5 3.5"/></symbol>
+  <symbol id="i-analyzer" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></symbol>
+  <symbol id="i-risk" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9.5" x2="12" y2="13.5"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-projections" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+  <symbol id="i-alerts" viewBox="0 0 24 24"><path d="M18 8.5A6 6 0 0 0 6 8.5c0 7-2.5 8.5-2.5 8.5h17S18 15.5 18 8.5"/><path d="M13.7 20.5a2 2 0 0 1-3.4 0"/></symbol>
+  <symbol id="i-clients" viewBox="0 0 24 24"><path d="M16 20.5v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3.6"/><path d="M22 20.5v-2a4 4 0 0 0-3-3.8"/><path d="M16.5 3.7a4 4 0 0 1 0 6.6"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><polyline points="14.5 18 8.5 12 14.5 6"/></symbol>
+</defs></svg>
+
 <div id="app" style="display:none">
 <header>
-  <div class="logo"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
+  <button id="sideToggle" onclick="toggleSidebar()" aria-label="Toggle sidebar" title="Collapse the sidebar  ·  [">
+    <svg viewBox="0 0 24 24"><use href="#i-chev"/></svg>
+  </button>
+  <a class="logo" href="#" onclick="showTab('dashboard');return false" aria-label="PerceptFolio">
+    <svg class="logo-mark" width="1.5em" height="1.5em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg>
+    <span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span>
+  </a>
+  <span class="hd-div"></span>
+  <div class="hd-where"><span id="hdSection">Dashboard</span></div>
+
+  <!-- Centre: the ticker command palette. Typing a symbol offers everywhere it can be taken,
+       and marks the places it already exists. -->
+  <div class="hd-search">
+    <svg class="hd-search-ico" viewBox="0 0 24 24"><use href="#i-analyzer"/></svg>
+    <input id="globalSearch" placeholder="Search a ticker…  /" autocomplete="off" spellcheck="false"
+      oninput="renderTickerPalette()" onfocus="renderTickerPalette()"
+      onkeydown="paletteKey(event)">
+    <div id="gsPanel" class="gs-panel"></div>
+  </div>
+
   <div class="row" style="position:relative">
     <button class="icon-btn" id="calcToggleBtn" onclick="toggleCalc(event)" title="Calculator" aria-label="Calculator">
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -589,8 +715,6 @@ body.touring header,body.touring #sidebar{z-index:201}
         <line x1="8" y1="17" x2="8" y2="17"/><line x1="12" y1="17" x2="12" y2="17"/><line x1="16" y1="17" x2="16" y2="17"/>
       </svg>
     </button>
-    <input id="globalSearch" placeholder="Jump to ticker…" style="max-width:130px" onkeydown="if(event.key==='Enter')globalJumpToTicker()">
-    <button class="btn btn-ghost btn-sm" onclick="globalJumpToTicker()">Go</button>
     <span class="avatar" id="avatarInitial" onclick="toggleAccountMenu(event)" style="cursor:pointer"></span>
     <div id="accountMenu" class="card" style="display:none;position:absolute;top:46px;right:0;width:262px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.5);padding:0;overflow:hidden">
       <!-- Identity block: avatar on top (click to change), name under it (click to edit) -->
@@ -641,25 +765,23 @@ body.touring header,body.touring #sidebar{z-index:201}
 <div id="shell">
 <aside id="sidebar">
   <nav>
-    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')"><span class="ico" aria-hidden="true">▤</span><span class="lbl">Dashboard</span></button>
-    <button data-tab="command" id="navCommand" onclick="showTab('command')"><span class="ico" aria-hidden="true">⌘</span><span class="lbl">Command</span></button>
-    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')"><span class="ico" aria-hidden="true">◈</span><span class="lbl">Portfolio</span></button>
-    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')"><span class="ico" aria-hidden="true">☆</span><span class="lbl">Watchlist</span></button>
-    <button data-tab="history" id="navHistory" onclick="showTab('history')"><span class="ico" aria-hidden="true">↻</span><span class="lbl">History</span></button>
+    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')" data-tip="Dashboard"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-dash"/></svg></span><span class="lbl">Dashboard</span></button>
+    <button data-tab="command" id="navCommand" onclick="showTab('command')" data-tip="Command"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-command"/></svg></span><span class="lbl">Command</span></button>
+    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')" data-tip="Portfolio"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"/></svg></span><span class="lbl">Portfolio</span></button>
+    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Watchlist"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Watchlist</span></button>
+    <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="History"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">History</span></button>
     <div class="nav-sep"></div>
-    <button data-tab="market" id="navMarket" onclick="showTab('market')"><span class="ico" aria-hidden="true">◉</span><span class="lbl">Market</span></button>
-    <button data-tab="map" id="navMap" onclick="showTab('map')"><span class="ico" aria-hidden="true">⛓</span><span class="lbl">Map</span></button>
-    <button data-tab="screener" id="navScreener" onclick="showTab('screener')"><span class="ico" aria-hidden="true">⚟</span><span class="lbl">Screener</span></button>
-    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')"><span class="ico" aria-hidden="true">⌕</span><span class="lbl">Analyzer</span></button>
+    <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="Market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">Market</span></button>
+    <button data-tab="map" id="navMap" onclick="showTab('map')" data-tip="Map"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg></span><span class="lbl">Map</span></button>
+    <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Screener"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Screener</span></button>
+    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Analyzer"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Analyzer</span></button>
     <div class="nav-sep"></div>
-    <button data-tab="risk" id="navRisk" onclick="showTab('risk')"><span class="ico" aria-hidden="true">⚠</span><span class="lbl">Risk</span></button>
-    <button data-tab="projections" id="navProjections" onclick="showTab('projections')"><span class="ico" aria-hidden="true">◑</span><span class="lbl">Projections</span></button>
-    <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')"><span class="ico" aria-hidden="true">◔</span><span class="lbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
-    <button data-tab="clients" id="navClients" onclick="showTab('clients')" style="display:none"><span class="ico" aria-hidden="true">◇</span><span class="lbl">Clients</span></button>
+    <button data-tab="risk" id="navRisk" onclick="showTab('risk')" data-tip="Risk"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"/></svg></span><span class="lbl">Risk</span></button>
+    <button data-tab="projections" id="navProjections" onclick="showTab('projections')" data-tip="Projections"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"/></svg></span><span class="lbl">Projections</span></button>
+    <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')" data-tip="Alerts"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-alerts"/></svg></span><span class="lbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
+    <button data-tab="clients" id="navClients" onclick="showTab('clients')" style="display:none" data-tip="Clients"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-clients"/></svg></span><span class="lbl">Clients</span></button>
   </nav>
-  <button id="sideToggle" onclick="toggleSidebar()" title="Collapse or expand (press [)" aria-label="Toggle sidebar">
-    <span class="ico" aria-hidden="true">«</span><span class="lbl">Collapse</span>
-  </button>
+  <div class="side-foot"><span class="lbl">Press <b>[</b> to collapse</span></div>
 </aside>
 <main>
 
@@ -1227,29 +1349,14 @@ body.touring header,body.touring #sidebar{z-index:201}
     <div id="soloRiskResults"></div>
   </div>
 
-  <div class="section-title">Quick calculator</div>
+  <!-- The Quick calculator that lived here was a duplicate of the floating calculator in the header,
+       which does all of it and more. Two places to do the same sum is two places to maintain and one
+       more thing to scan past. -->
+
+  <div class="section-title">Loss severity — VaR and Expected Shortfall</div>
   <div class="card">
-    <p class="muted" style="margin-bottom:12px">No simulation, just simple compounding: if I put in $X at Y% for a year, what do I get?</p>
-    <div class="grid grid-2">
-      <div class="field"><label>Amount ($)</label><input id="calcAmount" type="number" min="0" step="100" value="10000" oninput="runCalc()"></div>
-      <div class="field"><label>Annual return (%)</label><input id="calcPct" type="number" step="0.1" value="8" oninput="runCalc()"></div>
-    </div>
-    <div class="stat-row" style="border:none;padding-top:6px;padding-bottom:0;margin-bottom:0">
-      <div class="stat"><span class="stat-label">Value after 1 year</span><span class="stat-value" id="calcValue">$0</span></div>
-      <div class="stat"><span class="stat-label">Gain</span><span class="stat-value" id="calcGain">$0</span></div>
-    </div>
-    <div style="border-top:1px solid var(--border);margin-top:18px;padding-top:16px">
-      <p class="muted" style="margin-bottom:12px">How many shares can I buy? Price per share × how much you're willing to spend.</p>
-      <div class="grid grid-2">
-        <div class="field"><label>Price per share ($)</label><input id="calcSharePrice" type="number" min="0" step="0.01" placeholder="e.g. 145.30" oninput="runShareCalc()"></div>
-        <div class="field"><label>Amount to spend ($)</label><input id="calcSpendAmount" type="number" min="0" step="100" placeholder="e.g. 5000" oninput="runShareCalc()"></div>
-      </div>
-      <div class="stat-row" style="border:none;padding-top:6px;padding-bottom:0;margin-bottom:0">
-        <div class="stat"><span class="stat-label">Shares (fractional)</span><span class="stat-value" id="calcSharesFrac">—</span></div>
-        <div class="stat"><span class="stat-label">Whole shares</span><span class="stat-value" id="calcSharesWhole">—</span></div>
-        <div class="stat"><span class="stat-label">Leftover cash</span><span class="stat-value" id="calcSharesLeftover">—</span></div>
-      </div>
-    </div>
+    <p class="muted" style="margin-bottom:12px">How bad a bad day gets, measured from your own daily history. <b>These do not predict returns.</b> They describe severity, which is what risk machinery is for — surviving being wrong, not being right more often.</p>
+    <div id="varBody"></div>
   </div>
 
 </div>
@@ -1603,11 +1710,15 @@ function applySidebar(){
   try{c=localStorage.getItem(SIDE_KEY)==='1';}catch(e){}
   document.body.classList.toggle('side-collapsed',c);
   const t=document.getElementById('sideToggle');
-  if(t){
-    const lbl=t.querySelector('.lbl');
-    if(lbl)lbl.textContent=c?'Expand':'Collapse';
-    t.title=(c?'Expand':'Collapse')+' the sidebar (press [)';
-  }
+  if(t)t.title=(c?'Expand':'Collapse')+' the sidebar  ·  [';
+}
+/* The header names the section you are in. Once the sidebar can be reduced to icons, this is the
+   only thing on screen that says where you are. */
+function setHeaderSection(tab){
+  const el=document.getElementById('hdSection');
+  if(!el)return;
+  const btn=document.querySelector('#sidebar nav button[data-tab="'+tab+'"]');
+  el.textContent=(btn&&btn.getAttribute('data-tip'))||(tab==='settings'?'Settings':tab);
 }
 function toggleSidebar(){
   const now=document.body.classList.contains('side-collapsed');
@@ -1966,6 +2077,9 @@ function resetTransientState(){
   const ht=document.getElementById('hzTicker');if(ht)ht.value='';
   const shb=document.getElementById('sharpeBody');if(shb)shb.innerHTML='';
   const rcb=document.getElementById('riskContribBody');if(rcb)rcb.innerHTML='';
+  const vb=document.getElementById('varBody');if(vb)vb.innerHTML='';
+  const gs=document.getElementById('globalSearch');if(gs)gs.value='';
+  if(typeof closePalette==='function')closePalette();
 
   sellingIndex=null;
   openClientReport=null;
@@ -2423,6 +2537,7 @@ function showTab(t){
   document.querySelectorAll('main > div[id^="tab-"]').forEach(el=>el.classList.add('tabs-hidden'));
   document.getElementById('tab-'+t).classList.remove('tabs-hidden');
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  setHeaderSection(t);
   if(t==='alerts')markAlertsSeen();
   // Macro data is fetched only when the tab is actually opened, so a user who never looks at it
   // never spends a request on it.
@@ -2431,18 +2546,115 @@ function showTab(t){
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
   if(t==='projections'){renderSharpe();renderHerizen();}
-  if(t==='risk')renderRiskContrib();
+  if(t==='risk'){renderRiskContrib();renderVaR();}
   if(t==='settings'){fillPolicyInputs();renderRuleLog();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
+/* ================= TICKER COMMAND PALETTE =================
+   The old search did one thing: type a ticker, get analysed. But a ticker means different things
+   depending on where it already is — if you hold it you usually want the position, if it is mapped
+   you want the map. So the palette lists every destination and marks the ones that already exist,
+   rather than guessing which you meant. */
+let palSel=0,palActs=[];
+function symbolContext(sym){
+  const held=(D.holdings||[]).filter(h=>h.sym===sym);
+  const val=held.reduce((a,h)=>a+(h.price??h.cost)*h.shares,0);
+  const rel=(D.relations||{})[sym];
+  const sc=(D.analyses||{})[sym];
+  return{
+    held:held.length>0, shares:held.reduce((a,h)=>a+h.shares,0), value:val,
+    watched:(D.watchlist||[]).includes(sym),
+    mapped:!!(rel&&((rel.suppliers||[]).length||(rel.customers||[]).length)),
+    scored:!!(sc&&!sc.error),
+    price:(sc&&isFinite(sc.price))?sc.price:null,
+    priced:((D.priceLog||{})[sym]||[]).length,
+    thesis:!!thesisFor(sym)
+  };
+}
+function paletteActions(sym){
+  const c=symbolContext(sym);
+  const A=[];
+  if(c.held)A.push({icon:'i-portfolio',label:'Open in Portfolio',note:c.shares+' sh · '+fmt$(c.value),
+    run:()=>{showTab('portfolio');const f=document.getElementById('pfFilterQ');if(f){f.value=sym;renderAll();}}});
+  if(c.watched)A.push({icon:'i-watch',label:'Open in Watchlist',note:'on your list',
+    run:()=>{showTab('watchlist');const f=document.getElementById('wlFilterQ');if(f){f.value=sym;renderAll();}}});
+  A.push({icon:'i-analyzer',label:'Analyze '+sym,note:c.scored?'re-score':'22 checks',run:()=>analyzeStock(sym)});
+  A.push({icon:'i-map',label:'Map '+sym,note:c.mapped?'already mapped':'suppliers & customers',
+    run:()=>{showTab('map');const t=document.getElementById('mapTicker');if(t){t.value=sym;loadMap();}}});
+  A.push({icon:'i-projections',label:'Momentum score',note:c.priced>7?c.priced+'d logged':'needs history',
+    run:()=>{showTab('projections');const t=document.getElementById('hzTicker');if(t){t.value=sym;renderHerizen();}}});
+  A.push({icon:'i-risk',label:'Check its risk',note:'volatility & beta',
+    run:()=>{showTab('risk');const t=document.getElementById('soloRiskTicker');if(t){t.value=sym;calcSoloRisk();}}});
+  if(c.held)A.push({icon:'i-command',label:'Size a trade',note:'before you buy',run:()=>tiPrefill(sym)});
+  if(!c.watched)A.push({icon:'i-watch',label:'Add to Watchlist',note:'scored every refresh',
+    run:()=>{if(!D.watchlist.includes(sym)){D.watchlist.push(sym);saveDB();renderAll();toast(sym+' added to watchlist.');}}});
+  return A;
+}
+function closePalette(){
+  const p=document.getElementById('gsPanel');
+  if(p){p.classList.remove('on');p.innerHTML='';}
+  palActs=[];palSel=0;
+}
+function renderTickerPalette(){
+  const el=document.getElementById('globalSearch'),p=document.getElementById('gsPanel');
+  if(!el||!p||!D)return;
+  const sym=(el.value||'').trim().toUpperCase().replace(/[^A-Z.\-]/g,'');
+  if(!sym){closePalette();return;}
+  const c=symbolContext(sym);
+  palActs=paletteActions(sym);palSel=0;
+  const tags=[];
+  if(c.held)tags.push('<span class="pill pill-buy" style="font-size:10px">held</span>');
+  if(c.watched)tags.push('<span class="pill pill-watch" style="font-size:10px">watching</span>');
+  if(c.mapped)tags.push('<span class="pill pill-na" style="font-size:10px">mapped</span>');
+  if(c.thesis)tags.push('<span class="pill pill-hold" style="font-size:10px">thesis</span>');
+  p.innerHTML=
+    '<div class="gs-head"><span class="gs-sym">'+esc(sym)+'</span>'+tags.join('')+
+      '<span class="gs-meta">'+(c.price!=null?fmt$(c.price):'not scored yet')+
+      (c.priced?'<br>'+c.priced+' days logged':'')+'</span></div>'+
+    palActs.map((a,i)=>
+      '<button class="gs-act'+(i===palSel?' sel':'')+'" onclick="runPalette('+i+')">'+
+        '<svg class="gi" viewBox="0 0 24 24"><use href="#'+a.icon+'"/></svg>'+
+        '<span>'+esc(a.label)+'</span><small>'+esc(a.note||'')+'</small></button>').join('');
+  p.classList.add('on');
+}
+function runPalette(i){
+  const a=palActs[i];
+  const el=document.getElementById('globalSearch');
+  closePalette();
+  if(el){el.value='';el.blur();}
+  if(a&&a.run)a.run();
+}
+function paletteKey(e){
+  if(e.key==='Escape'){closePalette();e.target.blur();return;}
+  if(!palActs.length){if(e.key==='Enter')globalJumpToTicker();return;}
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    palSel=(palSel+(e.key==='ArrowDown'?1:-1)+palActs.length)%palActs.length;
+    document.querySelectorAll('#gsPanel .gs-act').forEach((b,i)=>b.classList.toggle('sel',i===palSel));
+    return;
+  }
+  if(e.key==='Enter'){e.preventDefault();runPalette(palSel);}
+}
+/* Kept for the old call sites and as the Enter fallback when the panel is closed. */
 function globalJumpToTicker(){
   const el=document.getElementById('globalSearch');
   const sym=(el.value||'').trim().toUpperCase();
   if(!sym)return;
-  el.value='';
+  el.value='';closePalette();
   analyzeStock(sym);
 }
+/* Click outside closes it. "/" focuses it, the way every search box worth using does. */
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.hd-search'))closePalette();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='/'||e.metaKey||e.ctrlKey||e.altKey)return;
+  const t=e.target,tag=t&&t.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable))return;
+  const el=document.getElementById('globalSearch');
+  if(el){e.preventDefault();el.focus();el.select();}
+});
 function toast(msg){
   const t=document.createElement('div');t.className='toast';t.textContent=msg;
   document.body.appendChild(t);setTimeout(()=>t.remove(),4200);
@@ -3512,6 +3724,145 @@ function renderSharpe(){
     (bench?'<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.6">Against the index over the same days: <b>'+f(bench.sharpe)+'</b> versus your <b>'+f(me.sharpe)+'</b>. '+
       (me.sharpe>bench.sharpe?'You are being paid more per unit of risk — on this sample.':'The index is being paid more per unit of risk on this sample, which is the outcome most active books produce.')+'</p>':'')+
     '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Returns are computed from <b>gain</b>, not portfolio value, so money you deposit is not counted as a return. Cash is in the denominator, so holding a large idle balance correctly drags this down. Sortino uses downside deviation only, since Sharpe penalises upside volatility just as hard — which punishes exactly the outcome you want.</p>';
+}
+
+/* ================= VaR, EXPECTED SHORTFALL, GARCH =================
+   These measure SEVERITY, not direction. None of them predicts a return, and none of them raises a
+   win rate — banks build this machinery to survive being wrong, not to be right more often. Filed
+   under Risk and labelled accordingly, because the mislabelling is the dangerous part.
+
+   VaR answers: on a bad day, how much do I lose. Expected Shortfall answers the question VaR
+   refuses to: once it IS a bad day, how bad on average. Two portfolios with identical VaR can have
+   completely different tails, which is why Basel moved from VaR to ES in FRTB. Both are shown, ES
+   is the one to read. */
+function pctile(sorted,p){
+  if(!sorted.length)return null;
+  const i=(sorted.length-1)*p;
+  const lo=Math.floor(i),hi=Math.ceil(i);
+  return lo===hi?sorted[lo]:sorted[lo]+(sorted[hi]-sorted[lo])*(i-lo);
+}
+function varStats(rets,conf){
+  const n=rets.length;
+  if(n<30)return null;
+  const q=1-conf;                                   // 0.05 for 95%
+  const sorted=[...rets].sort((a,b)=>a-b);
+  const histQ=pctile(sorted,q);
+  const mean=rets.reduce((a,b)=>a+b,0)/n;
+  const sd=Math.sqrt(rets.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(n-1));
+  const z=conf>=0.99?2.3263:1.6449;
+  const paramQ=mean-z*sd;
+  // ES: the average of everything at or beyond the historical threshold.
+  const tail=sorted.filter(r=>r<=histQ);
+  const es=tail.length?tail.reduce((a,b)=>a+b,0)/tail.length:histQ;
+  return{n,conf,hist:-histQ,param:-paramQ,es:-es,tailN:tail.length,mean,sd};
+}
+/* GARCH(1,1) with variance targeting: omega is pinned so the model's long-run variance equals the
+   sample variance, leaving a two-parameter search instead of three. Standard practice, far more
+   stable on short samples, and it means the fit cannot drift to an implied long-run vol that
+   contradicts the data it was fitted on.
+
+   Why bother: your Monte Carlo and volatility budget currently treat volatility as one constant
+   number. It isn't — it clusters, which is the single most reliably documented feature of return
+   series. A model that knows last week was violent expects this week to be violent too. */
+function garchFit(rets){
+  const n=rets.length;
+  if(n<60)return null;
+  const mean=rets.reduce((a,b)=>a+b,0)/n;
+  const dev=rets.map(r=>r-mean);
+  const lrVar=dev.reduce((a,b)=>a+b*b,0)/(n-1);
+  if(!(lrVar>0))return null;
+  const ll=(alpha,beta)=>{
+    const omega=lrVar*(1-alpha-beta);
+    if(omega<=0)return -Infinity;
+    let s2=lrVar,sum=0;
+    for(let i=0;i<n;i++){
+      if(s2<=0)return -Infinity;
+      sum+=-0.5*(Math.log(s2)+dev[i]*dev[i]/s2);
+      s2=omega+alpha*dev[i]*dev[i]+beta*s2;
+    }
+    return sum;
+  };
+  // Coarse grid then a local refine. Cheap, deterministic, and good enough at this sample size —
+  // a proper optimiser would give false precision on 60 to 300 observations.
+  let best={a:0.08,b:0.90,l:-Infinity};
+  for(let a=0.02;a<=0.30001;a+=0.02)
+    for(let b=0.60;b<=0.97001;b+=0.02){
+      if(a+b>=0.999)continue;
+      const l=ll(a,b);
+      if(l>best.l)best={a,b,l};
+    }
+  for(let a=Math.max(0.005,best.a-0.02);a<=best.a+0.02;a+=0.005)
+    for(let b=Math.max(0.50,best.b-0.02);b<=Math.min(0.98,best.b+0.02);b+=0.005){
+      if(a+b>=0.999)continue;
+      const l=ll(a,b);
+      if(l>best.l)best={a,b,l};
+    }
+  const omega=lrVar*(1-best.a-best.b);
+  let s2=lrVar;
+  for(let i=0;i<n;i++)s2=omega+best.a*dev[i]*dev[i]+best.b*s2;
+  const persist=best.a+best.b;
+  return{
+    alpha:best.a,beta:best.b,omega,persist,
+    sigmaNext:Math.sqrt(s2)*Math.sqrt(TRADING_DAYS),
+    sigmaLR:Math.sqrt(lrVar)*Math.sqrt(TRADING_DAYS),
+    sigmaTrail:Math.sqrt(lrVar)*Math.sqrt(TRADING_DAYS),
+    halfLife:persist<1?Math.log(0.5)/Math.log(persist):null,
+    n
+  };
+}
+function renderVaR(){
+  const el=document.getElementById('varBody');
+  if(!el||!D)return;
+  const rows=portfolioReturns();
+  const rets=rows.map(r=>r.r);
+  const rows2=portfolioRows();
+  const total=rows2.reduce((a,r)=>a+r.val,0)+(D.cash||0);
+  const v95=varStats(rets,0.95),v99=varStats(rets,0.99);
+  if(!v95){
+    el.innerHTML='<div class="empty">Needs about 30 daily snapshots. There are '+rets.length+' so far — they accumulate every time you run a refresh.</div>';
+    return;
+  }
+  const g=garchFit(rets);
+  const $=(p)=>total>0?fmt$(total*p):'—';
+  el.innerHTML=
+    '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+      '<div class="stat s-out"><span class="stat-label">1-day VaR 95%</span><span class="stat-value neg">'+(v95.hist*100).toFixed(2)+'%</span></div>'+
+      '<div class="stat s-out"><span class="stat-label">Expected Shortfall 95%</span><span class="stat-value neg">'+(v95.es*100).toFixed(2)+'%</span></div>'+
+      '<div class="stat s-count"><span class="stat-label">In dollars</span><span class="stat-value">'+pmask($(v95.es))+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Days measured</span><span class="stat-value">'+v95.n+'</span></div>'+
+    '</div>'+
+    '<div style="overflow-x:auto;margin-top:14px"><table><thead><tr>'+
+      '<th>Measure</th><th>95%</th><th>99%</th><th>What it answers</th>'+
+    '</tr></thead><tbody>'+
+      '<tr><td>Historical VaR</td><td class="neg">'+(v95.hist*100).toFixed(2)+'%</td><td class="neg">'+(v99?(v99.hist*100).toFixed(2)+'%':'—')+'</td>'+
+        '<td class="muted" style="font-size:12.5px">The loss your worst days actually reached. No distribution assumed.</td></tr>'+
+      '<tr><td>Parametric VaR</td><td class="neg">'+(v95.param*100).toFixed(2)+'%</td><td class="neg">'+(v99?(v99.param*100).toFixed(2)+'%':'—')+'</td>'+
+        '<td class="muted" style="font-size:12.5px">Same thing assuming returns are normal. Understates fat tails — compare it to the row above.</td></tr>'+
+      '<tr style="background:rgba(59,130,246,.06)"><td><b>Expected Shortfall</b></td><td class="neg"><b>'+(v95.es*100).toFixed(2)+'%</b></td><td class="neg"><b>'+(v99?(v99.es*100).toFixed(2)+'%':'—')+'</b></td>'+
+        '<td class="muted" style="font-size:12.5px"><b>Read this one.</b> The average loss on the days you breach VaR. VaR says where the cliff is; this says how far down.</td></tr>'+
+      (total>0?'<tr><td class="muted">In dollars, on '+pmask(fmt$(total))+'</td><td class="muted">'+pmask($(v95.es))+'</td><td class="muted">'+(v99?pmask($(v99.es)):'—')+'</td><td class="muted" style="font-size:12.5px">Expected Shortfall, applied to today\'s book.</td></tr>':'')+
+    '</tbody></table></div>'+
+    (v95.hist>v95.param
+      ? '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">Your historical VaR is <b>larger</b> than the parametric one, which means your actual bad days have been worse than a normal distribution predicts. That is the usual finding and the reason the bell curve is a poor model of the left tail.</p>'
+      : '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">Historical and parametric VaR are close on this sample, so the return distribution has been reasonably well behaved so far. That tends not to survive a real shock.</p>')+
+    (g?'<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">'+
+      '<div class="row" style="margin-bottom:10px"><b style="font-size:14px">Volatility forecast — GARCH(1,1)</b></div>'+
+      '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+        '<div class="stat s-profit"><span class="stat-label">Forecast next day</span><span class="stat-value '+(g.sigmaNext>g.sigmaLR?'neg':'pos')+'">'+(g.sigmaNext*100).toFixed(1)+'%</span></div>'+
+        '<div class="stat s-in"><span class="stat-label">Long-run average</span><span class="stat-value">'+(g.sigmaLR*100).toFixed(1)+'%</span></div>'+
+        '<div class="stat s-count"><span class="stat-label">Persistence α+β</span><span class="stat-value">'+g.persist.toFixed(3)+'</span></div>'+
+        '<div class="stat"><span class="stat-label">Shock half-life</span><span class="stat-value">'+(g.halfLife?Math.round(g.halfLife)+'d':'—')+'</span></div>'+
+      '</div>'+
+      '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">'+
+        (g.sigmaNext>g.sigmaLR*1.15
+          ? 'The model expects the next day to be <b class="neg">more volatile than usual</b> — recent moves have been large and volatility clusters. Your position sizes are computed off trailing volatility, so this is the signal to size smaller than that suggests, not larger.'
+          : g.sigmaNext<g.sigmaLR*0.85
+            ? 'The model expects the next day to be <b class="pos">calmer than usual</b>. Worth knowing that calm periods are when volatility-based sizing is most generous and most likely to be wrong.'
+            : 'The forecast sits near the long-run average, so there is no volatility signal either way right now.')+
+        ' Persistence of '+g.persist.toFixed(3)+' means a shock decays'+(g.halfLife?' to half its size in about '+Math.round(g.halfLife)+' trading days':'')+'. Values close to 1 mean volatility shocks last a long time.</p>'+
+      '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Fitted by variance targeting on '+g.n+' days — omega is pinned so the model\'s long-run variance matches the sample, leaving two parameters instead of three. That is standard on short samples and stops the fit implying a long-run volatility the data never showed. It is a forecast of <b>how much things move</b>, never of <b>which way</b>.</p>'+
+    '</div>':'<p class="muted" style="font-size:12.5px;margin-top:14px">Volatility forecasting needs about 60 days of history — there are '+rets.length+'.</p>')+
+    '<p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6"><b>None of this predicts a return.</b> VaR, Expected Shortfall and GARCH measure how bad and how wild, never which direction. Banks build them to survive being wrong, not to be right more often, and reading them as a win-rate tool is the most common mistake made with them.</p>';
 }
 
 /* ================= RISK CONTRIBUTION =================
