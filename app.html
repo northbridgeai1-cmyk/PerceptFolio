@@ -174,6 +174,7 @@ main>div:not(.tabs-hidden){animation:tabIn .16s var(--ease)}
   #sidebar,#sideToggle{transition:none}
 }
 /* Where you are, in the header. Cheap orientation once the sidebar labels can be hidden. */
+.nw-win.on{background:var(--panel2);border-color:var(--brand2);color:var(--text)}
 .hd-where{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.09em;
   text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 header>.row{margin-left:auto;flex:none}
@@ -674,6 +675,7 @@ body.touring header,body.touring #sidebar{z-index:201}
   <symbol id="i-watch" viewBox="0 0 24 24"><polygon points="12 2.6 15 8.7 21.7 9.7 16.8 14.4 18 21 12 17.9 6 21 7.2 14.4 2.3 9.7 9 8.7 12 2.6"/></symbol>
   <symbol id="i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 6.8 12 12 15.6 14"/></symbol>
   <symbol id="i-market" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
+  <symbol id="i-news" viewBox="0 0 24 24"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1z"/><path d="M18 8h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2"/><line x1="7" y1="8.5" x2="14" y2="8.5"/><line x1="7" y1="12" x2="14" y2="12"/><line x1="7" y1="15.5" x2="11" y2="15.5"/></symbol>
   <symbol id="i-map" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><line x1="8.5" y1="10.6" x2="15.5" y2="6.4"/><line x1="8.5" y1="13.4" x2="15.5" y2="17.6"/></symbol>
   <symbol id="i-screener" viewBox="0 0 24 24"><polygon points="21.5 3.5 2.5 3.5 10 12.4 10 19 14 21 14 12.4 21.5 3.5"/></symbol>
   <symbol id="i-analyzer" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></symbol>
@@ -772,6 +774,7 @@ body.touring header,body.touring #sidebar{z-index:201}
     <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="History"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">History</span></button>
     <div class="nav-sep"></div>
     <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="Market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">Market</span></button>
+    <button data-tab="news" id="navNews" onclick="showTab('news')" data-tip="News"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-news"/></svg></span><span class="lbl">News</span></button>
     <button data-tab="map" id="navMap" onclick="showTab('map')" data-tip="Map"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg></span><span class="lbl">Map</span></button>
     <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Screener"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Screener</span></button>
     <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Analyzer"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Analyzer</span></button>
@@ -1236,6 +1239,24 @@ body.touring header,body.touring #sidebar{z-index:201}
   </div>
 </div>
 
+<!-- NEWS -->
+<div id="tab-news" class="tabs-hidden">
+  <div class="card">
+    <div class="row" style="flex-wrap:wrap">
+      <div class="row" style="gap:2px">
+        <button class="btn btn-ghost btn-sm nw-win on" data-win="1" onclick="setNewsWindow(1)">Today</button>
+        <button class="btn btn-ghost btn-sm nw-win" data-win="7" onclick="setNewsWindow(7)">Week</button>
+        <button class="btn btn-ghost btn-sm nw-win" data-win="30" onclick="setNewsWindow(30)">Month</button>
+      </div>
+      <div class="spacer"></div>
+      <span class="muted" id="newsStatus" style="font-size:12px"></span>
+      <button class="btn" id="newsLoadBtn" onclick="loadNews(true)">Load news</button>
+    </div>
+    <p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">Loaded on demand, not on every page view — each holding costs one API call and Finnhub's free tier allows sixty a minute. Cached for thirty minutes.</p>
+  </div>
+  <div id="newsBody" style="margin-top:16px"></div>
+</div>
+
 <!-- SCREENER -->
 <div id="tab-screener" class="tabs-hidden">
   <div class="card">
@@ -1379,12 +1400,6 @@ body.touring header,body.touring #sidebar{z-index:201}
       <div class="section-title" style="margin-top:0">Ranges — what the spread of outcomes looks like</div>
       <p class="muted" style="font-size:13px;max-width:70ch;line-height:1.6">These answer "where might this end up", not "what should I do today". Every one is a distribution under stated assumptions, and every one is wrong in a way the assumptions decide.</p>
     </div>
-  </div>
-
-  <div class="section-title">Crash replay — what six real declines would do to this book</div>
-  <div class="card">
-    <p class="muted" style="margin-bottom:12px">Six documented peak-to-trough index falls, applied to what you hold <b>right now</b>. This is the one projection that needs no accumulated history — it reads your composition, not your past — so it works the day you enter a portfolio.</p>
-    <div id="scenarioBody"></div>
   </div>
 
   <div class="section-title">Monte Carlo projection</div>
@@ -2085,6 +2100,11 @@ function resetTransientState(){
   const rcb=document.getElementById('riskContribBody');if(rcb)rcb.innerHTML='';
   const vb=document.getElementById('varBody');if(vb)vb.innerHTML='';
   const sb2=document.getElementById('scenarioBody');if(sb2)sb2.innerHTML='';
+  /* News is market data, not user data — but it is fetched per HOLDING, so the cache leaks which
+     tickers the previous account owned. Cleared on switch for that reason alone. */
+  newsCache={};
+  const nb=document.getElementById('newsBody');if(nb)nb.innerHTML='';
+  const ns=document.getElementById('newsStatus');if(ns)ns.textContent='';
   const gs=document.getElementById('globalSearch');if(gs)gs.value='';
   if(typeof closePalette==='function')closePalette();
 
@@ -2236,7 +2256,7 @@ function updateAccountTypeUI(){
   // the business account doesn't hold investments of its own — it exists to manage client books.
   // Switching into a client (bizContext set) restores the full nav, since that's the client's money.
   const hideOwnInvesting=isBiz&&!bizContext;
-  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navProjections','navMarket','navMap','navCommand'].forEach(id=>{
+  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navProjections','navMarket','navNews','navMap','navCommand'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display=hideOwnInvesting?'none':'';
   });
@@ -2552,7 +2572,8 @@ function showTab(t){
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
-  if(t==='projections'){renderScenarios();renderHerizen();}
+  if(t==='projections')renderHerizen();
+  if(t==='news')renderNews();
   if(t==='risk'){renderRiskContrib();renderSharpe();renderVaR();}
   if(t==='settings'){fillPolicyInputs();renderRuleLog();}
 }
@@ -3885,6 +3906,178 @@ function renderScenarios(){
       '</tbody></table></div>'+
       (T.allUnder?'<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.6">Every position is below what you paid once the index falls <b class="neg">'+Math.abs(T.allUnder.d)+'%</b>. That is the point at which there is nothing green left on the screen to reassure you, which is when most people sell.</p>':'')+
     '</div>':'');
+}
+
+/* ================= NEWS =================
+   Headlines for the market and for what you hold, grouped by window.
+
+   WHAT THIS DOES NOT DO, AND WHY.
+
+   It does not tell you WHY something happened, and it does not issue a verdict on what a story means
+   for your positions. Both would require judgement this app does not have — it is a static page with
+   no model behind it — and inventing them would be the worst thing in the product: a confident
+   sentence with no author, about your money.
+
+   What it does instead is the one thing a computer can honestly add to a headline: put the story
+   next to WHAT THE PRICE ACTUALLY DID. That turns news from narrative into evidence. Six stories and
+   the stock moved 0.3% means the market read it and shrugged. Two stories and it moved 9% means
+   something in there mattered. That comparison is computable, it is not a guess, and it is far more
+   useful than a summary telling you a headline is "bullish". */
+let newsCache={};            // key -> {at, items}
+let newsWindow=1;            // days
+const NEWS_TTL=30*60*1000;
+
+function setNewsWindow(d){
+  newsWindow=d;
+  document.querySelectorAll('.nw-win').forEach(b=>b.classList.toggle('on',+b.dataset.win===d));
+  renderNews();
+}
+function newsDateRange(days){
+  const to=new Date(), from=new Date(Date.now()-days*86400000);
+  const f=d=>d.toISOString().slice(0,10);
+  return{from:f(from),to:f(to)};
+}
+async function fhNews(sym,days){
+  const key=(sym||'_market')+':'+days;
+  const hit=newsCache[key];
+  if(hit&&Date.now()-hit.at<NEWS_TTL)return hit.items;
+  let items=[];
+  try{
+    if(sym){
+      const r=newsDateRange(Math.max(days,2));
+      items=await fh('/company-news?symbol='+encodeURIComponent(sym)+'&from='+r.from+'&to='+r.to);
+    }else{
+      items=await fh('/news?category=general');
+    }
+  }catch(e){ items=[]; }
+  if(!Array.isArray(items))items=[];
+  newsCache[key]={at:Date.now(),items};
+  return items;
+}
+/* What the price did across the same window, from the price log. This is the column that makes the
+   tab worth having. */
+function moveOver(sym,days){
+  const arr=(D.priceLog||{})[sym];
+  if(!arr||arr.length<2)return null;
+  const now=arr[arr.length-1];
+  const a=priceAt(arr,days)||arr[0];
+  if(!a||!(a.p>0)||a.d===now.d)return null;
+  return{pct:(now.p-a.p)/a.p*100,from:a.d,to:now.d};
+}
+async function loadNews(force){
+  const btn=document.getElementById('newsLoadBtn'),st=document.getElementById('newsStatus');
+  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(force)newsCache={};
+  if(btn)btn.disabled=true;
+  try{
+    if(st)st.textContent='Market headlines…';
+    await fhNews(null,newsWindow);
+    /* Holdings first, then watchlist, capped. Each is one request and the free tier allows sixty a
+       minute — a thirty-name watchlist would otherwise trip the limit and return nothing at all. */
+    const syms=[...new Set([
+      ...(D.holdings||[]).filter(h=>h.type!=='Fund').map(h=>h.sym),
+      ...(D.watchlist||[])
+    ])].slice(0,14);
+    for(let i=0;i<syms.length;i++){
+      if(st)st.textContent='Reading '+syms[i]+'  ('+(i+1)+' of '+syms.length+')';
+      await fhNews(syms[i],newsWindow);
+      await new Promise(r=>setTimeout(r,220));
+    }
+    if(st)st.textContent='Updated '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    renderNews();
+  }catch(e){
+    if(st)st.textContent='';
+    handleApiErr(e);
+  }finally{ if(btn)btn.disabled=false; }
+}
+function newsItemHtml(n){
+  const t=n.datetime?new Date(n.datetime*1000):null;
+  const when=t?t.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+  const sum=(n.summary||'').trim();
+  return '<div style="padding:12px 0;border-bottom:1px solid var(--border)">'+
+    '<div style="font-size:14px;line-height:1.5;font-weight:600">'+
+      (n.url?'<a href="'+esc(n.url)+'" target="_blank" rel="noopener" style="color:var(--text)">'+esc(n.headline||'')+'</a>':esc(n.headline||''))+
+    '</div>'+
+    (sum?'<p class="muted" style="font-size:13px;line-height:1.6;margin-top:5px">'+esc(sum.slice(0,300))+(sum.length>300?'…':'')+'</p>':'')+
+    '<div class="muted" style="font-size:11.5px;margin-top:6px">'+esc(n.source||'')+(when?' · '+esc(when):'')+'</div>'+
+  '</div>';
+}
+function renderNews(){
+  const el=document.getElementById('newsBody');
+  if(!el||!D)return;
+  const cutoff=Date.now()-newsWindow*86400000;
+  const inWin=arr=>(arr||[]).filter(n=>n.datetime&&n.datetime*1000>=cutoff)
+                            .sort((a,b)=>b.datetime-a.datetime);
+
+  const market=inWin((newsCache['_market:'+newsWindow]||{}).items);
+  const syms=[...new Set([
+    ...(D.holdings||[]).filter(h=>h.type!=='Fund').map(h=>h.sym),
+    ...(D.watchlist||[])
+  ])].slice(0,14);
+  const perSym=syms.map(s=>({sym:s,items:inWin((newsCache[s+':'+newsWindow]||{}).items),
+    held:(D.holdings||[]).some(h=>h.sym===s), move:moveOver(s,newsWindow)}))
+    .filter(x=>x.items.length)
+    .sort((a,b)=>b.items.length-a.items.length);
+
+  const loaded=Object.keys(newsCache).length>0;
+  if(!loaded){
+    el.innerHTML='<div class="card"><div class="empty">Hit <b>Load news</b>. It pulls the general market feed plus a story list for each of your holdings and watchlist names, up to fourteen tickers.</div></div>';
+    return;
+  }
+  const label=newsWindow===1?'today':newsWindow===7?'this week':'this month';
+
+  el.innerHTML=
+    '<div class="stat-row" style="margin-bottom:16px">'+
+      '<div class="stat s-in"><span class="stat-label">Market stories '+label+'</span><span class="stat-value">'+market.length+'</span></div>'+
+      '<div class="stat s-count"><span class="stat-label">Your names in the news</span><span class="stat-value">'+perSym.length+' / '+syms.length+'</span></div>'+
+      '<div class="stat s-profit"><span class="stat-label">Busiest</span><span class="stat-value" style="font-size:16px">'+(perSym.length?esc(perSym[0].sym):'—')+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Window</span><span class="stat-value" style="font-size:15px">'+newsWindow+'d</span></div>'+
+    '</div>'+
+
+    (perSym.length?'<div class="section-title" style="margin-top:0">Your positions</div>'+
+      perSym.map(x=>{
+        const m=x.move;
+        const quiet=m&&Math.abs(m.pct)<2;
+        return '<div class="card" style="margin-bottom:14px">'+
+          '<div class="row" style="align-items:center;gap:10px;flex-wrap:wrap">'+
+            '<b style="font-size:16px;font-family:var(--mono)">'+esc(x.sym)+'</b>'+
+            (x.held?'<span class="pill pill-buy" style="font-size:10px">held</span>':'<span class="pill pill-watch" style="font-size:10px">watching</span>')+
+            '<span class="muted" style="font-size:12.5px">'+x.items.length+' stor'+(x.items.length===1?'y':'ies')+'</span>'+
+            '<div class="spacer"></div>'+
+            (m?'<span class="'+(m.pct>=0?'pos':'neg')+'" style="font-family:var(--mono);font-size:15px;font-weight:700">'+
+                (m.pct>=0?'+':'')+m.pct.toFixed(2)+'%</span><span class="muted" style="font-size:11.5px">over the same window</span>'
+              :'<span class="muted" style="font-size:12px">no price history to compare</span>')+
+          '</div>'+
+          (m?'<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.6">'+
+            (quiet
+              ? '<b>'+x.items.length+' stor'+(x.items.length===1?'y':'ies')+' and the price barely moved.</b> The market read this and shrugged. Whatever is in these headlines is already in the price, which is the usual case by the time anything is published.'
+              : Math.abs(m.pct)>=8
+                ? '<b class="'+(m.pct>=0?'pos':'neg')+'">A '+Math.abs(m.pct).toFixed(1)+'% move alongside this coverage.</b> Something here mattered. Worth reading properly and checking it against what you wrote in your thesis — not worth trading on the headline itself, which is hours old.'
+                : 'A '+(m.pct>=0?'+':'')+m.pct.toFixed(1)+'% move over the same window. Neither dramatic nor nothing.')+
+          '</p>':'')+
+          '<div style="margin-top:6px">'+x.items.slice(0,6).map(newsItemHtml).join('')+'</div>'+
+          (x.items.length>6?'<p class="muted" style="font-size:12px;margin-top:8px">'+(x.items.length-6)+' more not shown.</p>':'')+
+        '</div>';
+      }).join('')
+      :'<div class="card"><div class="empty">Nothing published about your holdings or watchlist in this window. Try a longer one.</div></div>')+
+
+    '<div class="section-title">Market-wide</div>'+
+    '<div class="card">'+
+      (market.length?market.slice(0,25).map(newsItemHtml).join('')
+        :'<div class="empty">No general market stories in this window.</div>')+
+    '</div>'+
+
+    '<div class="card" style="margin-top:16px;border-left:3px solid var(--red)">'+
+      '<h3 class="neg">Why there is no buy or sell verdict here</h3>'+
+      '<p class="muted" style="font-size:13.5px;line-height:1.68;margin-top:8px">'+
+        'You asked for this tab to feed the buy and sell decision. It deliberately does not, and the reason is the number in the corner of every card above: <b>the price has already moved.</b> '+
+        'A headline is published after the event it describes. Professionals with direct feeds, and machines reading the wire in microseconds, have traded it before you finished the first sentence. Acting on public news is one of the most reliably losing habits in retail investing, and it feels like the most informed thing you could possibly do — which is exactly what makes it dangerous.'+
+        '<br><br>'+
+        'The app also cannot tell you <b>why</b> something happened or what it means for your positions. That takes judgement it does not have, and a confident sentence with no author, about your money, would be the worst thing in this product.'+
+        '<br><br>'+
+        '<b>What this tab is for:</b> checking whether something has broken the reason you own a company. Not the price — the <i>reason</i>. If a story contradicts what you wrote in your thesis, that is a real signal and it belongs in Command as a review. If it merely moved the price, that is noise you already missed.'+
+      '</p>'+
+    '</div>';
 }
 
 /* ================= VaR, EXPECTED SHORTFALL, GARCH =================
