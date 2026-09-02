@@ -1,14 +1,25 @@
 /* PerceptFolio service worker.
    Bump CACHE_VERSION whenever the terminal changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v23';
+const CACHE_VERSION = 'perceptfolio-v24';
 
 /* THE TERMINAL is what has to work offline — and it lives at /terminal/, not at the root. The
    landing page is the front door: nobody needs to read it on a plane, and listing it as required
    would let a failed fetch of the page nobody opens break the install for the page everybody opens.
 
    Note the trailing slash. The terminal is terminal/index.html on disk, but the URL it is fetched by
-   is /terminal/ — cache keys are URLs, so this must match what the browser actually requests. */
+   is /terminal/ — cache keys are URLs, so this must match what the browser actually requests.
+
+   v24 — WHY THIS BUMP MATTERS MORE THAN THE USUAL ONE.
+   Under v23 this line was correct in intent and wrong in fact: /terminal/ served the LANDING page,
+   because the landing page and the terminal had been uploaded to each other's paths. So every
+   installed copy faithfully cached the marketing page as its offline terminal, and the root — which
+   the OPTIONAL list below tries to cache as './' and './index.html' — 404'd, because the only file
+   at the root was Index.html with a capital I.
+
+   Those installs are still out there holding a v23 cache. Bumping the version is what evicts it.
+   Without the bump, a user who installed the app during that window keeps opening the landing page
+   offline forever, and no amount of fixing the files on the server reaches them. */
 const REQUIRED = ['/terminal/'];
 
 /* Everything else is cached best-effort. cache.addAll() is atomic — a single 404 anywhere in the

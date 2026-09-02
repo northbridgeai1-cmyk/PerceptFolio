@@ -122,6 +122,78 @@ The key stays inside the worker and is never sent to the browser.
 
 ---
 
+## Step 5c — Add an AI key (for the News tab's written summaries)
+
+Optional. Without it the News tab still works — it falls back to matching keywords in headlines.
+What the key buys you is a worker route (`/summarise`) that actually *reads* the headlines and
+writes two or three sentences of prose about them, naming the banks and products the coverage
+names. A static page cannot do that; it can only pattern-match.
+
+1. Get a key from **console.anthropic.com** → API Keys.
+2. In your worker: **Settings** → **Variables and Secrets** → **Add**
+3. **Type:** Secret · **Variable name:** `AI_API_KEY` · **Value:** your key
+4. Optionally add a plain **Variable** named `AI_MODEL` to pin a model. Left unset the worker uses
+   a small fast one, which is the right default for summarising a couple of dozen headlines.
+5. **Deploy**
+
+Summaries are cached in KV for six hours per ticker, so opening the same stock twice in a morning
+costs one call, not two.
+
+---
+
+## Step 5d — Give the worker its own hostname
+
+**Do this one.** The access-request form on the front page depends on it.
+
+`perceptfolio.com` is served by GitHub Pages, which is a file host — it cannot run code. So the
+request queue, the invite codes, the FRED proxy and the summaries all have to be reached at a
+different hostname. The front page is wired to expect:
+
+```
+https://api.perceptfolio.com
+```
+
+To make that real:
+
+1. Cloudflare dashboard → **Workers & Pages** → your worker (**crimson-hat-6ad9**).
+2. **Settings** → **Domains & Routes** → **Add** → **Custom domain**.
+3. Enter `api.perceptfolio.com` and add it. Cloudflare creates the DNS record itself, provided
+   perceptfolio.com is on your Cloudflare account.
+4. Go to **Settings** → **Variables and Secrets** and set a plain **Variable** named
+   `ALLOWED_ORIGIN` to exactly:
+
+   ```
+   https://perceptfolio.com
+   ```
+
+   No trailing slash. This is the value the worker echoes back in its CORS header, and the browser
+   compares it character for character against the page's origin. A trailing slash fails the match
+   and the form will look broken with nothing in the logs to explain it.
+
+5. **Deploy.**
+
+### Why not just use the workers.dev address
+
+Two reasons, and the second is the one that bites.
+
+The `crimson-hat-6ad9.<something>.workers.dev` name publishes your Cloudflare account subdomain to
+anyone who views source. Minor, but free to avoid.
+
+The real problem is that the name is not yours. Rename the service, recreate it after an accident,
+or let Cloudflare reassign it, and the address changes — while the front page goes on POSTing to
+the old one. Nothing errors on your side. The form just quietly stops delivering requests, and the
+only symptom is that nobody applies any more, which reads exactly like nobody being interested.
+
+A hostname you control cannot fail that way.
+
+### Until it resolves
+
+Nothing breaks. The form tries the worker, the request fails at the network layer, and it hands the
+visitor their mail client with all three calls already written into the body. Wiring the URL in
+before the DNS exists is safe by design.
+
+---
+
 ## Step 6 — Check it's alive
 
 Open your worker URL in a browser tab. You should see:
