@@ -246,6 +246,89 @@ async function handle(request, env) {
     return json({ ok: true, decision, code }, 200, env);
   }
 
+  /* ---- POST /summarise — narrative news summary ----
+     The app is a static page with no model behind it, so it can pattern-match headlines but cannot
+     READ them. Producing a sentence like "BofA and UBS named it a top pick, citing its lithography
+     monopoly" requires actually understanding the articles. That happens here, server-side, where
+     the API key can be kept out of the browser.
+
+     The prompt is deliberately fenced: summarise only what the headlines say, name the institutions
+     the headlines name, invent nothing, and do not issue a trading recommendation. A model asked to
+     say BUY from press coverage will always find a reason to — that is what makes it dangerous, not
+     that it would be wrong every time.
+
+     Cached 6 hours per ticker per window. Headlines do not change fast enough to justify paying for
+     the same summary twice in a morning. */
+  if (url.pathname === '/summarise' && request.method === 'POST') {
+    if (!env.AI_API_KEY) {
+      return json({ error: 'Worker is missing AI_API_KEY. Add it under Settings > Variables and Secrets as a Secret, then Deploy. Without it the app falls back to its own keyword summary.' }, 500, env);
+    }
+    let body;
+    try { body = await request.json(); }
+    catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+
+    const sym = clean(body.sym, 8).toUpperCase();
+    if (!/^[A-Z.\-]{1,8}$/.test(sym)) return json({ error: 'Bad ticker.' }, 400, env);
+    const days = Math.min(90, Math.max(1, parseInt(body.days, 10) || 7));
+    const move = isFinite(body.move) ? Number(body.move) : null;
+    const heads = (Array.isArray(body.headlines) ? body.headlines : []).slice(0, 25)
+      .map(h => ({ t: clean(h.t, 220), s: clean(h.s, 60), d: clean(h.d, 10) }))
+      .filter(h => h.t);
+    if (heads.length < 1) return json({ error: 'No headlines supplied.' }, 400, env);
+
+    const cacheKey = 'ai:' + sym + ':' + days + ':' + new Date().toISOString().slice(0, 13);
+    const cached = await env.PF_SYNC.get(cacheKey);
+    if (cached) return json(JSON.parse(cached), 200, env);
+
+    const list = heads.map(h => '- ' + h.t + '  [' + (h.s || 'unknown') + (h.d ? ', ' + h.d : '') + ']').join('\n');
+    const prompt =
+      'Below are news headlines about ' + sym + ' from the last ' + days + ' day(s).' +
+      (move !== null ? ' Over that window the stock moved ' + move.toFixed(1) + '%.' : '') + '\n\n' +
+      list + '\n\n' +
+      'Write 2 to 3 sentences of plain prose describing what this coverage is actually about. Name the ' +
+      'institutions, people or products the headlines name, and what they said or did. Mention the price ' +
+      'move and whether the coverage skews positive, negative or mixed.\n\n' +
+      'Then on a new line beginning exactly with "READ:" add one short sentence on what the coverage ' +
+      'implies about the company\'s near-term narrative.\n\n' +
+      'Rules: use only what is in the headlines above. Do not add facts you were not given. Do not ' +
+      'recommend buying, selling or holding, and do not use those words as a verdict. If the headlines ' +
+      'are thin, repetitive or unrelated to the company, say so plainly rather than padding.';
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': env.AI_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: env.AI_MODEL || 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!res.ok) {
+      let detail = '';
+      try { const e = await res.json(); detail = (e.error && e.error.message) || ''; } catch (e) {}
+      return json({ error: 'Summary provider rejected the request (' + res.status + ')' + (detail ? ': ' + detail : '') }, 502, env);
+    }
+    const out = await res.json();
+    const text = (out.content && out.content[0] && out.content[0].text) ? out.content[0].text.trim() : '';
+    if (!text) return json({ error: 'Empty summary returned.' }, 502, env);
+
+    // Split the narrative from the READ line so the app can style them differently.
+    const idx = text.indexOf('READ:');
+    const payload = {
+      sym,
+      summary: (idx >= 0 ? text.slice(0, idx) : text).trim(),
+      read: idx >= 0 ? text.slice(idx + 5).trim() : '',
+      n: heads.length,
+      at: Date.now()
+    };
+    await env.PF_SYNC.put(cacheKey, JSON.stringify(payload), { expirationTtl: 21600 });
+    return json(payload, 200, env);
+  }
+
   /* ---- FRED proxy ----
      The St. Louis Fed's API sends no CORS headers, so a browser cannot call it directly no matter
      what the app does. This route fetches it server-side and hands the result back with headers the

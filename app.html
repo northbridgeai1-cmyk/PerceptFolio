@@ -2074,6 +2074,13 @@ function resetTransientState(){
   const startBtn=document.getElementById('screenerStartBtn');if(startBtn)startBtn.style.display='';
   const stopBtn=document.getElementById('screenerStopBtn');if(stopBtn)stopBtn.style.display='none';
 
+  /* Written summaries are per-ticker, not per-account, but they are keyed only by symbol — so
+     switching to a client book would show summaries generated while looking at a different one.
+     Cheap to regenerate, confusing to leave behind. */
+  aiSummaries={};
+  newsFocus=null;
+  const nwS=document.getElementById('newsSearch');if(nwS)nwS.value='';
+
   lastRiskCorrPairs=null;
   const riskEl=document.getElementById('riskResults');if(riskEl)riskEl.innerHTML='';
   const soloRiskEl=document.getElementById('soloRiskResults');if(soloRiskEl)soloRiskEl.innerHTML='';
@@ -4101,6 +4108,60 @@ function newsItemHtml(n){
     '<div class="muted" style="font-size:11.5px;margin-top:6px">'+esc(n.source||'')+(when?' · '+esc(when):'')+'</div>'+
   '</div>';
 }
+/* ---- Written summaries ----
+   The keyword brief above is honest but mechanical. A sentence like "BofA and UBS named it a top
+   pick, citing its lithography monopoly" needs something that can actually read the articles, which
+   a static page cannot do. So the headlines are sent to the Worker, which calls a model server-side
+   with the API key kept out of the browser, and returns prose.
+
+   The prompt forbids a buy/sell verdict. Not squeamishness — a model asked to justify BUY from press
+   coverage will always find a way, because that is what the words in headlines are for. It returns a
+   READ line instead: what the coverage implies about the narrative. That is a claim about the press,
+   which the headlines can support, rather than a claim about the future, which they cannot. */
+let aiSummaries={};      // sym+':'+window -> {summary,read,n} | {error}
+async function summariseNews(sym){
+  const key=sym+':'+newsWindow;
+  const items=((newsCache[sym+':'+newsWindow]||{}).items||[])
+    .filter(n=>n.datetime&&n.datetime*1000>=Date.now()-newsWindow*86400000)
+    .sort((a,b)=>b.datetime-a.datetime);
+  if(!items.length)return;
+  if(!syncConfigured()){
+    aiSummaries[key]={error:'Written summaries need the Cloudflare Worker. Set it up under Settings → Sync Across Your Devices, then add an AI_API_KEY secret to it.'};
+    renderNews();return;
+  }
+  aiSummaries[key]={loading:true};renderNews();
+  const mv=moveOver(sym,newsWindow);
+  try{
+    const res=await fetch(syncCfg.url.replace(/\/+$/,'')+'/summarise',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+syncCfg.key,'Content-Type':'application/json'},
+      body:JSON.stringify({sym,days:newsWindow,move:mv?mv.pct:null,
+        headlines:items.slice(0,25).map(n=>({
+          t:n.headline||'',s:n.source||'',
+          d:n.datetime?new Date(n.datetime*1000).toISOString().slice(0,10):''}))})
+    });
+    const j=await res.json();
+    if(!res.ok)throw new Error(j.error||('HTTP '+res.status));
+    aiSummaries[key]=j;
+  }catch(e){ aiSummaries[key]={error:e.message}; }
+  renderNews();
+}
+function aiSummaryHtml(sym){
+  const a=aiSummaries[sym+':'+newsWindow];
+  if(!a){
+    return '<button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="summariseNews(\''+esc(sym)+'\')">Write me a summary</button>';
+  }
+  if(a.loading)return '<p class="muted" style="font-size:13px;margin-top:10px">Reading the coverage…</p>';
+  if(a.error)return '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.6"><span class="warn">Couldn\'t write a summary:</span> '+esc(a.error)+'</p>'+
+    '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="summariseNews(\''+esc(sym)+'\')">Try again</button>';
+  return '<div style="margin-top:12px;padding:13px 15px;background:var(--panel2);border:1px solid var(--border);border-radius:9px">'+
+    '<div style="font-size:14px;line-height:1.7">'+esc(a.summary)+'</div>'+
+    (a.read?'<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+      '<span class="pill pill-na" style="font-size:10px">Read</span> '+
+      '<span style="font-size:13.5px;line-height:1.65">'+esc(a.read)+'</span></div>':'')+
+    '<p class="muted" style="font-size:11px;margin-top:10px;line-height:1.5">Written from '+(a.n||0)+' headlines only — no other source, and no access to the full articles. It is a summary of what was <b>published</b>, not an assessment of the company, and deliberately carries no buy or sell verdict.</p>'+
+  '</div>';
+}
 /* One card per ticker: the brief up top, every source folded behind an arrow underneath. The
    headlines are the evidence, but nobody wants forty of them stacked on the screen at once. */
 function symbolNewsCard(sym,items,tag,move){
@@ -4118,6 +4179,7 @@ function symbolNewsCard(sym,items,tag,move){
           (m.pct>=0?'+':'')+m.pct.toFixed(2)+'%</span><span class="muted" style="font-size:11.5px">same window</span>'
         :'<span class="muted" style="font-size:12px">no price history yet</span>')+
     '</div>'+
+    aiSummaryHtml(sym)+
     newsBrief(sym,items,newsWindow)+
     (m?'<p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.62">'+
       (quiet
@@ -4219,7 +4281,9 @@ function renderNews(){
         'You asked for this tab to feed the buy and sell decision. It deliberately does not, and the reason is the number in the corner of every card above: <b>the price has already moved.</b> '+
         'A headline is published after the event it describes. Professionals with direct feeds, and machines reading the wire in microseconds, have traded it before you finished the first sentence. Acting on public news is one of the most reliably losing habits in retail investing, and it feels like the most informed thing you could possibly do — which is exactly what makes it dangerous.'+
         '<br><br>'+
-        'The app also cannot tell you <b>why</b> something happened or what it means for your positions. That takes judgement it does not have, and a confident sentence with no author, about your money, would be the worst thing in this product.'+
+        'The written summary on each card is a summary of <b>press coverage</b> — what was published, by whom, and about what. That is a real question the headlines can answer. Whether the company is worth owning at today\'s price is a different question, and no amount of reading headlines answers it.'+
+        '<br><br>'+
+        'That is why the summary carries a Read line and not a verdict. A model asked to justify BUY from news coverage will always find a reason, because finding reasons is what the words in headlines are for. It would be fluent, it would be confident, and it would have no track record. The four tracks on the Scorecard earned their place by being marked at a fixed horizon and graded whether they worked or not. News has not done that yet.'+
         '<br><br>'+
         '<b>What this tab is for:</b> checking whether something has broken the reason you own a company. Not the price — the <i>reason</i>. If a story contradicts what you wrote in your thesis, that is a real signal and it belongs in Command as a review. If it merely moved the price, that is noise you already missed.'+
       '</p>'+
