@@ -240,6 +240,23 @@ main{flex:1;min-width:0;max-width:1180px;padding:28px 26px;
 .pos{color:var(--green)} .neg{color:var(--red)} .warn{color:var(--yellow)}
 .muted{color:var(--muted);font-size:13px}
 
+/* ---- thesis probability ---- */
+.prob-box{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px 16px;margin:12px 0 4px}
+.prob-head{font:10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.prob-row{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.prob-k{font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:7px}
+.prob-v{font:700 26px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.prob-n{font-size:11px;line-height:1.5;color:var(--muted);margin-top:6px}
+.prob-own{display:flex;align-items:baseline;gap:5px}
+.prob-own input{width:82px;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+  border-radius:7px;padding:5px 9px;font:700 22px/1.15 var(--mono);font-variant-numeric:tabular-nums}
+.prob-own span{font:600 17px/1 var(--mono);color:var(--muted)}
+/* The assumption is not a footnote. A probability printed without it is false precision with a
+   Nobel Prize stapled to it, so it renders in warning colour directly beneath the number. */
+.prob-warn{font-size:11.5px;line-height:1.55;color:var(--yellow);margin-top:13px;padding-top:11px;border-top:1px solid var(--border)}
+.prob-warn b{color:var(--text)}
+@media(max-width:760px){.prob-row{grid-template-columns:1fr;gap:14px}.prob-v{font-size:22px}}
+
 /* ---- TRACK RECORD STRIP ----
    The Council's verdict was that the track record is the product and the portfolio value is not,
    so the record gets real estate above the fold on both the Command screen and the Dashboard.
@@ -1001,9 +1018,45 @@ body.touring header,body.touring #sidebar{z-index:201}
     <div class="row">
       <div class="field" style="max-width:200px;margin-bottom:0"><label>Target price ($)</label><input id="thesisTarget" type="number" step="any" min="0" placeholder="where you think it goes" oninput="updatePlannedRR()"></div>
       <div class="field" style="max-width:200px;margin-bottom:0"><label>Stop price ($) — sell below</label><input id="thesisStop" type="number" step="any" min="0" placeholder="where you're wrong" oninput="updatePlannedRR()"></div>
-      <div class="field" style="max-width:200px;margin-bottom:0"><label>Deadline — exit if it hasn't worked</label><input id="thesisDeadline" type="date"></div>
+      <div class="field" style="max-width:200px;margin-bottom:0"><label>Deadline — exit if it hasn't worked</label><input id="thesisDeadline" type="date" onchange="updatePlannedRR()"></div>
     </div>
     <div class="muted" id="plannedRR" style="font-size:12.5px;margin:10px 0 4px"></div>
+
+    <!-- ---- THE THESIS PROBABILITY ----
+         A target and a date are a strike and an expiry wearing different words. N(d2) — the one term
+         in Black–Scholes that needs no options chain, no strike quote and no implied vol — turns
+         them into a stated likelihood under the volatility this app already measures.
+
+         The point is not options. It is that a thesis with no probability attached cannot be graded
+         properly: when it fails you cannot tell "I was wrong" from "I was right and it was a 20%
+         shot that missed", and those two errors need opposite corrections.
+
+         Your own number goes in beside the model's, because the GAP between them is the thing
+         actually worth recording. In ninety days it is a calibration score, and nothing else in
+         retail finance keeps one. -->
+    <div class="prob-box" id="thesisProbBox" style="display:none">
+      <div class="prob-head">Probability the target is reached by the deadline</div>
+      <div class="prob-row">
+        <div class="prob-cell">
+          <div class="prob-k">Model — N(d2)</div>
+          <div class="prob-v" id="probModel">—</div>
+          <div class="prob-n" id="probInputs"></div>
+        </div>
+        <div class="prob-cell">
+          <div class="prob-k">Your own estimate</div>
+          <div class="prob-own">
+            <input id="thesisPrior" type="number" min="1" max="99" step="1" placeholder="—" oninput="updatePlannedRR()"><span>%</span>
+          </div>
+          <div class="prob-n">What you actually believe, before you saw the model.</div>
+        </div>
+        <div class="prob-cell">
+          <div class="prob-k">Gap — logged</div>
+          <div class="prob-v" id="probGap">—</div>
+          <div class="prob-n" id="probGapNote">Saved with the thesis and graded at the deadline.</div>
+        </div>
+      </div>
+      <p class="prob-warn" id="probAssume"></p>
+    </div>
     <div class="row">
       <div class="field" style="max-width:250px;margin-bottom:0"><label>Sell if quality drops below (of 12)</label><input id="thesisSellBelow" type="number" min="0" max="12" step="1" placeholder="e.g. 8"></div>
       <div class="field" style="max-width:220px;margin-bottom:0"><label>Next review</label><input id="thesisReview" type="date"></div>
@@ -1218,6 +1271,19 @@ body.touring header,body.touring #sidebar{z-index:201}
     </div>
     <div id="todaysMove" style="margin-top:12px"><div class="empty">Loading…</div></div>
     <p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.55">The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b> — it's a ruler, not a forecast.</p>
+  </div>
+
+  <!-- 1b. Calendar effects — CONTEXT ONLY, and the panel says so twice.
+       This exists because on the fourth of September somebody publishes "September is the worst
+       month for stocks" and does not divide by the standard deviation. The defence against a bad
+       statistic is the same statistic displayed properly, so the arithmetic is done here in full.
+       Nothing on this panel feeds a score, a verdict or a size. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Calendar effects — context, not a signal</h3>
+      <span class="pill pill-na" style="font-size:10px">not used in any verdict</span>
+    </div>
+    <div id="seasonalBody" style="margin-top:12px"></div>
   </div>
 
   <!-- 2. Market weather -->
@@ -2631,7 +2697,7 @@ function showTab(t){
   if(t==='alerts')markAlertsSeen();
   // Macro data is fetched only when the tab is actually opened, so a user who never looks at it
   // never spends a request on it.
-  if(t==='market'){fillMacroInputs();renderScorecard();loadMarketData(false);}
+  if(t==='market'){fillMacroInputs();renderScorecard();renderSeasonal();loadMarketData(false);}
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
@@ -4225,12 +4291,48 @@ function aiSummaryHtml(sym){
        whether the request was even pointed at the right place. */
     (a.url?'<p class="muted" style="font-size:11.5px;margin-top:6px;font-family:var(--mono);word-break:break-all">Called: '+esc(a.url)+'</p>':'')+
     '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="summariseNews(\''+esc(sym)+'\')">Try again</button>';
+  /* ---- ATTRIBUTED RENDERING ----
+     The old card asserted "written from N headlines only" and nothing checked it — the model could
+     name an institution appearing in none of them and this footer would vouch for it in the
+     operator's voice. The worker now discards any sentence that cannot cite a headline it was
+     actually given, so the claim is finally true, and the citations are shown rather than promised.
+     A footnote nobody can follow is a decoration; one that resolves to a specific headline is
+     evidence. */
+  const cite=n=>'<sup style="font-family:var(--mono);font-size:9.5px;color:var(--accent);margin-left:1px">'+n+'</sup>';
+  const claimHtml=c=>esc(c.text)+(c.sources||[]).map(cite).join('');
+
+  const body=(Array.isArray(a.claims)&&a.claims.length)
+    ? a.claims.map(claimHtml).join(' ')
+    : esc(a.summary||'');
+  const readHtml=a.readClaim?claimHtml(a.readClaim):(a.read?esc(a.read):'');
+
+  const srcList=(Array.isArray(a.sources)&&a.sources.length)
+    ? '<details style="margin-top:11px"><summary style="cursor:pointer;font-size:11.5px;color:var(--muted)">'+
+        'Sources — '+a.sources.length+' headline'+(a.sources.length===1?'':'s')+' the summary was built from</summary>'+
+        '<ol style="margin:9px 0 0 18px;padding:0;font-size:11.5px;line-height:1.65;color:var(--muted)">'+
+        a.sources.map(h=>'<li style="margin-bottom:3px">'+esc(h.t)+
+          '<span style="opacity:.7"> — '+esc(h.s||'unknown')+(h.d?', '+esc(h.d):'')+'</span></li>').join('')+
+        '</ol></details>'
+    : '';
+
   return '<div style="margin-top:12px;padding:13px 15px;background:var(--panel2);border:1px solid var(--border);border-radius:9px">'+
-    '<div style="font-size:14px;line-height:1.7">'+esc(a.summary)+'</div>'+
-    (a.read?'<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+    '<div style="font-size:14px;line-height:1.75">'+body+'</div>'+
+    (readHtml?'<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
       '<span class="pill pill-na" style="font-size:10px">Read</span> '+
-      '<span style="font-size:13.5px;line-height:1.65">'+esc(a.read)+'</span></div>':'')+
-    '<p class="muted" style="font-size:11px;margin-top:10px;line-height:1.5">Written from '+(a.n||0)+' headlines only — no other source, and no access to the full articles. It is a summary of what was <b>published</b>, not an assessment of the company, and deliberately carries no buy or sell verdict.</p>'+
+      '<span style="font-size:13.5px;line-height:1.7">'+readHtml+'</span></div>':'')+
+    srcList+
+    (a.dropped?'<p class="muted" style="font-size:11.5px;margin-top:9px;line-height:1.5"><span class="warn">'+
+      a.dropped+' sentence'+(a.dropped===1?'':'s')+' discarded</span> for citing no headline that was actually supplied. '+
+      'You are seeing only what survived that check.</p>':'')+
+    /* THE FALSIFIABILITY LINE. Every module states, next to its own output, the thing that would
+       show it to be wrong. For a summariser the failure mode is not hallucination — that is now
+       caught — it is a true summary of coverage that is itself misleading. */
+    '<p class="muted" style="font-size:11px;margin-top:10px;line-height:1.55">'+
+      'Each sentence cites the numbered headline it came from, and the worker drops any sentence it '+
+      'cannot trace back. <b>How this can still be wrong:</b> it summarises what was <b>published</b>, '+
+      'not what is true. Coverage can be uniformly wrong, planted, or simply absent, and this card '+
+      'would faithfully report it. It reads headlines only — never the articles — and carries no buy '+
+      'or sell verdict.</p>'+
   '</div>';
 }
 /* One card per ticker: the brief up top, every source folded behind an arrow underneath. The
@@ -6849,6 +6951,176 @@ function importData(ev){
    price moves — afterwards you'll construct a reason for whatever happened, and won't notice you're
    doing it. The review date is what makes it a live document rather than a note nobody reopens. */
 function thesisFor(sym){return (D.theses||{})[sym]||null;}
+
+/* ================= CALENDAR EFFECTS — DISPLAYED, NEVER ACTED ON =================
+
+   WHY THIS IS CONTEXT AND NOT A SIGNAL, since the distinction is the whole point of the panel.
+
+   September's long-run mean S&P return is about -1%, and it is the only negative month. That sounds
+   damning until you divide. The monthly standard deviation is around 5.5% and there are roughly 97
+   observations, so the standard error of the mean is 5.5/sqrt(97) = 0.56% and the t-statistic is
+   about -1.9. On its own that is marginal.
+
+   And it is not on its own. TWELVE months were tested. One of them had to come out worst — that is
+   arithmetic, not discovery. Against a Bonferroni-corrected threshold for twelve simultaneous tests,
+   |t| would need to clear roughly 2.87. It does not.
+
+   Calendar anomalies are also the most decayed class in the literature: "Sell in May" was published
+   in 2002 and substantially faded afterwards. Publishing an edge is how it dies.
+
+   So the panel prints the arithmetic the headline omits. It cannot reach a score, a verdict or a
+   position size, and it says so on its face.
+
+   ON THE NUMBERS THEMSELVES: these are the widely published long-run figures, entered as constants
+   and labelled as such. This data tier caps index history at ten years, which is far too short to
+   estimate a monthly mean — roughly ten observations per month. Rather than compute something
+   worthless from the data at hand or present borrowed figures as if measured here, the source is
+   named and the arithmetic on top of them is done live and honestly. */
+const SEASONAL_MEANS={            // long-run mean monthly S&P return, %, commonly published figures
+  1:1.2, 2:-0.1, 3:0.6, 4:1.4, 5:0.2, 6:0.8,
+  7:1.4, 8:0.7, 9:-1.0, 10:0.6, 11:1.5, 12:1.4
+};
+const SEASONAL_SD=5.5;            // monthly standard deviation, %
+const SEASONAL_N=97;              // observations per month since 1928
+const SEASONAL_TESTS=12;          // months tested — the multiple-comparison count that kills it
+
+function renderSeasonal(){
+  const el=document.getElementById('seasonalBody');
+  if(!el)return;
+  const now=new Date();
+  const m=now.getMonth()+1;
+  const name=now.toLocaleString('en-US',{month:'long'});
+  const mean=SEASONAL_MEANS[m];
+  const se=SEASONAL_SD/Math.sqrt(SEASONAL_N);
+  const t=mean/se;
+  const lo=mean-1.96*se, hi=mean+1.96*se;
+  const straddles=lo<0&&hi>0;
+
+  /* Bonferroni for 12 simultaneous tests: alpha 0.05 -> 0.00417 two-sided -> |z| ~ 2.87.
+     Stated as a number rather than a claim so the reader can check it. */
+  const crit=2.87;
+  const survives=Math.abs(t)>=crit;
+  const worst=Object.keys(SEASONAL_MEANS).reduce((a,b)=>SEASONAL_MEANS[a]<=SEASONAL_MEANS[b]?a:b);
+  const isWorst=String(m)===String(worst);
+
+  el.innerHTML=
+    '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+      '<div class="stat"><span class="stat-label">'+esc(name)+' mean, since 1928</span>'+
+        '<span class="stat-value '+(mean>=0?'pos':'neg')+'">'+(mean>=0?'+':'')+mean.toFixed(1)+'%</span></div>'+
+      '<div class="stat"><span class="stat-label">95% interval</span>'+
+        '<span class="stat-value" style="font-size:17px">'+(lo>=0?'+':'')+lo.toFixed(1)+'% to '+(hi>=0?'+':'')+hi.toFixed(1)+'%</span></div>'+
+      '<div class="stat"><span class="stat-label">t-statistic</span>'+
+        '<span class="stat-value '+(survives?'warn':'muted')+'">'+t.toFixed(2)+'</span></div>'+
+      '<div class="stat"><span class="stat-label">needed for 12 tests</span>'+
+        '<span class="stat-value muted">±'+crit.toFixed(2)+'</span></div>'+
+    '</div>'+
+    '<p class="muted" style="font-size:13px;line-height:1.65;margin-top:14px">'+
+      '<b>Reading:</b> '+esc(name)+'’s mean is '+(mean>=0?'+':'')+mean.toFixed(1)+'%, but the standard error on '+
+      SEASONAL_N+' observations is '+se.toFixed(2)+'%, so the 95% interval runs '+(lo>=0?'+':'')+lo.toFixed(1)+
+      '% to '+(hi>=0?'+':'')+hi.toFixed(1)+'%. '+
+      (straddles
+        ? 'That interval <b>contains zero</b>, so this month is not distinguishable from any other.'
+        : 'That interval excludes zero on its own — but it was not tested on its own.')+
+      ' Twelve months were tested, and one of them had to come out '+(mean<0?'worst':'best')+
+      '. Correcting for that, |t| would need to exceed '+crit.toFixed(2)+'; it is '+Math.abs(t).toFixed(2)+', so '+
+      (survives?'it clears the bar — which would be worth a second look.':'<b>it does not clear the bar.</b>')+
+    '</p>'+
+    (isWorst
+      ? '<p class="muted" style="font-size:12.5px;line-height:1.6;margin-top:8px"><span class="warn">You are in the month with the lowest long-run mean.</span> '+
+        'That is the fact behind every article you will read this month. It is also the fact that survives no correction for having tested twelve months, '+
+        'and calendar effects are the most decayed class in the literature — “Sell in May” was published in 2002 and substantially faded afterwards. '+
+        'Publishing an edge is how it dies.</p>'
+      : '')+
+    '<p class="muted" style="font-size:11.5px;line-height:1.55;margin-top:10px">'+
+      '<b>How this can be wrong:</b> the means and standard deviation are long-run published figures entered as constants, '+
+      'not measured by this app — the data tier caps index history at ten years, roughly ten observations per month, which is far too few to estimate a monthly mean. '+
+      'The arithmetic on top of them is done here and can be checked. '+
+      '<b>Nothing on this panel reaches a score, a verdict or a position size</b>, and it never will: an effect this weak would fail the forty-call rule on its first day.</p>';
+}
+
+/* ================= THESIS PROBABILITY — N(d2) =================
+
+   THE ONE PIECE OF BLACK-SCHOLES THAT SURVIVES THIS DATA TIER, and the reasoning for why the rest
+   was refused is worth keeping next to it.
+
+   A full option pricer needs a strike quoted by a market, an expiry, and an implied volatility
+   backed out of a traded price. This app's data tier has no options chain — no strikes, no expiries,
+   no prices. Building a pricer here would mean feeding it a volatility we guessed, pricing a
+   contract we cannot see, against a market we cannot check, and then trusting the answer because
+   the formula won a Nobel Prize. That is false precision with a famous name attached, so it is not
+   built.
+
+   N(d2) is different. It needs a spot price, a level, a horizon, a drift and a volatility — all five
+   of which we already have or already assume out loud. And a thesis already contains a level and a
+   horizon; they are simply called "target" and "deadline".
+
+   WHAT IT ASSUMES, because the number is meaningless without this:
+     - Returns are lognormal. Real equity returns have fat tails, so genuine probabilities of large
+       moves are HIGHER than this says.
+     - Volatility is constant to the deadline. This app's own GARCH panel exists precisely because
+       that is false — volatility clusters.
+   Both are stated in the interface next to the output, not buried here.
+
+   DRIFT. Using the risk-free rate would give the RISK-NEUTRAL probability, which is a pricing
+   construct and not the real-world chance of anything — confusing the two is the classic error.
+   The CAPM drift the rest of the app already assumes is used instead, and named on screen. */
+
+/* Normal CDF via Abramowitz & Stegun 7.1.26 on erf. Max error ~1.5e-7 — far below the precision
+   this number should ever be read to. */
+function normCdf(x){
+  const s=x<0?-1:1; const z=Math.abs(x)/Math.SQRT2;
+  const t=1/(1+0.3275911*z);
+  const y=1-((((1.061405429*t-1.453152027)*t+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-z*z);
+  return 0.5*(1+s*y);
+}
+
+/* Annualised volatility from the app's own price log. No network call, so this works offline and on
+   a ticker the candle endpoint refuses. Falls back to a labelled default rather than pretending. */
+function thesisSigma(sym){
+  const log=(D.priceLog||{})[sym]||[];
+  const closes=log.map(r=>r.p).filter(p=>p>0);
+  if(closes.length>=25){
+    const rets=toReturns(closes);
+    if(rets.length>20){
+      const m=rets.reduce((a,b)=>a+b,0)/rets.length;
+      const v=rets.reduce((a,b)=>a+(b-m)*(b-m),0)/(rets.length-1);
+      const sig=Math.sqrt(v)*Math.sqrt(252);
+      if(sig>0.01&&sig<3) return{sigma:sig,source:'measured from '+closes.length+' of your own logged closes'};
+    }
+  }
+  const h=(D.holdings||[]).find(x=>x.sym===sym);
+  const type=h?h.type:'Stock';
+  const def=type==='ETF'?0.15:type==='Fund'?0.12:0.28;
+  return{sigma:def,source:'assumed '+(def*100).toFixed(0)+'% — not enough logged history for '+sym+' yet'};
+}
+
+/* Returns null whenever any input is missing, so the panel stays hidden rather than showing a
+   probability computed from defaults the operator never chose. */
+function thesisProbability(sym,targetOpt,deadlineOpt){
+  const sc=(D.analyses||{})[sym];
+  const S=(sc&&!sc.error&&isFinite(sc.price)&&sc.price>0)?sc.price:null;
+  const K=isFinite(targetOpt)?targetOpt:null;
+  const dl=deadlineOpt||'';
+  if(S==null||K==null||K<=0||!/^\d{4}-\d{2}-\d{2}$/.test(dl))return null;
+
+  const days=(Date.parse(dl+'T00:00:00')-Date.now())/86400000;
+  if(!(days>0))return{expired:true};
+  const T=days/365.25;
+
+  const {sigma,source}=thesisSigma(sym);
+  const RF=0.045,MKT=0.08;
+  let beta=1;
+  const rb=sc&&isFinite(sc.riskBeta)?sc.riskBeta:null;
+  if(rb!=null&&isFinite(rb))beta=rb;
+  const mu=RF+beta*(MKT-RF);
+
+  const d2=(Math.log(S/K)+(mu-0.5*sigma*sigma)*T)/(sigma*Math.sqrt(T));
+  /* A SELL thesis targets a price BELOW spot, so the question flips to P(S_T < K). */
+  const below=K<S;
+  const p=below?(1-normCdf(d2)):normCdf(d2);
+  return{p,d2,S,K,T,days,sigma,sigmaSource:source,mu,beta,below};
+}
+
 /* Planned reward-to-risk, computed from the target and stop at the moment they are written.
    This is the pre-registration the Council demanded, applied to a single position: a target and a
    stop together are a falsifiable prediction, where "I like this company" is not. It also surfaces
@@ -6888,6 +7160,60 @@ function updatePlannedRR(){
     (p.rr<1?' — <span class="neg">worse than a coin flip, so this needs an unusually high hit rate to work.</span>'
            :good?' — a comfortable margin.'
            :'.');
+  updateThesisProbability();
+}
+
+/* Renders the N(d2) panel. Hidden entirely unless a target and a future deadline both exist —
+   a probability shown for inputs the operator has not supplied is worse than no probability. */
+function updateThesisProbability(){
+  const box=document.getElementById('thesisProbBox');
+  if(!box||!D)return;
+  const sym=(document.getElementById('thesisSym')||{}).value;
+  const num=id=>{const v=parseFloat((document.getElementById(id)||{}).value);return isFinite(v)?v:null;};
+  const r=thesisProbability(sym,num('thesisTarget'),(document.getElementById('thesisDeadline')||{}).value);
+
+  if(!r||r.expired){
+    box.style.display=r&&r.expired?'block':'none';
+    if(r&&r.expired){
+      document.getElementById('probModel').innerHTML='<span class="muted">—</span>';
+      document.getElementById('probInputs').textContent='The deadline is in the past. Move it forward to get a probability.';
+      document.getElementById('probGap').innerHTML='<span class="muted">—</span>';
+      document.getElementById('probAssume').innerHTML='';
+    }
+    return;
+  }
+  box.style.display='block';
+
+  const pc=r.p*100;
+  const cls=pc>=60?'pos':pc>=30?'warn':'neg';
+  document.getElementById('probModel').innerHTML='<span class="'+cls+'">'+pc.toFixed(0)+'%</span>';
+  document.getElementById('probInputs').innerHTML=
+    (r.below?'Chance of falling to ':'Chance of reaching ')+fmt$(r.K)+' from '+fmt$(r.S)+
+    ' within '+Math.round(r.days)+' days.<br>Volatility '+(r.sigma*100).toFixed(0)+'% — '+esc(r.sigmaSource)+
+    '.<br>Drift '+(r.mu*100).toFixed(1)+'%/yr (CAPM, beta '+r.beta.toFixed(2)+').';
+
+  const own=num('thesisPrior');
+  const gapEl=document.getElementById('probGap'),noteEl=document.getElementById('probGapNote');
+  if(own==null){
+    gapEl.innerHTML='<span class="muted">—</span>';
+    noteEl.textContent='Put your own number in and the gap is saved with the thesis, then graded at the deadline.';
+  }else{
+    const gap=own-pc;
+    gapEl.innerHTML='<span class="'+(Math.abs(gap)<10?'pos':Math.abs(gap)<25?'warn':'neg')+'">'+
+      (gap>=0?'+':'−')+Math.abs(gap).toFixed(0)+'pts</span>';
+    noteEl.innerHTML=Math.abs(gap)<10
+      ? 'You and the model roughly agree.'
+      : (gap>0
+        ? 'You are <b>more</b> confident than the volatility implies. That is a real position to hold — but it is now on the record, and the deadline will settle it.'
+        : 'You are <b>less</b> confident than the volatility implies. Worth asking why you are writing the thesis at all.');
+  }
+
+  document.getElementById('probAssume').innerHTML=
+    '<b>How this can be wrong:</b> it assumes returns are lognormal and volatility stays at '+
+    (r.sigma*100).toFixed(0)+'% until the deadline. Both are false — real returns have fat tails, and '+
+    'this app\'s own GARCH panel exists because volatility clusters. Treat it as an order of magnitude, '+
+    'not a figure to two significant figures. It is a check on whether your target is even plausible, '+
+    'not a forecast.';
 }
 function fillThesisPicker(){
   const sel=document.getElementById('thesisSym');
@@ -6913,6 +7239,7 @@ function loadThesis(){
   set('thesisTarget',isFinite(t.target)?t.target:'');
   set('thesisStop',isFinite(t.stop)?t.stop:'');
   set('thesisDeadline',t.deadline);
+  set('thesisPrior',(t.prob&&t.prob.own!=null)?t.prob.own:'');
   updatePlannedRR();
   const st=document.getElementById('thesisStatus');
   if(st){
@@ -6947,6 +7274,19 @@ function saveThesis(){
        unanswerable after the fact. */
     entryPrice:(existing&&existing.entryPrice)||(sc&&!sc.error&&isFinite(sc.price)?sc.price:null),
     sellBelow:(isFinite(sb)&&sb>0)?Math.min(12,sb):null,
+    /* THE CALIBRATION RECORD. Both probabilities are frozen at the moment of writing, along with
+       the volatility and drift they were computed from, so the number can be reconstructed later
+       rather than recomputed against whatever volatility happens to prevail at the deadline.
+       Recomputing it later would quietly rewrite what you believed. */
+    prob:(function(){
+      const pv=parseFloat(val('thesisPrior'));
+      const own=(isFinite(pv)&&pv>0&&pv<100)?pv:null;
+      const r=thesisProbability(sym,(isFinite(tg)&&tg>0)?tg:null,val('thesisDeadline'));
+      if(!r||r.expired)return (existing&&existing.prob)||null;
+      return{model:+(r.p*100).toFixed(1),own,gap:own==null?null:+(own-r.p*100).toFixed(1),
+             sigma:+r.sigma.toFixed(4),sigmaSource:r.sigmaSource,mu:+r.mu.toFixed(4),beta:+r.beta.toFixed(3),
+             S:r.S,K:r.K,days:Math.round(r.days),below:r.below,at:Date.now()};
+    })(),
     created:(existing&&existing.created)||new Date().toISOString().slice(0,10),
     // Snapshot the score at the time of writing, so drift since is visible later.
     scoreAtEntry:(existing&&existing.scoreAtEntry)||(tot?tot.got+'/'+tot.max:'')
