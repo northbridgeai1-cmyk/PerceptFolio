@@ -1,7 +1,7 @@
 /* PerceptFolio service worker.
    Bump CACHE_VERSION whenever the terminal changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v24';
+const CACHE_VERSION = 'perceptfolio-v25';
 
 /* THE TERMINAL is what has to work offline — and it lives at /terminal/, not at the root. The
    landing page is the front door: nobody needs to read it on a plane, and listing it as required
@@ -39,7 +39,7 @@ const OPTIONAL = [
   './icon-maskable-512.png',
   './icon.svg',
   './favicon.svg',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'
+  './vendor/chart-4.4.1.umd.min.js'
 ];
 
 self.addEventListener('install', event => {
@@ -76,10 +76,12 @@ self.addEventListener('fetch', event => {
        - Market data must never be cached; a stale quote shown as live is worse than no quote.
        - Authenticated requests must never be cached; that would put private data in a shared cache. */
   const sameOrigin = url.origin === self.location.origin;
-  const isChartCdn = req.url === 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
   const hasAuth = req.headers.has('Authorization');
   if (hasAuth) return;
-  if (!sameOrigin && !isChartCdn) return;
+  /* Chart.js used to be the one cross-origin exception here. It is vendored into
+     /vendor/ now, so this worker no longer caches anything it did not serve, and the
+     rule is simply: same origin, or straight to the network. */
+  if (!sameOrigin) return;
 
   /* Navigations: network-first so a redeployed page is picked up as soon as there's a connection,
      with the cached copy as the offline fallback.

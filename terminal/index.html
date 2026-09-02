@@ -19,7 +19,11 @@
 <!-- MUST be a PNG. iOS silently ignores an SVG apple-touch-icon and falls back to a screenshot of
      the page, which is what you get if this line ever points at icon.svg again. -->
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Chart.js, served from this origin rather than cdnjs. An offline-first terminal that
+     silently needs a third-party CDN on first load is not offline-first, and an
+     un-pinned CDN script runs with full access to a page holding positions and an API
+     key. Provenance and upgrade steps are in vendor/README.md. -->
+<script src="/vendor/chart-4.4.1.umd.min.js"></script>
 <style>
 :root{
   /* Warm charcoal rather than pure black — less eye strain over a long session, and it gives the
