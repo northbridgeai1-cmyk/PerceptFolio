@@ -4119,6 +4119,19 @@ function newsItemHtml(n){
    coverage will always find a way, because that is what the words in headlines are for. It returns a
    READ line instead: what the coverage implies about the narrative. That is a claim about the press,
    which the headlines can support, rather than a claim about the future, which they cannot. */
+/* Build a worker URL properly instead of gluing strings together.
+   The old code did syncCfg.url.replace(/\/+$/,'') + '/summarise', which is correct only if the
+   saved URL is a bare origin. Paste in anything with a query string or a path — 'https://x.workers
+   .dev/?slot=' is an easy thing to end up with — and you get '.../?slot=/summarise', whose pathname
+   is just '/'. The worker then falls through to the sync handler and reports a missing slot
+   parameter, which reads like a completely unrelated fault. new URL() removes the guesswork. */
+function workerUrl(path,query){
+  const u=new URL(syncCfg.url);
+  u.search='';u.hash='';
+  u.pathname=u.pathname.replace(/\/+$/,'')+'/'+path.replace(/^\/+/,'');
+  if(query)Object.keys(query).forEach(k=>u.searchParams.set(k,query[k]));
+  return u.toString();
+}
 let aiSummaries={};      // sym+':'+window -> {summary,read,n} | {error}
 async function summariseNews(sym){
   const key=sym+':'+newsWindow;
@@ -4132,8 +4145,10 @@ async function summariseNews(sym){
   }
   aiSummaries[key]={loading:true};renderNews();
   const mv=moveOver(sym,newsWindow);
+  let target='(url not built)';
   try{
-    const res=await fetch(syncCfg.url.replace(/\/+$/,'')+'/summarise',{
+    target=workerUrl('summarise');
+    const res=await fetch(target,{
       method:'POST',
       headers:{'Authorization':'Bearer '+syncCfg.key,'Content-Type':'application/json'},
       body:JSON.stringify({sym,days:newsWindow,move:mv?mv.pct:null,
@@ -4148,15 +4163,19 @@ async function summariseNews(sym){
     let j={};try{j=JSON.parse(raw);}catch(e){}
     if(!res.ok){
       let msg=(j.error||raw.slice(0,200)||'no detail')+' [HTTP '+res.status+']';
-      /* The old worker had no /summarise route, so the request falls through to the sync-slot
-         handler and complains about a slot parameter. That message is meaningless here and would
-         send you looking in the wrong place, so translate it. */
-      if(/slot parameter/i.test(msg))msg='This Worker does not have the /summarise route — the deployed worker.js is an older version. Paste the current worker.js into Cloudflare and Deploy.';
+      /* A slot-parameter complaint means the request reached the worker but fell past every route.
+         Two very different causes produce it, so name both rather than picking one — the previous
+         version asserted "your worker is old" and sent you re-pasting a file that was already
+         correct. The URL is printed below so the answer is visible instead of inferred. */
+      if(/slot parameter/i.test(msg)){
+        msg='The worker answered but did not recognise /summarise. Either the deployed worker.js '+
+            'predates that route, or the URL below is not hitting the worker root.';
+      }
       throw new Error(msg);
     }
     if(!j.summary)throw new Error('Worker replied but sent no summary text.');
     aiSummaries[key]=j;
-  }catch(e){ aiSummaries[key]={error:e.message}; }
+  }catch(e){ aiSummaries[key]={error:e.message,url:target}; }
   renderNews();
 }
 function aiSummaryHtml(sym){
@@ -4166,6 +4185,9 @@ function aiSummaryHtml(sym){
   }
   if(a.loading)return '<p class="muted" style="font-size:13px;margin-top:10px">Reading the coverage…</p>';
   if(a.error)return '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.6"><span class="warn">Couldn\'t write a summary:</span> '+esc(a.error)+'</p>'+
+    /* Print the exact URL that was called. Every wrong guess in this area came from not knowing
+       whether the request was even pointed at the right place. */
+    (a.url?'<p class="muted" style="font-size:11.5px;margin-top:6px;font-family:var(--mono);word-break:break-all">Called: '+esc(a.url)+'</p>':'')+
     '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="summariseNews(\''+esc(sym)+'\')">Try again</button>';
   return '<div style="margin-top:12px;padding:13px 15px;background:var(--panel2);border:1px solid var(--border);border-radius:9px">'+
     '<div style="font-size:14px;line-height:1.7">'+esc(a.summary)+'</div>'+
