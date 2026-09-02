@@ -1,15 +1,15 @@
 /* PerceptFolio service worker.
    Bump CACHE_VERSION whenever the terminal changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v22';
+const CACHE_VERSION = 'perceptfolio-v23';
 
-/* THE TERMINAL is what has to work offline — and it lives at /app/, not at the root. The landing
-   page is the front door: nobody needs to read it on a plane, and listing it as required would let
-   a failed fetch of the page nobody opens break the install for the page everybody opens.
+/* THE TERMINAL is what has to work offline — and it lives at /terminal/, not at the root. The
+   landing page is the front door: nobody needs to read it on a plane, and listing it as required
+   would let a failed fetch of the page nobody opens break the install for the page everybody opens.
 
-   Note the trailing slash. The terminal is app/index.html on disk, but the URL it is fetched by is
-   /app/ — cache keys are URLs, so this must match what the browser actually requests. */
-const REQUIRED = ['/app/'];
+   Note the trailing slash. The terminal is terminal/index.html on disk, but the URL it is fetched by
+   is /terminal/ — cache keys are URLs, so this must match what the browser actually requests. */
+const REQUIRED = ['/terminal/'];
 
 /* Everything else is cached best-effort. cache.addAll() is atomic — a single 404 anywhere in the
    list aborts the whole install and you silently get no offline support at all. So optional assets
@@ -20,6 +20,7 @@ const OPTIONAL = [
   './404.html',
   './thanks.html',
   './admin.html',
+  './app/',
   './manifest.json',
   './apple-touch-icon.png',
   './icon-192.png',
@@ -86,7 +87,7 @@ self.addEventListener('fetch', event => {
         return fresh;
       } catch (e) {
         const cached = await caches.match(req, { ignoreSearch: true });
-        return cached || (await caches.match('/app/')) || Response.error();
+        return cached || (await caches.match('/terminal/')) || Response.error();
       }
     })());
     return;

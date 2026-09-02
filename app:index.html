@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Moved — PerceptFolio</title>
+<meta name="robots" content="noindex">
+<!-- ============================================================================
+     UPLOAD THIS FILE AS:  app/index.html
+     ============================================================================
+
+     The terminal moved from /app/ to /terminal/. This stub is what stops that
+     rename from silently breaking things.
+
+     GitHub Pages has no rewrite rules and no 301s, so a moved page just 404s.
+     Three groups of people would hit that:
+
+       1. Anyone who bookmarked /app/.
+       2. Anyone who INSTALLED the app — the PWA's start_url was baked into the
+          install as /app/. Their home-screen icon opens a dead page and there
+          is nothing they can do about it except delete and reinstall.
+       3. The old service worker, which cached '/app/' as its offline fallback.
+
+     A meta refresh plus a JS replace covers all three. location.replace() rather
+     than location.href so the dead URL does not sit in the back-history and
+     bounce them in a loop when they hit Back.
+
+     Keep this file. It costs nothing and the day you delete it is the day
+     someone's installed copy stops opening.
+     ============================================================================ -->
+<meta http-equiv="refresh" content="0; url=/terminal/">
+<link rel="canonical" href="/terminal/">
+<style>
+  body{background:#0e0f12;color:#949aa6;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       display:grid;place-items:center;min-height:100vh;margin:0;text-align:center;padding:24px}
+  a{color:#3b82f6}
+</style>
+</head>
+<body>
+  <div>
+    <p>The terminal now lives at <a href="/terminal/">perceptfolio.com/terminal</a>.</p>
+    <p style="font-size:13px">Redirecting. If nothing happens, use the link above and update your bookmark.</p>
+  </div>
+<script>
+  /* replace(), not assign() — the old URL must not stay in history or Back will
+     bounce the user straight back here. */
+  location.replace('/terminal/');
+</script>
+</body>
+</html>
