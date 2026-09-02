@@ -48,6 +48,12 @@ p{color:var(--muted);font-size:16px;line-height:1.66;max-width:56ch}
 footer{border-top:1px solid var(--border);padding:24px 0;font-size:12.5px;color:var(--muted)}
 .links{display:flex;gap:22px;flex-wrap:wrap}
 .links a:hover{color:var(--text)}
+.rec404{border:1px solid var(--border);border-radius:9px;background:var(--panel);padding:15px 17px;margin:26px 0 4px;text-align:left}
+.rec404 .k{font:10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--muted,#8d939f);margin-bottom:9px}
+.rec404 .v{font:700 22px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.rec404 .n{font-size:13px;line-height:1.55;color:var(--muted,#8d939f);margin-top:7px}
+.rec404 .pos{color:#2ea043}.rec404 .neg{color:#e5534b}
 </style>
 </head>
 <body>
@@ -69,6 +75,13 @@ footer{border-top:1px solid var(--border);padding:24px 0;font-size:12.5px;color:
         <div>→ your data is untouched <span style="opacity:.6">(it never left your browser)</span></div>
       </div>
     </div>
+
+    <!-- A 404 is the highest-attention page on the site: somebody typed something wrong and is
+         looking straight at you. So it carries the one thing worth saying. Where a stranger gets a
+         sentence, an operator gets their own marked record read out of this browser's storage — the
+         404 page and the terminal are the same origin, so it is already there. Nothing is fetched
+         and nothing is sent. -->
+    <div id="rec404" class="rec404" style="display:none"></div>
 
     <div class="cta">
       <a class="btn btn-p" href="/terminal/">Open the terminal</a>
@@ -92,6 +105,67 @@ footer{border-top:1px solid var(--border);padding:24px 0;font-size:12.5px;color:
    a genuinely broken link something the person can quote back to you in an email. */
 document.getElementById('path').textContent =
   (location.pathname + location.search).slice(0, 120) || '/';
+
+/* ---- The visitor's own 90-day record, if this browser holds one. ----
+   Read-only, same-origin, wrapped so a storage change or a schema change can never turn a 404 into
+   a blank page. A stranger sees nothing extra; an operator sees the number that matters. */
+(function ownRecord(){
+  try{
+    const raw = localStorage.getItem('quantfolio_v1');
+    if(!raw) return;
+    const db = JSON.parse(raw);
+    const profiles = (db && db.profiles) ? Object.values(db.profiles) : [];
+    if(!profiles.length) return;
+
+    const edges = [];
+    let waiting = 0;
+    profiles.forEach(pr => (pr && Array.isArray(pr.calls) ? pr.calls : []).forEach(c => {
+      if(c.verdict !== 'buy' && c.verdict !== 'sell') return;
+      const mk = (c.marks || {})['90'] || (c.marks || {})[90];
+      if(!mk || mk.missed){ if(!mk) waiting++; return; }
+      if(!(c.price > 0) || !(c.spy > 0) || !(mk.price > 0) || !(mk.spy > 0)) return;
+      const alpha = (mk.price - c.price) / c.price * 100 - (mk.spy - c.spy) / c.spy * 100;
+      edges.push(c.verdict === 'buy' ? alpha : -alpha);
+    }));
+
+    const box = document.getElementById('rec404');
+    if(!box) return;
+    const esc = n => String(n);
+
+    if(!edges.length){
+      if(!waiting) return;                       // nothing logged: say nothing rather than pad
+      box.innerHTML = '<div class="k">Your record</div>' +
+        '<div class="v">' + esc(waiting) + ' logged, 0 marked</div>' +
+        '<div class="n">None of your calls has reached its 90-day anniversary yet. ' +
+        'Marks are taken while the terminal is open, so they are only recorded if you are there on the day.</div>';
+      box.style.display = 'block';
+      return;
+    }
+
+    const n = edges.length;
+    const mean = edges.reduce((a, b) => a + b, 0) / n;
+    let sd = 0;
+    if(n > 1){
+      sd = Math.sqrt(edges.reduce((a, e) => a + (e - mean) * (e - mean), 0) / (n - 1));
+    }
+    const se = n > 1 ? sd / Math.sqrt(n) : null;
+    const lo = se != null ? mean - 1.96 * se : null;
+    const hi = se != null ? mean + 1.96 * se : null;
+    const straddles = lo != null && lo < 0 && hi > 0;
+    const sign = x => (x >= 0 ? '+' : '\u2212') + Math.abs(x).toFixed(2);
+
+    box.innerHTML = '<div class="k">Your record \u00b7 90-day marks</div>' +
+      '<div class="v ' + (straddles ? '' : (mean >= 0 ? 'pos' : 'neg')) + '">' + sign(mean) +
+        ' pts per call vs SPY</div>' +
+      '<div class="n">' + esc(n) + ' marked call' + (n === 1 ? '' : 's') +
+        (lo != null ? ' \u00b7 95% CI ' + sign(lo) + ' to ' + sign(hi) : '') +
+        (straddles ? ' \u2014 the interval crosses zero, so there is no measurable edge yet.'
+                   : (mean >= 0 ? ' \u2014 measurably ahead of the index.'
+                                : ' \u2014 measurably behind the index.')) +
+        ' Read out of this browser; nothing was fetched and nothing was sent.</div>';
+    box.style.display = 'block';
+  }catch(e){ /* a 404 that throws is worse than a 404 that says less */ }
+})();
 </script>
 </body>
 </html>

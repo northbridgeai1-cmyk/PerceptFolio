@@ -239,6 +239,32 @@ main{flex:1;min-width:0;max-width:1180px;padding:28px 26px;
 .big{font-family:var(--mono);font-size:25px;font-weight:600;letter-spacing:-.2px;font-variant-numeric:tabular-nums}
 .pos{color:var(--green)} .neg{color:var(--red)} .warn{color:var(--yellow)}
 .muted{color:var(--muted);font-size:13px}
+
+/* ---- TRACK RECORD STRIP ----
+   The Council's verdict was that the track record is the product and the portfolio value is not,
+   so the record gets real estate above the fold on both the Command screen and the Dashboard.
+   It leads with EXPECTANCY. It used to lead with "8 of 10 right", which is the most manufacturable
+   statistic in the discipline: sell covered calls, take profit at +0.5%, never stop out, and you can
+   report 95% right while losing money on every third gap-down. Expectancy cannot be gamed that way,
+   because a large loss is still in the average. */
+.rec{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
+.rec-head{font:10.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
+  display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.rec-head:before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent);flex:none}
+.rec-top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.rec-val{font:700 30px/1 var(--mono);letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.rec-unit{font:400 12px/1 var(--mono);color:var(--muted);margin-left:7px;letter-spacing:0}
+.rec-ci{font-size:12.5px;color:var(--muted);line-height:1.5}
+/* The reading is the sentence that matters, so it is not muted into the furniture. */
+.rec-read{font-size:13px;line-height:1.5;margin-top:3px}
+.rec-read.thin{color:var(--yellow)}
+.rec-bar{height:5px;border-radius:3px;background:var(--panel2);overflow:hidden;margin-top:12px;border:1px solid var(--border)}
+.rec-bar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .4s}
+.rec-bar i.done{background:var(--green)}
+.rec-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  font:11.5px/1.5 var(--mono);color:var(--muted);margin-top:7px}
+.rec-foot b{color:var(--text);font-weight:600}
+@media(max-width:600px){.rec-val{font-size:25px}}
 .hero{padding:8px 0 28px}
 .hero-label{font-family:var(--mono);color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
 .hero-value{font-family:var(--mono);font-size:48px;font-weight:600;letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1.1}
@@ -817,7 +843,7 @@ body.touring header,body.touring #sidebar{z-index:201}
   <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"></div>
   <!-- The track record sits above the actions on purpose. Anything that tells you what to do should
        have to state, in the same breath, how often it has been right. -->
-  <div id="cmdRecord" style="font-size:12.5px;margin-bottom:18px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)"></div>
+  <div id="cmdRecord" class="rec"></div>
   <div id="commandQueue"></div>
 </div>
 
@@ -858,6 +884,12 @@ body.touring header,body.touring #sidebar{z-index:201}
       <p style="margin-bottom:18px"><span class="step-num">3</span>Add a few tickers to your <b>Watchlist</b> — PerceptFolio scores them automatically.</p>
       <button class="btn" onclick="showTab('portfolio')">Add your first holding</button>
     </div>
+    <!-- THE RECORD SITS ABOVE THE PORTFOLIO VALUE, deliberately.
+         What this screen led with before was a number that goes up when the market goes up. It
+         tells the operator nothing about whether their judgment is any good, and reading it every
+         morning trains the wrong reflex. The record is the one thing here that is actually earned,
+         so it goes first and the balance goes second. -->
+    <div id="dashRecord" class="rec"></div>
     <div class="hero">
       <div class="hero-label" id="heroLabel">Portfolio value</div>
       <span class="hero-value" id="dTotal">$0</span><button class="privacy-btn" id="privacyToggleBtn" onclick="togglePrivacy()" title="Show/hide dollar amounts"></button>
@@ -5999,11 +6031,16 @@ function renderAll(){
     dayChange,dayBase,dayMissing};
   renderHeroStats();
 
+  renderRecordStrip();
+
   const gs=document.getElementById('greetingSub');
   if(gs){
     if(bizOwnView)gs.textContent='Here\'s how your clients are doing.';
     else if(isNew)gs.textContent='Let\'s get your portfolio set up below.';
-    else if(dayBase>0&&dayChange!==0)gs.textContent=(dayChange>=0?'You\'re up ':'You\'re down ')+pmask(fmt$(Math.abs(dayChange)))+' today. '+(dayChange>=0?'Nice.':'Markets move — check Signals below.');
+    /* "Nice." is gone. A one-day move is noise and congratulating the operator on it trains them to
+       read noise as skill — the precise habit this app exists to break. State the number, then say
+       what it is worth, which is nothing on its own. */
+    else if(dayBase>0&&dayChange!==0)gs.textContent=(dayChange>=0?'Up ':'Down ')+pmask(fmt$(Math.abs(dayChange)))+' today — one day is noise, not evidence.';
     else gs.textContent='Here\'s where things stand today.';
   }
 
@@ -8654,6 +8691,15 @@ function median(arr){
 /* The one-line record. Deliberately reused on the Command screen so the app's track record is the
    first thing visible every morning, whether or not it flatters the checklist. Returns null when
    there is nothing honest to say yet. */
+/* THE THRESHOLD. Forty marked calls before the record is treated as evidence of anything.
+   It is not arbitrary: at the spreads a retail checklist produces, a sample under about forty leaves
+   the 95% interval straddling zero almost regardless of the point estimate — which is to say the
+   honest reading of a small sample is "don't know", and the strip should say so rather than print a
+   number that looks decided. Showing the distance to forty turns that from a caveat into a target. */
+const RECORD_THRESHOLD=40;
+
+/* Every marked call at one horizon, with its edge against SPY. Returns the full expectancy
+   distribution rather than a hit count, because the hit count on its own is not decision-useful. */
 function callRecord(days){
   const marked=[];
   (D.calls||[]).forEach(c=>{
@@ -8667,27 +8713,94 @@ function callRecord(days){
     marked.push({c,edge});
   });
   if(!marked.length)return null;
-  const right=marked.filter(r=>r.edge>0).length;
-  return{n:marked.length,right,medEdge:median(marked.map(r=>r.edge))};
+  const st=expectancyStats(marked.map(r=>r.edge));
+  return{n:marked.length,right:marked.filter(r=>r.edge>0).length,
+         medEdge:median(marked.map(r=>r.edge)),st};
 }
-function renderRecordStrip(){
-  const el=document.getElementById('cmdRecord');
-  if(!el||!D)return;
-  const rec=callRecord(90);
+
+/* How many logged calls are still waiting on a 90-day anniversary. Distinguishing "waiting" from
+   "unmarkable" matters: the first is patience, the second is a hole in the record. */
+function callsAwaiting(days){
+  let waiting=0,unmarkable=0;
+  (D.calls||[]).forEach(c=>{
+    if(c.verdict!=='buy'&&c.verdict!=='sell')return;
+    const mk=(c.marks||{})[days];
+    if(mk&&mk.missed){unmarkable++;return;}
+    if(!mk)waiting++;
+  });
+  return{waiting,unmarkable};
+}
+
+function recordStripHTML(){
+  const days=90;
+  const rec=callRecord(days);
+  const aw=callsAwaiting(days);
+  const scorecardLink='<a href="#" onclick="showTab(\'history\');return false" style="color:var(--accent)">every call</a>';
+
+  /* ---- Nothing marked yet. This is the state the app ships in and it must not be dressed up. ---- */
   if(!rec){
-    const total=(D.calls||[]).length;
-    const pending=(D.calls||[]).filter(c=>(c.verdict==='buy'||c.verdict==='sell')).length;
-    el.innerHTML='<span class="muted">Track record: <b>'+(total?pending+' call'+(pending===1?'':'s')+' logged, none marked at 90 days yet':'nothing logged yet')+
-      '</b> — the app cannot claim an edge it has not measured. <a href="#" onclick="showTab(\'market\');return false" style="color:var(--accent)">Scorecard</a>'+
-      dueSoonNote()+'</span>';
-    return;
+    const pct=0;
+    return '<div class="rec-head">Track record · 90-day marks</div>'+
+      '<div class="rec-top"><span class="rec-val muted">—<span class="rec-unit">no expectancy yet</span></span></div>'+
+      '<div class="rec-read thin">Nothing has been marked at 90 days. The app cannot claim an edge it has not measured, '+
+        'and it will not estimate one from a shorter window to fill the space.</div>'+
+      '<div class="rec-bar"><i style="width:'+pct+'%"></i></div>'+
+      '<div class="rec-foot"><span><b>0</b> of '+RECORD_THRESHOLD+' marked calls</span>'+
+        '<span>'+(aw.waiting?'<b>'+aw.waiting+'</b> logged, waiting on an anniversary':'nothing logged yet')+
+        (aw.unmarkable?' · <b>'+aw.unmarkable+'</b> unmarkable':'')+dueSoonNote()+' · '+scorecardLink+'</span></div>';
   }
-  const good=rec.medEdge>=0;
-  el.innerHTML='<span class="muted">90-day record: <b class="'+(good?'pos':'neg')+'">'+
-    rec.right+' of '+rec.n+' right</b>, median <b class="'+(good?'pos':'neg')+'">'+(good?'+':'')+rec.medEdge.toFixed(1)+'pts</b> vs SPY'+
-    (rec.n<20?' <span style="opacity:.7">(too few to mean much)</span>':'')+
-    ' · <a href="#" onclick="showTab(\'market\');return false" style="color:var(--accent)">see every call</a>'+
-    dueSoonNote()+'</span>';
+
+  const st=rec.st;
+  const e=st.expectancy;
+  const straddles=st.lo!=null&&st.lo<0&&st.hi>0;
+  const thin=rec.n<RECORD_THRESHOLD;
+  const pct=Math.min(100,Math.round(rec.n/RECORD_THRESHOLD*100));
+  const sign=x=>(x>=0?'+':'−')+Math.abs(x).toFixed(2);
+
+  /* THE READING, in one sentence. An interval that straddles zero means no measurable edge, and
+     saying that plainly is the entire reason this tool exists. A positive point estimate inside a
+     straddling interval is not a small edge; it is a coin toss with a decimal place. */
+  let read,cls;
+  if(straddles){
+    read='The 95% interval crosses zero — <b>no measurable edge yet</b>. On this evidence the system '+
+         'is indistinguishable from picking at random, whatever the point estimate above says.';
+    cls='thin';
+  }else if(e>0){
+    read='The interval sits <b>entirely above zero</b>. On '+rec.n+' marked call'+(rec.n===1?'':'s')+
+         ' this is a measurable edge'+(thin?', though still on a thin sample':'')+'.';
+    cls=thin?'thin':'';
+  }else{
+    read='The interval sits <b>entirely below zero</b>. The system is measurably losing to the index — '+
+         'that is a result, and acting on it is what the record is for.';
+    cls='';
+  }
+
+  return '<div class="rec-head">Track record · 90-day marks</div>'+
+    '<div class="rec-top">'+
+      '<span class="rec-val '+(straddles?'':(e>=0?'pos':'neg'))+'">'+sign(e)+
+        '<span class="rec-unit">pts per call vs SPY</span></span>'+
+      '<span class="rec-ci">95% CI '+(st.lo!=null?sign(st.lo)+' to '+sign(st.hi):'n too small')+'</span>'+
+    '</div>'+
+    '<div class="rec-read '+cls+'">'+read+'</div>'+
+    '<div class="rec-bar"><i class="'+(pct>=100?'done':'')+'" style="width:'+pct+'%"></i></div>'+
+    '<div class="rec-foot">'+
+      '<span><b>'+rec.n+'</b> of '+RECORD_THRESHOLD+' marked calls'+
+        (pct>=100?' — sample is no longer thin':'')+'</span>'+
+      '<span>hit rate <b>'+st.hitRate.toFixed(0)+'%</b> ('+st.wins+'/'+st.n+')'+
+        (st.payoff!=null?' · payoff <b>'+st.payoff.toFixed(2)+'×</b>':'')+
+        (aw.waiting?' · <b>'+aw.waiting+'</b> waiting':'')+dueSoonNote()+' · '+scorecardLink+'</span>'+
+    '</div>';
+}
+
+/* Rendered into BOTH mounts. It was previously on Command only, which meant the screen everyone
+   actually lands on led with portfolio value and a compliment. */
+function renderRecordStrip(){
+  if(!D)return;
+  const html=recordStripHTML();
+  ['cmdRecord','dashRecord'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=html;
+  });
 }
 /* A mark can only be taken while the app is open. Saying so in advance is the difference between a
    record with a gap in it and a record with a gap you chose. */

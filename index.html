@@ -103,6 +103,15 @@ section{padding:68px 0;border-bottom:1px solid var(--line)}
 .sec-k{font:11px/1 var(--mono);color:var(--faint);letter-spacing:.14em;text-transform:uppercase}
 h2{font-size:clamp(23px,3.1vw,32px);line-height:1.15;letter-spacing:-.024em;font-weight:700;max-width:22ch}
 .lede{color:var(--dim);font-size:15.5px;line-height:1.66;max-width:64ch;margin-top:16px}
+.neg{color:#ef8b85}
+.goal-h{font-size:17px;font-weight:650;letter-spacing:-.01em;margin-top:40px}
+.goals{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:16px}
+.goal{background:var(--panel);padding:22px 20px}
+.goal-k{font:10px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.goal p{color:var(--dim);font-size:13.5px;line-height:1.62}
+.goal b{color:var(--text);font-weight:600}
+@media(max-width:820px){.goals{grid-template-columns:1fr}}
 
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
   border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:38px}
@@ -217,9 +226,9 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
     <a href="./" class="logo"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--line2)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></a>
     <span class="chip">Restricted</span>
     <div class="nav-links">
-      <a href="#terminal">Terminal</a>
       <a href="#record">Record</a>
       <a href="#access">Access</a>
+      <a href="#terminal">Terminal</a>
       <a href="#roadmap">Roadmap</a>
       <a href="#faq">FAQ</a>
     </div>
@@ -231,7 +240,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
   <div class="wrap" style="position:relative">
     <div class="cmdline">northbridge:financial $ <b>perceptfolio --status</b><span class="cur"></span></div>
     <h1>Internal investment terminal.</h1>
-    <p class="sub">The system NorthBridge's financial branch runs on. It scores companies against written rules, sizes positions before they are taken, and marks every call it makes against the index on a fixed horizon it cannot move afterwards.</p>
+    <p class="sub">The system NorthBridge's financial branch runs on. Every other tool in this category sells you signals. This one keeps a record of what it told you — marked against the index on a horizon it cannot move afterwards, and reported whether or not the result flatters the system.</p>
     <div class="cta">
       <a class="btn btn-p btn-lg" href="/terminal/">Sign in to the terminal</a>
       <a class="btn btn-lg" href="#access">Request access</a>
@@ -254,31 +263,9 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
   </div>
 </div>
 
-<section id="terminal">
-  <div class="wrap">
-    <div class="sec-head"><span class="sec-no">01</span><span class="sec-k">The terminal</span></div>
-    <h2>Fourteen screens. One question each.</h2>
-    <p class="lede">Every screen answers one decision and shows the arithmetic behind it. Nothing is a black box, because a system nobody can audit is a system nobody should act on.</p>
-    <div class="grid3">
-      <div class="tile"><div class="tile-h"><span class="tag t1">Command</span></div>
-        <p>One list each morning: what needs you today. Sell signals, breached limits, stops hit, reviews due, idle cash. Most days it reports that nothing needs you, and that is the correct answer.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t2">Scorecard</span></div>
-        <p>Every verdict the system has issued, marked against the index at 30, 90, 180 and 365 days. Reported with a confidence interval, so a thin sample reads as a thin sample rather than a result.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t3">Sizing</span></div>
-        <p>Three limits before any trade — policy cap, volatility budget, distance to stop — and the smallest one binds. Being right about the company and wrong about the size is how accounts end.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t3">Drawdown</span></div>
-        <p>Not where the book might finish but the hole it passes through. Sampled from real market history rather than a normal curve, because losses arrive in runs and a bell curve cannot represent that.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t4">Supply map</span></div>
-        <p>Who a company depends on, upstream and down. Five holdings that all rely on one supplier are one position, not five, and no other screen will surface it.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t5">Behaviour</span></div>
-        <p>How long positions are actually held. Whether what gets sold keeps rising without us. Whether the cash rule survives contact with a bad week. The one dataset that cannot be bought.</p></div>
-    </div>
-  </div>
-</section>
-
 <section id="record">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-no">02</span><span class="sec-k">The discipline</span></div>
+    <div class="sec-head"><span class="sec-no">01</span><span class="sec-k">The record</span></div>
     <h2>It writes down what it said, then checks.</h2>
     <p class="lede">Each verdict is logged the moment it changes, stamped with the price and the index, and marked on an anniversary that cannot be moved afterwards. A tool that flatters itself is worse than no tool, because it launders a guess into a number.</p>
 
@@ -299,12 +286,34 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       </table>
       <div class="panel-f">Empty by design. A fixed-horizon record cannot be reconstructed backwards, so every account's record begins the day it begins. Anything presenting a completed history on day one is presenting something it never had to live through.</div>
     </div>
+
+    <!-- THE TARGET, STATED SO IT CAN BE CHECKED.
+         This block exists because the brief that nearly got built asked for an 80% win rate and a
+         tripled account. Both are stated here in the form that can be falsified, because a goal
+         expressed as a return tells you nothing about whether it is reachable, and a goal expressed
+         as a hit rate can be manufactured in an afternoon. -->
+    <h3 class="goal-h">What this is aiming at, in the only terms that can be checked</h3>
+    <div class="goals">
+      <div class="goal">
+        <div class="goal-k">The target</div>
+        <p><b>Positive expectancy per call, measured against the index, with a 95% interval that clears zero.</b> Not a win rate and not a return. A return target tells you nothing about whether it is reachable, because you picked the answer before you had the inputs.</p>
+      </div>
+      <div class="goal">
+        <div class="goal-k">The constraint</div>
+        <p><b>A stated ruin tolerance that sizing is never allowed to breach.</b> Three limits bind every position — policy cap, volatility budget, distance to stop — and the smallest one wins. Being right about the company and wrong about the size is how accounts end.</p>
+      </div>
+      <div class="goal">
+        <div class="goal-k">The threshold</div>
+        <p><b>Forty marked calls before the record counts as evidence.</b> Under about forty, the interval straddles zero almost regardless of the point estimate. The honest reading of a small sample is <em>don't know</em>, and the terminal says so on its own front screen.</p>
+      </div>
+    </div>
+    <p class="lede" style="margin-top:26px">Why it is put this way: a hit rate is the most manufacturable statistic in finance. Sell covered calls, take profit at +0.5%, never stop out, hold the losers to recovery, and you can report being right nine times in ten while losing money on every third gap-down — 80% of wins at +1% against 20% of losses at −10% is an expectancy of <b class="neg">−1.2% per trade</b>. Right nearly always, and reliably bankrupt. Expectancy cannot be dressed up that way, because the large loss stays in the average.</p>
   </div>
 </section>
 
 <section id="access">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-no">03</span><span class="sec-k">Access</span></div>
+    <div class="sec-head"><span class="sec-no">02</span><span class="sec-k">Access</span></div>
     <h2>Applications are graded, not read.</h2>
     <p class="lede">Anyone can write a paragraph about why they should have access. So the form asks for something that can be checked: three calls, with a target, a stop and a date. In ninety days they will have marked themselves, and the decision is made on evidence rather than on how the paragraph read.</p>
 
@@ -341,6 +350,28 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
         <p>The terminal does not resell market data. You connect a free Finnhub key of your own — two minutes, no card. Client work additionally requires the shared macro proxy.</p></div>
       <div class="step"><h3><span class="step-n">4</span> Thesis before position</h3>
         <p>Any position taken through the terminal carries a written thesis, a stop and a deadline recorded when it is opened. A reason invented after the price moves is not a reason.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="terminal">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-no">03</span><span class="sec-k">The terminal</span></div>
+    <h2>Fourteen screens. One question each.</h2>
+    <p class="lede">Every screen answers one decision and shows the arithmetic behind it. Nothing is a black box, because a system nobody can audit is a system nobody should act on.</p>
+    <div class="grid3">
+      <div class="tile"><div class="tile-h"><span class="tag t1">Command</span></div>
+        <p>One list each morning: what needs you today. Sell signals, breached limits, stops hit, reviews due, idle cash. Most days it reports that nothing needs you, and that is the correct answer.</p></div>
+      <div class="tile"><div class="tile-h"><span class="tag t2">Scorecard</span></div>
+        <p>Every verdict the system has issued, marked against the index at 30, 90, 180 and 365 days. Reported with a confidence interval, so a thin sample reads as a thin sample rather than a result.</p></div>
+      <div class="tile"><div class="tile-h"><span class="tag t3">Sizing</span></div>
+        <p>Three limits before any trade — policy cap, volatility budget, distance to stop — and the smallest one binds. Being right about the company and wrong about the size is how accounts end.</p></div>
+      <div class="tile"><div class="tile-h"><span class="tag t3">Drawdown</span></div>
+        <p>Not where the book might finish but the hole it passes through. Sampled from real market history rather than a normal curve, because losses arrive in runs and a bell curve cannot represent that.</p></div>
+      <div class="tile"><div class="tile-h"><span class="tag t4">Supply map</span></div>
+        <p>Who a company depends on, upstream and down. Five holdings that all rely on one supplier are one position, not five, and no other screen will surface it.</p></div>
+      <div class="tile"><div class="tile-h"><span class="tag t5">Behaviour</span></div>
+        <p>How long positions are actually held. Whether what gets sold keeps rising without us. Whether the cash rule survives contact with a bad week. The one dataset that cannot be bought.</p></div>
     </div>
   </div>
 </section>
