@@ -8589,6 +8589,14 @@ async function loadMarketData(force){
         if(q&&isFinite(q.c)&&isFinite(q.pc)&&q.pc>0){
           out.LIVE={price:q.c,prevClose:q.pc,pct:(q.c-q.pc)/q.pc*100,at:Date.now()};
           macroCache.LIVE=out.LIVE;
+          /* SPY closes go into the app's own price log, exactly as ticker prices do.
+             THE POINT: the volatility ruler on this panel used to come only from FRED, so no
+             FRED key meant no ruler and the whole panel died with an error. Finnhub's SPY quote
+             is on the free tier and always available, so the index history is built here instead
+             — forward from every visit, backfilled from candles where the endpoint allows. The
+             panel then works on Finnhub alone, and improves on its own the more it is opened. */
+          logPrice('SPY',q.c);
+          try{ await backfillPrices('SPY'); }catch(e){}
         }
       }catch(e){}
     }
@@ -8600,6 +8608,115 @@ async function loadMarketData(force){
 /* VIX / sqrt(252) = the size of an ordinary day at the current level of implied volatility.
    sqrt(252) is 15.8745; the familiar "divide by 16" is that rounded. */
 const TRADING_DAYS=252;
+/* Realised daily volatility of the index, measured from the app's own SPY log. Needs no FRED key
+   and no worker — this is what keeps "The Move, In Context" alive when the macro proxy is not
+   configured. Returns null rather than a guess when there is not enough history. */
+function spyRealisedVol(sessions){
+  const log=(D.priceLog||{}).SPY||[];
+  const closes=log.map(r=>r.p).filter(p=>p>0);
+  const want=(sessions||20)+1;
+  if(closes.length<12)return null;
+  const use=closes.slice(Math.max(0,closes.length-want));
+  const rets=toReturns(use);
+  if(rets.length<10)return null;
+  const m=rets.reduce((a,b)=>a+b,0)/rets.length;
+  const v=rets.reduce((a,b)=>a+(b-m)*(b-m),0)/(rets.length-1);
+  const dailyPct=Math.sqrt(v)*100;
+  if(!(dailyPct>0))return null;
+  return{daily:dailyPct,annual:dailyPct*Math.sqrt(TRADING_DAYS),n:rets.length};
+}
+
+/* The panel, minus the options market. Everything here comes from Finnhub and the app's own log,
+   so it works with no FRED key, no macro proxy, and no worker at all. */
+function renderMoveWithoutVix(el,data,errMsg){
+  const live=data&&data.LIVE;
+  const rv=spyRealisedVol(20);
+
+  /* Genuinely nothing to show. Say what is missing and what each missing piece would buy, rather
+     than repeating a worker error the reader cannot act on without translation. */
+  if(!live&&!rv){
+    el.innerHTML='<div class="empty" style="text-align:left;line-height:1.65">'+
+      '<b>Nothing to measure yet.</b><br>'+
+      'This panel needs one of two things, and has neither:<br><br>'+
+      '<b>1. A Finnhub key</b> — Settings, in this app. Free. Gives a live S&amp;P move immediately, '+
+      'and the app starts logging index closes so it can measure volatility itself within a few weeks.<br>'+
+      '<b>2. A FRED key</b> — added to the <b>Cloudflare worker</b>, not to this app. Free. Adds the VIX, '+
+      'which is the only way to show what the options market <em>expects</em> rather than what already happened.'+
+      (errMsg?'<br><br><span class="muted" style="font-size:12px">Worker said: '+esc(errMsg)+'</span>':'')+
+      '</div>';
+    return;
+  }
+
+  /* The toggle still has to light up. Without this the three buttons look clickable and do nothing,
+     which reads as a broken panel rather than a degraded one. */
+  updateMoveButtons();
+
+  /* TOMORROW, without the options market. Realised vol gives a legitimate range — it is simply a
+     backward-looking one, and the copy says so rather than passing it off as the VIX. */
+  if(moveDay==='tomorrow'){
+    if(!rv){
+      el.innerHTML='<div class="empty" style="text-align:left;line-height:1.6">'+
+        '<b>No range for tomorrow yet.</b><br>It needs either the VIX (a free <b>FRED_API_KEY</b> on your '+
+        '<b>Cloudflare worker</b>) or about three weeks of logged S&amp;P closes, which build up each time '+
+        'you open this tab.</div>';
+      return;
+    }
+    el.innerHTML=
+      '<div style="font-size:26px;font-weight:700;line-height:1.35;letter-spacing:-.3px">'+
+        'Tomorrow: expect roughly <span class="warn">±'+rv.daily.toFixed(2)+'%</span></div>'+
+      '<div style="margin-top:12px;font-size:15px;line-height:1.6">'+
+        'Two thirds of days land inside ±'+rv.daily.toFixed(2)+'%. About one in twenty exceeds <b>±'+
+        (rv.daily*2).toFixed(2)+'%</b>. Measured from the last '+rv.n+' sessions ('+rv.annual.toFixed(1)+'% annualised).</div>'+
+      '<div class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.55">'+
+        '<b>This is a range, not a prediction</b>, and nothing here says up or down.</div>'+
+      '<div class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.55">'+
+        '<b>How this can be wrong:</b> this is what the market <em>has been</em> doing, not what it '+
+        '<em>expects</em>. It cannot see a scheduled event — an earnings date, a Fed meeting, an election — '+
+        'so it will quote a calm range into the day before a known catalyst. That forward-looking half is '+
+        'the VIX, and it needs a free <b>FRED_API_KEY</b> on your <b>Cloudflare worker</b> (not in this '+
+        'app\'s Settings). See SYNC-SETUP.md, step 5b.'+
+        (errMsg?'<br><span style="opacity:.75">Worker said: '+esc(errMsg)+'</span>':'')+
+      '</div>';
+    return;
+  }
+
+  const actual=live?live.pct:null;
+  const sigma=(actual!=null&&rv)?Math.abs(actual)/rv.daily:null;
+  const band=sigma==null?'':sigma<1?'quiet':sigma<2?'busy':'unusual';
+  const cls=sigma==null?'flat':sigma<1?'':sigma<2?'warn':'neg';
+
+  el.innerHTML=
+    '<div style="font-size:26px;font-weight:700;line-height:1.35;letter-spacing:-.3px">'+
+      (actual!=null
+        ? 'The S&P is '+(actual>=0?'up':'down')+' <span class="'+(actual>=0?'pos':'neg')+'">'+Math.abs(actual).toFixed(2)+'%</span> '+
+          '<span class="muted" style="font-size:15px;font-weight:500">right now</span>'
+        : 'Recent volatility: ±'+rv.daily.toFixed(2)+'% a day')+
+    '</div>'+
+    '<div style="margin-top:10px;font-size:15px;line-height:1.6">'+
+      (rv
+        ? 'The last '+rv.n+' sessions ran <b>±'+rv.daily.toFixed(2)+'%</b> a day ('+rv.annual.toFixed(1)+'% annualised).'
+        : 'Not enough logged index history yet to measure a typical day — it builds each time you open this tab.')+
+      (sigma!=null
+        ? ' Today is a <b class="'+cls+'">'+sigma.toFixed(1)+'σ</b> move against that — <b class="'+cls+'">'+band+'</b>.'
+        : '')+
+    '</div>'+
+    (sigma!=null?'<div class="muted" style="font-size:12.5px;margin-top:8px">'+
+      (sigma<1?'Inside the normal range. Days like this are the majority of days and rarely mean anything.'
+       :sigma<2?'Larger than typical but not rare — roughly a once-a-fortnight size of move.'
+       :'Well outside the normal range. Moves this size cluster around real news.')+'</div>':'')+
+    /* The falsifiability line, and an honest statement of which ruler is in use. A realised-vol
+       ruler is BACKWARD-looking: it cannot know about an event scheduled for tomorrow, which is
+       exactly the gap the VIX fills. Saying so is the difference between a fallback and a fake. */
+    '<div class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">'+
+      '<b>Measured, not implied.</b> This uses volatility calculated from '+(rv?rv.n+' ':'')+'logged S&amp;P closes, '+
+      'not the VIX. <b>How this can be wrong:</b> a realised ruler only knows what already happened — it '+
+      'cannot price an event scheduled for tomorrow, so it will call a move ordinary right up until the '+
+      'day it is not. The VIX is the forward-looking half and needs a free <b>FRED_API_KEY</b> added to your '+
+      '<b>Cloudflare worker</b> (not to this app\'s Settings). See SYNC-SETUP.md, step 5b.'+
+      (errMsg?'<br><span style="opacity:.75">Worker said: '+esc(errMsg)+'</span>':'')+
+    '</div>';
+}
+
 function renderTodaysMove(data){
   const el=document.getElementById('todaysMove');
   if(!el)return;
@@ -8608,8 +8725,14 @@ function renderTodaysMove(data){
     return;
   }
   const vix=data.VIXCLS,spx=data.SP500;
+
+  /* ---- NO VIX? THEN USE THE RULER WE CAN MEASURE OURSELVES. ----
+     This used to print "Couldn't load VIX" and stop, which threw away a working live S&P quote and
+     a perfectly good realised-volatility estimate because ONE optional key was missing. VIX is the
+     options market's EXPECTATION; realised volatility is what actually happened. The second is a
+     weaker ruler for tomorrow and a better one for today, and it costs nothing. */
   if(!vix||vix.error||!vix.length){
-    el.innerHTML='<div class="empty neg">Couldn\'t load VIX'+(vix&&vix.error?': '+esc(vix.error):'')+'</div>';
+    renderMoveWithoutVix(el,data,vix&&vix.error?vix.error:'');
     return;
   }
   updateMoveButtons();
