@@ -8745,17 +8745,25 @@ function renderTodaysMove(data){
      whether the market is braced for more turbulence than it has been delivering, and by how much.
      When they diverge sharply, that gap is itself the information. */
   const realized=(()=>{
-    if(!spx||spx.error||spx.length<21)return null;
-    const r=[];
-    for(let i=1;i<=20&&i<spx.length;i++){
-      const a=spx[i].value,b=spx[i-1].value;
-      if(a>0)r.push((b-a)/a);
+    if(spx&&!spx.error&&spx.length>=21){
+      const r=[];
+      for(let i=1;i<=20&&i<spx.length;i++){
+        const a=spx[i].value,b=spx[i-1].value;
+        if(a>0)r.push((b-a)/a);
+      }
+      if(r.length>=10){
+        const m=r.reduce((x,y)=>x+y,0)/r.length;
+        const v=r.reduce((x,y)=>x+(y-m)*(y-m),0)/(r.length-1);
+        const dailyPct=Math.sqrt(v)*100;
+        return{daily:dailyPct,annual:dailyPct*Math.sqrt(TRADING_DAYS),src:'S&P via FRED'};
+      }
     }
-    if(r.length<10)return null;
-    const m=r.reduce((x,y)=>x+y,0)/r.length;
-    const v=r.reduce((x,y)=>x+(y-m)*(y-m),0)/(r.length-1);
-    const dailyPct=Math.sqrt(v)*100;
-    return{daily:dailyPct,annual:dailyPct*Math.sqrt(TRADING_DAYS)};
+    /* FRED's index series can be short, throttled or refused while the VIX still loads fine — and
+       when that happened this card printed "not enough history" beside a perfectly good SPY log the
+       app had been keeping all along. The implied half of the comparison is useless without the
+       realised half, so fall back to our own measurement rather than blanking it. */
+    const own=spyRealisedVol(20);
+    return own?{daily:own.daily,annual:own.annual,src:'SPY, measured from '+own.n+' of your own logged closes'}:null;
   })();
 
   /* TOMORROW is not a forecast and cannot be. There is no data for a day that hasn't happened.
@@ -8772,7 +8780,7 @@ function renderTodaysMove(data){
           '<div class="muted" style="font-size:11.5px;margin-top:4px">VIX '+vixNow.toFixed(2)+' ÷ √252</div></div>'+
         '<div class="card" style="background:var(--panel2)"><h3>Realized — what actually happened</h3>'+
           '<div class="big">'+(realized?'±'+realized.daily.toFixed(2)+'%':'—')+'</div>'+
-          '<div class="muted" style="font-size:11.5px;margin-top:4px">'+(realized?'last 20 sessions · '+realized.annual.toFixed(1)+'% annualised':'not enough history')+'</div></div>'+
+          '<div class="muted" style="font-size:11.5px;margin-top:4px">'+(realized?realized.annual.toFixed(1)+'% annualised · '+esc(realized.src):'not enough history yet — it builds each time you open this tab')+'</div></div>'+
       '</div>'+
       '<div style="margin-top:12px;font-size:14.5px;line-height:1.6">'+
         'Two thirds of days land inside ±'+expected.toFixed(2)+'%. About one in twenty exceeds <b>±'+(expected*2).toFixed(2)+'%</b>.'+
@@ -8797,9 +8805,20 @@ function renderTodaysMove(data){
     // Live SPY from Finnhub — the only genuinely "today" number available.
     actual=data.LIVE.pct;spxDate='live';live=true;
   }else if(spx&&!spx.error&&spx.length>=2){
-    // FRED's newest close. With the publishing lag this is yesterday, so it's labelled as its date.
-    actual=(spx[0].value-spx[1].value)/spx[1].value*100;
-    spxDate=spx[0].date;
+    /* YESTERDAY HAS TO STEP BACK A SESSION, and which session depends on what "today" showed.
+
+       This was the bug: both buttons read spx[0] against spx[1] unconditionally, so with no live
+       quote the two tabs rendered byte-identical output and the toggle looked broken. With a live
+       quote it was merely wrong in a way that was harder to see.
+
+       FRED publishes end-of-day about a day in arrears, so spx[0] is the last COMPLETED session:
+         - live quote present -> "today" is the live figure, so "yesterday" is spx[0] vs spx[1].
+         - no live quote      -> "today" already shows spx[0], so "yesterday" must be spx[1] vs spx[2]. */
+    const off=(moveDay==='yesterday'&&!data.LIVE)?1:0;
+    if(spx.length>=off+2){
+      actual=(spx[off].value-spx[off+1].value)/spx[off+1].value*100;
+      spxDate=spx[off].date;
+    }
   }
   const label=live?'Today':'That day';
   const sigma=(actual!=null&&expected>0)?Math.abs(actual)/expected:null;
@@ -8831,7 +8850,15 @@ function renderTodaysMove(data){
     '</div>';
 }
 let moveDay='today';
-function setMoveDay(d){moveDay=d;renderTodaysMove(macroCache);}
+/* Render immediately from cache so the toggle feels instant, THEN fetch if the cache cannot
+   actually answer. Previously this only ever read the cache, so clicking a day before the first
+   load finished — or after a config change that made data newly available — showed the "nothing to
+   measure" state and stayed there, with no indication that pressing the refresh arrow would fix it. */
+function setMoveDay(d){
+  moveDay=d;
+  renderTodaysMove(macroCache);
+  if(!macroCache.VIXCLS&&!macroCache.LIVE)loadMarketData(false);
+}
 
 /* ---- Regime shift detection ----
    Named honestly: this is a VARIANCE-RATIO change detector, not PELT or Bayesian change-point
