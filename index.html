@@ -229,7 +229,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       <a href="#record">Record</a>
       <a href="#access">Access</a>
       <a href="#terminal">Terminal</a>
-      <a href="#roadmap">Roadmap</a>
+      <a href="/refused/">Refused</a>
       <a href="#faq">FAQ</a>
     </div>
     <a class="btn btn-p" href="/terminal/">Sign in</a>
@@ -390,7 +390,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
   <div class="wrap">
     <div class="sec-head"><span class="sec-no">04</span><span class="sec-k">Roadmap</span></div>
     <h2>What we built, what we can't, and what we refused.</h2>
-    <p class="lede">Forty-five modules were considered for this terminal. Eighteen are live. Sixteen are impossible on retail market data at any effort. Eleven were declined on evidence. Every category and every reason is below, because a record of what an operation <em>refused</em> to build is rarer and more informative than a feature list.</p>
+    <p class="lede">Forty-five modules were considered for this terminal. Eighteen are live. Sixteen are impossible on retail market data at any effort. Eleven were declined on evidence.</p>
 
     <div class="band-g" style="margin-top:34px;border:1px solid var(--line);border-radius:9px;overflow:hidden">
       <div class="cell"><div class="cell-n" style="color:var(--green)">18</div><div class="cell-l">live — running in<br>the terminal today</div></div>
@@ -399,51 +399,24 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       <div class="cell"><div class="cell-n">0</div><div class="cell-l">built to look<br>impressive</div></div>
     </div>
 
-    <div style="margin-top:34px;max-width:900px">
-      <details open>
-        <summary>Live — 18</summary>
-        <p style="color:var(--dim)">
-          <b>VaR / ES engine · Historical VaR · Parametric VaR · Expected Shortfall</b> — loss severity from the daily return series. ES is shown as the primary figure because VaR states where the threshold is and nothing about how far past it losses run. That blindness is why Basel moved from VaR to Expected Shortfall.<br><br>
-          <b>Volatility forecasting (GARCH 1,1)</b> — fitted by variance targeting, so the model's long-run variance matches the sample rather than implying one the data never showed.<br><br>
-          <b>Monte Carlo VaR · Tail risk engine</b> — the drawdown model samples real market history in blocks rather than drawing from a normal curve, because losses cluster and a bell curve cannot represent that.<br><br>
-          <b>Portfolio construction</b> — three sizing limits, smallest binds: policy cap, volatility budget, distance to stop.<br><br>
-          <b>Correlation and covariance engine · Portfolio risk dashboard · Risk and stress testing</b> — including each holding's share of portfolio variance against its share of the money.<br><br>
-          <b>Market regime detection</b> — variance-ratio change detection on index returns.<br><br>
-          <b>Momentum strategy · Multi-asset trend following</b> — a four-segment momentum score and a 50/200 EWMA crossover, both graded against the index in parallel.<br><br>
-          <b>Stock return and volatility analyser · Regime-aware sizing · End-to-end research pipeline</b> — every verdict logged, marked on fixed anniversaries, reported with a confidence interval.
-        </p>
-      </details>
+    <!-- THE FULL LIST LIVES AT /refused/ AND ONLY THERE.
+         It used to sit here inside three collapsed <details>, in fourth position, behind the access
+         form. That is the one document on this site that cannot be faked — writing it required
+         understanding all forty-five, and everyone in the field knows that — so it now has its own
+         URL and can be sent to a person on its own.
 
-      <details>
-        <summary>Impossible on retail data — 16</summary>
-        <p style="color:var(--dim)">
-          Not hard. Not expensive. <b>Unavailable at any effort on a free market-data tier.</b><br><br>
-          <b>Derivatives pricing · Volatility surface · Local volatility · Black-Scholes engine · Implied volatility solver · Option Greeks · Binomial pricing · Monte Carlo option pricing</b> — all eight need a live <b>options chain</b>: strikes, expiries, bid and ask. There is none.<br><br>
-          <b>Interest rate modelling · Yield curve modelling · XVA</b> — need a term structure and discount curves.<br><br>
-          <b>Credit and CDS pricing</b> — needs credit spreads.<br><br>
-          <b>Electronic trading · High-frequency LOB model · Microstructure simulator · Optimal execution</b> — need tick-level order book data, and an execution venue this has no connection to and never will.<br><br>
-          <b>Alternative data alpha</b> — a budget line, not a feature.<br><br>
-          A model built on data you do not have does not fail loudly. It emits a confident number with a Greek letter attached, and you act on it.
-        </p>
-      </details>
-
-      <details>
-        <summary>Declined on evidence — 11</summary>
-        <p style="color:var(--dim)">
-          <b>Mean-variance portfolio optimisation</b> — needs expected returns and is pathologically unstable in them, overweighting whatever holding carries estimation error in its favour. Naive equal weighting has beaten it out of sample in published tests. The stable half — risk contribution, which needs no expected returns — was built instead.<br><br>
-          <b>Statistical arbitrage · Pairs trading · Kalman filter pairs · Factor long/short</b> — all four require short positions the data model does not support, executed on two legs by hand, on an edge measured in basis points. Published pairs returns have declined substantially since the approach was publicised.<br><br>
-          <b>Moving-average mean reversion</b> — sits in the horizon band where the documented effect runs opposite to the rule's assumption.<br><br>
-          <b>Machine learning return predictor</b> — with this sample size it is an overfitting machine that produces its most confident output exactly where it has learned the least.<br><br>
-          <b>XVA · FRTB and model validation</b> — regulatory capital machinery. XVA requires counterparties. FRTB satisfies a supervisor. There is no supervisor here.<br><br>
-          <b>Factor exposure analyser</b> — proper factor returns are not in the data set; an approximation would be a guess wearing a Greek letter.<br><br>
-          <b>Fully systematic trading strategy</b> — there is no broker connection and there will not be one. The terminal reports; a person decides and executes.
-        </p>
-      </details>
+         Deliberately NOT duplicated. Two copies of a 4,000-word argument drift, and the moment they
+         disagree the page has contradicted itself, which on this site costs more than it would
+         anywhere else. The counts stay here because they carry the point in one glance; the reasons
+         live in one place. -->
+    <p class="lede" style="margin-top:28px">A record of what an operation <em>refused</em> to build is rarer and more informative than a feature list, and considerably harder to fake. Every module, and the reason behind each refusal, is set out in full on its own page.</p>
+    <div class="cta" style="margin-top:22px">
+      <a class="btn btn-p btn-lg" href="/refused/">Read the refusal list</a>
     </div>
 
     <div class="notice" style="margin-top:30px;border-color:rgba(59,130,246,.26);background:rgba(59,130,246,.05)">
       <b style="color:#79a8f4">The rule that governs this list</b>
-      <p>No further analytics are added until the call scorecard holds forty marked calls. Evidence arrives at one day per day and no amount of building accelerates it, so every module added before then would change the interface without changing what is known. Most of the list above is risk machinery — it exists to make being wrong survivable, not to make being right more frequent, and treating it as the second thing is the most common error made with it.</p>
+      <p>No further analytics are added until the call scorecard holds forty marked calls. Evidence arrives at one day per day and no amount of building accelerates it, so every module added before then would change the interface without changing what is known. Most of the list is risk machinery — it exists to make being wrong survivable, not to make being right more frequent, and treating it as the second thing is the most common error made with it.</p>
     </div>
   </div>
 </section>

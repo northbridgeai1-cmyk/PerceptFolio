@@ -1,7 +1,7 @@
 /* PerceptFolio service worker.
    Bump CACHE_VERSION whenever the terminal changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v32';
+const CACHE_VERSION = 'perceptfolio-v33';
 
 /* THE TERMINAL is what has to work offline — and it lives at /terminal/, not at the root. The
    landing page is the front door: nobody needs to read it on a plane, and listing it as required
@@ -29,6 +29,7 @@ const OPTIONAL = [
   './',
   './index.html',
   './404.html',
+  './refused/',
   './thanks.html',
   './admin.html',
   './app/',
