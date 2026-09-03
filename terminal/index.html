@@ -4324,15 +4324,26 @@ function aiSummaryHtml(sym){
     (a.dropped?'<p class="muted" style="font-size:11.5px;margin-top:9px;line-height:1.5"><span class="warn">'+
       a.dropped+' sentence'+(a.dropped===1?'':'s')+' discarded</span> for citing no headline that was actually supplied. '+
       'You are seeing only what survived that check.</p>':'')+
-    /* THE FALSIFIABILITY LINE. Every module states, next to its own output, the thing that would
-       show it to be wrong. For a summariser the failure mode is not hallucination — that is now
-       caught — it is a true summary of coverage that is itself misleading. */
-    '<p class="muted" style="font-size:11px;margin-top:10px;line-height:1.55">'+
-      'Each sentence cites the numbered headline it came from, and the worker drops any sentence it '+
-      'cannot trace back. <b>How this can still be wrong:</b> it summarises what was <b>published</b>, '+
-      'not what is true. Coverage can be uniformly wrong, planted, or simply absent, and this card '+
-      'would faithfully report it. It reads headlines only — never the articles — and carries no buy '+
-      'or sell verdict.</p>'+
+    /* THE FALSIFIABILITY LINE — AND IT MUST NOT OVERSTATE WHAT WAS CHECKED.
+       The citation guarantee belongs to the WORKER, not to this page, and the worker is deployed by
+       hand rather than from this repo. So a terminal on the new code can easily be talking to a
+       worker on the old code. Printing "every sentence is cited" in that case would be exactly the
+       unverifiable provenance claim this whole change set exists to remove — the same fault, moved
+       one layer up. The worker stamps verified:true; only then is the guarantee claimed. */
+    (a.verified
+      ? '<p class="muted" style="font-size:11px;margin-top:10px;line-height:1.55">'+
+          'Each sentence cites the numbered headline it came from, and the worker discarded anything '+
+          'it could not trace back. <b>How this can still be wrong:</b> it summarises what was '+
+          '<b>published</b>, not what is true. Coverage can be uniformly wrong, planted, or simply '+
+          'absent, and this card would faithfully report it. It reads headlines only — never the '+
+          'articles — and carries no buy or sell verdict.</p>'
+      : '<p class="muted" style="font-size:11px;margin-top:10px;line-height:1.55">'+
+          '<span class="warn">Unverified summary.</span> The worker that produced this predates the '+
+          'citation check, so these sentences have <b>not</b> been traced back to specific headlines '+
+          'and may name things the coverage never said. Re-paste <code>worker.js</code> into '+
+          'Cloudflare and redeploy to turn the check on. <b>How this can still be wrong:</b> even '+
+          'once verified it summarises what was <b>published</b>, not what is true, and it reads '+
+          'headlines only — never the articles.</p>')+
   '</div>';
 }
 /* One card per ticker: the brief up top, every source folded behind an arrow underneath. The
