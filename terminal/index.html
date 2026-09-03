@@ -8561,8 +8561,27 @@ async function loadMarketData(force){
   if(macroLoading)return;
   macroLoading=true;
   try{
+    /* NO WORKER IS NOT THE SAME AS NO DATA.
+       This used to bail here and render "needs the Cloudflare Worker" into the move panel, which
+       threw away a live SPY quote that needs no worker at all — Finnhub is called directly from the
+       browser. The regime banner and the weather map genuinely do need FRED and still say so; the
+       move panel does not, so it now gets whatever can actually be fetched. */
     if(!syncConfigured()){
-      renderTodaysMove({error:'NEEDS_WORKER'});
+      const solo={};
+      if(D.apiKey){
+        try{
+          const q=await getQuote('SPY');
+          if(q&&isFinite(q.c)&&isFinite(q.pc)&&q.pc>0){
+            solo.LIVE={price:q.c,prevClose:q.pc,pct:(q.c-q.pc)/q.pc*100,at:Date.now()};
+            macroCache.LIVE=solo.LIVE;
+            logPrice('SPY',q.c);
+            try{ await backfillPrices('SPY'); }catch(e){}
+          }
+        }catch(e){}
+      }
+      // Only claim the worker is the blocker when there is genuinely nothing else to show.
+      if(solo.LIVE||((D.priceLog||{}).SPY||[]).length>=2)renderTodaysMove(solo);
+      else renderTodaysMove({error:'NEEDS_WORKER'});
       renderRegimeBanner({});   // clears rather than leaving a stale banner
       renderWeather({error:'NEEDS_WORKER'});
       return;
@@ -8628,6 +8647,23 @@ function spyRealisedVol(sessions){
 
 /* The panel, minus the options market. Everything here comes from Finnhub and the app's own log,
    so it works with no FRED key, no macro proxy, and no worker at all. */
+/* One session's move out of the app's own SPY log. offset 0 is the most recent completed session,
+   1 the one before it. The log is appended oldest-first by logPrice, so the newest entry is last.
+
+   This exists because the no-VIX panel had no notion of "yesterday" at all: both day buttons read
+   the same live quote, so they rendered identically and the toggle looked dead. Exactly the defect
+   that was just fixed on the FRED path, reproduced on the fallback path when it was written. */
+function spySessionMove(offset){
+  const log=(D.priceLog||{}).SPY||[];
+  const rows=log.filter(r=>r&&r.p>0);
+  const n=rows.length;
+  const k=offset||0;
+  if(n<k+2)return null;
+  const cur=rows[n-1-k],prev=rows[n-2-k];
+  if(!(prev.p>0))return null;
+  return{pct:(cur.p-prev.p)/prev.p*100,date:cur.d||null};
+}
+
 function renderMoveWithoutVix(el,data,errMsg){
   const live=data&&data.LIVE;
   const rv=spyRealisedVol(20);
@@ -8680,7 +8716,17 @@ function renderMoveWithoutVix(el,data,errMsg){
     return;
   }
 
-  const actual=live?live.pct:null;
+  /* Same rule as the FRED path: which session "yesterday" means depends on what "today" showed.
+       live quote present -> today is live, so yesterday is the newest logged session (offset 0)
+       no live quote      -> today is already offset 0, so yesterday is offset 1 */
+  let actual=null,shownDate=null,isLive=false;
+  if(moveDay==='today'&&live){
+    actual=live.pct;isLive=true;
+  }else{
+    const off=(moveDay==='yesterday'&&live)?0:(moveDay==='yesterday'?1:0);
+    const mv=spySessionMove(off);
+    if(mv){actual=mv.pct;shownDate=mv.date;}
+  }
   const sigma=(actual!=null&&rv)?Math.abs(actual)/rv.daily:null;
   const band=sigma==null?'':sigma<1?'quiet':sigma<2?'busy':'unusual';
   const cls=sigma==null?'flat':sigma<1?'':sigma<2?'warn':'neg';
@@ -8688,17 +8734,21 @@ function renderMoveWithoutVix(el,data,errMsg){
   el.innerHTML=
     '<div style="font-size:26px;font-weight:700;line-height:1.35;letter-spacing:-.3px">'+
       (actual!=null
-        ? 'The S&P is '+(actual>=0?'up':'down')+' <span class="'+(actual>=0?'pos':'neg')+'">'+Math.abs(actual).toFixed(2)+'%</span> '+
-          '<span class="muted" style="font-size:15px;font-weight:500">right now</span>'
-        : 'Recent volatility: ±'+rv.daily.toFixed(2)+'% a day')+
+        ? 'The S&P '+(isLive?'is':'was')+' '+(actual>=0?'up':'down')+' <span class="'+(actual>=0?'pos':'neg')+'">'+Math.abs(actual).toFixed(2)+'%</span> '+
+          '<span class="muted" style="font-size:15px;font-weight:500">'+(isLive?'right now':(shownDate?'on '+esc(shownDate):'that session'))+'</span>'
+        : (moveDay==='yesterday'
+            ? 'No earlier session logged yet'
+            : 'Recent volatility: ±'+(rv?rv.daily.toFixed(2):'—')+'% a day'))+
     '</div>'+
     '<div style="margin-top:10px;font-size:15px;line-height:1.6">'+
       (rv
         ? 'The last '+rv.n+' sessions ran <b>±'+rv.daily.toFixed(2)+'%</b> a day ('+rv.annual.toFixed(1)+'% annualised).'
         : 'Not enough logged index history yet to measure a typical day — it builds each time you open this tab.')+
       (sigma!=null
-        ? ' Today is a <b class="'+cls+'">'+sigma.toFixed(1)+'σ</b> move against that — <b class="'+cls+'">'+band+'</b>.'
-        : '')+
+        ? ' '+(isLive?'Today':'That session')+' is a <b class="'+cls+'">'+sigma.toFixed(1)+'σ</b> move against that — <b class="'+cls+'">'+band+'</b>.'
+        : (actual==null&&moveDay==='yesterday'
+            ? ' The app needs two logged S&P closes to show a previous session, and has fewer. It records one each time you open this tab.'
+            : ''))+
     '</div>'+
     (sigma!=null?'<div class="muted" style="font-size:12.5px;margin-top:8px">'+
       (sigma<1?'Inside the normal range. Days like this are the majority of days and rarely mean anything.'
