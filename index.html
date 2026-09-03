@@ -334,7 +334,17 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
             <div class="call-row head"><div>Ticker</div><div>Direction</div><div>Target $</div><div>Stop $</div><div>By date</div></div>
             <div id="callRows"></div>
           </div>
-          <p class="hint">A target and a stop together make a claim that can be wrong, which a paragraph cannot. These are marked against the index on the date you set, and you are told the result whether or not access is granted.</p>
+          <!-- THIS SENTENCE USED TO PROMISE MORE THAN THE SOFTWARE DOES.
+               It read: "These are marked against the index on the date you set, and you are told the
+               result whether or not access is granted." There is no mechanism behind that. The worker
+               stores each request in KV with its three calls; there is no scheduler, no marking job for
+               outside calls, and no mailer. Nothing would ever have sent that report.
+
+               On a site whose whole argument is that a tool which flatters itself is worse than no
+               tool, printing a commitment the code cannot keep is the exact fault being condemned.
+               So it states what actually happens and stops there. When the marking job exists, this
+               is the line to change — not before. -->
+          <p class="hint">A target and a stop together make a claim that can be wrong, which a paragraph cannot. Your three calls are stored exactly as written, with the date you set against each one, so they can be checked later against what actually happened.</p>
         </div>
         <button class="btn btn-p btn-lg" type="submit" id="rqBtn">Submit request</button>
         <div class="msg" id="rqMsg"></div>
@@ -479,7 +489,12 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
 
 <div class="statusbar">
   <div class="sb"><span class="live"></span> <b>SYSTEM</b> nominal</div>
-  <div class="sb opt"><b>BUILD</b> <span id="sbBuild">—</span></div>
+  <!-- Labelled DEPLOYED, not BUILD. document.lastModified is the server's Last-Modified for this
+       file, which is when it was deployed — there is no build pipeline and calling it a build tag
+       implied one. If the header is absent the browser substitutes the current time, so the value is
+       checked for plausibility and the field hides itself rather than showing today's date as if it
+       meant something. -->
+  <div class="sb opt" id="sbBuildWrap"><b>DEPLOYED</b> <span id="sbBuild">—</span></div>
   <div class="sb opt"><b>ACCESS</b> restricted</div>
   <div class="sb"><b id="sbClock">--:--:--</b> <span id="sbZone">UTC</span></div>
 </div>
@@ -515,7 +530,15 @@ const PF = {
 };
 
 document.getElementById('yr').textContent = new Date().getFullYear();
-document.getElementById('sbBuild').textContent = document.lastModified.slice(0,10).replace(/\//g,'-');
+(function stamp(){
+  const el=document.getElementById('sbBuild'), wrap=document.getElementById('sbBuildWrap');
+  const t=Date.parse(document.lastModified);
+  /* A missing Last-Modified header makes lastModified read as "now". Showing that as a deploy stamp
+     would be a fabricated number on a page that argues against fabricated numbers, so anything
+     inside the last two minutes is treated as absent and the field is removed. */
+  if(!isFinite(t)||Date.now()-t<120000){ if(wrap)wrap.style.display='none'; return; }
+  el.textContent=new Date(t).toISOString().slice(0,10);
+})();
 
 /* Clock in the status bar. Small thing, but a terminal that doesn't know
    what time it is doesn't read as a terminal. */
