@@ -1754,9 +1754,15 @@ body.touring header,body.touring #sidebar{z-index:201}
       <button class="btn" onclick="saveSyncConfig()">Save &amp; connect</button>
       <button class="btn btn-ghost" onclick="syncNow()">Sync now</button>
       <button class="btn btn-ghost" onclick="syncPullForce()">Pull from cloud</button>
+      <button class="btn btn-ghost" onclick="checkConnection()">Check connection</button>
       <button class="btn-danger btn btn-ghost" onclick="disableSync()">Turn off</button>
     </div>
     <p class="muted" id="syncStatus" style="margin-top:10px;font-size:13px"></p>
+    <!-- Answers "is any of this actually working" without a terminal, a curl command, or a guess.
+         Every failure in this area so far has been one of four things — the worker not reachable,
+         an old build pasted, a secret missing, or sync simply not configured on this device — and
+         from inside the app all four looked identical. -->
+    <div id="connCheck" style="display:none;margin-top:12px"></div>
     <p class="muted" style="margin-top:10px;font-size:11.5px;line-height:1.55">Once connected it syncs automatically — when you open the app, a few seconds after you make changes, and when you close the tab. <b>This is whole-account last-write-wins, not a merge.</b> If you edit on your phone and your laptop without letting them sync in between, the device that saves last overwrites the other. It warns you before clobbering something newer, but the safe habit is to open the app on a device and let it sync before you start editing there.</p>
   </div>
   <div class="card" style="margin-top:16px">
@@ -9751,6 +9757,98 @@ function syncEndpoint(slot){
   const base=syncCfg.url.replace(/\/+$/,'');
   return base+'/?slot='+encodeURIComponent(slot);
 }
+/* A single request that tells you which of the four usual failures you have.
+   Uses /version, which is public, so it can distinguish "worker unreachable" from "worker fine, key
+   wrong" — an authenticated probe cannot tell those apart, and that ambiguity is exactly what made
+   this hard to debug from the app. */
+async function checkConnection(){
+  const box=document.getElementById('connCheck');
+  if(!box)return;
+  box.style.display='block';
+  const row=(ok,label,detail)=>'<div style="display:flex;gap:9px;align-items:baseline;padding:5px 0;border-top:1px solid var(--border)">'+
+    '<span class="'+(ok===true?'pos':ok===false?'neg':'warn')+'" style="font-family:var(--mono);font-size:12px;min-width:14px">'+
+      (ok===true?'✔':ok===false?'✘':'—')+'</span>'+
+    '<span style="font-size:13px"><b>'+label+'</b>'+(detail?' <span class="muted" style="font-size:12px">— '+detail+'</span>':'')+'</span></div>';
+
+  const url=(document.getElementById('syncUrlInput').value||'').trim()||(syncCfg&&syncCfg.url)||'';
+  const key=(document.getElementById('syncKeyInput').value||'').trim()||(syncCfg&&syncCfg.key)||'';
+
+  if(!url){
+    box.innerHTML=row(false,'No worker URL','Paste it above, then press Check connection again.');
+    return;
+  }
+  box.innerHTML='<p class="muted" style="font-size:13px">Checking…</p>';
+
+  const base=url.replace(/\/+$/,'');
+  let out='';
+  let v=null;
+
+  /* 1. unauthenticated — is anything there, and is it the current build? */
+  try{
+    const r=await fetch(base+'/version');
+    if(r.ok){
+      v=await r.json();
+      out+=row(true,'Worker reachable',esc(base));
+      out+=row(true,'Build '+esc(v.version||'unknown'),
+        (v.routes||[]).includes('/finnhub')?'includes the market-data proxy':'<span class="neg">this build has no /finnhub route</span>');
+    }else if(r.status===401){
+      out+=row(false,'Old worker build deployed',
+        'The worker answers but has no public /version route, so it predates the market-data proxy. Re-paste worker.js into Cloudflare and press Deploy.');
+      box.innerHTML=out; return;
+    }else{
+      out+=row(false,'Worker returned HTTP '+r.status,'Check the URL points at the worker root.');
+      box.innerHTML=out; return;
+    }
+  }catch(e){
+    box.innerHTML=row(false,'Cannot reach the worker',
+      esc(base)+' did not respond. Check the address, and that the worker is deployed.');
+    return;
+  }
+
+  /* 2. authenticated — is the key right, and which secrets are set? */
+  if(!key){
+    out+=row(null,'No sync key entered','Paste your SYNC_SECRET above to check the rest.');
+    box.innerHTML=out; return;
+  }
+  try{
+    const r=await fetch(base+'/version',{headers:{'Authorization':'Bearer '+key}});
+    const j=await r.json();
+    if(!j.configured){
+      out+=row(false,'Sync key rejected','The worker is fine; this key is not the SYNC_SECRET it holds.');
+      box.innerHTML=out; return;
+    }
+    out+=row(true,'Sync key accepted');
+    const c=j.configured;
+    out+=row(!!c.PF_SYNC,'KV storage bound',c.PF_SYNC?'':'Add a KV namespace named PF_SYNC.');
+    out+=row(!!c.FINNHUB_API_KEY,'Market data key (FINNHUB_API_KEY)',
+      c.FINNHUB_API_KEY?'this device needs no key of its own':'<b>not set</b> — prices and fundamentals will not load unless this device has its own key');
+    out+=row(!!c.FRED_API_KEY,'Macro data key (FRED_API_KEY)',
+      c.FRED_API_KEY?'':'optional — the Market tab falls back to measured volatility');
+    out+=row(!!c.AI_API_KEY,'Summary key (AI_API_KEY)',
+      c.AI_API_KEY?'':'optional — News falls back to keyword matching');
+    const originOk=/^https:\/\/perceptfolio\.com$/.test(c.ALLOWED_ORIGIN||'');
+    out+=row(originOk,'ALLOWED_ORIGIN',
+      originOk?esc(c.ALLOWED_ORIGIN):'is '+esc(String(c.ALLOWED_ORIGIN))+' — must be exactly https://perceptfolio.com, no trailing slash');
+  }catch(e){
+    out+=row(false,'Authenticated check failed',esc(e.message));
+  }
+
+  /* 3. the thing you actually care about — does a real quote come back? */
+  try{
+    const saved=syncCfg;
+    syncCfg={url:base,key};
+    const q=await getQuote('AAPL');
+    syncCfg=saved;
+    out+=row(!!(q&&isFinite(q.c)),'A live quote came back',
+      q&&isFinite(q.c)?'AAPL '+fmt$(q.c)+' — market data is working on this device':'the request succeeded but returned no price');
+  }catch(e){
+    out+=row(false,'Live quote failed',esc(e.message));
+  }
+
+  box.innerHTML=out;
+  refreshMarketDataCard();
+}
+
 function saveSyncConfig(){
   const url=(document.getElementById('syncUrlInput').value||'').trim();
   const key=(document.getElementById('syncKeyInput').value||'').trim();
@@ -9759,6 +9857,9 @@ function saveSyncConfig(){
   syncCfg={url,key};
   localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg));
   setSyncStatus('Connecting…');
+  /* The market-data card keys off whether sync is configured, so it has to be told right away —
+     otherwise it keeps demanding a Finnhub key on a device that just gained access to one. */
+  refreshMarketDataCard();
   syncNow();
 }
 function disableSync(){
@@ -9768,6 +9869,7 @@ function disableSync(){
   const u=document.getElementById('syncUrlInput'),k=document.getElementById('syncKeyInput');
   if(u)u.value='';if(k)k.value='';
   setSyncStatus('Sync is off on this device.');
+  refreshMarketDataCard();
   toast('Sync turned off here.');
 }
 function syncPayloadFromD(){
