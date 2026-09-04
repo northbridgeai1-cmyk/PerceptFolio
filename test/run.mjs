@@ -173,6 +173,28 @@ t('a local key still wins over the worker', term.indexOf('if(!D.apiKey&&syncConf
 t('feature gates count the worker as a source of market data',
   !/if\(!D\.apiKey\)\{toast\(/.test(term) && /function hasMarketData\(\)/.test(term));
 
+/* ==================== 4c. TEST ACCOUNT — must be a sandbox ==================== */
+G('Test account — public credentials, so containment is the whole safety argument');
+
+t('the demo credentials exist', /const DEMO_ID='test1212', DEMO_PW='testishard'/.test(term));
+t('login accepts them before the normal profile lookup',
+  term.indexOf("if(email===DEMO_ID&&pw===DEMO_PW)return enterDemo()") <
+  term.indexOf("if(!email||!DB.profiles[email])return toast"));
+
+/* The containment claim, checked per function. If any sync entry point loses its guard, a login
+   whose password is printed in a public file could overwrite the real portfolio — and
+   last-write-wins makes that silent and unrecoverable. */
+for (const fn of ['syncPush','syncPull','syncNow','syncPullForce','scheduleSync','saveSyncConfig']) {
+  const m = new RegExp('function ' + fn + '\\([^)]*\\)\\{\\s*(?:\\/\\*[\\s\\S]*?\\*\\/\\s*|\\/\\/[^\\n]*\\n\\s*)*if\\(isDemoUser\\(\\)\\)').test(term);
+  t(fn + ' refuses the demo account before doing anything', m);
+}
+t('the demo profile is flagged in storage', /isDemo:true/.test(term));
+t('the demo is rebuilt on each sign-in, not reused', /DB\.profiles\[DEMO_ID\]=\{/.test(term));
+t('a demo session is visually unmistakable', /body\.is-demo #app::before/.test(term) && /classList\.toggle\('is-demo'/.test(term));
+t('the demo carries no market-data key', !/demoData[\s\S]{0,900}apiKey:\s*['"][^'"]+['"]/.test(term));
+t('demo holdings are seeded with prices so screens render with no API',
+  /demoData\(\)[\s\S]{0,700}sym:'AAPL'[^}]*price:/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

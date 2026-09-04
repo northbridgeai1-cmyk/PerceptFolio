@@ -239,6 +239,11 @@ main{flex:1;min-width:0;max-width:1180px;padding:28px 26px;
 .big{font-family:var(--mono);font-size:25px;font-weight:600;letter-spacing:-.2px;font-variant-numeric:tabular-nums}
 .pos{color:var(--green)} .neg{color:var(--red)} .warn{color:var(--yellow)}
 .muted{color:var(--muted);font-size:13px}
+/* Test-account banner. Deliberately loud: a demo mistaken for the real account is how someone
+   concludes their portfolio has been wiped. */
+body.is-demo #app::before{content:"TEST ACCOUNT — sandbox data, sync disabled. Nothing here is real.";
+  display:block;background:var(--amber,#d9a441);color:#151515;font:700 11.5px/1 var(--mono);
+  letter-spacing:.09em;text-transform:uppercase;text-align:center;padding:7px 10px;position:sticky;top:0;z-index:300}
 
 /* ---- thesis probability ---- */
 .prob-box{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px 16px;margin:12px 0 4px}
@@ -2161,9 +2166,78 @@ async function createProfile(){
   toast('Account created. Logging in…');
   await finishLogin(email);
 }
+/* ================= THE TEST ACCOUNT =================
+
+   Sign in as test1212 / testishard and a sandbox profile is built on the spot. It exists so the app
+   can be opened in a private window to check a deploy actually landed, without creating a throwaway
+   account every time and without touching the real one.
+
+   IT IS NOT SECRET, AND CANNOT BE. These two strings sit in a file served from a public host —
+   anyone who opens View Source has them. That is a deliberate trade, and it is only acceptable
+   because of what the account can reach, which is nothing:
+
+     - SYNC IS REFUSED for this profile, in every direction. It cannot push over the real portfolio
+       and it cannot pull one down. That guard is enforced inside syncPush/syncPull/syncNow rather
+       than by hiding the buttons, because a hidden button is not a control.
+     - It holds invented holdings at invented prices. No real position is ever in it.
+     - It carries no market-data key of its own and never gains one.
+
+   So the worst a stranger can do with these credentials is look at a demo portfolio in their own
+   browser — which they could already do by saving this public file and opening it offline. The
+   invite gate was never a security boundary; the worker is, and this account cannot reach it.
+
+   Being a private window, the profile evaporates when the window closes. That is the point: every
+   check starts from the same known state. */
+const DEMO_ID='test1212', DEMO_PW='testishard';
+function isDemoUser(){return USER===DEMO_ID;}
+
+/* Seeded with prices already set, so every screen renders with no API key and no worker. That is
+   what makes this useful for "did the deploy land" — the answer must not depend on a market data
+   provider being up. */
+function demoData(){
+  const d=defaultData();
+  d.displayName='Test Account';
+  d.cash=12500;
+  d.holdings=[
+    {sym:'AAPL',type:'Stock',shares:40,cost:171.20,price:328.21},
+    {sym:'MSFT',type:'Stock',shares:18,cost:402.55,price:510.12},
+    {sym:'NVDA',type:'Stock',shares:60,cost:64.80,price:228.45},
+    {sym:'KO',  type:'Stock',shares:90,cost:61.10,price:88.81},
+    {sym:'SPY', type:'ETF',  shares:25,cost:512.40,price:773.17}
+  ];
+  d.watchlist=['XOM','DIS','PFE','BA'];
+  d.theses={AAPL:{why:'Demo thesis — installed base and services margin.',
+    mustBeTrue:'Services keeps compounding above hardware.',
+    invalidIf:'Two consecutive quarters of services deceleration.',
+    target:380,stop:290,deadline:new Date(Date.now()+120*86400000).toISOString().slice(0,10),
+    created:new Date().toISOString().slice(0,10),entryPrice:328.21,scoreAtEntry:'9/12'}};
+  /* A few closes so the volatility ruler and the momentum score have something to read. */
+  ['AAPL','MSFT','NVDA','KO','SPY'].forEach(sym=>{
+    const base={AAPL:328.21,MSFT:510.12,NVDA:228.45,KO:88.81,SPY:773.17}[sym];
+    const rows=[];let px=base*0.88;
+    for(let i=59;i>=0;i--){ px*=1+Math.sin(i*1.7+sym.length)*0.011;
+      rows.push({d:new Date(Date.now()-i*86400000).toISOString().slice(0,10),p:+px.toFixed(2)}); }
+    rows[rows.length-1].p=base;
+    d.priceLog[sym]=rows;
+  });
+  d.tourSeen=true;                 // the walkthrough is not what is being tested
+  return d;
+}
+
+async function enterDemo(){
+  DB.profiles[DEMO_ID]={pinHash:await sha(DEMO_PW),data:demoData(),
+                        accountType:'personal',userId:'PF-DEMO',isDemo:true};
+  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  toast('Test account — sandbox, never synced.');
+  await finishLogin(DEMO_ID);
+}
+
 async function doLogin(){
   const email=document.getElementById('loginEmail').value.trim().toLowerCase();
   const pw=document.getElementById('loginPassword').value;
+  /* Rebuilt from scratch on every sign-in rather than reused, so a session that left it in a odd
+     state cannot poison the next check. A test account you have to remember to reset is not one. */
+  if(email===DEMO_ID&&pw===DEMO_PW)return enterDemo();
   if(!email||!DB.profiles[email])return toast('No account with that email — create one below.');
   const p=DB.profiles[email];
   if(p.pinHash&&p.pinHash!==await sha(pw))return toast('Wrong password.');
@@ -2173,6 +2247,9 @@ async function finishLogin(email){
   const p=DB.profiles[email];
   if(!p.userId){p.userId=makeUserId();localStorage.setItem(STORE_KEY,JSON.stringify(DB));}
   USER=email;D=Object.assign(defaultData(),p.data||{});
+  /* Impossible to confuse the sandbox with the real account at a glance. Checked on every login
+     rather than set once, so signing out of the demo clears it. */
+  document.body.classList.toggle('is-demo',email===DEMO_ID);
   sessionStorage.setItem('qf_user',email);
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='block';
@@ -9850,6 +9927,10 @@ async function checkConnection(){
 }
 
 function saveSyncConfig(){
+  /* Refused rather than ignored: silently accepting a config that will never be used is how you end
+     up believing a device is syncing when it is not. */
+  if(isDemoUser()){setSyncStatus('Test account — sync cannot be configured here.','warn');
+    return toast('Sync is disabled on the test account by design.');}
   const url=(document.getElementById('syncUrlInput').value||'').trim();
   const key=(document.getElementById('syncKeyInput').value||'').trim();
   if(!url||!key)return toast('Enter both the sync URL and the sync key.');
@@ -9892,6 +9973,10 @@ async function syncFetch(method,slot,body){
   return res.json();
 }
 async function syncPush(){
+  /* THE GUARD THAT MATTERS. The test account's credentials are public, so if it could push, anyone
+     holding a sync key could overwrite the real portfolio with demo holdings — and last-write-wins
+     means that would be silent and unrecoverable. Enforced here rather than by hiding buttons. */
+  if(isDemoUser()){setSyncStatus('Test account — sync is disabled here.','muted');return{skipped:true};}
   if(!syncConfigured()||!D)return;
   const slot=await syncSlotId();
   const stamp=Date.now();
@@ -9904,6 +9989,8 @@ async function syncPush(){
 }
 /* force=true skips the "are you sure" and always takes the cloud copy. */
 async function syncPull(force){
+  // Pulling would drop the real portfolio into the sandbox, which is a data leak into a public login.
+  if(isDemoUser()){setSyncStatus('Test account — sync is disabled here.','muted');return{skipped:true};}
   if(!syncConfigured()||!D)return{applied:false,empty:true};
   const slot=await syncSlotId();
   const remote=await syncFetch('GET',slot);
@@ -9928,6 +10015,7 @@ async function syncPull(force){
   return{applied:true};
 }
 async function syncPullForce(){
+  if(isDemoUser()){setSyncStatus('Test account — sync is disabled here.','muted');return;}
   if(!syncConfigured())return toast('Set up sync first.');
   if(!confirm('Replace everything on this device with the cloud copy? Anything here that hasn\'t been synced will be lost.'))return;
   try{
@@ -9938,6 +10026,7 @@ async function syncPullForce(){
   }catch(e){setSyncStatus('✗ '+e.message,'neg');toast(e.message);}
 }
 async function syncNow(){
+  if(isDemoUser()){setSyncStatus('Test account — sync is disabled here.','muted');return;}
   if(!syncConfigured())return toast('Enter your sync URL and key first.');
   if(syncing)return;
   syncing=true;
@@ -9954,6 +10043,7 @@ async function syncNow(){
 /* saveDB() fires on nearly every interaction. Cloudflare's KV free tier allows 1,000 writes a day,
    so pushing on every save would burn through it in an afternoon. This waits for a lull instead. */
 function scheduleSync(){
+  if(isDemoUser())return;   // nothing queued, so nothing can fire after a tab switch either
   if(!syncConfigured())return;
   if(syncTimer)clearTimeout(syncTimer);
   syncTimer=setTimeout(()=>{
