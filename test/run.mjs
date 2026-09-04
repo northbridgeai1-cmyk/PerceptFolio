@@ -220,6 +220,37 @@ t('expectancy is the mean edge', Math.abs(st.expectancy - 1) < 1e-9);
 t('hit rate counts positive edges only', Math.abs(st.hitRate - 60) < 1e-9);
 t('a 95% interval is produced', st.lo != null && st.hi != null && st.lo < st.expectancy && st.hi > st.expectancy);
 
+/* ==================== 5b. MARKS SCHEDULE ==================== */
+G('Marks schedule — the record cannot accrue if marks are missed');
+
+const S2 = new Function(`
+  let D; const CALL_HORIZONS=[30,90,180,365];
+  ${grab(term, 'upcomingMarks')}
+  ${grab(term, 'missedMarks')}
+  return {setD:d=>{D=d}, upcomingMarks, missedMarks};
+`)();
+const DAY = 864e5, NOW = Date.now();
+const mkCall = (sym, age, marks) => ({ sym, verdict: 'buy', ts: NOW - age * DAY, price: 100, spy: 100, marks: marks || {} });
+S2.setD({ calls: [
+  mkCall('AAA', 29), mkCall('BBB', 88), mkCall('CCC', 1),
+  mkCall('DDD', 200, { 30: { price: 1, spy: 1 }, 90: { price: 1, spy: 1 } }),
+  mkCall('EEE', 120, { 30: { missed: true, lag: 44 } }),
+  { sym: 'HOLD', verdict: 'hold', ts: NOW - 40 * DAY, price: 100, spy: 100 },
+]});
+const due = S2.upcomingMarks(14);
+t('lists an anniversary falling inside the window', due.some(m => m.sym === 'AAA' && m.horizon === 30));
+t('excludes horizons already marked', !due.some(m => m.sym === 'DDD' && m.horizon <= 90));
+t('excludes anything beyond the window', !due.some(m => m.sym === 'CCC'));
+t('excludes non-directional verdicts', !due.some(m => m.sym === 'HOLD'));
+t('sorted soonest first', due.every((m, i) => !i || due[i-1].daysLeft <= m.daysLeft));
+t('every entry carries a real due date', due.every(m => /^\d{4}-\d{2}-\d{2}$/.test(m.due)));
+t('missed marks are reported, not swept up', S2.missedMarks().some(m => m.sym === 'EEE' && m.lag === 44));
+
+/* The bug this exists to prevent: the word and the date came from different sources, so a call
+   0.9999 days from its anniversary printed "today" beside tomorrow's date. */
+t('the day label is derived from the calendar date, not fractional days',
+  /const dayDiff=due=>Math\.round/.test(term) && !/m\.daysLeft<1\?'today'/.test(term));
+
 /* ============================ 6. SEASONALITY ============================ */
 G('Calendar effects — must stay context, never a signal');
 

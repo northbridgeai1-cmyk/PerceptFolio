@@ -281,6 +281,15 @@ main{flex:1;min-width:0;max-width:1180px;padding:28px 26px;
 .rec-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
   font:11.5px/1.5 var(--mono);color:var(--muted);margin-top:7px}
 .rec-foot b{color:var(--text);font-weight:600}
+/* ---- marks schedule ---- */
+.md{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
+.md-head{font:10.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+.md-head b{color:var(--text)}
+.md-row{display:flex;align-items:baseline;gap:12px;padding:6px 0;border-top:1px solid var(--border);flex-wrap:wrap}
+.md-row:first-of-type{border-top:none}
+.md-when{font:700 11.5px/1 var(--mono);letter-spacing:.04em;min-width:74px;color:var(--muted)}
+.md-sym{font:700 13.5px/1 var(--mono);letter-spacing:-.01em}
+.md-meta{font:11.5px/1.4 var(--mono);color:var(--faint)}
 @media(max-width:600px){.rec-val{font-size:25px}}
 .hero{padding:8px 0 28px}
 .hero-label{font-family:var(--mono);color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
@@ -861,6 +870,9 @@ body.touring header,body.touring #sidebar{z-index:201}
   <!-- The track record sits above the actions on purpose. Anything that tells you what to do should
        have to state, in the same breath, how often it has been right. -->
   <div id="cmdRecord" class="rec"></div>
+  <!-- The schedule sits beside the record because it is the thing that keeps the record
+       honest: a mark not taken on the day cannot be taken later. -->
+  <div id="marksDue" class="md"></div>
   <div id="commandQueue"></div>
 </div>
 
@@ -1649,15 +1661,36 @@ body.touring header,body.touring #sidebar{z-index:201}
       <span class="theme-side" style="right:0">☾ Dark</span>
     </div>
   </div>
-  <div class="card" style="margin-top:16px">
-    <h3>Market Data API (Finnhub — free)</h3>
-    <p class="muted" style="margin-bottom:10px">Get a free key at <b>finnhub.io/register</b> (takes ~2 min). Paste it here and it stays in this browser.</p>
+  <!-- MARKET DATA — HIDES ITSELF ONCE THE WORKER SUPPLIES THE KEY.
+       The card is not deleted, and the reason matters. A device only reaches the worker's key if
+       sync is configured AND the worker answers. If either is untrue — a browser that was never set
+       up, a custom domain not yet pointed, a secret typed into the wrong field — then deleting this
+       box would leave the terminal with no market data and no way to fix it from inside the app.
+       That is a dead end, and the fix would be editing HTML.
+
+       So it collapses instead. When the worker is answering, the card reports that in one line and
+       the input is folded away behind a disclosure. When it is not, the card is fully present with
+       instructions, because at that moment it is the only way to get prices on screen. -->
+  <div class="card" style="margin-top:16px" id="mktDataCard">
+    <h3 id="mktDataTitle">Market data</h3>
     <p class="muted" id="fhViaWorker" style="margin-bottom:10px;display:none"></p>
-    <div class="row">
-      <input id="apiKeyInput" placeholder="Finnhub API key" style="max-width:340px">
-      <button class="btn" onclick="saveApiKey()">Save Key</button>
-      <span id="apiStatus" class="muted"></span>
+    <div id="fhManual">
+      <p class="muted" style="margin-bottom:10px">Prices, fundamentals and news come from Finnhub. Get a free key at <b>finnhub.io/register</b> (about two minutes) and paste it here — it stays in this browser and is never sent to NorthBridge.</p>
+      <div class="row">
+        <input id="apiKeyInput" placeholder="Finnhub API key" style="max-width:340px">
+        <button class="btn" onclick="saveApiKey()">Save Key</button>
+        <span id="apiStatus" class="muted"></span>
+      </div>
     </div>
+    <details id="fhAdvanced" style="display:none;margin-top:4px">
+      <summary style="cursor:pointer;font-size:12.5px;color:var(--muted)">Override with a key just for this device</summary>
+      <p class="muted" style="margin:9px 0 10px;font-size:12.5px">Only needed to spend a different quota here, or to keep working if the worker is unreachable. Leave it empty and the worker's key is used.</p>
+      <div class="row">
+        <input id="apiKeyInputAdv" placeholder="Finnhub API key" style="max-width:340px">
+        <button class="btn" onclick="saveApiKey(true)">Save Key</button>
+        <span id="apiStatusAdv" class="muted"></span>
+      </div>
+    </details>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Investment Policy</h3>
@@ -2263,20 +2296,7 @@ function enterSession(){
   resetTransientState();
   const acctEl=document.getElementById('acctEmail');if(acctEl)acctEl.textContent=USER;
   updateGreeting();
-  document.getElementById('apiKeyInput').value=D.apiKey||'';
-  /* If the worker holds a key, this field is optional and the screen should say so — otherwise it
-     reads as a required step that has been skipped, on a device where market data already works. */
-  (function(){
-    const el=document.getElementById('fhViaWorker');
-    if(!el)return;
-    if(syncConfigured()&&!D.apiKey){
-      el.style.display='block';
-      el.innerHTML='<span class="pos">Market data is coming from your worker.</span> It holds the key, so this device does not need one — leave the box empty. A key typed here would be used instead, and only on this device.';
-    }else if(syncConfigured()&&D.apiKey){
-      el.style.display='block';
-      el.innerHTML='This device is using its own key. Clear the box to fall back to the key held by your worker.';
-    }else{ el.style.display='none'; }
-  })();
+  refreshMarketDataCard();
   document.getElementById('cashInput').value=D.cash||'';
   document.getElementById('setQBuy').value=D.rules.qBuy;
   document.getElementById('setPBuy').value=D.rules.pBuy;
@@ -2718,7 +2738,9 @@ function showTab(t){
   if(t==='projections')renderHerizen();
   if(t==='news')renderNews();
   if(t==='risk'){renderRiskContrib();renderSharpe();renderVaR();}
-  if(t==='settings'){fillPolicyInputs();renderRuleLog();}
+  /* refreshMarketDataCard on every open, not just at login: whether the worker answers changes
+     when sync is configured or a custom domain starts resolving, and the card must follow. */
+  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -3791,6 +3813,100 @@ function callNeedsMark(c,now){
   const marks=c.marks||{};
   return CALL_HORIZONS.some(h=>!marks[h]&&age>=h&&age<=h+markTolerance(h));
 }
+/* ================= THE MARKS SCHEDULE =================
+
+   THE BOTTLENECK ON THIS WHOLE PROJECT IS FORTY MARKED CALLS, and the one thing that can stop it
+   arriving is the one thing nothing warned about.
+
+   A mark can only be taken while the app is open. A call that crosses its 90-day anniversary while
+   the terminal is closed is stamped MISSED and excluded from grading — correctly, because recording
+   a day-118 price as a clean 90-day result would be a lie. But it is also unrecoverable. The price
+   on that date cannot be fetched later on this data tier, so the hole is permanent.
+
+   Until now the operator found out afterwards, as a number that quietly failed to grow. A schedule
+   turns that into something actionable: these calls, these dates, open the app. It is not analytics
+   and it does not touch a verdict — it is what makes the record the site promises actually accrue.
+   ===================================================================== */
+
+/* Every unmarked horizon that falls inside the window, soonest first. */
+function upcomingMarks(withinDays){
+  const now=Date.now(),out=[];
+  (D.calls||[]).forEach(c=>{
+    if(!(c.price>0)||!(c.spy>0))return;
+    if(c.verdict!=='buy'&&c.verdict!=='sell')return;
+    const marks=c.marks||{};
+    const age=(now-c.ts)/86400000;
+    CALL_HORIZONS.forEach(h=>{
+      if(marks[h])return;
+      const left=h-age;
+      if(left<0||left>withinDays)return;
+      out.push({sym:c.sym,track:c.track||'checklist',horizon:h,daysLeft:left,
+                due:new Date(c.ts+h*86400000).toISOString().slice(0,10),
+                verdict:(c.verdict||'').toUpperCase()});
+    });
+  });
+  return out.sort((a,b)=>a.daysLeft-b.daysLeft);
+}
+
+/* Marks already lost. Kept visible rather than swept up, because the honest reading of a thin
+   record is different when the thinness was avoidable. */
+function missedMarks(){
+  const out=[];
+  (D.calls||[]).forEach(c=>{
+    const marks=c.marks||{};
+    CALL_HORIZONS.forEach(h=>{
+      if(marks[h]&&marks[h].missed)out.push({sym:c.sym,horizon:h,lag:marks[h].lag||null});
+    });
+  });
+  return out;
+}
+
+function renderMarksDue(){
+  const el=document.getElementById('marksDue');
+  if(!el||!D)return;
+  const soon=upcomingMarks(14), missed=missedMarks();
+  const marked=CALL_HORIZONS.reduce((n,h)=>n+(D.calls||[]).filter(c=>(c.marks||{})[h]&&!(c.marks||{})[h].missed).length,0);
+
+  if(!soon.length&&!missed.length){
+    el.innerHTML='<div class="md-head">Marks</div><p class="muted" style="font-size:13px;line-height:1.6">'+
+      'Nothing falls due in the next fortnight. Marks are taken automatically whenever the app is open and a call '+
+      'crosses 30, 90, 180 or 365 days — so the only thing required of you is opening it.</p>';
+    return;
+  }
+
+  /* The word and the date must come from the SAME source, or they disagree.
+     They did: the label was derived from fractional days while the date came from the calendar, so
+     a call whose anniversary was 0.9999 days away printed "today" next to tomorrow's date. On a
+     panel whose entire purpose is telling you which day to open the app, that is the one error that
+     matters. Both now come off the calendar date. */
+  const today=new Date().toISOString().slice(0,10);
+  const dayDiff=due=>Math.round((Date.parse(due+'T00:00:00Z')-Date.parse(today+'T00:00:00Z'))/86400000);
+
+  const rows=soon.slice(0,8).map(m=>{
+    const dd=dayDiff(m.due);
+    const urgent=dd<=1;
+    return '<div class="md-row">'+
+      '<span class="md-when '+(urgent?'neg':(dd<=7?'warn':''))+'">'+
+        (dd<=0?'today':(dd===1?'tomorrow':dd+' days'))+'</span>'+
+      '<span class="md-sym">'+esc(m.sym)+'</span>'+
+      '<span class="md-meta">'+m.verdict+' · '+m.horizon+'d mark · '+esc(m.due)+'</span>'+
+    '</div>';
+  }).join('');
+
+  el.innerHTML='<div class="md-head">Marks'+
+      (soon.length?' — <b>'+soon.length+'</b> due within a fortnight':'')+'</div>'+
+    (rows||'')+
+    (soon.length>8?'<div class="md-row"><span class="md-meta">and '+(soon.length-8)+' more</span></div>':'')+
+    (soon.length?'<p class="muted" style="font-size:12px;line-height:1.55;margin-top:10px">'+
+      'The app has to be <b>open</b> on or near these dates. A mark taken too late is recorded as unmarkable and '+
+      'excluded rather than counted with the wrong holding period — and the price for that day cannot be fetched '+
+      'afterwards, so the gap is permanent.</p>':'')+
+    (missed.length?'<p class="muted" style="font-size:12px;line-height:1.55;margin-top:8px">'+
+      '<span class="neg">'+missed.length+' mark'+(missed.length===1?'':'s')+' already missed</span> — '+
+      esc(missed.slice(0,5).map(m=>m.sym+' '+m.horizon+'d').join(', '))+(missed.length>5?', …':'')+
+      '. Those calls cannot be graded at that horizon. '+marked+' mark'+(marked===1?'':'s')+' recorded so far.</p>':'');
+}
+
 function callsDueSoon(withinDays){
   const now=Date.now();
   let n=0;
@@ -6882,13 +6998,56 @@ function copyToAccount(){
 }
 
 /* ================= SETTINGS ================= */
-async function saveApiKey(){
-  D.apiKey=document.getElementById('apiKeyInput').value.trim();
+/* adv picks which of the two inputs was used — the always-visible one, or the override that only
+   appears when the worker is already supplying data. */
+async function saveApiKey(adv){
+  const inp=document.getElementById(adv?'apiKeyInputAdv':'apiKeyInput');
+  const st=document.getElementById(adv?'apiStatusAdv':'apiStatus');
+  D.apiKey=(inp&&inp.value.trim())||'';
   saveDB();
-  const st=document.getElementById('apiStatus');
-  st.textContent='Testing…';
-  try{await getQuote('AAPL');st.textContent='✔ Key works';st.className='pos';}
-  catch(e){st.textContent='✘ Key failed ('+e.message+')';st.className='neg';}
+  st.textContent=D.apiKey?'Testing…':'Cleared — falling back to the worker.';
+  st.className='muted';
+  try{
+    await getQuote('AAPL');
+    st.textContent=D.apiKey?'✔ Key works':'✔ Worker is serving market data';
+    st.className='pos';
+  }catch(e){ st.textContent='✘ Failed ('+e.message+')'; st.className='neg'; }
+  refreshMarketDataCard();
+}
+
+/* Decides which half of the card is on screen. Called whenever Settings is opened or the key
+   changes, because "is the worker answering" is not a fixed property of the install — it changes
+   when sync is configured, when a custom domain finally resolves, or when a secret is corrected. */
+function refreshMarketDataCard(){
+  const via=document.getElementById('fhViaWorker');
+  const manual=document.getElementById('fhManual');
+  const adv=document.getElementById('fhAdvanced');
+  const title=document.getElementById('mktDataTitle');
+  if(!via||!manual||!adv)return;
+
+  const a=document.getElementById('apiKeyInput'), b=document.getElementById('apiKeyInputAdv');
+  if(a)a.value=D.apiKey||''; if(b)b.value=D.apiKey||'';
+
+  if(syncConfigured()&&!D.apiKey){
+    // The worker holds the key. Nothing is required here, so nothing is asked for.
+    title.textContent='Market data — supplied by your worker';
+    via.style.display='block';
+    via.innerHTML='<span class="pos">✔ Your worker is supplying market data.</span> The key lives there as a secret, so this device does not need one and there is nothing to enter. Prices, fundamentals and news all route through it.';
+    manual.style.display='none';
+    adv.style.display='block';
+  }else if(syncConfigured()&&D.apiKey){
+    title.textContent='Market data — using this device\'s own key';
+    via.style.display='block';
+    via.innerHTML='This device is using a key saved here, not the one your worker holds. Clear the box and save to fall back to the worker.';
+    manual.style.display='block';
+    adv.style.display='none';
+  }else{
+    // No worker configured: this box is the only route to prices, so it is fully present.
+    title.textContent='Market data API (Finnhub — free)';
+    via.style.display='none';
+    manual.style.display='block';
+    adv.style.display='none';
+  }
 }
 /* ================= PRE-REGISTRATION =================
    Changing the buy or sell bar is not a settings tweak. It creates a different system, and every
@@ -8070,6 +8229,7 @@ function renderCommand(){
   if(g)g.textContent='Good '+period+(name?', '+name.charAt(0).toUpperCase()+name.slice(1):'');
 
   renderRecordStrip();
+  renderMarksDue();
   const q=buildActionQueue();
   const holdings=D.holdings||[];
   const totalVal=holdings.reduce((a,h)=>a+(h.price??h.cost)*h.shares,0)+(D.cash||0);
