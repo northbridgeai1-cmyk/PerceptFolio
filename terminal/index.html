@@ -896,7 +896,7 @@ body.touring header,body.touring #sidebar{z-index:201}
     <div id="welcomeCard" class="welcome-card" style="display:none">
       <h2>Let's set up your portfolio</h2>
       <p class="muted" style="margin-bottom:16px">Three steps and PerceptFolio starts working for you.</p>
-      <p style="margin-bottom:10px"><span class="step-num">1</span>Add your Finnhub API key in <b>Settings</b> — free, 2 minutes.</p>
+      <p style="margin-bottom:10px"><span class="step-num">1</span>Add a Finnhub API key in <b>Settings</b> — free, 2 minutes. Skip it if your worker already holds one.</p>
       <p style="margin-bottom:10px"><span class="step-num">2</span>Add what you own in <b>Portfolio</b> — stocks, ETFs, mutual funds, and cash on hand.</p>
       <p style="margin-bottom:18px"><span class="step-num">3</span>Add a few tickers to your <b>Watchlist</b> — PerceptFolio scores them automatically.</p>
       <button class="btn" onclick="showTab('portfolio')">Add your first holding</button>
@@ -1651,7 +1651,8 @@ body.touring header,body.touring #sidebar{z-index:201}
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Market Data API (Finnhub — free)</h3>
-    <p class="muted" style="margin-bottom:10px">Get a free key at <b>finnhub.io/register</b> (takes ~2 min). Paste it here. Without a key, prices and fundamentals can't load.</p>
+    <p class="muted" style="margin-bottom:10px">Get a free key at <b>finnhub.io/register</b> (takes ~2 min). Paste it here and it stays in this browser.</p>
+    <p class="muted" id="fhViaWorker" style="margin-bottom:10px;display:none"></p>
     <div class="row">
       <input id="apiKeyInput" placeholder="Finnhub API key" style="max-width:340px">
       <button class="btn" onclick="saveApiKey()">Save Key</button>
@@ -2144,7 +2145,7 @@ async function finishLogin(email){
       .then(r=>{ if(!r.applied&&!r.pushedInstead&&r.empty)return syncPush(); })
       .catch(e=>setSyncStatus('✗ '+e.message,'neg'));
   }
-  if(D.apiKey&&D.rules.autoRefresh==='yes')refreshAll();
+  if(hasMarketData()&&D.rules.autoRefresh==='yes')refreshAll();
 }
 /* ---- Business accounts: switch into a client's portfolio without a server, then switch back ----
    bizContext holds the business account's own email while USER/D are temporarily swapped to a client's.
@@ -2263,6 +2264,19 @@ function enterSession(){
   const acctEl=document.getElementById('acctEmail');if(acctEl)acctEl.textContent=USER;
   updateGreeting();
   document.getElementById('apiKeyInput').value=D.apiKey||'';
+  /* If the worker holds a key, this field is optional and the screen should say so — otherwise it
+     reads as a required step that has been skipped, on a device where market data already works. */
+  (function(){
+    const el=document.getElementById('fhViaWorker');
+    if(!el)return;
+    if(syncConfigured()&&!D.apiKey){
+      el.style.display='block';
+      el.innerHTML='<span class="pos">Market data is coming from your worker.</span> It holds the key, so this device does not need one — leave the box empty. A key typed here would be used instead, and only on this device.';
+    }else if(syncConfigured()&&D.apiKey){
+      el.style.display='block';
+      el.innerHTML='This device is using its own key. Clear the box to fall back to the key held by your worker.';
+    }else{ el.style.display='none'; }
+  })();
   document.getElementById('cashInput').value=D.cash||'';
   document.getElementById('setQBuy').value=D.rules.qBuy;
   document.getElementById('setPBuy').value=D.rules.pBuy;
@@ -2839,7 +2853,33 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 
 /* ================= FINNHUB API ================= */
 const FH='https://finnhub.io/api/v1';
+/* Market data comes from one of two places, and the order matters.
+
+   A key typed into THIS device wins, because someone who set one deliberately should get it.
+
+   Otherwise, if sync is configured, the request goes to the worker, which holds the key as a
+   secret and attaches it server-side. That is what lets a device have working market data with no
+   key of its own — the alternative people reach for is pasting the key into this file, which is
+   served from a public host and would hand it to anyone who opens View Source.
+
+   With neither, NO_KEY is thrown exactly as before and the app's existing prompts apply. */
 async function fh(path){
+  if(!D.apiKey&&syncConfigured()){
+    const qi=path.indexOf('?');
+    const base=qi<0?path:path.slice(0,qi);
+    const q={path:base};
+    if(qi>=0)new URLSearchParams(path.slice(qi+1)).forEach((v,k)=>{ if(k!=='token')q[k]=v; });
+    const r=await fetch(workerUrl('finnhub',q),{headers:{'Authorization':'Bearer '+syncCfg.key}});
+    if(r.status===401||r.status===403)throw new Error('BAD_KEY');
+    if(r.status===429)throw new Error('RATE_LIMIT');
+    if(!r.ok){
+      /* A worker with no FINNHUB_API_KEY set answers 500 with a message worth showing, rather than
+         letting this surface as a generic failure the operator cannot act on. */
+      let m='';try{ m=(await r.json()).error||''; }catch(e){}
+      throw new Error(m||('HTTP_'+r.status));
+    }
+    return r.json();
+  }
   if(!D.apiKey)throw new Error('NO_KEY');
   const r=await fetch(FH+path+(path.includes('?')?'&':'?')+'token='+encodeURIComponent(D.apiKey));
   if(r.status===401||r.status===403)throw new Error('BAD_KEY');
@@ -2847,6 +2887,10 @@ async function fh(path){
   if(!r.ok)throw new Error('HTTP_'+r.status);
   return r.json();
 }
+
+/* Anything gated on "is there a key" must now count the worker as one, or screens stay hidden on a
+   device that has perfectly good market data coming through the proxy. */
+function hasMarketData(){return !!(D.apiKey||syncConfigured());}
 async function getQuote(sym){const q=await fh('/quote?symbol='+sym);if(!q||!q.c)throw new Error('NO_DATA');return q;}
 async function getMetrics(sym){return fh('/stock/metric?symbol='+sym+'&metric=all');}
 async function getEarnings(sym){return fh('/stock/earnings?symbol='+sym);}
@@ -3518,7 +3562,7 @@ function loadRecommendations(){
   }
 }
 async function startScreener(){
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   if(screenerRunning)return;
   const list=parseTickerList(document.getElementById('screenerInput').value);
   if(!list.length)return toast('Paste some tickers or pick a preset first.');
@@ -3612,7 +3656,7 @@ async function refreshPrices(symbols){
 }
 async function refreshAll(){
   if(refreshing)return;
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   refreshing=true;
   document.getElementById('lastRefresh').textContent='Refreshing…';
   try{
@@ -3660,7 +3704,7 @@ async function refreshAll(){
 }
 function handleApiErr(e,sym){
   const pfx=sym?sym+': ':'';
-  if(e.message==='NO_KEY')toast('Add your Finnhub API key in Settings.');
+  if(e.message==='NO_KEY')toast('Add a Finnhub key in Settings, or set up sync so the worker supplies one.');
   else if(e.message==='BAD_KEY')toast('API key rejected — check it in Settings.');
   else if(e.message==='RATE_LIMIT')toast('API rate limit hit — wait a minute and refresh again.');
   else if(e.message==='NO_DATA')toast(pfx+'no live quote from Finnhub. If this is a mutual fund, set its type to "Mutual Fund" and enter the NAV manually in the Price column.');
@@ -4095,7 +4139,7 @@ function moveOver(sym,days){
 }
 async function loadNews(force){
   const btn=document.getElementById('newsLoadBtn'),st=document.getElementById('newsStatus');
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   if(force)newsCache={};
   if(btn)btn.disabled=true;
   try{
@@ -4383,7 +4427,7 @@ async function searchNews(){
   const el=document.getElementById('newsSearch');
   const sym=((el||{}).value||'').trim().toUpperCase().replace(/[^A-Z.\-]/g,'');
   if(!sym)return;
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   const st=document.getElementById('newsStatus');
   if(st)st.textContent='Reading '+sym+'…';
   newsFocus=sym;
@@ -5061,7 +5105,7 @@ function notify(title,body){
 async function analyzeStock(symArg){
   const sym=(symArg||document.getElementById('aTicker').value).trim().toUpperCase();
   if(!sym)return;
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   showTab('analyzer');
   document.getElementById('aTicker').value=sym;
   document.getElementById('analyzerResult').innerHTML='<div class="empty">Analyzing '+esc(sym)+'…</div>';
@@ -5178,7 +5222,7 @@ async function compareStocks(){
   const s2=document.getElementById('cmpTicker2').value.trim().toUpperCase();
   if(!s1||!s2)return toast('Enter two tickers to compare.');
   if(s1===s2)return toast('Pick two different tickers.');
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   const el=document.getElementById('compareResult');
   el.innerHTML='<div class="card" style="margin-top:16px"><div class="empty">Comparing '+esc(s1)+' vs '+esc(s2)+'…</div></div>';
   const freshMs=12*3600*1000; // reuse a cached score if it's less than 12h old, same convention as the Screener
@@ -5297,7 +5341,7 @@ async function computeRiskOutlook(sym,mOpt){
   };
 }
 async function calculateRisk(){
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   const stocks=[...new Set(D.holdings.filter(h=>h.type==='Stock').map(h=>h.sym))];
   if(!stocks.length)return toast('Add some stock holdings first — Risk looks at your stock positions.');
   const btn=document.getElementById('riskCalcBtn');btn.disabled=true;
@@ -5518,7 +5562,7 @@ function betaDriftHtml(stocks,priceSeries,marketSeries){
 
 /* Standalone risk check for any ticker — does not require it to be a holding or on the watchlist. */
 async function calcSoloRisk(){
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   const sym=(document.getElementById('soloRiskTicker').value||'').trim().toUpperCase();
   if(!sym)return;
   const btn=document.getElementById('soloRiskBtn');btn.disabled=true;
@@ -5763,7 +5807,7 @@ function toggleMcHypo(){
   document.getElementById('mcHypoWrap').style.display=v?'block':'none';
 }
 async function runMonteCarlo(){
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   const tickersRaw=(document.getElementById('mcTickers').value||'').trim();
   const customTickers=tickersRaw?[...new Set(tickersRaw.split(/[\s,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean))]:[];
   let holdings,cash,totalVal,hypothetical=false,simLabel;
@@ -8077,7 +8121,7 @@ function renderCommand(){
 }
 async function runDailyReview(){
   const btn=document.getElementById('cmdRunBtn'),st=document.getElementById('cmdStatus');
-  if(!D.apiKey){toast('Add your free Finnhub API key in Settings first.');showTab('settings');return;}
+  if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   if(btn)btn.disabled=true;
   if(st)st.textContent='Pulling prices and re-scoring everything…';
   try{
@@ -8120,10 +8164,10 @@ async function loadMap(){
      profile and the peer row do. Draw first, enrich after — that way a missing key, a rate limit or
      a foreign ticker Finnhub can't price still gives you a working map. */
   drawMap();renderRelList();
-  if(!D.apiKey){
+  if(!hasMarketData()){
     mapLoading=false;
     if(st)st.textContent='';
-    toast('Showing saved relationships. Add a Finnhub key in Settings for the company profile and peers.');
+    toast('Showing saved relationships. Add a Finnhub key in Settings, or set up sync, for the company profile and peers.');
     return;
   }
   try{
@@ -8568,7 +8612,7 @@ async function loadMarketData(force){
        move panel does not, so it now gets whatever can actually be fetched. */
     if(!syncConfigured()){
       const solo={};
-      if(D.apiKey){
+      if(hasMarketData()){
         try{
           const q=await getQuote('SPY');
           if(q&&isFinite(q.c)&&isFinite(q.pc)&&q.pc>0){
@@ -8602,7 +8646,7 @@ async function loadMarketData(force){
     /* FRED publishes SP500 end-of-day and roughly a day in arrears, so its newest row is yesterday's
        close, not today's. Finnhub's SPY quote IS live on the free tier and carries the previous
        close, so today's move is taken from there. Using FRED for "today" was simply wrong. */
-    if(D.apiKey){
+    if(hasMarketData()){
       try{
         const q=await getQuote('SPY');
         if(q&&isFinite(q.c)&&isFinite(q.pc)&&q.pc>0){
@@ -8896,7 +8940,7 @@ function renderTodaysMove(data){
       (live
         ? 'S&P move from live SPY via Finnhub, measured against yesterday\'s close. VIX as of '+esc(vix[0].date)+' from FRED.'
         : 'From FRED, which publishes end-of-day and about a day in arrears — this is the newest close it holds, dated above, not live intraday.'+
-          (moveDay==='today'&&!D.apiKey?' <span class="warn">Add a Finnhub key in Settings for a genuinely live figure.</span>':''))+
+          (moveDay==='today'&&!hasMarketData()?' <span class="warn">Add a Finnhub key in Settings, or set up sync, for a genuinely live figure.</span>':''))+
     '</div>';
 }
 let moveDay='today';

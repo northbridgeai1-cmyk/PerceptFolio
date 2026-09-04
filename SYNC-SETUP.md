@@ -122,6 +122,37 @@ The key stays inside the worker and is never sent to the browser.
 
 ---
 
+## Step 5b2 — Add the Finnhub key to the worker (so no device needs one)
+
+**Do this one.** It is what makes market data work on a new device without typing a key into it.
+
+The terminal needs a Finnhub key for every price, fundamental and news item. By default each device
+holds its own, pasted into Settings. That works, but it means setting up every new browser by hand.
+
+The alternative people reach for is pasting the key into `terminal/index.html`. **Do not.** That
+file is served from a public host. Anyone who opens View Source has your key, a free-tier key is 60
+requests a minute shared with whoever took it, and the first script pointed at it stops your
+terminal working with nothing in the app to explain why.
+
+Put it in the worker instead, where the browser never sees it:
+
+1. Get a free key at **finnhub.io/register** if you do not have one.
+2. In your worker: **Settings** → **Variables and Secrets** → **Add**
+3. **Type:** Secret · **Variable name:** `FINNHUB_API_KEY` · **Value:** your key
+4. **Deploy**
+
+Now any device with sync configured gets market data with an empty key box. The Settings screen
+says so when it is happening, so it is never ambiguous which key is in use.
+
+**Order of preference.** A key typed into a device wins on that device; otherwise the worker's key
+is used. So you can still give one browser a separate key without disturbing the rest.
+
+**What the worker will and will not proxy.** Only the twelve endpoints the app actually calls.
+Forwarding an arbitrary path would make the route an open proxy to any Finnhub endpoint for anyone
+holding your sync secret.
+
+---
+
 ## Step 5c — Add an AI key (for the News tab's written summaries)
 
 Optional. Without it the News tab still works — it falls back to matching keywords in headlines.

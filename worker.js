@@ -22,6 +22,7 @@
  *   KV namespace binding : PF_SYNC
  *   Secret               : SYNC_SECRET     (a long random string you generate)
  *   Secret               : FRED_API_KEY    (optional, for the Market tab)
+ *   Secret               : FINNHUB_API_KEY (optional; set it and no device needs its own key)
  *   Variable             : ALLOWED_ORIGIN  (e.g. https://perceptfolio.com)
  */
 
@@ -479,6 +480,62 @@ async function handle(request, env) {
     const payload = { fetchedAt: Date.now(), observations };
     await env.PF_SYNC.put(cacheKey, JSON.stringify(payload), { expirationTtl: 86400 });
     return json({ series, cached: false, fetchedAt: payload.fetchedAt, observations }, 200, env);
+  }
+
+  /* ---- Finnhub proxy ----
+     SO THAT NO DEVICE EVER HOLDS A MARKET-DATA KEY.
+
+     The obvious way to make the key "already there" is to type it into terminal/index.html. That
+     file is served from a public host: anyone who opens View Source has the key, and a free-tier
+     Finnhub key is 60 requests a minute shared with whoever took it. The first person to point a
+     script at it stops the terminal working for its owner, and nothing in the app would explain why.
+
+     So the key lives here as a secret and the browser asks this worker instead. Same reasoning as
+     the FRED proxy above, for the same reason.
+
+     ALLOWLIST, NOT PASSTHROUGH. Forwarding an arbitrary ?path= would turn this route into an open
+     proxy to any Finnhub endpoint — including ones on paid tiers this account may later hold — for
+     anyone who obtains the sync secret. Only the twelve endpoints the app actually calls are
+     permitted, and the token is attached here where the page never sees it.
+
+     NOT CACHED, deliberately. A stale quote presented as live is worse than no quote, and KV writes
+     are the scarce resource on the free tier at a thousand a day. Quotes go straight through. */
+  if (url.pathname === '/finnhub') {
+    if (!env.FINNHUB_API_KEY) {
+      return json({ error: 'Worker is missing FINNHUB_API_KEY. Add it under Settings > Variables and Secrets as a Secret, then Deploy. Until then each device needs its own key in the app.' }, 500, env);
+    }
+    const ALLOWED = new Set([
+      '/quote', '/news', '/company-news',
+      '/stock/candle', '/stock/earnings', '/stock/eps-estimate', '/stock/insider-transactions',
+      '/stock/metric', '/stock/peers', '/stock/price-target', '/stock/profile2',
+      '/stock/recommendation'
+    ]);
+    const p = url.searchParams.get('path') || '';
+    if (!ALLOWED.has(p)) {
+      return json({ error: 'Endpoint not permitted: ' + clean(p, 60) }, 400, env);
+    }
+    const target = new URL('https://finnhub.io/api/v1' + p);
+    // Everything except our own routing parameter is forwarded verbatim.
+    for (const [k, v] of url.searchParams) {
+      if (k !== 'path' && k !== 'token') target.searchParams.set(k, v);
+    }
+    target.searchParams.set('token', env.FINNHUB_API_KEY);
+
+    let res;
+    try { res = await fetch(target.toString()); }
+    catch (e) { return json({ error: 'Could not reach Finnhub: ' + (e && e.message ? e.message : String(e)) }, 502, env); }
+
+    /* The app distinguishes these three, so the status is preserved rather than flattened into a
+       generic failure — a rate limit and a dead key need different reactions from the operator. */
+    if (res.status === 401 || res.status === 403) return json({ error: 'Finnhub rejected the key held by this worker.' }, res.status, env);
+    if (res.status === 429) return json({ error: 'Finnhub rate limit reached.' }, 429, env);
+    if (!res.ok) return json({ error: 'Finnhub returned HTTP ' + res.status }, res.status, env);
+
+    const body = await res.text();
+    return new Response(body, {
+      status: 200,
+      headers: { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders(env) }
+    });
   }
 
   /* ---- Device sync ----

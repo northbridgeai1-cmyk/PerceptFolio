@@ -142,6 +142,31 @@ t('index 0 rejected (headlines are 1-based)', validate({ text: 'x', sources: [0]
 t('valid citation kept, bogus index stripped',
   JSON.stringify(validate({ text: 'x', sources: [2, 99] }, 5)?.sources) === '[2]');
 
+/* ==================== 4b. FINNHUB PROXY — no key in the browser ==================== */
+G('Finnhub proxy — the market-data key must never reach a public file');
+
+t('no Finnhub key is hardcoded anywhere in the shipped pages',
+  !/token=[A-Za-z0-9]{15,}/.test(term + idx) && !/["'][a-z0-9]{20}["']\s*;?\s*\/\/\s*finnhub/i.test(term));
+t('the worker exposes a /finnhub route', /url\.pathname === '\/finnhub'/.test(worker));
+t('the proxy is an allowlist, not a passthrough', /const ALLOWED = new Set\(\[/.test(worker));
+t('the routing parameter cannot smuggle a token', /k !== 'path' && k !== 'token'/.test(worker));
+t('the key is attached server-side', /searchParams\.set\('token', env\.FINNHUB_API_KEY\)/.test(worker));
+t('rate limit and bad key stay distinguishable', /res\.status === 429/.test(worker) && /res\.status === 401 \|\| res\.status === 403/.test(worker));
+
+/* Every endpoint the app calls must be permitted, or that screen breaks only for people
+   relying on the proxy — a failure mode invisible to anyone testing with a local key. */
+const called = [...new Set([...term.matchAll(/fh\('(\/[^'?]*)/g)].map(m => m[1]))].sort();
+const allowed = (/const ALLOWED = new Set\(\[([\s\S]*?)\]\)/.exec(worker) || [, ''])[1];
+const missing = called.filter(e => !allowed.includes("'" + e + "'"));
+t('every endpoint the app calls is on the allowlist', missing.length === 0,
+  missing.length ? 'MISSING: ' + missing.join(', ') : called.length + ' endpoints');
+
+t('the app falls back to the worker when no local key is set',
+  /if\(!D\.apiKey&&syncConfigured\(\)\)/.test(term));
+t('a local key still wins over the worker', term.indexOf('if(!D.apiKey&&syncConfigured()') < term.indexOf("if(!D.apiKey)throw new Error('NO_KEY')"));
+t('feature gates count the worker as a source of market data',
+  !/if\(!D\.apiKey\)\{toast\(/.test(term) && /function hasMarketData\(\)/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 
