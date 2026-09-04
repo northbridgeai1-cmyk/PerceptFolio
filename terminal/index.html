@@ -1481,6 +1481,18 @@ body.touring header,body.touring #sidebar{z-index:201}
 
 <!-- RISK -->
 <div id="tab-risk" class="tabs-hidden">
+
+  <!-- ACTIVE RETURN. Placed first in the tab because it grades a decision made every week, whereas
+       everything below it measures exposure. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Are you paid for being different?</h3>
+      <button class="btn btn-ghost btn-sm" onclick="renderBenchmarks()">Recalculate</button>
+    </div>
+    <p class="muted" style="margin-top:6px;font-size:13px">Two benchmarks. One asks whether your sizing beats doing nothing clever with the same stocks; the other asks whether any of it beats the index.</p>
+    <div id="benchBody" style="margin-top:12px"></div>
+  </div>
+
   <div class="card">
     <h3>Portfolio Risk</h3>
     <p class="muted" style="margin-bottom:12px">Your single-stock scores can't see this: how concentrated you are in one sector, and how correlated your holdings are with each other (owning 5 stocks that all move together isn't 5 bets — it's 1). This uses extra API calls per stock, so it's calculated on demand rather than on every refresh.</p>
@@ -2820,7 +2832,7 @@ function showTab(t){
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
   if(t==='projections')renderHerizen();
   if(t==='news')renderNews();
-  if(t==='risk'){renderRiskContrib();renderSharpe();renderVaR();}
+  if(t==='risk'){renderBenchmarks();renderRiskContrib();renderSharpe();renderVaR();}
   /* refreshMarketDataCard on every open, not just at login: whether the worker answers changes
      when sync is configured or a custom domain starts resolving, and the card must follow. */
   if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();}
@@ -4854,6 +4866,210 @@ function renderVaR(){
       '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Fitted by variance targeting on '+g.n+' days — omega is pinned so the model\'s long-run variance matches the sample, leaving two parameters instead of three. That is standard on short samples and stops the fit implying a long-run volatility the data never showed. It is a forecast of <b>how much things move</b>, never of <b>which way</b>.</p>'+
     '</div>':'<p class="muted" style="font-size:12.5px;margin-top:14px">Volatility forecasting needs about 60 days of history — there are '+rets.length+'.</p>')+
     '<p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6"><b>None of this predicts a return.</b> VaR, Expected Shortfall and GARCH measure how bad and how wild, never which direction. Banks build them to survive being wrong, not to be right more often, and reading them as a win-rate tool is the most common mistake made with them.</p>';
+}
+
+/* ================= ACTIVE RETURN, TRACKING ERROR, INFORMATION RATIO =================
+
+   WHY TRACKING ERROR IS NOT SHOWN ON ITS OWN.
+   Tracking error answers "how much do I differ from the index". A nine-name book with a third in one
+   position differs enormously, and a glance says so — the number adds no information. Worse, it has
+   a direction: the only way to improve tracking error is to look more like the index. Installed as a
+   standalone figure in a terminal built to justify deliberate difference, it would quietly point
+   every future decision toward closet indexing while still carrying single-stock risk. It is a
+   career-risk metric invented for managers with trustees. There is no trustee here.
+
+   So it appears only as the denominator of an Information Ratio, which asks the question that
+   actually matters: am I PAID for differing?
+
+   THE MEAN IS SUBTRACTED, because tracking error is the standard deviation of active return, not its
+   root mean square. Omitting it computes sqrt(TE^2 + mean^2) on same-period observations, which
+   inflates the figure exactly when you outperform.
+
+   Honest note on the size of that error, since it is easy to overstate: the inflation is
+   sqrt(TE^2 + mean_ann^2 / 252) on daily data, because the daily mean is ~1/252 of the annual one
+   and its square is ~1/63500 of the variance. For a 10% TE and 6% outperformance that is 10.007%,
+   not 11.7%. It matters on annual observations; on the daily series used here it is a rounding
+   error. Subtracting the mean is still correct — it is simply free to do right, not a rescue.
+
+   THE SAMPLE PROBLEM, which decides how this is displayed.
+   The standard error of an Information Ratio is roughly 1/sqrt(T) with T in years. For an IR of 0.5
+   to clear zero at 95% confidence you need IR*sqrt(T) > 1.96, so T > 15.4 years. Not forty calls.
+   Not ninety days. Sixteen years.
+
+   So for most of this account's life the only honest reading of an IR is DON'T KNOW, and the screen
+   says exactly that in words whenever the interval straddles zero — because a reader remembers the
+   figure and forgets the interval. */
+
+/* Lo (2002) rather than the plainer 1/sqrt(T): it reduces to it for small IR and stays honest for
+   large ones, where 1/sqrt(T) is too tight. */
+function irStandardError(ir,years){
+  if(!(years>0))return null;
+  return Math.sqrt((1+0.5*ir*ir)/years);
+}
+
+/* Daily returns for a set of tickers, restricted to dates where EVERY one has a close. Alignment is
+   not optional: comparing a portfolio built from Monday-to-Friday against a benchmark built from
+   Monday-to-Thursday manufactures active return out of a calendar mismatch. */
+function alignedReturns(syms){
+  const logs=syms.map(s=>(D.priceLog||{})[s]||[]);
+  if(logs.some(l=>l.length<2))return null;
+  const maps=logs.map(l=>{const m={};l.forEach(r=>{if(r&&r.p>0)m[r.d]=r.p;});return m;});
+  const dates=Object.keys(maps[0]).filter(d=>maps.every(m=>m[d]>0)).sort();
+  if(dates.length<21)return null;
+  const rets=syms.map((_,i)=>{
+    const out=[];
+    for(let k=1;k<dates.length;k++){
+      const a=maps[i][dates[k-1]],b=maps[i][dates[k]];
+      out.push(a>0?(b-a)/a:0);
+    }
+    return out;
+  });
+  return{dates:dates.slice(1),rets};
+}
+
+/* Active-return statistics against one benchmark series. */
+function activeStats(port,bench){
+  const n=Math.min(port.length,bench.length);
+  if(n<21)return null;
+  const d=[];for(let i=0;i<n;i++)d.push(port[i]-bench[i]);
+  const m=d.reduce((a,b)=>a+b,0)/d.length;
+  const v=d.reduce((a,b)=>a+(b-m)*(b-m),0)/(d.length-1);   // MEAN SUBTRACTED
+  const te=Math.sqrt(v)*Math.sqrt(TRADING_DAYS);
+  const meanAnn=m*TRADING_DAYS;
+  if(!(te>0))return null;
+  const ir=meanAnn/te;
+  const years=n/TRADING_DAYS;
+  const se=irStandardError(ir,years);
+  const lo=se==null?null:ir-1.96*se, hi=se==null?null:ir+1.96*se;
+  return{n,years,meanAnn,te,ir,se,lo,hi,
+         straddles:(lo==null||hi==null)?true:(lo<0&&hi>0),
+         yearsNeeded:ir!==0?Math.pow(1.96/Math.abs(ir),2):null};
+}
+
+/* The two benchmarks, built from the app's own price log.
+
+   WEIGHTS ARE COST BASIS, NOT MARKET VALUE, and that choice is the whole point. Market-value weights
+   embed the outcome — a winner is heavy BECAUSE it won — so back-testing them against equal weight
+   would be measuring hindsight and reporting it as skill. Cost weights are what was actually
+   committed at purchase, which is the sizing decision being graded.
+
+   The window starts at the latest position-open date on record, so every holding in the comparison
+   was genuinely held throughout it. Without that, a position opened last week is treated as held all
+   year, which is the same look-ahead bias by another route. */
+function portfolioBenchmarks(){
+  const hs=(D.holdings||[]).filter(h=>h.sym&&h.shares>0&&h.cost>0&&h.sym!=='SPY');
+  if(hs.length<2)return{error:'Needs at least two holdings to compare a weighting against.'};
+  const syms=hs.map(h=>h.sym);
+  if(!((D.priceLog||{}).SPY||[]).length)return{error:'No index history logged yet — open the Market tab once and it starts recording.'};
+
+  const al=alignedReturns(syms.concat(['SPY']));
+  if(!al)return{error:'Needs about a month of overlapping daily closes for every holding. It builds each time you refresh.'};
+
+  /* Trim to the window in which every current position was actually held. */
+  let start=null;
+  (D.transactions||[]).forEach(tx=>{
+    if(tx&&tx.action==='buy'&&syms.includes(tx.sym)&&tx.date){
+      if(!start||tx.date>start)start=tx.date;
+    }
+  });
+  let from=0;
+  if(start){ const i=al.dates.findIndex(d=>d>=start); if(i>0)from=i; }
+  const dates=al.dates.slice(from);
+  if(dates.length<21){
+    return{error:'Only '+dates.length+' trading days since the most recent position was opened. Needs about a month before a comparison means anything.'};
+  }
+  const rets=al.rets.map(r=>r.slice(from));
+  const spy=rets[rets.length-1], stockRets=rets.slice(0,-1);
+
+  const costs=hs.map(h=>h.shares*h.cost);
+  const total=costs.reduce((a,b)=>a+b,0);
+  const wActual=costs.map(c=>c/total);
+  const wEqual=hs.map(()=>1/hs.length);
+
+  const blend=w=>dates.map((_,k)=>stockRets.reduce((sum,r,i)=>sum+w[i]*r[k],0));
+  const actual=blend(wActual), equal=blend(wEqual);
+  const cum=a=>a.reduce((x,r)=>x*(1+r),1)-1;
+
+  return{
+    ok:true,n:dates.length,from:dates[0],to:dates[dates.length-1],windowFromEntry:!!start,
+    names:syms,weights:wActual,
+    cumActual:cum(actual),cumEqual:cum(equal),cumSpy:cum(spy),
+    vsEqual:activeStats(actual,equal),
+    vsSpy:activeStats(actual,spy)
+  };
+}
+/* Renders one benchmark comparison.
+
+   THE NON-NEGOTIABLE: an Information Ratio is never rendered as a bare number. When its 95% interval
+   straddles zero the verdict reads "don't know" in words, because a reader remembers a figure and
+   forgets the interval beside it. The point estimate is still shown — hiding it would be its own
+   dishonesty — but it is never the loudest thing on the row. */
+function benchRow(title,sub,st,winLabel){
+  if(!st)return '<div class="card" style="margin-top:12px"><h3>'+esc(title)+'</h3>'+
+    '<p class="muted" style="font-size:13px">Not enough overlapping history yet.</p></div>';
+  const dk=st.straddles;
+  const verdict=dk
+    ? '<span class="warn">Don\'t know</span>'
+    : (st.ir>0?'<span class="pos">Measurably ahead</span>':'<span class="neg">Measurably behind</span>');
+  return '<div class="card" style="margin-top:12px">'+
+    '<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">'+
+      '<h3 style="margin:0">'+esc(title)+'</h3>'+
+      '<span style="font-size:15px;font-weight:700">'+verdict+'</span>'+
+    '</div>'+
+    '<p class="muted" style="font-size:12.5px;margin-top:4px">'+sub+'</p>'+
+    '<div class="stat-row" style="margin-top:12px">'+
+      '<div class="stat"><span class="stat-label">Active return</span><span class="stat-value '+(st.meanAnn>=0?'pos':'neg')+'">'+
+        (st.meanAnn>=0?'+':'')+(st.meanAnn*100).toFixed(1)+'%</span><span class="muted" style="font-size:11px">a year</span></div>'+
+      '<div class="stat"><span class="stat-label">Tracking error</span><span class="stat-value">'+(st.te*100).toFixed(1)+'%</span>'+
+        '<span class="muted" style="font-size:11px">how different, not how good</span></div>'+
+      '<div class="stat"><span class="stat-label">Information ratio</span><span class="stat-value '+(dk?'muted':(st.ir>0?'pos':'neg'))+'">'+
+        st.ir.toFixed(2)+'</span><span class="muted" style="font-size:11px">'+
+        (st.lo!=null?st.lo.toFixed(2)+' to '+st.hi.toFixed(2):'—')+' (95%)</span></div>'+
+      '<div class="stat"><span class="stat-label">Sample</span><span class="stat-value">'+st.n+'</span>'+
+        '<span class="muted" style="font-size:11px">days · '+st.years.toFixed(2)+' yr'+(winLabel?' · '+winLabel:'')+'</span></div>'+
+    '</div>'+
+    '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.6">'+
+      (dk
+        ? 'The 95% interval runs '+(st.lo!=null?st.lo.toFixed(2)+' to '+st.hi.toFixed(2):'—')+
+          ' and <b>contains zero</b>, so this result is indistinguishable from luck. '+
+          (st.yearsNeeded&&isFinite(st.yearsNeeded)
+            ? 'At this ratio it would take about <b>'+st.yearsNeeded.toFixed(0)+' years</b> of data for the interval to clear zero. '
+            : '')+
+          'Read it as <b>don\'t know</b>, not as the number shown.'
+        : 'The interval excludes zero on '+st.n+' days of data. That is a real result for this window — it is not a promise about the next one.')+
+    '</p></div>';
+}
+
+function renderBenchmarks(){
+  const el=document.getElementById('benchBody');
+  if(!el)return;
+  const b=portfolioBenchmarks();
+  if(b.error){ el.innerHTML='<div class="empty" style="text-align:left">'+esc(b.error)+'</div>'; return; }
+
+  const pct=x=>(x>=0?'+':'')+(x*100).toFixed(1)+'%';
+  el.innerHTML=
+    '<div class="stat-row">'+
+      '<div class="stat s-profit"><span class="stat-label">Your weighting</span><span class="stat-value '+(b.cumActual>=0?'pos':'neg')+'">'+pct(b.cumActual)+'</span></div>'+
+      '<div class="stat s-in"><span class="stat-label">Same names, equal weight</span><span class="stat-value '+(b.cumEqual>=0?'pos':'neg')+'">'+pct(b.cumEqual)+'</span></div>'+
+      '<div class="stat"><span class="stat-label">S&amp;P 500</span><span class="stat-value '+(b.cumSpy>=0?'pos':'neg')+'">'+pct(b.cumSpy)+'</span></div>'+
+    '</div>'+
+    '<p class="muted" style="font-size:12px;margin-top:8px">'+esc(b.from)+' to '+esc(b.to)+' · '+b.n+' trading days'+
+      (b.windowFromEntry?' · window starts at your most recent position opening, so every holding was held throughout':'')+'</p>'+
+
+    benchRow('Against equal weight — does your sizing earn its keep?',
+      'Same tickers you picked, weighted 11.1% each instead of by your policy cap, volatility budget and stop distance. This isolates <b>sizing</b> from selection: the stock choices are identical on both sides.',
+      b.vsEqual,'sizing')+
+
+    benchRow('Against the S&P 500 — is the whole enterprise worth it?',
+      'Your book against simply buying the index. This mixes selection and sizing together, and needs far more history before it can say anything.',
+      b.vsSpy,'everything')+
+
+    '<p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6">'+
+      '<b>Why tracking error is not shown on its own.</b> It measures how much you differ from a benchmark, and the only way to improve it is to look more like one. In a book chosen to be deliberately different that gradient points at closet indexing while still carrying single-stock risk. It appears here strictly as the denominator of the ratio, which asks whether you are <em>paid</em> for differing.'+
+    '</p>'+
+    '<p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.6">'+
+      '<b>How this can be wrong.</b> Weights are cost basis, not market value — market weights would make a winner heavy <em>because</em> it won, and grade hindsight as skill. The comparison still assumes each position was held at constant weight across the window and ignores dividends, cash drag and costs. An Information Ratio needs roughly <b>16 years</b> before an IR of 0.5 separates from luck, so the equal-weight row is the one worth reading this year: it grades a decision you make every week, on a sample you actually have.'+
+    '</p>';
 }
 
 /* ================= RISK CONTRIBUTION =================

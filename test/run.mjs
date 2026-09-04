@@ -195,6 +195,29 @@ t('the demo carries no market-data key', !/demoData[\s\S]{0,900}apiKey:\s*['"][^
 t('demo holdings are seeded with prices so screens render with no API',
   /demoData\(\)[\s\S]{0,700}sym:'AAPL'[^}]*price:/.test(term));
 
+/* ==================== 4d. ACTIVE RETURN / INFORMATION RATIO ==================== */
+G('Active return — tracking error must never stand alone, and IR never without its interval');
+
+t('tracking error subtracts the mean (stdev, not RMS)',
+  /\(b-m\)\*\(b-m\)/.test(term) && /const te=Math\.sqrt\(v\)\*Math\.sqrt\(TRADING_DAYS\)/.test(term));
+t('IR is active return over tracking error', /const ir=meanAnn\/te/.test(term));
+t('a confidence interval is always computed', /lo=se==null\?null:ir-1\.96\*se/.test(term));
+t('the straddle case is detected explicitly', /straddles:/.test(term));
+t('a straddling interval renders the words "Don\'t know"', /Don\\'t know/.test(term));
+t('the years-needed figure is shown when the interval straddles', /yearsNeeded/.test(term));
+t('weights are cost basis, not market value',
+  /costs=hs\.map\(h=>h\.shares\*h\.cost\)/.test(term) && !/costs=hs\.map\(h=>h\.shares\*h\.price\)/.test(term));
+/* Ordering is the Chairman's ruling, not cosmetics: the equal-weight row grades sizing on a
+   sample that exists, the SPY row needs ~16 years. Whichever renders first is what gets read.
+   NB the source carries a raw ampersand here, not an entity — an earlier version of this
+   assertion searched for "S&amp;P" and failed against correct code. */
+t('the equal-weight benchmark exists and is listed first',
+  term.includes('Against equal weight') && term.includes('Against the S&P 500') &&
+  term.indexOf('Against equal weight') < term.indexOf('Against the S&P 500'));
+t('returns are date-aligned across every ticker', /dates\.every\?|dates=Object\.keys\(maps\[0\]\)\.filter\(d=>maps\.every/.test(term));
+t('tracking error is never presented as a standalone verdict',
+  /how different, not how good/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 
