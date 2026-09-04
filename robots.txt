@@ -1,0 +1,7 @@
+# The refusal list is public and meant to be found. Everything else is a private terminal
+# or the door to it, and is kept out of results by a meta tag on each page rather than here —
+# a Disallow would stop crawlers reading those tags at all.
+User-agent: *
+Allow: /
+
+Sitemap: https://perceptfolio.com/sitemap.xml

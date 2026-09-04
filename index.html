@@ -6,7 +6,10 @@
 <title>PerceptFolio — NorthBridge internal terminal</title>
 <meta name="description" content="Internal investment terminal operated by NorthBridge's financial branch. Access restricted to authorised personnel.">
 <meta name="theme-color" content="#0b0c0f">
-<meta name="robots" content="noindex,nofollow">
+<!-- Out of search results, but CRAWLABLE. "nofollow" would have stopped a crawler ever
+     reaching /refused/, which is the one page here meant to be found — the front door stays
+     unlisted while the essay behind it does not. -->
+<meta name="robots" content="noindex,follow">
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <style>
 :root{
@@ -104,6 +107,29 @@ section{padding:68px 0;border-bottom:1px solid var(--line)}
 h2{font-size:clamp(23px,3.1vw,32px);line-height:1.15;letter-spacing:-.024em;font-weight:700;max-width:22ch}
 .lede{color:var(--dim);font-size:15.5px;line-height:1.66;max-width:64ch;margin-top:16px}
 .neg{color:#ef8b85}
+/* ---- marking demo ---- */
+.demo{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-top:34px;overflow:hidden}
+.demo-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.demo-k{font:10.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+.demo-rec{margin-left:auto;font:11px/1 var(--mono);color:var(--faint)}
+.demo-rec b{color:var(--text)}
+#demoStage{padding:18px}
+.demo-intro{color:var(--dim);font-size:14px;line-height:1.65;max-width:62ch;margin-bottom:16px}
+.demo-canvas{width:100%;height:190px;display:block;border:1px solid var(--line);border-radius:8px;background:#08090b}
+.demo-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:16px}
+.demo-f{display:flex;flex-direction:column;gap:5px}
+.demo-f label{font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.demo-f input,.demo-f select{background:var(--panel2);border:1px solid var(--line2);color:var(--text);
+  border-radius:7px;padding:8px 10px;font:600 14px/1.2 var(--mono);min-width:104px}
+.demo-note{color:var(--faint);font-size:12px;line-height:1.6;margin-top:12px}
+.demo-out{margin-top:16px;padding:15px 17px;border-radius:9px;border:1px solid var(--line2);background:var(--panel2)}
+.demo-verdict{font:700 20px/1.25 var(--mono);letter-spacing:-.02em}
+.demo-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:14px;margin-top:14px}
+.demo-n{font:700 17px/1 var(--mono);font-variant-numeric:tabular-nums}
+.demo-l{font-size:10.5px;color:var(--faint);margin-top:5px;line-height:1.45;text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)}
+.demo-say{color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:14px}
+.demo-say b{color:var(--text)}
+.pos{color:var(--green)} .neg{color:var(--red)}
 .goal-h{font-size:17px;font-weight:650;letter-spacing:-.01em;margin-top:40px}
 .goals{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
   border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:16px}
@@ -268,6 +294,29 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
     <div class="sec-head"><span class="sec-no">01</span><span class="sec-k">The record</span></div>
     <h2>It writes down what it said, then checks.</h2>
     <p class="lede">Each verdict is logged the moment it changes, stamped with the price and the index, and marked on an anniversary that cannot be moved afterwards. A tool that flatters itself is worse than no tool, because it launders a guess into a number.</p>
+
+    <!-- ============================================================================
+         MAKE A CALL, THEN WATCH IT MARK.
+         The argument for fixed-horizon grading is on this page in prose, and prose is not how
+         anyone comes to believe it. Thirty seconds of making a falsifiable call and watching it
+         graded against the index does the job that four paragraphs cannot.
+
+         The series is real — three years of actual daily closes, bundled and inspectable at
+         /demo/data.js — and the ticker is hidden until after the mark, so the call is a judgement
+         about a price series rather than a memory of what a famous company did.
+
+         The dataset is 60 KB and loads only when someone presses the button. Nobody pays for it
+         on a page view. -->
+    <div class="demo" id="demo">
+      <div class="demo-head">
+        <span class="demo-k">Try it — make a call on real history</span>
+        <span class="demo-rec" id="demoRec"></span>
+      </div>
+      <div id="demoStage">
+        <p class="demo-intro">Three years of real daily closes, ticker hidden. Call it, set a horizon, and watch the mark land against the S&amp;P — the same way the terminal marks every verdict it issues.</p>
+        <button class="btn btn-p" id="demoStart" type="button">Deal me a series</button>
+      </div>
+    </div>
 
     <div class="quote">
       <p>“You do not get to forecast more until you can prove you forecast well.”</p>
@@ -539,6 +588,233 @@ document.getElementById('yr').textContent = new Date().getFullYear();
   const html=items.map(([t,k])=>'<span><i class="pip" style="background:'+c[k]+'"></i><b>'+t+'</b></span>').join('');
   document.getElementById('tape').innerHTML=html+html;
 })();
+
+/* =====================================================================
+   THE MARKING DEMO
+
+   Real closes, hidden ticker, fixed horizon, marked against SPY. It is the same arithmetic the
+   terminal runs on its own verdicts, on a dataset small enough to ship.
+
+   Three things are deliberate:
+
+   HIDDEN TICKER. Shown up front, this measures whether you remember what NVIDIA did, not whether
+   you can read a price series. Revealed after the mark, when it can no longer bias the call.
+
+   RANDOM CUTOFF. A fixed window would let the second attempt be informed by the first.
+
+   EDGE AGAINST THE INDEX, NOT RAW RETURN. Being up 8% in a quarter when the index was up 11% is
+   not a good call, and any demo that scores raw return teaches the opposite of the lesson.
+   ===================================================================== */
+const DEMO={data:null,cur:null,marks:[]};
+const DEMO_VISIBLE=120;                 // sessions of history shown before the call
+const DEMO_HORIZONS=[30,90,180];
+
+function demoLoad(){
+  if(DEMO.data)return Promise.resolve(DEMO.data);
+  return new Promise((res,rej)=>{
+    const sc=document.createElement('script');
+    sc.src='/demo/data.js';
+    sc.onload=()=>{ DEMO.data=window.PF_DEMO||null; DEMO.data?res(DEMO.data):rej(new Error('dataset empty')); };
+    sc.onerror=()=>rej(new Error('could not load the dataset'));
+    document.head.appendChild(sc);
+  });
+}
+
+function demoDeal(){
+  const d=DEMO.data, names=Object.keys(d.series).filter(t=>t!=='SPY');
+  const sym=names[Math.floor(Math.random()*names.length)];
+  const n=d.dates.length, maxH=Math.max.apply(null,DEMO_HORIZONS);
+  /* The cutoff must leave room for history behind it and the longest horizon ahead of it. */
+  const lo=DEMO_VISIBLE, hi=n-maxH-1;
+  const cut=lo+Math.floor(Math.random()*(hi-lo));
+  DEMO.cur={sym,cut,price:d.series[sym][cut],date:d.dates[cut]};
+  return DEMO.cur;
+}
+
+/* Plain canvas rather than a charting library. The landing page should not pull 200 KB of Chart.js
+   to draw one line, and this way the forward path can be drawn in a second colour on the same
+   axes without fighting an animation API. */
+let _demoDraw=null;                 // last draw, so a resize can repaint identically
+function demoChart(cv,closes,fwd,target){
+  _demoDraw=()=>demoChart(cv,closes,fwd,target);
+  const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
+  /* A canvas asked to draw itself at zero width paints nothing and never tries again — the chart
+     is simply blank forever. That happens whenever the element is measured before layout has run,
+     inside a collapsed container, or in a tab that was hidden when the section rendered. Rather
+     than paint nothing, wait for the element to have a size and draw then. */
+  if(!(w>0&&h>0)){
+    if(cv.__waiting)return;
+    cv.__waiting=true;
+    const go=()=>{ if(cv.clientWidth>0&&cv.clientHeight>0){ cv.__waiting=false; if(ro)ro.disconnect(); demoChart(cv,closes,fwd,target); } };
+    let ro=null;
+    if(window.ResizeObserver){ ro=new ResizeObserver(go); ro.observe(cv); }
+    requestAnimationFrame(go);
+    return;
+  }
+  cv.width=w*dpr; cv.height=h*dpr;
+  const g=cv.getContext('2d'); g.scale(dpr,dpr); g.clearRect(0,0,w,h);
+  const all=closes.concat(fwd||[]).concat(target?[target]:[]);
+  let lo=Math.min.apply(null,all), hi=Math.max.apply(null,all);
+  const pad=(hi-lo)*0.12||1; lo-=pad; hi+=pad;
+  const total=closes.length+((fwd&&fwd.length)||0);
+  const X=i=>8+(i/(total-1))*(w-16), Y=v=>h-10-((v-lo)/(hi-lo))*(h-20);
+
+  if(target){                                   // the level being called, drawn before the series
+    g.strokeStyle='rgba(217,164,65,.55)'; g.setLineDash([4,4]); g.lineWidth=1;
+    g.beginPath(); g.moveTo(0,Y(target)); g.lineTo(w,Y(target)); g.stroke(); g.setLineDash([]);
+  }
+  g.strokeStyle='#3b82f6'; g.lineWidth=1.6; g.beginPath();
+  closes.forEach((v,i)=>{ i?g.lineTo(X(i),Y(v)):g.moveTo(X(i),Y(v)); }); g.stroke();
+
+  if(fwd&&fwd.length){
+    g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=1;                 // the cutoff
+    g.beginPath(); g.moveTo(X(closes.length-1),0); g.lineTo(X(closes.length-1),h); g.stroke();
+    const up=fwd[fwd.length-1]>=closes[closes.length-1];
+    g.strokeStyle=up?'#2ea043':'#e5534b'; g.lineWidth=1.6; g.beginPath();
+    g.moveTo(X(closes.length-1),Y(closes[closes.length-1]));
+    fwd.forEach((v,i)=>g.lineTo(X(closes.length+i),Y(v))); g.stroke();
+  }
+}
+
+function demoRender(){
+  const st=document.getElementById('demoStage'), c=DEMO.cur, d=DEMO.data;
+  const closes=d.series[c.sym].slice(c.cut-DEMO_VISIBLE,c.cut+1);
+  st.innerHTML=
+    '<canvas class="demo-canvas" id="demoCv"></canvas>'+
+    '<div class="demo-row">'+
+      '<div class="demo-f"><label>Series</label><input value="'+('#'+(c.cut%997+103))+'" disabled></div>'+
+      '<div class="demo-f"><label>Price now</label><input value="'+c.price.toFixed(2)+'" disabled></div>'+
+      '<div class="demo-f"><label>Call</label><select id="demoDir"><option>BUY</option><option>SELL</option></select></div>'+
+      '<div class="demo-f"><label>Target $</label><input id="demoTgt" type="number" step="any" value="'+(c.price*1.1).toFixed(2)+'"></div>'+
+      '<div class="demo-f"><label>Horizon</label><select id="demoHz">'+
+        DEMO_HORIZONS.map(h=>'<option value="'+h+'"'+(h===90?' selected':'')+'>'+h+' days</option>').join('')+
+      '</select></div>'+
+      '<button class="btn btn-p" type="button" id="demoMark">Mark it</button>'+
+    '</div>'+
+    '<p class="demo-note">Real daily closes, ticker hidden until the mark. The dashed line is your target. Nothing here is a recommendation about any security.</p>';
+  demoChart(document.getElementById('demoCv'),closes,null,null);
+  document.getElementById('demoTgt').addEventListener('input',()=>{
+    const t=parseFloat(document.getElementById('demoTgt').value);
+    demoChart(document.getElementById('demoCv'),closes,null,isFinite(t)&&t>0?t:null);
+  });
+  document.getElementById('demoMark').addEventListener('click',demoMark);
+}
+
+function demoMark(){
+  const d=DEMO.data,c=DEMO.cur;
+  const dir=document.getElementById('demoDir').value;
+  const hz=parseInt(document.getElementById('demoHz').value,10);
+  const tgt=parseFloat(document.getElementById('demoTgt').value);
+  if(!isFinite(tgt)||tgt<=0)return;
+
+  const end=c.cut+hz;
+  const px=d.series[c.sym], spy=d.series.SPY;
+  const stockRet=(px[end]-px[c.cut])/px[c.cut]*100;
+  const spyRet=(spy[end]-spy[c.cut])/spy[c.cut]*100;
+  const alpha=stockRet-spyRet;
+  const edge=dir==='BUY'?alpha:-alpha;          // a SELL call is right when the name lags
+
+  const path=px.slice(c.cut+1,end+1);
+  const hit=dir==='BUY'?Math.max.apply(null,path)>=tgt:Math.min.apply(null,path)<=tgt;
+
+  DEMO.marks.push(edge);
+  const closes=px.slice(c.cut-DEMO_VISIBLE,c.cut+1);
+
+  const st=document.getElementById('demoStage');
+  const good=edge>0;
+  st.innerHTML=
+    '<canvas class="demo-canvas" id="demoCv"></canvas>'+
+    '<div class="demo-out">'+
+      '<div class="demo-verdict '+(good?'pos':'neg')+'">'+
+        (good?'Right — and ahead of the index.':'Wrong against the index.')+'</div>'+
+      '<div class="demo-nums">'+
+        '<div><div class="demo-n '+(stockRet>=0?'pos':'neg')+'">'+(stockRet>=0?'+':'')+stockRet.toFixed(1)+'%</div><div class="demo-l">the series, '+hz+'d</div></div>'+
+        '<div><div class="demo-n '+(spyRet>=0?'pos':'neg')+'">'+(spyRet>=0?'+':'')+spyRet.toFixed(1)+'%</div><div class="demo-l">S&amp;P, same days</div></div>'+
+        '<div><div class="demo-n '+(good?'pos':'neg')+'">'+(edge>=0?'+':'')+edge.toFixed(1)+'pts</div><div class="demo-l">your edge</div></div>'+
+        '<div><div class="demo-n">'+(hit?'yes':'no')+'</div><div class="demo-l">target touched</div></div>'+
+        '<div><div class="demo-n">'+esc(c.sym)+'</div><div class="demo-l">it was</div></div>'+
+      '</div>'+
+      '<p class="demo-say">'+demoSay(edge,hit,stockRet,spyRet,dir)+'</p>'+
+    '</div>'+
+    '<div class="demo-row"><button class="btn btn-p" type="button" id="demoAgain">Deal another</button>'+
+      '<button class="btn" type="button" id="demoDone">I have seen enough</button></div>';
+
+  demoChart(document.getElementById('demoCv'),closes,path,tgt);
+  document.getElementById('demoAgain').addEventListener('click',()=>{demoDeal();demoRender();demoRecord();});
+  document.getElementById('demoDone').addEventListener('click',demoSummary);
+  demoRecord();
+}
+
+/* The sentence that carries the lesson. Four outcomes, and the two awkward ones matter most:
+   right about the direction and still behind the index, or wrong and rescued by the market. */
+function demoSay(edge,hit,stockRet,spyRet,dir){
+  if(edge>0&&stockRet>0&&spyRet>0&&dir==='BUY')
+    return 'It rose <b>and</b> beat the index. Both halves are needed — a rise that trails the S&amp;P is a position you would have done better without.';
+  if(edge>0)return 'The call earned its place against the benchmark, which is the only comparison that decides whether holding it was worth doing.';
+  if(stockRet>0&&dir==='BUY')
+    return 'It went <b>up</b>, and you were still behind the index. This is the outcome that flatters every tool that reports raw return, and it is why the scorecard reports edge instead.';
+  if(!hit)return 'The target was never touched and the horizon expired. Neither right nor wrong — the thesis simply never happened, and the money sat there. That is the third outcome nobody plans for.';
+  return 'Marked against the index and it did not work. Recorded as-is: this is the number the terminal would show you, whether or not it flattered the system.';
+}
+
+function demoRecord(){
+  const el=document.getElementById('demoRec'),n=DEMO.marks.length;
+  if(!n){el.textContent='';return;}
+  const mean=DEMO.marks.reduce((a,b)=>a+b,0)/n;
+  const wins=DEMO.marks.filter(e=>e>0).length;
+  el.innerHTML='your record: <b>'+wins+'/'+n+'</b> · expectancy <b class="'+(mean>=0?'pos':'neg')+'">'+
+    (mean>=0?'+':'')+mean.toFixed(1)+'pts</b>';
+}
+
+/* The close. n is tiny by construction, and saying so is the point rather than a caveat —
+   it is the same argument the front screen of the terminal makes about forty marks. */
+function demoSummary(){
+  const n=DEMO.marks.length;
+  const mean=n?DEMO.marks.reduce((a,b)=>a+b,0)/n:0;
+  const wins=DEMO.marks.filter(e=>e>0).length;
+  let sd=0; if(n>1){const v=DEMO.marks.reduce((a,e)=>a+(e-mean)*(e-mean),0)/(n-1); sd=Math.sqrt(v);}
+  const se=n>1?sd/Math.sqrt(n):null;
+  const lo=se!=null?mean-1.96*se:null, hi=se!=null?mean+1.96*se:null;
+  const straddles=lo!=null&&lo<0&&hi>0;
+
+  document.getElementById('demoStage').innerHTML=
+    '<div class="demo-out">'+
+      '<div class="demo-verdict">'+wins+' of '+n+' right · expectancy <span class="'+(mean>=0?'pos':'neg')+'">'+
+        (mean>=0?'+':'')+mean.toFixed(2)+'pts</span> per call</div>'+
+      '<p class="demo-say">'+
+        (n<3
+          ? 'On '+n+' call'+(n===1?'':'s')+' this number means nothing at all, and it is worth sitting with that. '
+          : (straddles
+            ? 'The 95% interval runs '+lo.toFixed(1)+' to +'+hi.toFixed(1)+' and <b>crosses zero</b>, so on this evidence you are indistinguishable from chance. '
+            : 'The 95% interval is '+lo.toFixed(1)+' to '+hi.toFixed(1)+', which does not cross zero. On this handful of calls that is a real signal — and a handful is still a handful. '))+
+        'That is the entire idea. The terminal does this to every verdict it issues, on fixed horizons set in advance that cannot be moved afterwards, and reports the answer whether or not it flatters the system. '+
+        '<b>Its own scorecard is empty</b>, because a record cannot be reconstructed backwards.</p>'+
+      '<p class="demo-say" style="color:var(--faint);font-size:12px"><b>How this demo can mislead you:</b> ten large US listings over three particular years, and you chose the horizon after seeing the history — a freedom the real thing does not give you, since the deadline is fixed before the outcome is known. It shows you the mechanism, not your skill.</p>'+
+    '</div>'+
+    '<div class="demo-row"><button class="btn btn-p" type="button" id="demoAgain2">Go again</button>'+
+      '<a class="btn" href="#access">Request access</a></div>';
+  document.getElementById('demoAgain2').addEventListener('click',()=>{demoDeal();demoRender();});
+}
+
+/* Redraw on resize: the canvas backing store is sized in device pixels at draw time, so without
+   this a rotated phone or a dragged window leaves a stretched, blurry chart. */
+let _demoRz=null;
+window.addEventListener('resize',()=>{
+  if(!_demoDraw)return;
+  clearTimeout(_demoRz);
+  _demoRz=setTimeout(()=>{ try{ _demoDraw(); }catch(e){} },150);
+});
+
+document.getElementById('demoStart').addEventListener('click',function(){
+  const b=this; b.disabled=true; b.textContent='Loading three years of closes…';
+  demoLoad().then(()=>{demoDeal();demoRender();})
+    .catch(e=>{ b.disabled=false; b.textContent='Deal me a series';
+      document.getElementById('demoStage').insertAdjacentHTML('beforeend',
+        '<p class="demo-note" style="color:var(--red)">Could not load the dataset ('+esc(e.message)+'). The rest of the page is unaffected.</p>'); });
+});
+
+/* Shared with the access form below. */
+function esc(t){return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 /* ---- the three calls ---- */
 const DIRS=['BUY','SELL'];

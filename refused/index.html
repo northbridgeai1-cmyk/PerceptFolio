@@ -6,13 +6,17 @@
 <title>What we refused to build — PerceptFolio</title>
 <meta name="description" content="Forty-five modules were considered for an investment terminal. Eighteen are live, sixteen are impossible on retail market data, and eleven were declined on evidence. Every reason is recorded.">
 
-<!-- NOINDEX MATCHES THE REST OF THE SITE, AND IS THE ONE LINE TO CHANGE IF THAT DECISION CHANGES.
-     This page is the most forwardable thing here, and forwarding works whether or not search
-     engines index it — a link pasted into a mail or a Slack channel does not consult Google. So
-     indexing is upside rather than a requirement, and it is a positioning decision for the operator
-     rather than a technical one. Delete this tag and the page becomes discoverable; nothing else
-     needs to change. -->
-<meta name="robots" content="noindex,nofollow">
+<!-- THE ONE INDEXABLE PAGE ON THIS SITE, deliberately.
+     Everything else is a door: the landing page gates an invite-only terminal and stays out of
+     search results. This page is not a door. It contains no login, no private data and nothing
+     about any holding — it is a technical essay on forty-five modules and why thirty-four of them
+     were refused. Nothing is exposed by letting it be found, and it is the only thing here anyone
+     would forward.
+
+     To reverse: add <meta name="robots" content="noindex,nofollow"> back, and drop the sitemap
+     entry. Nothing else depends on this. -->
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://perceptfolio.com/refused/">
 
 <!-- Link previews matter more than indexing for a page whose whole job is being forwarded. These
      are what render when the URL is pasted into a mail client, Slack or a message. -->
