@@ -28,6 +28,13 @@
 
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally a few KB
 
+/* Bump this whenever worker.js changes in a way the app depends on.
+   THIS FILE IS DEPLOYED BY PASTING IT INTO THE CLOUDFLARE DASHBOARD, not from the repo, so the
+   version running and the version in git drift apart silently and there is no way to tell from
+   outside which one is live. That has already cost two rounds of debugging a fix that was correct
+   in git and absent in production. GET /version answers the question in one request. */
+const WORKER_VERSION = '2026-09-04.1';
+
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
 function safeEqual(a, b) {
@@ -165,6 +172,34 @@ async function handle(request, env) {
     // Two-day TTL on the counter; the date in the key already scopes it to today.
     await env.PF_SYNC.put(rlKey, String(seen + 1), { expirationTtl: 172800 });
     return json({ ok: true, id }, 200, env);
+  }
+
+  /* ---- GET /version — which build is actually deployed ----
+     Public, and deliberately thin: a version string and the routes this build serves. It reveals
+     nothing a visitor could not learn by trying each route, and it turns "did the paste take?" from
+     an afternoon of guessing into one curl.
+
+     Authenticated callers additionally get which optional secrets are configured — booleans only,
+     never values — because "the summary isn't working" is almost always one missing binding and
+     there is otherwise no way to see that from the app. */
+  if (url.pathname === '/version' && request.method === 'GET') {
+    const body = {
+      version: WORKER_VERSION,
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/summarise', '/fred', '/finnhub', '/?slot=']
+    };
+    const auth0 = request.headers.get('Authorization') || '';
+    const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
+    if (safeEqual(tok0, env.SYNC_SECRET)) {
+      body.configured = {
+        PF_SYNC: !!(env.PF_SYNC && typeof env.PF_SYNC.get === 'function'),
+        SYNC_SECRET: !!env.SYNC_SECRET,
+        FRED_API_KEY: !!env.FRED_API_KEY,
+        FINNHUB_API_KEY: !!env.FINNHUB_API_KEY,
+        AI_API_KEY: !!env.AI_API_KEY,
+        ALLOWED_ORIGIN: env.ALLOWED_ORIGIN || '(unset — CORS will fall back to *)'
+      };
+    }
+    return json(body, 200, env);
   }
 
   /* ---- /invite?code=XXXXX-XXXXX — validate an issued code ----

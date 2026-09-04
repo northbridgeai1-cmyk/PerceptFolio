@@ -161,6 +161,12 @@ const missing = called.filter(e => !allowed.includes("'" + e + "'"));
 t('every endpoint the app calls is on the allowlist', missing.length === 0,
   missing.length ? 'MISSING: ' + missing.join(', ') : called.length + ' endpoints');
 
+t('the landing form points at a worker hostname, not a path on this site',
+  /worker: 'https:\/\/[a-z0-9.-]+'/.test(idx) && !/worker: 'https:\/\/perceptfolio\.com/.test(idx));
+t('the worker reports its own build so a paste-deploy can be verified',
+  /const WORKER_VERSION/.test(worker) && /url\.pathname === '\/version'/.test(worker));
+t('/version never leaks secret values, only whether they are set',
+  /FINNHUB_API_KEY: !!env\.FINNHUB_API_KEY/.test(worker) && !/FINNHUB_API_KEY: env\.FINNHUB_API_KEY[^!]/.test(worker));
 t('the app falls back to the worker when no local key is set',
   /if\(!D\.apiKey&&syncConfigured\(\)\)/.test(term));
 t('a local key still wins over the worker', term.indexOf('if(!D.apiKey&&syncConfigured()') < term.indexOf("if(!D.apiKey)throw new Error('NO_KEY')"));

@@ -531,23 +531,20 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
    so the page is never a dead end on a fresh deploy.
    ===================================================================== */
 const PF = {
-  /* The Worker's own hostname, NOT a path on this site. perceptfolio.com is GitHub Pages
-     and cannot run code; the queue, the invite codes and the FRED proxy all live in the
-     Cloudflare Worker, which has to be reachable under its own name.
+  /* The Worker's own hostname. perceptfolio.com is GitHub Pages — a file host that cannot run code —
+     so the request queue, the invite codes and the data proxies all live at a separate origin.
 
-     A custom domain rather than the crimson-hat-6ad9.<subdomain>.workers.dev address on
-     purpose. The workers.dev name publishes your Cloudflare account subdomain, and it
-     changes if the service is ever renamed — which would silently kill this form and give
-     no sign that it had. A CNAME you control does neither.
+     This is the workers.dev address rather than a custom domain, which is a deliberate choice with a
+     known cost. The name embeds the Cloudflare account subdomain, and it is not yours: rename the
+     service, or recreate it after an accident, and the address changes while this page goes on
+     POSTing to the old one. Nothing errors on your side — the form quietly stops delivering, and the
+     only symptom is that nobody applies any more, which reads exactly like nobody being interested.
+     If that ever happens, this line is the first place to look. Pointing api.perceptfolio.com at the
+     worker and changing this string removes the failure mode entirely.
 
-     Set this up in Cloudflare: Workers > crimson-hat-6ad9 > Settings > Domains & Routes >
-     Add > Custom domain > api.perceptfolio.com. Then set the Worker variable
-     ALLOWED_ORIGIN to exactly https://perceptfolio.com so the CORS header it returns
-     matches this page's origin.
-
-     Until that domain resolves, the fetch below fails at the network layer and the form
-     falls back to the mail client on its own. Wiring this in early is therefore safe. */
-  worker: 'https://api.perceptfolio.com',
+     Verified live 2026-09-04: 401 on an unauthenticated GET (so SYNC_SECRET and the KV binding are
+     both set) and a preflight returning exactly https://perceptfolio.com. */
+  worker: 'https://crimson-hat-6ad9.northbridgeai1.workers.dev',
   contact: 'northbridgeai1@gmail.com'
 };
 

@@ -172,56 +172,48 @@ costs one call, not two.
 
 ---
 
-## Step 5d — Give the worker its own hostname
+## Step 5d — The worker's address
 
-**Do this one.** The access-request form on the front page depends on it.
-
-`perceptfolio.com` is served by GitHub Pages, which is a file host — it cannot run code. So the
-request queue, the invite codes, the FRED proxy and the summaries all have to be reached at a
-different hostname. The front page is wired to expect:
+Your worker answers at:
 
 ```
-https://api.perceptfolio.com
+https://crimson-hat-6ad9.northbridgeai1.workers.dev
 ```
 
-To make that real:
+That is what the front page posts access requests to, and what you paste into **Settings → Sync**
+on each device. Nothing further is required — this address works today.
 
-1. Cloudflare dashboard → **Workers & Pages** → your worker (**crimson-hat-6ad9**).
-2. **Settings** → **Domains & Routes** → **Add** → **Custom domain**.
-3. Enter `api.perceptfolio.com` and add it. Cloudflare creates the DNS record itself, provided
-   perceptfolio.com is on your Cloudflare account.
-4. Go to **Settings** → **Variables and Secrets** and set a plain **Variable** named
-   `ALLOWED_ORIGIN` to exactly:
+### The one failure mode to know about
 
-   ```
-   https://perceptfolio.com
-   ```
+This name is not yours. It embeds your Cloudflare account subdomain, and it changes if the service
+is ever renamed or recreated after an accident. If that happens the front page goes on POSTing to
+an address that no longer exists. **Nothing errors.** The form quietly stops delivering requests,
+and the only symptom is that nobody applies any more — which reads exactly like nobody being
+interested.
 
-   No trailing slash. This is the value the worker echoes back in its CORS header, and the browser
-   compares it character for character against the page's origin. A trailing slash fails the match
-   and the form will look broken with nothing in the logs to explain it.
+If applications ever stop arriving, check this first.
 
-5. **Deploy.**
+The permanent fix, whenever you want it: **Settings → Domains & Routes → Add → Custom domain →**
+`api.perceptfolio.com`. Your DNS is already on Cloudflare, so it needs nothing else. Then change
+the one `worker:` line at the bottom of `index.html`. A hostname you control cannot break this way.
 
-### Why not just use the workers.dev address
+### Checking what is actually deployed
 
-Two reasons, and the second is the one that bites.
+`worker.js` is deployed by pasting it into the dashboard, not from the repo, so the running version
+and the one in git drift apart with nothing to show it. Ask the worker directly:
 
-The `crimson-hat-6ad9.<something>.workers.dev` name publishes your Cloudflare account subdomain to
-anyone who views source. Minor, but free to avoid.
+```bash
+curl https://crimson-hat-6ad9.northbridgeai1.workers.dev/version
+```
 
-The real problem is that the name is not yours. Rename the service, recreate it after an accident,
-or let Cloudflare reassign it, and the address changes — while the front page goes on POSTing to
-the old one. Nothing errors on your side. The form just quietly stops delivering requests, and the
-only symptom is that nobody applies any more, which reads exactly like nobody being interested.
+That returns the build's version string and the routes it serves. Add your sync key and it also
+reports which optional secrets are set — booleans only, never values — which answers "why is the
+news summary not working" in one request:
 
-A hostname you control cannot fail that way.
-
-### Until it resolves
-
-Nothing breaks. The form tries the worker, the request fails at the network layer, and it hands the
-visitor their mail client with all three calls already written into the body. Wiring the URL in
-before the DNS exists is safe by design.
+```bash
+curl -H "Authorization: Bearer YOUR_SYNC_SECRET" \
+  https://crimson-hat-6ad9.northbridgeai1.workers.dev/version
+```
 
 ---
 
