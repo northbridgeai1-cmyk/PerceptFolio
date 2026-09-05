@@ -16,7 +16,7 @@
   --bg:#0b0c0f; --panel:#131519; --panel2:#1a1d23; --line:#24272f; --line2:#2f333c;
   --text:#eef0f3; --dim:#8d939f; --faint:#5d636e;
   --accent:#3b82f6; --green:#2ea043; --red:#e5534b; --amber:#d9a441; --violet:#8b5cf6;
-  --brand2:#1f9e8c;   /* the teal in the logo — same value the terminal uses */
+  --brand2:#1f9e8c;   /* the teal in the logo. Same value the terminal uses */
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   --bar:30px;
 }
@@ -46,13 +46,13 @@ nav{position:sticky;top:0;z-index:60;background:rgba(11,12,15,.94);backdrop-filt
 .nav-in{display:flex;align-items:center;gap:14px;height:56px}
 /* THE LOGO. Identical construction to the terminal's header mark so the two cannot drift apart:
    a bordered square, P in the text colour, F in the brand teal, wordmark split the same way.
-   An earlier version drew a blue gradient box with "PF" in it, which was not the logo at all —
+   An earlier version drew a blue gradient box with "PF" in it, which was not the logo at all -
    it was a placeholder that survived into three pages. */
 .logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   display:inline-flex;align-items:center;gap:7px}
 .logo-mark{flex-shrink:0}
 /* The wordmark is ONE flex child. Without this wrapper the .logo gap pushes the two coloured halves
-   apart and renders "Percept Folio" — it is one word, so they must sit flush. */
+   apart and renders "Percept Folio"; it is one word, so they must sit flush. */
 .logo-word{display:inline-flex;letter-spacing:-.01em}
 .logo .c1{color:var(--text)}
 .logo .c2{color:var(--brand2)}
@@ -414,7 +414,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
 <section id="terminal">
   <div class="wrap">
     <div class="sec-head"><span class="sec-no">03</span><span class="sec-k">The terminal</span></div>
-    <h2>Fourteen screens. One question each.</h2>
+    <h2>Fourteen screens: One question each.</h2>
     <p class="lede">Every screen answers one decision and shows the arithmetic behind it. Nothing is a black box, because a system nobody can audit is a system nobody should act on.</p>
     <div class="grid3">
       <div class="tile"><div class="tile-h"><span class="tag t1">Command</span></div>

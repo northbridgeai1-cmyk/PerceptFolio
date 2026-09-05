@@ -101,9 +101,19 @@ G('Promise audit — the site may not claim what the code does not do');
 const admin = read('admin.html');
 const privacy = read('privacy/index.html');
 const terms = read('terms/index.html');
+/* Comment scoping has to respect script boundaries. An earlier version stripped JS block comments
+   anywhere in the document, so an HTML attribute whose value ends in a slash-star sequence (an
+   image accept filter) opened a fake comment that swallowed 87,520 characters of real markup. The
+   audit built on it then reported "no em dashes" while 116 were still on screen. A tool that can
+   be fooled into a clean result is worse than no tool.
+   This very comment hit the same trap once: writing the offending literal inside a block comment
+   closed it early. It is described in words here for that reason. */
 const stripComments = h => h
-  .replace(/<!--[\s\S]*?-->/g, '')
-  .replace(/\/\*[\s\S]*?\*\//g, '');
+  .split(/(<script\b[^>]*>[\s\S]*?<\/script>)/i)
+  .map(part => /^<script\b/i.test(part)
+      ? part.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+      : part.replace(/<!--[\s\S]*?-->/g, ''))
+  .join('');
 const idxVisible = stripComments(idx);
 const marksApplicants = /addEventListener\('scheduled'|scheduled\s*\(|function markRequests|\/mark-requests/i.test(worker);
 t('no claim that applicant calls are marked and reported, unless a mechanism exists',
@@ -330,7 +340,7 @@ G('C8: an accrued figure must not be labelled as income received');
 
 t('no screen says "Dividends earned"', !/Dividends earned/.test(stripComments(term)));
 t('the tile says projected', /Dividends accrued <span class="muted"[^>]*>\(projected\)/.test(term));
-t('the tile states it was never received', /never received — accrued at declared rates/.test(term));
+t('the tile states it was never received', /never received[,—:] accrued at declared rates/.test(term));
 t('the explanatory copy calls it a projection, not income', /a <b>projection, not income<\/b>/.test(term));
 
 /* ==================== ACCESS REQUEST — no three-call requirement ==================== */
@@ -603,7 +613,14 @@ t('removing from the watchlist strips the symbol from every list',
 t('a fixed colour palette, not a free picker', /const LIST_COLORS=\[/.test(term));
 t('new lists get an unused colour where one is free', /LIST_COLORS\.find\(c=>!used\.includes\(c\.k\)\)/.test(term));
 t('duplicate list names are refused', /You already have a list called that/.test(term));
-t('symbols in no list are grouped as Unlisted', /label:'Unlisted'/.test(term));
+/* The default bucket is now shown and named as a list called Watchlist, rather than as leftovers
+   labelled "Unlisted" — it was always a list, and the old label made the default sound like a
+   failure state. */
+t('the default bucket is a list called Watchlist',
+  /const WATCHLIST_ID='__watchlist'/.test(term) && /name:'Watchlist'/.test(term) &&
+  !/label:'Unlisted'/.test(term));
+t('a ticker in no named list belongs to Watchlist',
+  /\(D\.watchlist\|\|\[\]\)\.filter\(x=>!filed\.has\(x\)\)/.test(term));
 t('the Lists column is rendered before My Call, matching the header',
   term.indexOf("listDotsHtml(s)+' '+listMenuHtml(s)") < term.indexOf("'<td class=\"mycall-cell\">'+myTagSelect(s)"));
 t('the empty-state colspan matches the column count', /colspan="9" class="empty"/.test(term));
@@ -617,8 +634,15 @@ t('every dialog has a close control', (term.match(/class="add-close"/g)||[]).len
 t('the tabs carry a + Add button', (term.match(/class="btn-add"/g)||[]).length >= 4);
 
 /* Success closes; failure must not, or a rejected entry silently loses what was typed. */
-t('a successful ticker add closes the dialog',
-  /D\.watchlist\.push\(t\);document\.getElementById\('wTicker'\)\.value='';\s*\n\s*closeAddModal\(\)/.test(term));
+/* addWatch now has two success paths: a brand-new ticker, and an existing one being filed into
+   the open list. Both must close; the "already watched, already in this list" path must not. */
+{
+  const fn = /function addWatch\(\)\{[\s\S]*?\n\}/.exec(term)[0];
+  const closes = (fn.match(/closeAddModal\(\)/g)||[]).length;
+  t('both successful ticker paths close the dialog', closes === 2, closes + ' close calls');
+  t('the duplicate path returns without closing',
+    /return toast\(t\+' is already on your watchlist\.'\)/.test(fn));
+}
 t('a successful alert closes the dialog', /paPrice'\)\.value='';\s*\n\s*closeAddModal\(\)/.test(term));
 t('a successful list closes the dialog', /if\(el\)el\.value='';\s*\n\s*closeAddModal\(\)/.test(term));
 t('a successful holding closes the dialog via clearForm, which only runs on success',
