@@ -353,7 +353,13 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       </div>
       <div class="goal">
         <div class="goal-k">The threshold</div>
-        <p><b>Forty marked calls before the record counts as evidence.</b> Under about forty, the interval straddles zero almost regardless of the point estimate. The honest reading of a small sample is <em>don't know</em>, and the terminal says so on its own front screen.</p>
+        <!-- C3. This said "forty marked calls" in the same voice the rest of the page uses for
+             arithmetic, and nobody derived forty. The number of observations needed to separate a
+             mean edge from zero at 95% confidence is n = (Z·sigma/mean)^2, which at a 2-point edge
+             with 12-point dispersion is 138 — forty was optimistic by about 3.5x, and optimistic in
+             the direction that declares an edge proven while it is still noise. The terminal now
+             computes this live from the observed sample, so the target moves as the record does. -->
+        <p><b>The record counts as evidence when the arithmetic says so, not at a round number.</b> The calls needed to separate a real edge from luck is <span class="mono">(1.96 × dispersion ÷ edge)²</span> — roughly <b>138</b> at a two-point edge with twelve-point dispersion. The terminal computes it from your own marks as they accumulate and shows the gap. Below it, the interval straddles zero almost regardless of the point estimate, and the honest reading is <em>don't know</em>.</p>
       </div>
     </div>
     <p class="lede" style="margin-top:26px">Why it is put this way: a hit rate is the most manufacturable statistic in finance. Sell covered calls, take profit at +0.5%, never stop out, hold the losers to recovery, and you can report being right nine times in ten while losing money on every third gap-down — 80% of wins at +1% against 20% of losses at −10% is an expectancy of <b class="neg">−1.2% per trade</b>. Right nearly always, and reliably bankrupt. Expectancy cannot be dressed up that way, because the large loss stays in the average.</p>
@@ -465,7 +471,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
 
     <div class="notice" style="margin-top:30px;border-color:rgba(59,130,246,.26);background:rgba(59,130,246,.05)">
       <b style="color:#79a8f4">The rule that governs this list</b>
-      <p>No further analytics are added until the call scorecard holds forty marked calls. Evidence arrives at one day per day and no amount of building accelerates it, so every module added before then would change the interface without changing what is known. Most of the list is risk machinery — it exists to make being wrong survivable, not to make being right more frequent, and treating it as the second thing is the most common error made with it.</p>
+      <p>No further analytics are added until the call scorecard holds enough marks for its own arithmetic to clear zero — a figure the terminal derives from the observed edge and dispersion rather than asserting, and which is nearer 138 than the 40 first guessed here. Evidence arrives at one day per day and no amount of building accelerates it, so every module added before then would change the interface without changing what is known. Most of the list is risk machinery — it exists to make being wrong survivable, not to make being right more frequent, and treating it as the second thing is the most common error made with it.</p>
     </div>
   </div>
 </section>
@@ -764,7 +770,7 @@ function demoRecord(){
 }
 
 /* The close. n is tiny by construction, and saying so is the point rather than a caveat —
-   it is the same argument the front screen of the terminal makes about forty marks. */
+   it is the same argument the front screen of the terminal makes about its derived sample target. */
 function demoSummary(){
   const n=DEMO.marks.length;
   const mean=n?DEMO.marks.reduce((a,b)=>a+b,0)/n:0;

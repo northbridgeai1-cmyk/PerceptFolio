@@ -94,7 +94,13 @@ G('Promise audit — the site may not claim what the code does not do');
 /* Strip HTML comments first. The repaired source explains, in a comment, exactly which sentence
    was removed and quotes it — so a naive scan finds the deleted promise in the note describing its
    deletion and fails on prose nobody can read. Only rendered text can make a claim. */
-const stripComments = h => h.replace(/<!--[\s\S]*?-->/g, '');
+/* Strips BOTH comment kinds. It stripped only HTML comments, which meant an assertion about what
+   the page CLAIMS could fail on a source comment documenting the very claim being removed — the
+   same trap that produced two false failures earlier in this suite's life. Only rendered text can
+   make a promise, so only rendered text is audited. */
+const stripComments = h => h
+  .replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
 const idxVisible = stripComments(idx);
 const marksApplicants = /addEventListener\('scheduled'|scheduled\s*\(|function markRequests|\/mark-requests/i.test(worker);
 t('no claim that applicant calls are marked and reported, unless a mechanism exists',
@@ -278,6 +284,22 @@ t('the code is burned only after the profile is written',
 t('validation works without sync configured (the /invite route is public)',
   /const INVITE_WORKER=/.test(term) && /syncConfigured\(\)\?syncCfg\.url:INVITE_WORKER/.test(term));
 t('a network failure fails closed, never open', /Could not reach the worker to check that code/.test(term));
+
+/* ==================== C3 — DERIVED SAMPLE THRESHOLD ==================== */
+G('C3 acceptance: "40" no longer appears as a threshold anywhere');
+
+t('the hard-coded constant is gone', !/RECORD_THRESHOLD/.test(term));
+t('no page asserts forty marked calls',
+  !/forty marked calls/i.test(stripComments(term)) && !/forty marked calls/i.test(stripComments(idx)));
+t('the threshold is computed as (Z*sigma/mean)^2',
+  /Math\.ceil\(Math\.pow\(Z95\*sd\/mean,2\)\)/.test(term));
+t('the pre-record assumption is declared as one',
+  /EDGE_ASSUMPTION=\{mean:2,sd:12\}/.test(term) && /an assumption, not a measurement/.test(term));
+t('the operator\'s own edge and dispersion replace it once a sample exists',
+  /usingOwn\?Math\.abs\(st\.expectancy\):EDGE_ASSUMPTION\.mean/.test(term));
+t('a floor stops dispersion being estimated from nothing', /RECORD_FLOOR=20/.test(term));
+t('the landing page states the formula rather than a round number',
+  /1\.96 × dispersion ÷ edge/.test(idx));
 
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');

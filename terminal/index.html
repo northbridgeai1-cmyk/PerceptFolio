@@ -3962,8 +3962,9 @@ function callNeedsMark(c,now){
 }
 /* ================= THE MARKS SCHEDULE =================
 
-   THE BOTTLENECK ON THIS WHOLE PROJECT IS FORTY MARKED CALLS, and the one thing that can stop it
-   arriving is the one thing nothing warned about.
+   THE BOTTLENECK ON THIS WHOLE PROJECT IS ACCUMULATING ENOUGH MARKED CALLS — a figure derived in
+   requiredSample(), not the forty once asserted here — and the one thing that can stop them arriving
+   is the one thing nothing warned about.
 
    A mark can only be taken while the app is open. A call that crosses its 90-day anniversary while
    the terminal is closed is stamped MISSED and excluded from grading — correctly, because recording
@@ -9907,12 +9908,41 @@ function median(arr){
 /* The one-line record. Deliberately reused on the Command screen so the app's track record is the
    first thing visible every morning, whether or not it flatters the checklist. Returns null when
    there is nothing honest to say yet. */
-/* THE THRESHOLD. Forty marked calls before the record is treated as evidence of anything.
-   It is not arbitrary: at the spreads a retail checklist produces, a sample under about forty leaves
-   the 95% interval straddling zero almost regardless of the point estimate — which is to say the
-   honest reading of a small sample is "don't know", and the strip should say so rather than print a
-   number that looks decided. Showing the distance to forty turns that from a caveat into a target. */
-const RECORD_THRESHOLD=40;
+/* THE THRESHOLD, and it is computed rather than chosen — see requiredSample() below. An earlier
+   version asserted forty here and called it "not arbitrary", which it was: forty is what the
+   arithmetic gives only if you assume a much tighter dispersion than a retail checklist produces.
+   Under the real target the interval straddles zero almost regardless of the point estimate, so the
+   strip shows the distance to it and says "don't know" until then. */
+/* ================= C3 — THE SAMPLE THRESHOLD IS DERIVED, NOT ASSERTED =================
+
+   The front page used to state forty marked calls in the same voice it uses for arithmetic. Nobody
+   derived forty. It was a round number wearing the authority of a calculation, on a site whose whole
+   argument is that numbers must be traceable.
+
+   The number of observations needed to distinguish a mean edge from zero at 95% confidence:
+
+       n = ( Z * sigma_edge / mean_edge )^2
+
+   At a 2% per-call edge with 12% dispersion — the assumption used before any record exists — that is
+   (1.96 * 12 / 2)^2 = 138 calls. Forty was optimistic by roughly 3.5x, and optimistic in the
+   direction that would have declared an edge proven while it was still noise.
+
+   Once marks exist the assumption is dropped and the operator's OWN observed mean and dispersion are
+   used, so the target moves as the record does: a noisier or thinner edge demands more evidence,
+   which is the honest behaviour and the uncomfortable one. */
+const EDGE_ASSUMPTION={mean:2,sd:12};      // per-call points, used only until a real sample exists
+const Z95=1.96;
+const RECORD_FLOOR=20;                     // below this, dispersion itself is not estimable
+
+function requiredSample(st){
+  const usingOwn=!!(st&&st.n>=RECORD_FLOOR&&st.sd>0&&isFinite(st.expectancy)&&Math.abs(st.expectancy)>1e-9);
+  const mean=usingOwn?Math.abs(st.expectancy):EDGE_ASSUMPTION.mean;
+  const sd=usingOwn?st.sd:EDGE_ASSUMPTION.sd;
+  if(!(mean>0)||!(sd>0))return{n:null,usingOwn,mean,sd};
+  /* Uncapped deliberately. If the observed edge is tiny the honest answer is a number so large it
+     tells you the edge is not worth pursuing — clamping it would hide exactly that finding. */
+  return{n:Math.ceil(Math.pow(Z95*sd/mean,2)),usingOwn,mean,sd};
+}
 
 /* Every marked call at one horizon, with its edge against SPY. Returns the full expectancy
    distribution rather than a hit count, because the hit count on its own is not decision-useful. */
@@ -9965,7 +9995,8 @@ function recordStripHTML(){
       '<div class="rec-read thin">Nothing has been marked at 90 days. The app cannot claim an edge it has not measured, '+
         'and it will not estimate one from a shorter window to fill the space.</div>'+
       '<div class="rec-bar"><i style="width:'+pct+'%"></i></div>'+
-      '<div class="rec-foot"><span><b>0</b> of '+RECORD_THRESHOLD+' marked calls</span>'+
+      '<div class="rec-foot"><span><b>0</b> of ~'+(requiredSample(null).n||'—')+' marked calls'+
+        ' <span class="muted" style="font-weight:400">(assumes a '+EDGE_ASSUMPTION.mean+'pt edge at '+EDGE_ASSUMPTION.sd+'pt dispersion — an assumption, not a measurement)</span></span>'+
         '<span>'+(aw.waiting?'<b>'+aw.waiting+'</b> logged, waiting on an anniversary':'nothing logged yet')+
         (aw.unmarkable?' · <b>'+aw.unmarkable+'</b> unmarkable':'')+dueSoonNote()+' · '+scorecardLink+'</span></div>';
   }
@@ -9973,8 +10004,10 @@ function recordStripHTML(){
   const st=rec.st;
   const e=st.expectancy;
   const straddles=st.lo!=null&&st.lo<0&&st.hi>0;
-  const thin=rec.n<RECORD_THRESHOLD;
-  const pct=Math.min(100,Math.round(rec.n/RECORD_THRESHOLD*100));
+  const req=requiredSample(st);
+  const need=req.n;
+  const thin=need==null?true:rec.n<need;
+  const pct=need?Math.min(100,Math.round(rec.n/need*100)):0;
   const sign=x=>(x>=0?'+':'−')+Math.abs(x).toFixed(2);
 
   /* THE READING, in one sentence. An interval that straddles zero means no measurable edge, and
@@ -10004,7 +10037,10 @@ function recordStripHTML(){
     '<div class="rec-read '+cls+'">'+read+'</div>'+
     '<div class="rec-bar"><i class="'+(pct>=100?'done':'')+'" style="width:'+pct+'%"></i></div>'+
     '<div class="rec-foot">'+
-      '<span><b>'+rec.n+'</b> of '+RECORD_THRESHOLD+' marked calls'+
+      '<span><b>'+rec.n+'</b> of ~'+(need||'—')+' marked calls'+
+        ' <span class="muted" style="font-weight:400">('+(req.usingOwn
+          ? 'from your own '+req.mean.toFixed(2)+'pt edge at '+req.sd.toFixed(2)+'pt dispersion'
+          : 'assumes a '+EDGE_ASSUMPTION.mean+'pt edge at '+EDGE_ASSUMPTION.sd+'pt dispersion — an assumption')+')</span>'+
         (pct>=100?' — sample is no longer thin':'')+'</span>'+
       '<span>hit rate <b>'+st.hitRate.toFixed(0)+'%</b> ('+st.wins+'/'+st.n+')'+
         (st.payoff!=null?' · payoff <b>'+st.payoff.toFixed(2)+'×</b>':'')+
