@@ -773,6 +773,50 @@ t('the lists overview is a row list, not a card grid', /class="list-rows"/.test(
 t('an open list shows a breadcrumb back to Lists',
   /class="crumb"/.test(term) && /onclick="closeList\(\)">Lists<\/a>/.test(term));
 
+/* ==================== INPUT VALIDATION ==================== */
+G('Nothing reaches the return series unchecked');
+
+t('every price passes an acceptance gate', /function acceptPrice\(sym,price,prevRow,date\)/.test(term));
+t('logPrice routes through it', /if\(!acceptPrice\(sym,price,ref,d\)\)return/.test(term));
+t('backfilled candles are scanned before storage', /D\.priceLog\[sym\]=scanSeries\(sym,series\)/.test(term));
+/* Comparing a same-day update against this morning's own quote would let a split through in
+   daily increments. */
+t('a same-day update compares against the previous DAY',
+  /const ref=\(last&&last\.d===d\)\?arr\[arr\.length-2\]:last/.test(term));
+t('refused observations are quarantined, never dropped', /function quarantine\(sym,date,price,prev,reason,detail\)/.test(term));
+t('one quarantine entry per symbol per day', /q\.sym===sym&&q\.d===date/.test(term));
+t('unclassified moves are held back too, not just splits', /'unexplained'/.test(term));
+
+t('existing logs are repaired, not just future ones', /function repairAllSeries/.test(term));
+t('repair runs on session entry, before any statistic', /try\{ repairAllSeries\(\); \}catch/.test(term));
+t('repair rescales history rather than deleting the observation',
+  /for\(let j=0;j<i;j\+\+\)out\[j\]\.p=\+\(out\[j\]\.p\/sp\.ratio\)/.test(term));
+/* 2% was too tight: an observed ratio carries one session's real price move on top of the split,
+   so a 10-for-1 on a 4% day reads as 10.42 and was missed. */
+t('split tolerance accommodates a day of real price movement', /const SPLIT_TOLERANCE=0\.08/.test(term));
+t('the nearest matching ratio wins, not the first', /err<best\.err/.test(term));
+
+/* ==================== TOTAL RETURN ==================== */
+G('Marks credit distributions, on both legs');
+
+t('marks are total return, not price return', /function accruedYield/.test(term) &&
+  /priceRet\+accruedYield\(dy,heldDays\)/.test(term));
+/* Crediting the holding but not the index would swap a bias against dividend payers for one in
+   their favour. */
+t('the benchmark is credited on the same basis',
+  /benchPriceRet\+accruedYield\(SPY_YIELD_PCT,heldDays\)/.test(term) && /const SPY_YIELD_PCT/.test(term));
+t('the aggregate uses total return too', /accruedYield\(yieldPctFor\(c\.sym\),held\)/.test(term));
+t('an unknown yield accrues nothing rather than an assumption', /isFinite\(y\)&&y>0&&y<25/.test(term));
+
+/* ==================== QUOTA GUARD ==================== */
+G('A full browser store must fail loudly');
+
+t('saveDB catches the write', /try\{\s*\n\s*localStorage\.setItem\(STORE_KEY/.test(term));
+t('QuotaExceededError is recognised across browsers', /err\.name==='QuotaExceededError'\|\|err\.code===22\|\|err\.code===1014/.test(term));
+t('a failed save is shown, not swallowed', /function showSaveFailure/.test(term));
+t('a failed save does not schedule a sync of data that never saved',
+  /showSaveFailure\(quota,err\);\s*\n\s*return;/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

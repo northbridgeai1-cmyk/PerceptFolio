@@ -2107,8 +2107,47 @@ function saveDB(){
     if(D)D.lastLocalEdit=Date.now();
     DB.profiles[USER].data=D;
   }
-  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  /* ---- QUOTA GUARD ----
+     This call had no try/catch. localStorage throws QuotaExceededError when the browser's ~5MB
+     ceiling is reached, and saveDB is called from everywhere: adding a holding, stamping a mark,
+     saving a thesis. An uncaught throw aborted whatever was in flight, told the operator nothing,
+     and — because marks are written through here — silently stopped the record accumulating. A
+     product whose only asset is an unbroken record cannot fail that way quietly.
+
+     A business account is the realistic route to the ceiling: every client profile carries its own
+     price log, score log and history. */
+  try{
+    localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+    _saveFailed=false;
+  }catch(err){
+    const quota=err&&(err.name==='QuotaExceededError'||err.code===22||err.code===1014);
+    _saveFailed=true;
+    showSaveFailure(quota,err);
+    return;                                  // do not schedule a sync of something that never saved
+  }
   if(typeof scheduleSync==='function')scheduleSync();
+}
+
+/* Loud and persistent, because the alternative is a silent one. Repeated failures do not stack up
+   banners; one stays until a save succeeds. */
+let _saveFailed=false;
+function showSaveFailure(isQuota,err){
+  let el=document.getElementById('saveFailBanner');
+  if(!el){
+    el=document.createElement('div');
+    el.id='saveFailBanner';
+    el.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:600;background:var(--red,#e5534b);'+
+      'color:#fff;padding:12px 16px;font-size:13.5px;line-height:1.5;display:flex;gap:12px;'+
+      'align-items:center;flex-wrap:wrap;box-shadow:0 -6px 24px rgba(0,0,0,.4)';
+    document.body.appendChild(el);
+  }
+  el.innerHTML='<span><b>'+(isQuota?'This browser is out of storage.':'Could not save to this browser.')+'</b> '+
+    (isQuota
+      ? 'Your last change was not saved, and nothing further can be saved until space is freed. Export a backup now, then delete a profile you no longer need under Settings.'
+      : 'Your last change was not saved. '+esc((err&&err.message)||'')) +
+    '</span>'+
+    '<span style="flex:1"></span>'+
+    '<button class="btn btn-sm" style="background:#fff;color:#111;border:none" onclick="exportData()">Export backup</button>';
 }
 function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorites:[],
   /* LISTS ARE AN ORGANISATIONAL LAYER OVER watchlist, NOT A REPLACEMENT FOR IT.
@@ -2119,6 +2158,7 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
      A list therefore holds symbol references. A symbol may sit in several lists or none; anything
      in none appears under Unlisted. Deleting a list never deletes the symbols. */
   lists:[],                                     // [{id,name,color,syms:[]}]
+  quarantine:[],                                // observations refused entry to the return series
   /* Line comments are deliberately NOT used inside this object literal: it is written on
      continued lines, and a // comment swallows everything after it on the same line. Doing exactly
      that here silently deleted alerts, analyses, manual, myTags and history from every new
@@ -2726,6 +2766,8 @@ function setAuthMode(m){
 }
 function enterSession(){
   resetTransientState();
+  /* Repairs anything already contaminated before a single statistic is computed from it. */
+  try{ repairAllSeries(); }catch(e){}
   renderBackupBanner();
   /* Adopt marks the worker stamped while this app was closed, then tell it what is still open.
      Both silent and unawaited: session entry must not wait on a network round-trip. */
@@ -6078,6 +6120,119 @@ function herizenVerdict(sym){
 }
 /* Daily closes per ticker. The momentum score needs price history and Finnhub's free candle endpoint
    is unreliable, so the app keeps its own log and backfills from candles opportunistically. */
+/* ================= INPUT VALIDATION AND QUARANTINE =================
+
+   THE FINDING THIS ANSWERS is not that stock splits are unhandled. It is that nothing in this
+   product checks what it is being fed, and splits are only the loudest instance. A price series
+   assembled from repeated live quotes is not a return series: it contains splits, distributions,
+   ticker changes, halts and vendor errors, and every statistic downstream assumes none of those
+   exist. Patching splits alone would leave the next instance to arrive unannounced.
+
+   WHY THIS RUNS BEFORE EVERYTHING. A single unhandled 10-for-1 split puts a -90% observation into
+   the log. That does not merely move the mean; it owns the skew and kurtosis. Those two terms sit
+   inside the Probabilistic and Deflated Sharpe Ratios and MinTRL, which exist precisely to say when
+   a number cannot be trusted. Contaminate them and the instrument built to detect false precision
+   becomes the most confident liar in the product.
+
+   THE RULE. Anything moving more than MAX_DAILY in one session is not accepted as a return. If its
+   ratio is close to a common split it is recorded as a suspected corporate action; if not, it is
+   recorded as unexplained. Either way it is quarantined rather than logged, and the operator is
+   shown it. Nothing is silently discarded and nothing unclassified reaches the return series.
+
+   A NOTE ON WHY THE HEURISTIC RATHER THAN AN API. Finnhub's split endpoint is not on the free tier
+   this app is built against, so the ratio test is what is available. It is deliberately conservative:
+   a genuine 45% single-day move on news is quarantined too, which costs one confirmation click and
+   is the right direction to be wrong in. */
+const MAX_DAILY=0.40;                       // beyond this, treat as an event rather than a return
+const SPLIT_RATIOS=[
+  {r:2,   label:'2-for-1'},   {r:3,   label:'3-for-1'},   {r:4,  label:'4-for-1'},
+  {r:5,   label:'5-for-1'},   {r:10,  label:'10-for-1'},  {r:20, label:'20-for-1'},
+  {r:1.5, label:'3-for-2'},
+  {r:1/2, label:'1-for-2 reverse'}, {r:1/3, label:'1-for-3 reverse'},
+  {r:1/5, label:'1-for-5 reverse'}, {r:1/10,label:'1-for-10 reverse'}
+];
+/* TOLERANCE IS 8%, NOT 2%.
+   The observed ratio is taken from two consecutive closes, so it carries one session's genuine
+   price move on top of the split itself. A 10-for-1 on a day the stock also moved 4% shows as
+   10.42, which a 2% window misses entirely — and a missed split is the whole failure this layer
+   exists to prevent. 8% is safe because the ratios are widely separated: the closest adjacent pair
+   is 4 and 5, twenty-five per cent apart, so nothing here can be confused with its neighbour. */
+const SPLIT_TOLERANCE=0.08;
+function matchSplit(prev,next){
+  if(!(prev>0)||!(next>0))return null;
+  const ratio=prev/next;                    // >1 means the price fell, i.e. a forward split
+  let best=null;
+  for(const s of SPLIT_RATIOS){
+    const err=Math.abs(ratio-s.r)/s.r;
+    if(err<=SPLIT_TOLERANCE&&(!best||err<best.err))best={...s,ratio,err};
+  }
+  return best;
+}
+function quarantine(sym,date,price,prev,reason,detail){
+  if(!Array.isArray(D.quarantine))D.quarantine=[];
+  /* One entry per symbol per day: a refresh loop must not be able to fill storage with duplicates
+     of the same unresolved event. */
+  if(D.quarantine.some(q=>q.sym===sym&&q.d===date))return;
+  D.quarantine.push({sym,d:date,price,prev,reason,detail,at:Date.now()});
+  if(D.quarantine.length>200)D.quarantine=D.quarantine.slice(-200);
+}
+/* Returns true if the observation may enter the log. */
+function acceptPrice(sym,price,prevRow,date){
+  if(!(price>0)||!isFinite(price))return false;
+  if(!prevRow||!(prevRow.p>0))return true;                 // nothing to compare against yet
+  const move=Math.abs(price-prevRow.p)/prevRow.p;
+  if(move<=MAX_DAILY)return true;
+  const sp=matchSplit(prevRow.p,price);
+  quarantine(sym,date,price,prevRow.p,
+    sp?'split':'unexplained',
+    sp?('looks like a '+sp.label+' split')
+      :((price<prevRow.p?'fell ':'rose ')+(move*100).toFixed(0)+'% in one session'));
+  return false;
+}
+
+/* ---- RETROACTIVE REPAIR ----
+   Prevention is not enough: any split that has already happened is already in the log, and every
+   beta and volatility computed since has been wrong. This walks an existing series, and where it
+   finds a split-shaped jump it rescales everything BEFORE the event so the series becomes
+   continuous, which is what a split-adjusted series is.
+
+   Rescaling rather than deleting, because deleting the observation would leave a gap that still
+   produces one enormous return across it. Adjusting the history is the only repair that makes the
+   return series correct. */
+function scanSeries(sym,rows){
+  if(!Array.isArray(rows)||rows.length<2)return rows;
+  const out=rows.map(r=>({...r}));
+  for(let i=1;i<out.length;i++){
+    const prev=out[i-1].p,cur=out[i].p;
+    if(!(prev>0)||!(cur>0))continue;
+    if(Math.abs(cur-prev)/prev<=MAX_DAILY)continue;
+    const sp=matchSplit(prev,cur);
+    if(sp){
+      /* Everything before the event is divided by the ratio, putting the whole series on the
+         post-split basis. Recorded so the operator can see what was changed and why. */
+      for(let j=0;j<i;j++)out[j].p=+(out[j].p/sp.ratio).toFixed(4);
+      quarantine(sym,out[i].d,cur,prev,'split-repaired','history rescaled for a '+sp.label+' split');
+    }else{
+      quarantine(sym,out[i].d,cur,prev,'unexplained',
+        (cur<prev?'fell ':'rose ')+(Math.abs(cur-prev)/prev*100).toFixed(0)+'% in one session');
+    }
+  }
+  return out;
+}
+/* Sweeps every logged ticker. Run once on sign-in so an existing account is repaired without the
+   operator having to know the problem existed. */
+function repairAllSeries(){
+  if(!D.priceLog)return 0;
+  let fixed=0;
+  Object.keys(D.priceLog).forEach(sym=>{
+    const before=JSON.stringify(D.priceLog[sym]);
+    const after=scanSeries(sym,D.priceLog[sym]);
+    if(JSON.stringify(after)!==before){D.priceLog[sym]=after;fixed++;}
+  });
+  if(fixed)saveDB();
+  return fixed;
+}
+
 function logPrice(sym,price){
   if(!(price>0))return;
   if(!D.priceLog)D.priceLog={};
@@ -6085,6 +6240,10 @@ function logPrice(sym,price){
   const arr=D.priceLog[sym];
   const d=new Date().toISOString().slice(0,10);
   const last=arr[arr.length-1];
+  /* Same-day updates compare against the PREVIOUS day, not against this morning's own quote:
+     comparing a price to itself would let a split slip through in daily increments. */
+  const ref=(last&&last.d===d)?arr[arr.length-2]:last;
+  if(!acceptPrice(sym,price,ref,d))return;
   if(last&&last.d===d)last.p=price; else arr.push({d,p:price});
   if(arr.length>300)D.priceLog[sym]=arr.slice(arr.length-300);
 }
@@ -6101,7 +6260,10 @@ async function backfillPrices(sym){
       const d=new Date(c.t[i]*1000).toISOString().slice(0,10);
       if(isFinite(c.c[i])&&c.c[i]>0)merged[d]=c.c[i];
     }
-    D.priceLog[sym]=Object.keys(merged).sort().map(d=>({d,p:merged[d]})).slice(-300);
+    const series=Object.keys(merged).sort().map(d=>({d,p:merged[d]})).slice(-300);
+    /* A hundred days of backfilled candles is the likeliest place a split already sits, so the
+       series is scanned before it is stored rather than after it has poisoned a statistic. */
+    D.priceLog[sym]=scanSeries(sym,series);
   }catch(e){/* candle endpoint refused; the log fills forward from here instead */}
 }
 /* ================= PRICE CHART =================
@@ -10703,6 +10865,40 @@ function expectancyStats(edges){
     hi:se!=null?expectancy+1.96*se:null
   };
 }
+/* ================= TOTAL RETURN, NOT PRICE RETURN =================
+
+   THE BIAS THIS REMOVES. On the ex-date a share price drops by roughly the distribution. Finnhub
+   returns a raw price, so every dividend entered the record as a small negative return that never
+   happened economically. Marks were price-only, which means the Scorecard was biased against every
+   dividend payer by approximately its entire yield, permanently.
+
+   That is worse than a split in one specific way. A -90% day announces itself. A -0.7% quarterly
+   drag never does; it simply makes an entire style of investing look worse than it was, inside a
+   record built to be trusted.
+
+   BOTH SIDES, OR THE CURE IS THE DISEASE. The benchmark pays distributions too — SPY yields around
+   1.3%. Crediting the holding and not the index would replace a bias against dividend payers with
+   a bias in favour of them. The index leg is credited on the same basis.
+
+   WHAT THIS IS AND IS NOT. It accrues the indicated annual yield pro rata over the holding period.
+   It is not a reconstruction of actual ex-dates and amounts, which this data tier does not expose:
+   it cannot see a cut, a special dividend or withholding. It is an approximation that removes a
+   systematic error, and it is labelled as one wherever it is shown. */
+const SPY_YIELD_PCT=1.3;                    // indicated, used only for the benchmark leg
+
+/* Indicated annual yield for a symbol, as a percentage, or null when unknown. Unknown means the
+   holding is credited nothing rather than an assumed figure. */
+function yieldPctFor(sym){
+  const sc=(D.analyses||{})[sym];
+  const y=sc&&sc.dividend?sc.dividend.yieldPct:null;
+  return (isFinite(y)&&y>0&&y<25)?y:null;   // above 25% is a data error, not a yield
+}
+/* Distribution accrued over a holding period, in percentage points. */
+function accruedYield(pct,days){
+  if(!(pct>0)||!(days>0))return 0;
+  return pct*(days/365);
+}
+
 /* ================= C1 — JENSEN'S ALPHA =================
 
    THE ERROR THIS REPLACES, because it is the specific kind that feels like evidence.
@@ -10786,15 +10982,20 @@ function scorecardRows(){
         else if(mk.missed)missed=true;
         else{now=mk.price;bench=mk.spy;heldDays=days+(mk.lag||0);}
       }
-      const stockRet=(c.price>0&&now!=null)?((now-c.price)/c.price*100):null;
-      const spyRet=(c.spy>0&&bench!=null)?((bench-c.spy)/c.spy*100):null;
+      const priceRet=(c.price>0&&now!=null)?((now-c.price)/c.price*100):null;
+      const benchPriceRet=(c.spy>0&&bench!=null)?((bench-c.spy)/c.spy*100):null;
+      /* Total return on both legs. Crediting one and not the other would trade a bias against
+         dividend payers for a bias in favour of them. */
+      const dy=yieldPctFor(c.sym);
+      const stockRet=priceRet==null?null:priceRet+accruedYield(dy,heldDays);
+      const spyRet=benchPriceRet==null?null:benchPriceRet+accruedYield(SPY_YIELD_PCT,heldDays);
       /* raw is kept and shown, clearly labelled unadjusted, so the adjustment can be checked
          rather than taken on trust. alpha is the beta-adjusted figure and the only one graded. */
       const raw=(stockRet!=null&&spyRet!=null)?(stockRet-spyRet):null;
       const bi=betaVsSpy(c.sym);
       const beta=bi?bi.beta:null;
       const alpha=jensenAlpha(stockRet,spyRet,beta,heldDays);
-      return{c,now,stockRet,spyRet,raw,beta,betaN:bi?bi.n:null,alpha,
+      return{c,now,stockRet,spyRet,priceRet,divYield:dy,raw,beta,betaN:bi?bi.n:null,alpha,
              edge:callEdge(c,alpha),heldDays,pending,missed,
              ungraded:(raw!=null&&alpha==null)};
     })
@@ -10852,12 +11053,12 @@ function callRecord(days){
     if(c.verdict!=='buy'&&c.verdict!=='sell')return;
     const mk=(c.marks||{})[days];
     if(!mk||mk.missed||!(c.price>0)||!(c.spy>0))return;
-    const stockRet=(mk.price-c.price)/c.price*100;
-    const spyRet=(mk.spy-c.spy)/c.spy*100;
+    const held=days+((mk.lag||0));
+    const stockRet=(mk.price-c.price)/c.price*100+accruedYield(yieldPctFor(c.sym),held);
+    const spyRet=(mk.spy-c.spy)/c.spy*100+accruedYield(SPY_YIELD_PCT,held);
     /* Same rule in the aggregate as on the row: unadjusted excess return is not an edge, so a call
        whose beta cannot be estimated contributes nothing rather than contributing a wrong number. */
     const bi=betaVsSpy(c.sym);
-    const held=days+((mk.lag||0));
     const edge=callEdge(c,jensenAlpha(stockRet,spyRet,bi?bi.beta:null,held));
     if(edge==null)return;
     marked.push({c,edge});
@@ -11008,6 +11209,27 @@ async function renderAudit(){
 
   out+=row(syncActive()?'ok':'wait','Sync',
     syncConfigured()?'operator key, this device':(codeSyncActive()?'invite code, this device only':'off, this browser is the only copy'));
+
+  /* ---- INPUT INTEGRITY: what was refused entry to the return series ---- */
+  out+=head('Data integrity');
+  const q=Array.isArray(D.quarantine)?D.quarantine:[];
+  const splits=q.filter(x=>x.reason==='split'||x.reason==='split-repaired');
+  const unex=q.filter(x=>x.reason==='unexplained');
+  out+=row(q.length===0?'ok':'wait','Price observations checked',
+    q.length===0?'nothing has been refused entry to the return series'
+                :q.length+' observation'+(q.length===1?'':'s')+' held back from the return series');
+  if(splits.length)out+=row('ok','Corporate actions handled',
+    splits.length+' split'+(splits.length===1?'':'s')+' detected; history rescaled so no false return survives');
+  if(unex.length)out+=row('wait','Unexplained moves quarantined',
+    unex.length+' move'+(unex.length===1?'':'s')+' beyond 40% in a session, not matching a split ratio. Left out of every statistic until identified.');
+  if(q.length){
+    out+='<div style="padding:8px 0 2px"><details><summary style="cursor:pointer;font-size:12px;color:var(--muted)">Show the '+q.length+' held observation'+(q.length===1?'':'s')+'</summary>'+
+      '<div style="margin-top:8px;font:11.5px/1.7 var(--mono);color:var(--muted)">'+
+      q.slice(-12).reverse().map(x=>esc(x.d)+'  '+esc(x.sym)+'  '+fmt$(x.prev)+' to '+fmt$(x.price)+'  '+esc(x.detail)).join('<br>')+
+      '</div></details></div>';
+  }
+  out+=row('ok','Marks use total return',
+    'distributions accrued on the holding and on the index, so a dividend payer is not scored as if it paid nothing');
 
   /* ---- NUMBERS: whether the maths on screen is currently readable ---- */
   out+=head('Numbers');
