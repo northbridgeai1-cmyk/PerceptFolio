@@ -2097,9 +2097,62 @@ document.addEventListener('keydown',e=>{
 
 /* ================= STORAGE & AUTH ================= */
 const STORE_KEY='quantfolio_v1';
-let DB={profiles:{}}, USER=null, D=null; // D = current user's data
 
-function loadDB(){try{DB=JSON.parse(localStorage.getItem(STORE_KEY))||{profiles:{}};}catch(e){DB={profiles:{}};}}
+/* ============================ D6. BOOT ASSERTIONS ============================
+   Every user's data lives under exactly one key. An agent tidying names would rename this for
+   perfectly good reasons, and the rename does not throw: loadDB would find nothing at the new key,
+   hand back an empty {profiles:{}}, and the first save would write that empty object over the top.
+   No error, no warning, no recovery. Documentation asks whoever comes next to be careful. An
+   assertion does not need them to be.
+
+   Four lines between a routine refactor and total data loss. Do not remove them, and do not
+   "fix" a failure by editing the literal below — if this throws, the rename is the bug. */
+if(STORE_KEY!=='quantfolio_v1'){
+  throw new Error('STORE_KEY changed \u2014 this deletes all user data. Refusing to boot.');
+}
+
+let DB={profiles:{}}, USER=null, D=null; // D = current user's data
+let _profileCount=null;                  // what was last successfully on disk (D6)
+
+function loadDB(){
+  try{DB=JSON.parse(localStorage.getItem(STORE_KEY))||{profiles:{}};}catch(e){DB={profiles:{}};}
+  if(!DB.profiles||typeof DB.profiles!=='object')DB.profiles={};
+  _profileCount=Object.keys(DB.profiles).length;
+}
+
+/* ---- The only write path ----
+   Ten call sites used to write localStorage directly, so a guard added to saveDB protected none of
+   them. Everything goes through here now, which makes both checks unbypassable: a profile count
+   that dropped without an explicit deletion, and the quota catch.
+
+   The count check is the second half of D6. Renaming the key is not the only way to lose an
+   account; assigning over DB.profiles, a failed merge, or a sync that resolved to an empty object
+   all end the same way. If a write would reduce the number of profiles and the caller did not say
+   it was deleting one, that write does not happen. Refusing to save is recoverable. Saving over
+   an account is not. */
+function persistDB(opts){
+  const o=opts||{};
+  const n=Object.keys(DB.profiles||{}).length;
+  if(_profileCount!==null&&n<_profileCount&&!o.deleting){
+    const lost=_profileCount-n;
+    _saveFailed=true;
+    showSaveFailure(false,new Error('Refusing to write: '+lost+' profile'+(lost===1?'':'s')+
+      ' would be lost. Nothing was saved. Export a backup, then reload this page to '+
+      'restore from what is still on disk.'),'refused');
+    return false;
+  }
+  try{
+    localStorage.setItem(STORE_KEY,JSON.stringify(DB));   // the one place this call is allowed
+  }catch(err){
+    const quota=err&&(err.name==='QuotaExceededError'||err.code===22||err.code===1014);
+    _saveFailed=true;
+    showSaveFailure(quota,err);
+    return false;
+  }
+  _profileCount=n;
+  _saveFailed=false;
+  return true;
+}
 function saveDB(){
   if(USER){
     // Timestamp every local change so a pull can tell whether taking the cloud copy would
@@ -2107,31 +2160,17 @@ function saveDB(){
     if(D)D.lastLocalEdit=Date.now();
     DB.profiles[USER].data=D;
   }
-  /* ---- QUOTA GUARD ----
-     This call had no try/catch. localStorage throws QuotaExceededError when the browser's ~5MB
-     ceiling is reached, and saveDB is called from everywhere: adding a holding, stamping a mark,
-     saving a thesis. An uncaught throw aborted whatever was in flight, told the operator nothing,
-     and — because marks are written through here — silently stopped the record accumulating. A
-     product whose only asset is an unbroken record cannot fail that way quietly.
-
-     A business account is the realistic route to the ceiling: every client profile carries its own
-     price log, score log and history. */
-  try{
-    localStorage.setItem(STORE_KEY,JSON.stringify(DB));
-    _saveFailed=false;
-  }catch(err){
-    const quota=err&&(err.name==='QuotaExceededError'||err.code===22||err.code===1014);
-    _saveFailed=true;
-    showSaveFailure(quota,err);
-    return;                                  // do not schedule a sync of something that never saved
-  }
+  if(!persistDB())return;                  // never schedule a sync of something that never saved
   if(typeof scheduleSync==='function')scheduleSync();
 }
 
 /* Loud and persistent, because the alternative is a silent one. Repeated failures do not stack up
    banners; one stays until a save succeeds. */
 let _saveFailed=false;
-function showSaveFailure(isQuota,err){
+/* Three different failures, three different things to do about them, so they do not share one
+   message. A refusal is not a browser problem and must not read like one \u2014 the data is fine,
+   the write was stopped on purpose, and reloading recovers it. */
+function showSaveFailure(isQuota,err,kind){
   let el=document.getElementById('saveFailBanner');
   if(!el){
     el=document.createElement('div');
@@ -2141,11 +2180,14 @@ function showSaveFailure(isQuota,err){
       'align-items:center;flex-wrap:wrap;box-shadow:0 -6px 24px rgba(0,0,0,.4)';
     document.body.appendChild(el);
   }
-  el.innerHTML='<span><b>'+(isQuota?'This browser is out of storage.':'Could not save to this browser.')+'</b> '+
-    (isQuota
-      ? 'Your last change was not saved, and nothing further can be saved until space is freed. Export a backup now, then delete a profile you no longer need under Settings.'
-      : 'Your last change was not saved. '+esc((err&&err.message)||'')) +
-    '</span>'+
+  const refused=kind==='refused';
+  const head=refused ? 'Save stopped to protect your data.'
+           : isQuota ? 'This browser is out of storage.'
+                     : 'Could not save to this browser.';
+  const body=refused ? esc((err&&err.message)||'')
+           : isQuota ? 'Your last change was not saved, and nothing further can be saved until space is freed. Export a backup now, then delete a profile you no longer need under Settings.'
+                     : 'Your last change was not saved. '+esc((err&&err.message)||'');
+  el.innerHTML='<span><b>'+head+'</b> '+body+'</span>'+
     '<span style="flex:1"></span>'+
     '<button class="btn btn-sm" style="background:#fff;color:#111;border:none" onclick="exportData()">Export backup</button>';
 }
@@ -2437,7 +2479,7 @@ async function createProfile(){
                       /* Recorded on the profile: which documents were accepted and when. An
                          acceptance nobody can evidence later is not much of an acceptance. */
                       acceptedTerms:{at:Date.now(),terms:'2026-09-05',privacy:'2026-09-05'}};
-  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  persistDB();
   /* Burned after the profile is safely stored. If this call fails the account still exists and the
      code stays live — the recoverable direction. The reverse would strand someone with a spent code
      and no account. */
@@ -2509,7 +2551,7 @@ function demoData(){
 async function enterDemo(){
   DB.profiles[DEMO_ID]={pinHash:await sha(DEMO_PW),data:demoData(),
                         accountType:'personal',userId:'PF-DEMO',isDemo:true};
-  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  persistDB();
   toast('Test account. Sandbox, never synced.');
   await finishLogin(DEMO_ID);
 }
@@ -2634,7 +2676,7 @@ async function finishLogin(email){
     const acc=await checkAccess(email);
     if(!acc.allow){ showAccessBlocked(acc); return; }
   }
-  if(!p.userId){p.userId=makeUserId();localStorage.setItem(STORE_KEY,JSON.stringify(DB));}
+  if(!p.userId){p.userId=makeUserId();persistDB();}
   USER=email;D=Object.assign(defaultData(),p.data||{});
   /* Impossible to confuse the sandbox with the real account at a glance. Checked on every login
      rather than set once, so signing out of the demo clears it. */
@@ -2955,7 +2997,7 @@ async function createClientProfile(){
   if(!email||!email.includes('@'))return toast('Enter a valid email for this client to log in with.');
   if(DB.profiles[email])return toast('An account with that email already exists.');
   DB.profiles[email]={pinHash:pw?await sha(pw):'',data:defaultData(),accountType:'personal',managedBy:USER,clientLabel:name,feePct,userId:makeUserId()};
-  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  persistDB();
   document.getElementById('clientName').value='';
   document.getElementById('clientEmail').value='';
   document.getElementById('clientPassword').value='';
@@ -2969,7 +3011,7 @@ function setClientFee(email,val){
   if(!p)return;
   const n=parseFloat(val);
   p.feePct=isFinite(n)&&n>=0?n:0;
-  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  persistDB();
   renderClientsList();
 }
 function switchToClient(email){
@@ -3055,7 +3097,7 @@ function removeClient(email){
   if(!p)return;
   if(!confirm('Remove client "'+(p.clientLabel||email)+'" and ALL their portfolio data? This cannot be undone.'))return;
   delete DB.profiles[email];
-  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  persistDB({deleting:true});
   renderClientsList();
   toast('Client removed.');
 }
@@ -3198,7 +3240,7 @@ function switchAccount(){
 
 function deleteProfile(){
   if(!confirm('Delete profile "'+USER+'" and ALL its data? This cannot be undone.'))return;
-  delete DB.profiles[USER];localStorage.setItem(STORE_KEY,JSON.stringify(DB));logout();
+  delete DB.profiles[USER];persistDB({deleting:true});logout();
 }
 
 /* ================= UI HELPERS ================= */
@@ -8294,7 +8336,7 @@ function copyToAccount(){
     D.watchlist.forEach(s=>{if(!td.watchlist.includes(s)){td.watchlist.push(s);addedW++;}});
   }
 
-  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  persistDB();
   if(email===USER)D=Object.assign(defaultData(),td);
   renderAll();
   const bits=[];
@@ -11667,7 +11709,7 @@ async function syncPush(){
   await syncFetch('PUT',slot,JSON.stringify(payload));
   D.syncedAt=stamp;
   DB.profiles[USER].data=D;
-  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  persistDB();
   setSyncStatus('✓ Synced '+new Date(stamp).toLocaleTimeString());
 }
 /* force=true skips the "are you sure" and always takes the cloud copy. */
@@ -11692,7 +11734,7 @@ async function syncPull(force){
   D=Object.assign(defaultData(),remote.data||{});
   D.syncedAt=remote.updatedAt;
   DB.profiles[USER].data=D;
-  localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  persistDB();
   enterSession();
   setSyncStatus('✓ Pulled from cloud, '+new Date(remote.updatedAt).toLocaleString());
   return{applied:true};

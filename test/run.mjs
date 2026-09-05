@@ -773,6 +773,33 @@ t('the lists overview is a row list, not a card grid', /class="list-rows"/.test(
 t('an open list shows a breadcrumb back to Lists',
   /class="crumb"/.test(term) && /onclick="closeList\(\)">Lists<\/a>/.test(term));
 
+/* ==================== D6. BOOT ASSERTIONS ==================== */
+G('A rename must throw, not wipe');
+
+t('the key literal is asserted at boot', /if\(STORE_KEY!=='quantfolio_v1'\)\{[\s\S]{0,160}?throw new Error/.test(term));
+t('the assertion refuses to boot rather than warning', /Refusing to boot/.test(term));
+/* A guard on saveDB protected nothing while ten call sites wrote localStorage directly. */
+/* Exactly one: inside persistDB. A blanket rewrite once pointed persistDB's own write back at
+   itself, which the assertion below is shaped to catch as well as the original leak. */
+t('the store is written from exactly one place',
+  (term.match(/localStorage\.setItem\(STORE_KEY/g)||[]).length === 1);
+t('that one place is inside the guarded path, not recursing into it',
+  /function persistDB\(opts\)\{[\s\S]{0,900}?localStorage\.setItem\(STORE_KEY,JSON\.stringify\(DB\)\);/.test(term) &&
+  !/function persistDB\(opts\)\{[\s\S]{0,900}?\n\s*persistDB\(\);/.test(term));
+t('every write goes through the guarded path', (term.match(/persistDB\(/g)||[]).length >= 10);
+t('the profile count is captured from what was actually on disk', /_profileCount=Object\.keys\(DB\.profiles\)\.length/.test(term));
+t('a write that would lose a profile is refused', /n<_profileCount&&!o\.deleting/.test(term));
+t('the refusal is shown, not just returned', /Refusing to write: '\+lost/.test(term));
+/* A refusal is not a browser fault and must not be worded as one; the data is intact and a
+   reload recovers it. */
+t('a refusal reads differently from a storage failure',
+  /showSaveFailure\(false,new Error\([\s\S]{0,300}?\),'refused'\)/.test(term) &&
+  /const refused=kind==='refused'/.test(term) &&
+  /Save stopped to protect your data/.test(term));
+t('the count only advances after a successful write', /_profileCount=n;\s*\n\s*_saveFailed=false;/.test(term));
+t('deliberate deletion passes the intent explicitly', (term.match(/persistDB\(\{deleting:true\}\)/g)||[]).length === 2);
+t('DB.profiles is repaired if the stored blob is malformed', /if\(!DB\.profiles\|\|typeof DB\.profiles!=='object'\)DB\.profiles=\{\}/.test(term));
+
 /* ==================== INPUT VALIDATION ==================== */
 G('Nothing reaches the return series unchecked');
 
@@ -811,11 +838,11 @@ t('an unknown yield accrues nothing rather than an assumption', /isFinite\(y\)&&
 /* ==================== QUOTA GUARD ==================== */
 G('A full browser store must fail loudly');
 
-t('saveDB catches the write', /try\{\s*\n\s*localStorage\.setItem\(STORE_KEY/.test(term));
+t('the single write path catches the write', /try\{\s*\n\s*localStorage\.setItem\(STORE_KEY,JSON\.stringify\(DB\)\);[^\n]*\n\s*\}catch\(err\)/.test(term));
 t('QuotaExceededError is recognised across browsers', /err\.name==='QuotaExceededError'\|\|err\.code===22\|\|err\.code===1014/.test(term));
 t('a failed save is shown, not swallowed', /function showSaveFailure/.test(term));
 t('a failed save does not schedule a sync of data that never saved',
-  /showSaveFailure\(quota,err\);\s*\n\s*return;/.test(term));
+  /if\(!persistDB\(\)\)return;/.test(term) && /showSaveFailure\(quota,err\);\s*\n\s*return false;/.test(term));
 
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
