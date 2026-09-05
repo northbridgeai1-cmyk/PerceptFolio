@@ -322,6 +322,14 @@ t('no empirical series is still annualised by a bare sqrt',
   !/const te=Math\.sqrt\(v\)\*Math\.sqrt\(TRADING_DAYS\)/.test(term) &&
   !/sigma=Math\.sqrt\(variance\)\*Math\.sqrt\(252\)/.test(term));
 
+/* ==================== C8 — DIVIDENDS ARE A PROJECTION ==================== */
+G('C8: an accrued figure must not be labelled as income received');
+
+t('no screen says "Dividends earned"', !/Dividends earned/.test(stripComments(term)));
+t('the tile says projected', /Dividends accrued <span class="muted"[^>]*>\(projected\)/.test(term));
+t('the tile states it was never received', /never received — accrued at declared rates/.test(term));
+t('the explanatory copy calls it a projection, not income', /a <b>projection, not income<\/b>/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

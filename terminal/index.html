@@ -1201,13 +1201,18 @@ body.touring header,body.touring #sidebar{z-index:201}
     <div class="stat s-in"><span class="stat-label">↓ Bought (logged here)</span><span class="stat-value" id="histTotalIn">$0</span></div>
     <div class="stat s-out"><span class="stat-label">↑ Sold (logged here)</span><span class="stat-value" id="histTotalOut">$0</span></div>
     <div class="stat s-profit"><span class="stat-label">✓ Realized gain / loss</span><span class="stat-value" id="histRealized">$0</span></div>
-    <div class="stat s-income"><span class="stat-label">≈ Dividends earned</span><span class="stat-value" id="histTotalDiv">$0</span></div>
+    <!-- C8. "Dividends earned" reads as cash received. Nothing here is received: the figure accrues
+     day by day from each holding's declared rate, so it is a projection of what SHOULD have been
+     paid at rates that may since have been cut. Finnhub's free tier exposes no payment dates or
+     amounts, so the app cannot know. The label now says projected and the caveat sits in the tile
+     rather than only in a paragraph below it. -->
+<div class="stat s-income"><span class="stat-label">Dividends accrued <span class="muted" style="font-weight:400">(projected)</span></span><span class="stat-value" id="histTotalDiv">$0</span><span class="muted" style="font-size:11px">never received — accrued at declared rates</span></div>
   </div>
   <p class="muted" style="font-size:12px;margin:-12px 0 20px;line-height:1.55">
     <b>Bought</b> and <b>Sold</b> add up the rows in the ledger below — nothing else. They only count trades you recorded <i>inside PerceptFolio</i>, so a position you typed in before the ledger existed won't appear, and Bought never goes down when you sell. They're a record of activity, not a statement of what you currently have in. For that, use <b>Portfolio value</b> and <b>Unrealized gain / loss</b> on the dashboard.</p>
   <div class="card">
     <h3>Dividend Income</h3>
-    <p class="muted" style="margin-bottom:10px">Worked out from your holdings automatically — nothing to log. The <b>Dividends earned</b> figure above accrues day by day from the rates below, so it grows the longer you hold. Finnhub's free tier doesn't expose actual payment dates or amounts, so this is an estimate at each company's current declared rate — it can't see a cut, a raise, or tax withheld.</p>
+    <p class="muted" style="margin-bottom:10px">Worked out from your holdings automatically — nothing to log. The <b>Dividends accrued</b> figure above is a <b>projection, not income</b> — it accrues day by day from the rates below, so it grows the longer you hold, whether or not a payment ever lands. Finnhub's free tier doesn't expose actual payment dates or amounts, so this is an estimate at each company's current declared rate — it can't see a cut, a raise, or tax withheld.</p>
     <div id="divBreakdown"></div>
   </div>
   <div class="section-title">Transaction History</div>
@@ -7093,7 +7098,7 @@ function drawGrowthChart(){
   }
 
   if(graphView==='dividends'){
-    if(titleEl)titleEl.textContent='Dividends earned';
+    if(titleEl)titleEl.textContent='Dividends accrued (projected)';
     // Cumulative money earned, not the forward annual rate. Older snapshots predate this field.
     const series=hist.filter(d=>d.divEarned!=null);
     if(series.length<2)return showEmpty('No dividend earnings tracked yet. PerceptFolio accrues this from your dividend-paying holdings each time you refresh — it needs a couple of days of data before there\'s anything to draw.');
@@ -7103,11 +7108,11 @@ function drawGrowthChart(){
     currentChartHist=series;clearScrub();
     growthChartInst=new Chart(ctx,{type:'line',
       data:{labels:series.map(d=>d.date),datasets:[
-        {label:'Dividends earned (running total)',data:series.map(d=>d.divEarned),borderColor:'#d9a441',backgroundColor:'rgba(217,164,65,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
+        {label:'Dividends accrued, projected (running total)',data:series.map(d=>d.divEarned),borderColor:'#d9a441',backgroundColor:'rgba(217,164,65,.12)',fill:true,pointRadius:0,tension:.2,borderWidth:2}
       ]},
       options:chartOpts(true)});
     const latest=series[series.length-1];
-    if(titleEl)titleEl.innerHTML='Dividends earned &nbsp;<span style="font-size:13px;font-weight:600" class="pos">'+fmt$(latest.divEarned||0)+' so far</span>';
+    if(titleEl)titleEl.innerHTML='Dividends accrued &nbsp;<span style="font-size:13px;font-weight:600" class="pos">'+fmt$(latest.divEarned||0)+' projected</span><span class="muted" style="font-size:12px;font-weight:400"> — not cash received</span>';
     return;
   }
 
