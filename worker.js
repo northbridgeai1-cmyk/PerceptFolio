@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-04.1';
+const WORKER_VERSION = '2026-09-05.1';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -140,11 +140,16 @@ async function handle(request, env) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400, env);
     if (who.length < 10) return json({ error: 'Tell us who you are and why, in a sentence or two.' }, 400, env);
 
-    /* The three calls are the point of the form, so they are validated rather than accepted as free
-       text. A call with no target or no stop is not a falsifiable claim, and refusing it here is
-       what makes the whole approach work. */
+    /* The three-call requirement was removed. It used to reject any request without exactly three
+       structured calls, which is why an email-only submission returned "Three calls are required."
+
+       What replaces it is one optional free-text line, stored verbatim and never parsed. Parsing it
+       would quietly reinstate the requirement — a format to get wrong and a validation error to hit.
+
+       Structured `calls` are still ACCEPTED and validated if a client sends them, so records already
+       in KV keep their shape and nothing that was stored becomes unreadable. */
+    const call = clean(body.call, 300);
     const raw = Array.isArray(body.calls) ? body.calls.slice(0, 3) : [];
-    if (raw.length !== 3) return json({ error: 'Three calls are required.' }, 400, env);
     const calls = [];
     for (const c of raw) {
       const sym = clean(c.sym, 8).toUpperCase();
@@ -161,7 +166,7 @@ async function handle(request, env) {
 
     const id = Date.now().toString(36) + '-' + makeCode().slice(0, 4).toLowerCase();
     const record = {
-      id, email, who, calls,
+      id, email, who, call, calls,
       status: 'pending',
       createdAt: Date.now(),
       date: new Date().toISOString().slice(0, 10),

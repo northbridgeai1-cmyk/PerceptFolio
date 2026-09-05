@@ -98,6 +98,7 @@ G('Promise audit — the site may not claim what the code does not do');
    the page CLAIMS could fail on a source comment documenting the very claim being removed — the
    same trap that produced two false failures earlier in this suite's life. Only rendered text can
    make a promise, so only rendered text is audited. */
+const admin = read('admin.html');
 const stripComments = h => h
   .replace(/<!--[\s\S]*?-->/g, '')
   .replace(/\/\*[\s\S]*?\*\//g, '');
@@ -329,6 +330,29 @@ t('no screen says "Dividends earned"', !/Dividends earned/.test(stripComments(te
 t('the tile says projected', /Dividends accrued <span class="muted"[^>]*>\(projected\)/.test(term));
 t('the tile states it was never received', /never received — accrued at declared rates/.test(term));
 t('the explanatory copy calls it a projection, not income', /a <b>projection, not income<\/b>/.test(term));
+
+/* ==================== ACCESS REQUEST — no three-call requirement ==================== */
+G('Access request: email and a reason, nothing else mandatory');
+
+t('the worker no longer rejects a request without three calls',
+  !/return json\(\{ error: 'Three calls are required\.' \}/.test(worker));
+t('structured calls are still accepted and validated if sent',
+  /if \(!\/\^\[A-Z\.\\-\]\{1,8\}\$\/\.test\(sym\)\)/.test(worker));
+t('the optional free-text call is stored', /const call = clean\(body\.call, 300\)/.test(worker));
+t('the form no longer builds three structured rows', !/callRows/.test(idx));
+t('the form no longer blocks on calls', !/Fill in all three calls/.test(idx));
+t('the page does not claim all fields are required', !/all fields required/.test(stripComments(idx)));
+t('no public page still says three calls are required',
+  !/three calls, with a target, a stop and a date/.test(stripComments(idx)));
+
+/* The denial email carried the marking promise C5 removed from the landing page — in the one place
+   an applicant would read it as a personal commitment. */
+/* stripComments, because the change note above the fix quotes the sentence it removed — the same
+   trap that has produced a false failure in this suite four times now. */
+t('the denial email makes no promise to mark and report',
+  !/will be marked on the dates you set/.test(stripComments(admin)));
+t('the approval email points at a real sign-in URL',
+  /origin\+'\/terminal\//.test(admin) && !/origin\+'\/app\\n/.test(admin));
 
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');

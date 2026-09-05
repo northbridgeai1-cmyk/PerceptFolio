@@ -369,11 +369,11 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
 <section id="access">
   <div class="wrap">
     <div class="sec-head"><span class="sec-no">02</span><span class="sec-k">Access</span></div>
-    <h2>Applications are graded, not read.</h2>
-    <p class="lede">Anyone can write a paragraph about why they should have access. So the form asks for something that can be checked: three calls, with a target, a stop and a date. In ninety days they will have marked themselves, and the decision is made on evidence rather than on how the paragraph read.</p>
+    <h2>Access is granted per person.</h2>
+    <p class="lede">Tell us who you are and what you would use it for. Requests are read by someone who can act on them, and access is tied to what you will actually be doing with the terminal — if it is not the right tool for your work, you will be told that plainly.</p>
 
     <form class="form" id="reqForm" autocomplete="off">
-      <div class="form-h"><span class="pip" style="background:var(--accent)"></span> access request — all fields required</div>
+      <div class="form-h"><span class="pip" style="background:var(--accent)"></span> access request</div>
       <div class="form-b">
         <div class="fg">
           <label for="rqEmail">Email <span class="req">*</span></label>
@@ -383,23 +383,15 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
           <label for="rqWho">Who you are, and why <span class="req">*</span></label>
           <textarea id="rqWho" required placeholder="Your role, what you'd use the terminal for, and anything that makes the case."></textarea>
         </div>
+        <!-- The three-call requirement was removed on request. It is gone from the form, from the
+             worker's validation and from the copy in the same change, because a page that still
+             asked for something the software no longer wanted would be the same class of fault
+             Phase 1 spent its time closing. The optional box below keeps the capability available
+             to anyone who wants to make a checkable claim, without making it a barrier. -->
         <div class="fg">
-          <label>Three calls <span class="req">*</span></label>
-          <div class="calls">
-            <div class="call-row head"><div>Ticker</div><div>Direction</div><div>Target $</div><div>Stop $</div><div>By date</div></div>
-            <div id="callRows"></div>
-          </div>
-          <!-- THIS SENTENCE USED TO PROMISE MORE THAN THE SOFTWARE DOES.
-               It read: "These are marked against the index on the date you set, and you are told the
-               result whether or not access is granted." There is no mechanism behind that. The worker
-               stores each request in KV with its three calls; there is no scheduler, no marking job for
-               outside calls, and no mailer. Nothing would ever have sent that report.
-
-               On a site whose whole argument is that a tool which flatters itself is worse than no
-               tool, printing a commitment the code cannot keep is the exact fault being condemned.
-               So it states what actually happens and stops there. When the marking job exists, this
-               is the line to change — not before. -->
-          <p class="hint">A target and a stop together make a claim that can be wrong, which a paragraph cannot. Your three calls are stored exactly as written, with the date you set against each one, so they can be checked later against what actually happened.</p>
+          <label for="rqCalls">A call you would stand behind <span class="muted" style="font-weight:400">(optional)</span></label>
+          <textarea id="rqCalls" rows="2" placeholder="e.g. BUY NVDA, target 260, stop 190, by 2027-03-01 — or leave blank"></textarea>
+          <p class="hint">Not required, and not scored. A claim with a target, a stop and a date is simply harder to argue with later than a paragraph is.</p>
         </div>
         <button class="btn btn-p btn-lg" type="submit" id="rqBtn">Submit request</button>
         <div class="msg" id="rqMsg"></div>
@@ -819,32 +811,12 @@ document.getElementById('demoStart').addEventListener('click',function(){
 /* Shared with the access form below. */
 function esc(t){return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
-/* ---- the three calls ---- */
-const DIRS=['BUY','SELL'];
-(function buildRows(){
-  const wrap=document.getElementById('callRows');
-  const d=new Date(); d.setDate(d.getDate()+90);
-  const def=d.toISOString().slice(0,10);
-  wrap.innerHTML=[0,1,2].map(i=>
-    '<div class="call-row">'+
-      '<div><input id="c'+i+'sym" placeholder="TICKER" maxlength="8" style="text-transform:uppercase"></div>'+
-      '<div><select id="c'+i+'dir">'+DIRS.map(x=>'<option>'+x+'</option>').join('')+'</select></div>'+
-      '<div><input id="c'+i+'tgt" type="number" step="any" min="0" placeholder="target"></div>'+
-      '<div><input id="c'+i+'stp" type="number" step="any" min="0" placeholder="stop"></div>'+
-      '<div><input id="c'+i+'dte" type="date" value="'+def+'"></div>'+
-    '</div>').join('');
-})();
-
-function readCalls(){
-  const out=[];
-  for(let i=0;i<3;i++){
-    const g=id=>(document.getElementById('c'+i+id)||{}).value||'';
-    const sym=g('sym').trim().toUpperCase();
-    const tgt=parseFloat(g('tgt')), stp=parseFloat(g('stp'));
-    if(!sym||!isFinite(tgt)||!isFinite(stp)||!g('dte'))return null;
-    out.push({sym,dir:g('dir'),target:tgt,stop:stp,by:g('dte')});
-  }
-  return out;
+/* The three structured call rows are gone. What replaces them is one optional line of free text,
+   deliberately NOT parsed: the moment it is parsed it becomes a requirement again, with validation
+   errors and a format to get wrong. It is stored verbatim for a human to read. */
+function readCall(){
+  const v=(document.getElementById('rqCalls')||{}).value||'';
+  return v.trim().slice(0,300);
 }
 
 function show(kind,text){
@@ -857,18 +829,14 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
   ev.preventDefault();
   const email=document.getElementById('rqEmail').value.trim();
   const who=document.getElementById('rqWho').value.trim();
-  const calls=readCalls();
-  if(!calls)return show('err','Fill in all three calls — ticker, target, stop and date on each. That is the part that gets graded.');
-
+  const call=readCall();
   const btn=document.getElementById('rqBtn');
-  const payload={email,who,calls,at:Date.now()};
+  const payload={email,who,call,at:Date.now()};
 
-  /* The mail client is the floor this form cannot fall through. Three calls with targets,
-     stops and dates are the whole point of the page, and a visitor who typed all of that
-     must never lose it to a DNS record that is not live yet. */
+  /* The mail client is the floor this form cannot fall through. A visitor who has typed out who
+     they are must never lose it to a worker that happens to be unreachable. */
   function mailFallback(note){
-    const body='Email: '+email+'\n\nWho and why:\n'+who+'\n\nThree calls:\n'+
-      calls.map((c,i)=>(i+1)+'. '+c.dir+' '+c.sym+' — target '+c.target+', stop '+c.stop+', by '+c.by).join('\n');
+    const body='Email: '+email+'\n\nWho and why:\n'+who+(call?'\n\nA call they would stand behind:\n'+call:'');
     location.href='mailto:'+PF.contact+'?subject='+encodeURIComponent('PerceptFolio access request')+'&body='+encodeURIComponent(body);
     show('ok',(note||'')+'Opening your mail client. If nothing happened, send the details to <b>'+PF.contact+'</b> directly.');
   }

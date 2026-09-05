@@ -100,7 +100,7 @@ tr:last-child td{border-bottom:none}
 
 <main><div class="wrap">
   <h1>Access queue</h1>
-  <p class="lede">Every application, with the three calls it was submitted against. Decide personal, business or denied. Approving mints a single-use code valid for thirty days.</p>
+  <p class="lede">Every application. Decide personal, business or denied. Approving mints a single-use code valid for thirty days, which you send to the applicant yourself.</p>
 
   <!-- connection -->
   <div class="card" id="connCard">
@@ -232,9 +232,13 @@ function render(){
       '</div>'+
       '<div class="req-b">'+
         '<div class="who">'+esc(r.who)+'</div>'+
-        '<div class="calls-w"><table>'+
+        /* The free-text line is what new requests carry. The structured table is kept for records
+           submitted before the requirement was dropped, and is hidden when there are none rather
+           than rendering an empty frame. */
+        (r.call?'<div class="who" style="border-left:2px solid var(--line);padding-left:10px;margin-bottom:14px"><span class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.1em">A call they would stand behind</span><br>'+esc(r.call)+'</div>':'')+
+        (calls?'<div class="calls-w"><table>'+
           '<thead><tr><th></th><th>Ticker</th><th>Dir</th><th>Target</th><th>Stop</th><th>By</th><th>Check</th></tr></thead>'+
-          '<tbody>'+calls+'</tbody></table></div>'+
+          '<tbody>'+calls+'</tbody></table></div>':'')+
         (r.note?'<p class="dim" style="font-size:12.5px">Note: '+esc(r.note)+'</p>':'')+
         (r.code?'<div style="margin-top:12px"><label>Invite code issued</label><span class="code">'+esc(r.code)+'</span></div>':'')+
       '</div>'+
@@ -292,12 +296,16 @@ function mailReply(id){
   if(!r)return;
   const origin=location.origin;
   const body=r.status==='denied'
+    /* This used to end: "Your three calls are still logged and will be marked on the dates you set.
+       We will send you the results either way." No scheduler, no marking job and no mailer exist, so
+       nothing would ever have sent that. The same promise was removed from the landing page in C5
+       and survived here, in the one place it would have been read as a personal commitment. */
     ? 'Thanks for applying to PerceptFolio.\n\nWe are not able to grant access at this time.\n\n'+
-      'Your three calls are still logged and will be marked on the dates you set. We will send you the results either way.\n\n— NorthBridge, financial branch'
+      'Your request is kept on file. If that changes, we will be in touch.\n\n— NorthBridge, financial branch'
     : 'Your PerceptFolio access has been approved.\n\n'+
       'Account type: '+r.status+'\n'+
       'Invite code: '+(r.code||'')+'  (single use, expires in 30 days)\n'+
-      'Sign in: '+origin+'/app\n\n'+
+      'Sign in: '+origin+'/terminal/\n\n'+
       'Setup takes about ten minutes:\n'+
       '1. Get a free Finnhub key at finnhub.io and paste it into Settings.\n'+
       '2. Enter your holdings and cash in Portfolio.\n'+
