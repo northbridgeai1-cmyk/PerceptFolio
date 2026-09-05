@@ -2560,6 +2560,9 @@ function setAuthMode(m){
 }
 function enterSession(){
   resetTransientState();
+  /* Adopt marks the worker stamped while this app was closed, then tell it what is still open.
+     Both silent and unawaited: session entry must not wait on a network round-trip. */
+  reconcileWorkerMarks().then(()=>pushCallRegistry());
   const acctEl=document.getElementById('acctEmail');if(acctEl)acctEl.textContent=USER;
   updateGreeting();
   refreshMarketDataCard();
@@ -3983,6 +3986,7 @@ async function refreshAll(){
     const markPrices=await fetchMarkPrices();
     markCalls(markPrices);
     markSells(markPrices);
+    pushCallRegistry();                      // keep the worker's registry current; not awaited
     checkPriceAlerts();
     D.lastRefresh=Date.now();
     recordHistorySnapshot(spyClose);
@@ -4207,6 +4211,75 @@ async function fetchMarkPrices(){
   }
   return out;
 }
+/* ================= B1, CLIENT HALF — REGISTER CALLS, ADOPT WORKER MARKS =================
+
+   The worker can only mark what it knows about, and the app can only benefit if it adopts what the
+   worker stamped while it was closed. Two small functions, both silent on failure — marking must
+   degrade to exactly the old behaviour when the worker is unreachable, never block a refresh.
+
+   Identity: ts + sym + track is stable and needs no new field on stored calls. */
+function callId(c){return c.ts+':'+c.sym+':'+(c.track||'checklist');}
+
+/* Which credential this device can register under: the operator's slot, or the profile's invite
+   code. The demo account registers nothing. */
+function cronIdent(){
+  if(typeof isDemoUser==='function'&&isDemoUser())return null;
+  if(syncConfigured())return{q:'slot',auth:{'Authorization':'Bearer '+syncCfg.key},base:syncCfg.url};
+  const inv=(DB.profiles[USER]||{}).invite;
+  if(inv)return{q:'code',code:inv,base:INVITE_WORKER};
+  return null;
+}
+async function cronUrl(path){
+  const id=cronIdent(); if(!id)return null;
+  const base=id.base.replace(/\/+$/,'');
+  if(id.q==='slot'){const slot=await syncSlotId();return{url:base+path+'?slot='+encodeURIComponent(slot),headers:id.auth};}
+  return{url:base+path+'?code='+encodeURIComponent(id.code),headers:{}};
+}
+
+let _lastRegPush='';
+async function pushCallRegistry(){
+  try{
+    const t=await cronUrl('/callreg'); if(!t)return;
+    /* Only calls the worker could still act on: an unmarked horizon that is not already past
+       tolerance. Everything else is the client's to close. */
+    const now=Date.now();
+    const open=(D.calls||[]).filter(c=>{
+      if(!(c.price>0)||!(c.spy>0))return false;
+      const age=(now-c.ts)/86400000;
+      return CALL_HORIZONS.some(h=>!(c.marks||{})[h]&&age<=h+markTolerance(h));
+    }).map(c=>({id:callId(c),sym:c.sym,ts:c.ts,price:c.price,spy:c.spy}));
+    const body=JSON.stringify({calls:open});
+    if(body===_lastRegPush)return;                 // unchanged; save the write
+    const res=await fetch(t.url,{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},t.headers),body});
+    if(res.ok)_lastRegPush=body;
+  }catch(e){}
+}
+
+async function reconcileWorkerMarks(){
+  try{
+    const t=await cronUrl('/marks'); if(!t)return;
+    const res=await fetch(t.url,{headers:t.headers});
+    if(!res.ok)return;
+    const j=await res.json();
+    const marks=j.marks||{};
+    let adopted=0;
+    (D.calls||[]).forEach(c=>{
+      const wm=marks[callId(c)]; if(!wm)return;
+      if(!c.marks)c.marks={};
+      CALL_HORIZONS.forEach(h=>{
+        /* Adopt only where the client has nothing. A local mark taken the same day differs by
+           pennies and rewriting stamped history for that would be worse than the discrepancy. */
+        if(c.marks[h]||!wm[h])return;
+        const m=wm[h];
+        if(!(m.price>0)||!(m.spy>0))return;
+        c.marks[h]={price:m.price,spy:m.spy,at:m.at,lag:m.lag||0,cron:true};
+        adopted++;
+      });
+    });
+    if(adopted){saveDB();toast(adopted+' mark'+(adopted===1?'':'s')+' taken by the worker while the app was closed.');}
+  }catch(e){}
+}
+
 function markCalls(extraPrices){
   if(!D.calls||!D.calls.length)return;
   const spyNow=(_spyPriceCache&&isFinite(_spyPriceCache.price))?_spyPriceCache.price:null;

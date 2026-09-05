@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-05.5';
+const WORKER_VERSION = '2026-09-05.6';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -86,6 +86,25 @@ function clean(v, max) {
 }
 
 export default {
+  /* ================= B1 — CRON MARKING =================
+
+     THE PROBLEM THIS SOLVES. A mark could only be taken while the app was open on the call's
+     anniversary; otherwise the call was closed as unmarkable. Those drops are not random — the app
+     is least likely to be open during travel, holidays, and the stretches the operator is avoiding
+     the market, which makes them survivorship bias in the one record the product exists to protect.
+
+     Now the browser registers its open calls here (PUT /callreg), this handler stamps due marks
+     every day whether or not any browser is open, and the app adopts them on next open (GET
+     /marks). Invariant I11 holds: every price is fetched ON the day, never reconstructed after.
+
+     SETUP — THE CODE ALONE IS NOT ENOUGH. A Cron Trigger must be added in the dashboard:
+     worker > Settings > Triggers > Cron Triggers > Add >  30 21 * * *   (21:30 UTC, after the US
+     close). Without the trigger this handler never runs. Whether it is actually running is
+     observable: every run stamps cron:last, which /version reports to an authenticated caller —
+     "never" there means the trigger is missing, not that the code is. */
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runCronMarks(env));
+  },
   async fetch(request, env) {
     /* Everything is wrapped so that ANY failure still returns CORS headers. Without this an
        unhandled exception produces Cloudflare's own error page, which has no CORS headers, and the
@@ -97,6 +116,81 @@ export default {
     }
   }
 };
+
+/* One daily pass. Reads every registry, stamps whatever is due, and always records that it ran —
+   the AUDIT screen distinguishes "trigger missing" from "ran and found nothing" by this stamp. */
+const CRON_HORIZONS = [30, 90, 180, 365];
+function cronTolerance(h) { return Math.max(7, h * 0.25); }
+
+async function runCronMarks(env) {
+  const startedAt = Date.now();
+  const note = { at: startedAt, registries: 0, due: 0, marked: 0, errors: [] };
+  try {
+    if (!env.PF_SYNC) throw new Error('no KV binding');
+    if (!env.FINNHUB_API_KEY) throw new Error('no FINNHUB_API_KEY — marks need prices');
+
+    const list = await env.PF_SYNC.list({ prefix: 'creg:', limit: 100 });
+    note.registries = list.keys.length;
+
+    /* First pass: find what is due, so quotes are fetched once per symbol across every registry.
+       The free tier allows 60 calls a minute; a bounded set and one SPY call stay far inside it. */
+    const work = [];       // {ident, reg, due:[{call, h, lag}]}
+    const symbols = new Set(['SPY']);
+    for (const k of list.keys) {
+      const raw = await env.PF_SYNC.get(k.name);
+      if (!raw) continue;
+      let reg; try { reg = JSON.parse(raw); } catch (e) { continue; }
+      const ident = k.name.slice(5);
+      const marksRaw = await env.PF_SYNC.get('cmarks:' + ident);
+      const marks = marksRaw ? JSON.parse(marksRaw) : {};
+      const due = [];
+      for (const c of (reg.calls || []).slice(0, 400)) {
+        if (!c || !c.id || !/^[A-Z.\-]{1,8}$/.test(String(c.sym || ''))) continue;
+        if (!(c.ts > 0) || !(c.price > 0) || !(c.spy > 0)) continue;
+        const age = (startedAt - c.ts) / 86400000;
+        for (const h of CRON_HORIZONS) {
+          if ((marks[c.id] || {})[h]) continue;
+          const lag = age - h;
+          /* Overdue past tolerance is left alone: the client closes those as missed, and a mark
+             fabricated late is exactly what I11 forbids. Healthy cron means lag is 0 or 1. */
+          if (lag < 0 || lag > cronTolerance(h)) continue;
+          due.push({ c, h, lag });
+          symbols.add(c.sym);
+        }
+      }
+      if (due.length) work.push({ ident, marks, due });
+      note.due += due.length;
+    }
+
+    if (note.due) {
+      const px = {};
+      for (const sym of [...symbols].slice(0, 45)) {
+        try {
+          const r = await fetch('https://finnhub.io/api/v1/quote?symbol=' + encodeURIComponent(sym)
+            + '&token=' + env.FINNHUB_API_KEY);
+          if (r.ok) { const q = await r.json(); if (q && q.c > 0) px[sym] = q.c; }
+        } catch (e) {}
+      }
+      if (!(px.SPY > 0)) throw new Error('no SPY quote — nothing can be marked against the index');
+
+      for (const w of work) {
+        let changed = false;
+        for (const { c, h, lag } of w.due) {
+          const p = px[c.sym];
+          if (!(p > 0)) continue;             // no price today; tomorrow's run may still be in tolerance
+          if (!w.marks[c.id]) w.marks[c.id] = {};
+          w.marks[c.id][h] = { price: p, spy: px.SPY, at: startedAt, lag: Math.round(lag), cron: true };
+          changed = true; note.marked++;
+        }
+        if (changed) await env.PF_SYNC.put('cmarks:' + w.ident, JSON.stringify(w.marks));
+      }
+    }
+  } catch (e) {
+    note.errors.push(String(e && e.message || e));
+  }
+  note.ms = Date.now() - startedAt;
+  try { await env.PF_SYNC.put('cron:last', JSON.stringify(note)); } catch (e) {}
+}
 
 async function handle(request, env) {
   if (request.method === 'OPTIONS') {
@@ -190,11 +284,15 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/summarise', '/fred', '/finnhub', '/?slot=']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/summarise', '/fred', '/finnhub', '/?slot=']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
     if (safeEqual(tok0, env.SYNC_SECRET)) {
+      try {
+        const cl = await env.PF_SYNC.get('cron:last');
+        body.cron = cl ? JSON.parse(cl) : null;   // null = the trigger has never fired
+      } catch (e) {}
       body.configured = {
         PF_SYNC: !!(env.PF_SYNC && typeof env.PF_SYNC.get === 'function'),
         SYNC_SECRET: !!env.SYNC_SECRET,
@@ -354,6 +452,45 @@ async function handle(request, env) {
       reason: rec.paused ? 'paused' : 'active',
       tier: rec.tier || null
     }, 200, env);
+  }
+
+  /* ---- /callreg and /marks — the two halves of cron marking ----
+     Dual-auth like /fred: the operator authenticates with the sync key and a slot, an invited user
+     with a live invite code. Each identity's registry and marks live under their own KV keys, so
+     nobody can read or write anyone else's. */
+  if (url.pathname === '/callreg' || url.pathname === '/marks') {
+    const auth1 = request.headers.get('Authorization') || '';
+    const tok1 = auth1.startsWith('Bearer ') ? auth1.slice(7) : '';
+    let ident = null;
+    if (safeEqual(tok1, env.SYNC_SECRET)) {
+      const slot = (url.searchParams.get('slot') || '').trim();
+      if (/^[A-Za-z0-9_-]{4,128}$/.test(slot)) ident = 's:' + slot;
+    } else {
+      const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+      if (await activeGrant(code)) ident = 'c:' + code;
+    }
+    if (!ident) return json({ error: 'Needs the sync key with a slot, or a live invite code.' }, 401, env);
+
+    if (url.pathname === '/callreg' && request.method === 'PUT') {
+      const raw = await request.text();
+      if (raw.length > 256 * 1024) return json({ error: 'Registry too large.' }, 413, env);
+      let body; try { body = JSON.parse(raw); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+      /* Only the fields the cron needs are kept. Storing the client's blob verbatim would let this
+         keyspace become a second, unvalidated sync channel. */
+      const calls = (Array.isArray(body.calls) ? body.calls : []).slice(0, 400)
+        .map(c => ({
+          id: clean(c.id, 80), sym: clean(c.sym, 8).toUpperCase(),
+          ts: Number(c.ts) || 0, price: Number(c.price) || 0, spy: Number(c.spy) || 0
+        }))
+        .filter(c => c.id && /^[A-Z.\-]{1,8}$/.test(c.sym) && c.ts > 0 && c.price > 0 && c.spy > 0);
+      await env.PF_SYNC.put('creg:' + ident, JSON.stringify({ updatedAt: Date.now(), calls }));
+      return json({ ok: true, registered: calls.length }, 200, env);
+    }
+    if (url.pathname === '/marks' && request.method === 'GET') {
+      const m = await env.PF_SYNC.get('cmarks:' + ident);
+      return json({ marks: m ? JSON.parse(m) : {} }, 200, env);
+    }
+    return json({ error: 'Method not allowed.' }, 405, env);
   }
 
   // Auth: Authorization: Bearer <SYNC_SECRET>. Everything past this point is yours alone.

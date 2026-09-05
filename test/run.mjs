@@ -454,6 +454,22 @@ t('the sign-up screen says the invite governs the tier',
 t('first-run setup does not assume the reader owns the worker',
   !/Skip it if your worker already holds one/.test(term));
 
+/* ==================== B1 — CRON MARKING ==================== */
+G('B1: marks no longer depend on the app being open');
+
+t('the worker exports a scheduled handler', /async scheduled\(event, env, ctx\)/.test(worker));
+t('every run stamps cron:last, even on failure', /put\('cron:last', JSON\.stringify\(note\)\)/.test(worker));
+t('overdue-past-tolerance is never backfilled (I11)', /lag < 0 \|\| lag > cronTolerance\(h\)/.test(worker));
+t('an existing mark is never overwritten', /if \(\(marks\[c\.id\] \|\| \{\}\)\[h\]\) continue/.test(worker));
+t('the registry keeps only validated fields, not the client blob',
+  /Only the fields the cron needs are kept/.test(worker));
+t('/callreg and /marks are dual-auth like /fred', /'c:' \+ code/.test(worker) && /'s:' \+ slot/.test(worker));
+t('the client registers open calls after marking', /pushCallRegistry\(\);\s*\/\/ keep the worker/.test(term));
+t('the client adopts worker marks on session entry', /reconcileWorkerMarks\(\)\.then/.test(term));
+t('adoption never overwrites a local mark', /if\(c\.marks\[h\]\|\|!wm\[h\]\)return/.test(term));
+t('the demo account registers nothing', /isDemoUser\(\)\)return null/.test(term));
+t('/version reports the last cron run so a missing trigger is observable', /body\.cron = cl/.test(worker));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 
