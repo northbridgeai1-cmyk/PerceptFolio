@@ -710,6 +710,31 @@ t('acceptance is checked before the invite code is validated',
 t('what was accepted is recorded on the profile', /acceptedTerms:\{at:Date\.now\(\)/.test(term));
 t('the links open in a new tab so the form is not lost', /href="\/terms\/" target="_blank"/.test(term));
 
+/* ==================== CRAFT ==================== */
+G('Craft: focus, contrast, landmarks, touch targets');
+
+{
+  const pages = ['index.html','terminal/index.html','refused/index.html','privacy/index.html',
+                 'terms/index.html','404.html','thanks.html','admin.html'].map(read);
+  t('every page has a visible keyboard focus state',
+    pages.every(p => /:focus-visible/.test(p)));
+  /* An earlier assertion here tried to prove no plain :focus rule existed. It could not tell the
+     legitimate "input:focus{outline:none;border-color:...}" — which pairs with the :focus-visible
+     ring above — from a real problem, and flagged correct code. Presence of :focus-visible is the
+     check that means something. */
+  t('the faint text colour clears WCAG AA (4.60:1, was 3.24:1)',
+    !/--faint:#5d636e/.test(read('index.html')) && /--faint:#757b86/.test(read('index.html')));
+  t('public pages have a main landmark',
+    /<main>/.test(read('index.html')) && /<main>/.test(read('refused/index.html')));
+  /* Vertical padding on an inline element is painted and clickable but does not grow the box, so
+     the display change is what actually enlarges the target rather than just its paint. */
+  t('touch targets are enlarged on coarse pointers',
+    /@media\(hover:none\),\(max-width:760px\)/.test(read('index.html')) &&
+    /\.nav-links a\{display:inline-block;padding:11px 12px/.test(read('index.html')));
+  t('footer links are targeted by their own class, not a losing generic selector',
+    /footer a,\.foot-l a\{display:inline-block;padding:12px 10px\}/.test(read('index.html')));
+}
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

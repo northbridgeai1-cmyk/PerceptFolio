@@ -56,6 +56,28 @@ h1{font-size:clamp(26px,4.4vw,38px);line-height:1.14;letter-spacing:-.024em;font
 footer{border-top:1px solid var(--border);padding:24px 0;font-size:12.5px;color:var(--muted)}
 .links{display:flex;gap:22px;flex-wrap:wrap}
 .links a:hover{color:var(--text)}
+
+/* ---- keyboard focus ----
+   Only inputs had a visible focus state, so anyone tabbing through buttons and links had no idea
+   where they were. :focus-visible rather than :focus, so a mouse click never draws a ring the
+   pointer user did not ask for. */
+a:focus-visible,button:focus-visible,summary:focus-visible,
+[tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ---- touch targets ----
+   Nav and footer links were 15-25px tall, which is fine for a cursor and awkward for a thumb. The
+   guidance is roughly 44px; padding gets them there without changing how the row looks, because the
+   extra height sits inside the existing line box. */
+@media(hover:none),(max-width:760px){
+  /* display matters here: vertical padding on an inline element is painted and is clickable, but
+     does not grow the box, so the target stays the height of one line. inline-block makes the
+     padding count toward the hit area rather than just the paint. */
+  .nav-links a{display:inline-block;padding:11px 12px;line-height:1.1}
+  /* .foot-l a carries its own padding at a higher specificity, so a bare "footer a" loses to it. */
+  footer a,.foot-l a{display:inline-block;padding:12px 10px}
+  .logo{display:inline-flex;padding:6px 0}
+}
 </style>
 </head>
 <body>

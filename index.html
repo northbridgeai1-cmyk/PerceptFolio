@@ -14,7 +14,7 @@
 <style>
 :root{
   --bg:#0b0c0f; --panel:#131519; --panel2:#1a1d23; --line:#24272f; --line2:#2f333c;
-  --text:#eef0f3; --dim:#8d939f; --faint:#5d636e;
+  --text:#eef0f3; --dim:#8d939f; --faint:#757b86;
   --accent:#3b82f6; --green:#2ea043; --red:#e5534b; --amber:#d9a441; --violet:#8b5cf6;
   --brand2:#1f9e8c;   /* the teal in the logo. Same value the terminal uses */
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
@@ -241,6 +241,28 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
   .call-row.head{display:none}
   .call-row{padding:6px 0;border-bottom:1px solid var(--line)}
 }
+
+/* ---- keyboard focus ----
+   Only inputs had a visible focus state, so anyone tabbing through buttons and links had no idea
+   where they were. :focus-visible rather than :focus, so a mouse click never draws a ring the
+   pointer user did not ask for. */
+a:focus-visible,button:focus-visible,summary:focus-visible,
+[tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ---- touch targets ----
+   Nav and footer links were 15-25px tall, which is fine for a cursor and awkward for a thumb. The
+   guidance is roughly 44px; padding gets them there without changing how the row looks, because the
+   extra height sits inside the existing line box. */
+@media(hover:none),(max-width:760px){
+  /* display matters here: vertical padding on an inline element is painted and is clickable, but
+     does not grow the box, so the target stays the height of one line. inline-block makes the
+     padding count toward the hit area rather than just the paint. */
+  .nav-links a{display:inline-block;padding:11px 12px;line-height:1.1}
+  /* .foot-l a carries its own padding at a higher specificity, so a bare "footer a" loses to it. */
+  footer a,.foot-l a{display:inline-block;padding:12px 10px}
+  .logo{display:inline-flex;padding:6px 0}
+}
 </style>
 </head>
 <body>
@@ -261,6 +283,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
     <a class="btn btn-p" href="/terminal/">Sign in</a>
   </div>
 </nav>
+<main>
 
 <header>
   <div class="wrap" style="position:relative">
@@ -489,6 +512,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
   </div>
 </section>
 
+</main>
 <footer>
   <div class="wrap">
     <div class="foot-t">
