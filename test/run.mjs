@@ -439,6 +439,14 @@ t('a paused grant loses macro data too', /return rec\.paused \? null : rec/.test
 t('the terminal presents its invite code when it has no sync key',
   /codeParam=syncConfigured\(\)\?'':'&code='/.test(term));
 
+t('the invite grant decides the account tier, not the sign-up dropdown',
+  /const grantedTier=\(inv\.tier==='business'\|\|inv\.tier==='personal'\)\?inv\.tier:accountType/.test(term) &&
+  /accountType:grantedTier/.test(term));
+t('the sign-up screen says the invite governs the tier',
+  /Your invite decides this/.test(term));
+t('first-run setup does not assume the reader owns the worker',
+  !/Skip it if your worker already holds one/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

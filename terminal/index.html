@@ -710,6 +710,7 @@ body.touring header,body.touring #sidebar{z-index:201}
             <option value="personal">Personal — my own portfolio</option>
             <option value="business">Business — I manage client portfolios too</option>
           </select>
+          <p class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.5">Your invite decides this. If it was issued as personal, the account is personal whatever is selected here.</p>
         </div>
         <!-- C2. The landing page states there is no self-service sign-up. Until now this form was
              exactly that, so the site made a claim about itself that the software contradicted.
@@ -923,7 +924,7 @@ body.touring header,body.touring #sidebar{z-index:201}
     <div id="welcomeCard" class="welcome-card" style="display:none">
       <h2>Let's set up your portfolio</h2>
       <p class="muted" style="margin-bottom:16px">Three steps and PerceptFolio starts working for you.</p>
-      <p style="margin-bottom:10px"><span class="step-num">1</span>Add a Finnhub API key in <b>Settings</b> — free, 2 minutes. Skip it if your worker already holds one.</p>
+      <p style="margin-bottom:10px"><span class="step-num">1</span>Add a Finnhub API key in <b>Settings</b> — free at finnhub.io, about 2 minutes, no card. This is what loads prices.</p>
       <p style="margin-bottom:10px"><span class="step-num">2</span>Add what you own in <b>Portfolio</b> — stocks, ETFs, mutual funds, and cash on hand.</p>
       <p style="margin-bottom:18px"><span class="step-num">3</span>Add a few tickers to your <b>Watchlist</b> — PerceptFolio scores them automatically.</p>
       <button class="btn" onclick="showTab('portfolio')">Add your first holding</button>
@@ -2222,7 +2223,13 @@ async function createProfile(){
     return toast('Could not reach the worker to check that code ('+e.message+').');
   }
 
-  DB.profiles[email]={pinHash:pw?await sha(pw):'',data:defaultData(),accountType,userId:makeUserId(),
+  /* THE GRANT DECIDES THE TIER, NOT THE DROPDOWN.
+     The worker returns the tier the operator chose when approving. Taking accountType from the form
+     instead meant anyone granted "personal" could select "business" on this screen and unlock the
+     Clients tab — a decision the operator had explicitly made the other way. The dropdown is now a
+     fallback for the case where a grant carries no tier at all. */
+  const grantedTier=(inv.tier==='business'||inv.tier==='personal')?inv.tier:accountType;
+  DB.profiles[email]={pinHash:pw?await sha(pw):'',data:defaultData(),accountType:grantedTier,userId:makeUserId(),
                       invite:code,inviteTier:inv.tier||null};
   localStorage.setItem(STORE_KEY,JSON.stringify(DB));
   /* Burned after the profile is safely stored. If this call fails the account still exists and the
