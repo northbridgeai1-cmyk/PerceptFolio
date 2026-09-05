@@ -354,6 +354,37 @@ t('the denial email makes no promise to mark and report',
 t('the approval email points at a real sign-in URL',
   /origin\+'\/terminal\//.test(admin) && !/origin\+'\/app\\n/.test(admin));
 
+/* ==================== ADMIN QUEUE — tabs, pause, two emails ==================== */
+G('Access queue: four views, a pause that states its own limits, and both emails');
+
+t('four filter tabs exist', /data-f="pending"/.test(admin) && /data-f="accepted"/.test(admin) &&
+  /data-f="denied"/.test(admin) && /data-f="all"/.test(admin));
+t('a paused grant still counts as accepted, not denied',
+  /const isAccepted=r=>r\.status==='personal'\|\|r\.status==='business'/.test(admin));
+t('each tab shows a count', /\['pending','accepted','denied','all'\]\.forEach/.test(admin));
+
+t('the worker refuses a paused code', /if \(inv\.paused\) return json/.test(worker));
+t('only a granted request can be paused', /Only a granted request can be paused/.test(worker));
+t('pausing reports which case applied', /already redeemed — their existing account is unaffected/.test(worker));
+/* The honest limit, stated in the UI and not only in a comment: an already-created account cannot
+   be revoked, because the terminal is local and offline by design. */
+t('the admin screen states that a redeemed account keeps working',
+  /that account still works/.test(admin));
+t('the confirm dialog says the same before you click', /there is nothing to revoke remotely/.test(admin));
+
+t('there are two distinct email templates', /const denied=r\.status==='denied'/.test(admin));
+t('the approval email congratulates and leads with the code',
+  /Congratulations — your access to PerceptFolio has been approved/.test(admin) &&
+  /YOUR INVITE CODE:/.test(admin));
+t('single use is stated twice, once on the code line',
+  /This code works ONCE, and expires 30 days from today/.test(admin) &&
+  /it stops working the moment your account exists/.test(admin));
+t('the decline email issues no code and makes no promise',
+  /not able to grant access at this time/.test(admin) && !/invite code/i.test(
+    (/\? 'Thanks for applying[\s\S]*?financial branch'/.exec(admin)||[''])[0]));
+t('the sign-in link is the public site, not location.origin',
+  /const origin='https:\/\/perceptfolio\.com'/.test(admin));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

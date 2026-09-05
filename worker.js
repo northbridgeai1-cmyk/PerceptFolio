@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-05.1';
+const WORKER_VERSION = '2026-09-05.2';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -190,7 +190,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/summarise', '/fred', '/finnhub', '/?slot=']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/summarise', '/fred', '/finnhub', '/?slot=']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -218,6 +218,9 @@ async function handle(request, env) {
     if (!stored) return json({ valid: false, error: 'Unknown code.' }, 404, env);
     const inv = JSON.parse(stored);
     if (inv.usedAt) return json({ valid: false, error: 'That code has already been redeemed.' }, 409, env);
+    /* PAUSED. The operator suspended this grant after issuing it. Refused here rather than deleted,
+       so resuming restores the same code instead of forcing a fresh one through the queue. */
+    if (inv.paused) return json({ valid: false, error: 'Access for this code is paused. Contact the person who issued it.' }, 423, env);
     if (inv.expiresAt && Date.now() > inv.expiresAt) return json({ valid: false, error: 'That code has expired.' }, 410, env);
     if (request.method === 'POST') {
       inv.usedAt = Date.now();
@@ -285,6 +288,54 @@ async function handle(request, env) {
     }
     await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
     return json({ ok: true, decision, code }, 200, env);
+  }
+
+  /* ---- POST /pause — suspend or restore an issued grant ----
+
+     WHAT THIS CAN AND CANNOT DO, because the difference matters and the UI states it too.
+
+     CAN: stop an unredeemed code being used. The holder cannot create an account while paused, and
+     resuming restores the same code rather than forcing a new request through the queue.
+
+     CANNOT: remove access from someone who already redeemed it. The terminal is a public file that
+     keeps its data in the browser's own storage and is built to work offline — it does not phone
+     home, so there is no session to revoke. Anyone who has already created an account keeps it.
+
+     Shipping a button that implied otherwise would be the exact fault this product exists to
+     condemn, so the route reports which of the two cases applies and the admin screen prints it. */
+  if (url.pathname === '/pause' && request.method === 'POST') {
+    let body;
+    try { body = await request.json(); }
+    catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const id = clean(body.id, 40);
+    const paused = !!body.paused;
+    const stored = await env.PF_SYNC.get('req:' + id);
+    if (!stored) return json({ error: 'No such request.' }, 404, env);
+    const rec = JSON.parse(stored);
+    if (rec.status !== 'personal' && rec.status !== 'business') {
+      return json({ error: 'Only a granted request can be paused.' }, 400, env);
+    }
+
+    rec.paused = paused;
+    rec.pausedAt = paused ? Date.now() : null;
+    await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
+
+    let effect = 'no code on this record';
+    if (rec.code) {
+      const cs = await env.PF_SYNC.get('code:' + rec.code);
+      if (cs) {
+        const inv = JSON.parse(cs);
+        inv.paused = paused;
+        await env.PF_SYNC.put('code:' + rec.code, JSON.stringify(inv),
+          { expirationTtl: 40 * 86400 });
+        effect = inv.usedAt
+          ? 'already redeemed — their existing account is unaffected'
+          : (paused ? 'the code can no longer be redeemed' : 'the code can be redeemed again');
+      } else {
+        effect = 'the code has expired out of storage';
+      }
+    }
+    return json({ ok: true, paused, effect }, 200, env);
   }
 
   /* ---- POST /summarise — attributable news summary ----

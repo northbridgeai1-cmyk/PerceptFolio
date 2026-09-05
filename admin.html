@@ -71,6 +71,8 @@ table{width:100%;border-collapse:collapse;font:12.5px/1 var(--mono)}
 th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line)}
 th{font-size:9.5px;letter-spacing:.09em;color:var(--faint);text-transform:uppercase;font-weight:600}
 tr:last-child td{border-bottom:none}
+.tab-n{font-size:11px;opacity:.55;margin-left:5px;font-variant-numeric:tabular-nums}
+.paused-note{border:1px solid var(--amber,#d9a441);background:rgba(217,164,65,.08);border-radius:7px;padding:10px 12px;margin-top:12px;font-size:12.5px;line-height:1.55}
 .calls-w{border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-bottom:16px}
 .rr{font-weight:700}
 .pos{color:var(--green)}.neg{color:var(--red)}.warn{color:var(--amber)}.dim{color:var(--faint)}
@@ -124,9 +126,10 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div class="tabs" id="tabs" style="display:none">
-    <button class="tab on" data-f="pending" onclick="setFilter('pending')">Pending</button>
-    <button class="tab" data-f="decided" onclick="setFilter('decided')">Decided</button>
-    <button class="tab" data-f="all" onclick="setFilter('all')">All</button>
+    <button class="tab on" data-f="pending" onclick="setFilter('pending')">Pending <span class="tab-n" id="n-pending"></span></button>
+    <button class="tab" data-f="accepted" onclick="setFilter('accepted')">Accepted <span class="tab-n" id="n-accepted"></span></button>
+    <button class="tab" data-f="denied" onclick="setFilter('denied')">Denied <span class="tab-n" id="n-denied"></span></button>
+    <button class="tab" data-f="all" onclick="setFilter('all')">All <span class="tab-n" id="n-all"></span></button>
   </div>
 
   <div id="queue"></div>
@@ -201,8 +204,22 @@ function rr(c){
 
 function render(){
   const q=$('queue');
-  const rows=requests.filter(r=>
-    filter==='all'?true:filter==='pending'?r.status==='pending':r.status!=='pending');
+  /* "Accepted" means granted, whether or not it is currently paused — a paused grant is still an
+     accepted applicant, and hiding it in Denied would misfile the one case you most need to find. */
+  const isAccepted=r=>r.status==='personal'||r.status==='business';
+  const match=r=>filter==='all'?true
+    :filter==='pending'?(r.status||'pending')==='pending'
+    :filter==='accepted'?isAccepted(r)
+    :filter==='denied'?r.status==='denied':true;
+  const rows=requests.filter(match);
+
+  const count=f=>requests.filter(r=>f==='all'?true
+    :f==='pending'?(r.status||'pending')==='pending'
+    :f==='accepted'?isAccepted(r)
+    :r.status==='denied').length;
+  ['pending','accepted','denied','all'].forEach(f=>{
+    const el=$('n-'+f); if(el)el.textContent=count(f);
+  });
   if(!rows.length){
     q.innerHTML='<div class="card"><div class="empty">'+
       (requests.length?'Nothing in this view.':'No requests yet. They arrive here the moment someone submits the form on the front page.')+
@@ -226,6 +243,7 @@ function render(){
     return '<div class="req" id="r-'+esc(r.id)+'">'+
       '<div class="req-h">'+
         '<span class="pill p-'+esc(st)+'">'+esc(st)+'</span>'+
+        (r.paused?'<span class="pill" style="background:rgba(217,164,65,.16);color:#e0bc72;border:1px solid rgba(217,164,65,.35)">paused</span>':'')+
         '<span class="req-em">'+esc(r.email)+'</span>'+
         '<span class="spacer"></span>'+
         '<span class="req-dt">'+esc(r.date||'')+'</span>'+
@@ -254,12 +272,24 @@ function render(){
               '<span class="dim" style="font-size:11.5px" id="s-'+esc(r.id)+'"></span>'+
             '</div>'+
           '</div>'
-        : '<div class="decide"><div class="row">'+
-            '<button class="btn btn-sm" onclick="mailReply(\''+esc(r.id)+'\')">Draft the reply</button>'+
-            '<button class="btn btn-r btn-sm" onclick="wipe(\''+esc(r.id)+'\')">Remove record</button>'+
-            '<span class="spacer"></span>'+
-            '<span class="dim" style="font-size:11.5px" id="s-'+esc(r.id)+'"></span>'+
-          '</div></div>')+
+        : '<div class="decide">'+
+            (r.paused
+              ? '<div class="paused-note"><b>Access paused.</b> '+
+                (r.code
+                  ? 'The code <b>'+esc(r.code)+'</b> cannot be redeemed while this is on. '
+                  : '')+
+                'If they already created an account, <b>that account still works</b> — the terminal keeps its data in their own browser and runs offline, so there is no session to revoke.</div>'
+              : '')+
+            '<div class="row" style="margin-top:11px">'+
+              '<button class="btn btn-sm" onclick="mailReply(\''+esc(r.id)+'\')">Draft the '+(r.status==='denied'?'decline':'welcome')+' email</button>'+
+              (isAccepted(r)
+                ? '<button class="btn '+(r.paused?'btn-g':'btn-r')+' btn-sm" onclick="setPaused(\''+esc(r.id)+'\','+(r.paused?'false':'true')+')">'+
+                  (r.paused?'Resume access':'Pause access')+'</button>'
+                : '')+
+              '<button class="btn btn-r btn-sm" onclick="wipe(\''+esc(r.id)+'\')">Remove record</button>'+
+              '<span class="spacer"></span>'+
+              '<span class="dim" style="font-size:11.5px" id="s-'+esc(r.id)+'"></span>'+
+            '</div></div>')+
     '</div>';
   }).join('');
 }
@@ -274,9 +304,28 @@ async function decide(id,decision){
     const j=await r.json();
     if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
     await load();
-    if(j.code)show('connMsg','ok','Granted <b>'+esc(decision)+'</b>. Code <b>'+esc(j.code)+'</b> — single use, expires in 30 days. Send it with the sign-in link.');
-    else show('connMsg','ok','Request denied and recorded.');
+    if(j.code)show('connMsg','ok','Granted <b>'+esc(decision)+'</b>. Code <b>'+esc(j.code)+'</b> — single use, expires in 30 days. Opening the welcome email…');
+    else show('connMsg','ok','Request denied and recorded. Opening the decline email…');
+    /* Deciding and telling them are one action in practice, so the draft opens straight away rather
+       than waiting to be remembered. The button stays for redrafting. */
+    setTimeout(()=>mailReply(id),400);
   }catch(e){if(st)st.textContent='';show('connMsg','err','Failed: '+esc(e.message));}
+}
+
+async function setPaused(id,paused){
+  const st=$('s-'+id);
+  if(paused&&!confirm('Pause access for this person?\n\nAn unredeemed code stops working immediately.\nIf they have already created an account, that account keeps working — the terminal stores data in their browser and runs offline, so there is nothing to revoke remotely.'))return;
+  if(st)st.textContent=paused?'Pausing…':'Resuming…';
+  try{
+    const r=await fetch(base()+'/pause',{method:'POST',headers:hdrs(),body:JSON.stringify({id,paused})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    await load();
+    /* The worker reports which of the two cases actually applied, and it is shown verbatim —
+       "already redeemed, their account is unaffected" is the one you most need to read. */
+    show('connMsg', paused?'err':'ok',
+      (paused?'Access paused. ':'Access resumed. ')+esc(j.effect||''));
+  }catch(e){ if(st)st.textContent=''; show('connMsg','err','Failed: '+esc(e.message)); }
 }
 
 async function wipe(id){
@@ -291,29 +340,57 @@ async function wipe(id){
 
 /* The reply is drafted rather than sent. There is no mail service wired in here, and pretending
    otherwise would mean silently dropping messages you thought had gone out. */
+/* TWO TEMPLATES, drafted rather than sent. There is no mail service wired in here and pretending
+   otherwise would mean silently dropping messages you believed had gone out. This opens your own
+   mail client with everything written, addressed to them, and you press send — so it genuinely
+   comes from you.
+
+   The approval email leads with the code and states the single-use rule twice, in the line that
+   carries the code and again on its own, because it is the one instruction that cannot be retried
+   if it is missed. */
 function mailReply(id){
   const r=requests.find(x=>x.id===id);
   if(!r)return;
-  const origin=location.origin;
-  const body=r.status==='denied'
-    /* This used to end: "Your three calls are still logged and will be marked on the dates you set.
-       We will send you the results either way." No scheduler, no marking job and no mailer exist, so
-       nothing would ever have sent that. The same promise was removed from the landing page in C5
-       and survived here, in the one place it would have been read as a personal commitment. */
-    ? 'Thanks for applying to PerceptFolio.\n\nWe are not able to grant access at this time.\n\n'+
-      'Your request is kept on file. If that changes, we will be in touch.\n\n— NorthBridge, financial branch'
-    : 'Your PerceptFolio access has been approved.\n\n'+
-      'Account type: '+r.status+'\n'+
-      'Invite code: '+(r.code||'')+'  (single use, expires in 30 days)\n'+
-      'Sign in: '+origin+'/terminal/\n\n'+
-      'Setup takes about ten minutes:\n'+
-      '1. Get a free Finnhub key at finnhub.io and paste it into Settings.\n'+
-      '2. Enter your holdings and cash in Portfolio.\n'+
-      '3. Set your rules in Settings, then run a review from Command.\n\n'+
-      'One thing to expect: the Call Scorecard is empty for about ninety days. A fixed-horizon record cannot be built backwards.\n\n'+
+  /* The public site, not location.origin. This page is sometimes opened from localhost while
+     testing, and location.origin would then post a link nobody outside can open — into an email
+     that has already been sent. */
+  const origin='https://perceptfolio.com';
+  const denied=r.status==='denied';
+  const tier=r.status==='business'?'Business — you can manage client portfolios as well as your own'
+                                  :'Personal — your own portfolio';
+
+  const subject=denied
+    ? 'Your PerceptFolio application'
+    : 'Welcome to PerceptFolio — your invite code inside';
+
+  const body=denied
+    ? 'Thanks for applying to PerceptFolio, and for taking the time to write.\n\n'+
+      'We are not able to grant access at this time. That is a decision about fit and capacity right '+
+      'now, not a judgement of you.\n\n'+
+      'Your request stays on file. If that changes, we will be in touch.\n\n'+
+      '— NorthBridge, financial branch'
+
+    : 'Congratulations — your access to PerceptFolio has been approved.\n\n'+
+      'YOUR INVITE CODE:  '+(r.code||'(missing — reissue from the admin queue)')+'\n'+
+      'This code works ONCE, and expires 30 days from today.\n\n'+
+      'Account type: '+tier+'\n'+
+      'Sign in here: '+origin+'/terminal/\n\n'+
+      'To get started, choose Create account and enter your email, a password, and the code above. '+
+      'Because it is single use, it stops working the moment your account exists — so create the '+
+      'account on the device you intend to use, and keep this email until you have.\n\n'+
+      'Setup takes about ten minutes after that:\n\n'+
+      '1. Get a free API key at finnhub.io — two minutes, no card — and paste it into Settings. '+
+      'This is what loads prices and fundamentals.\n'+
+      '2. Enter your holdings and your cash in Portfolio.\n'+
+      '3. Set your buy bar, sell bar and position cap in Settings, then run a review from Command.\n\n'+
+      'One thing to expect so it is not a surprise: the Call Scorecard will be empty for about ninety '+
+      'days. A fixed-horizon record cannot be built backwards — the terminal has to be open on the '+
+      'anniversary to mark the price. Yours starts the day you begin.\n\n'+
+      'Welcome aboard.\n\n'+
       '— NorthBridge, financial branch';
+
   location.href='mailto:'+encodeURIComponent(r.email)+
-    '?subject='+encodeURIComponent('PerceptFolio access')+'&body='+encodeURIComponent(body);
+    '?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
 }
 </script>
 </body>
