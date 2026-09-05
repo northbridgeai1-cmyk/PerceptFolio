@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-05.6';
+const WORKER_VERSION = '2026-09-05.7';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -284,7 +284,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/summarise', '/fred', '/finnhub', '/?slot=']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -493,125 +493,40 @@ async function handle(request, env) {
     return json({ error: 'Method not allowed.' }, 405, env);
   }
 
-  // Auth: Authorization: Bearer <SYNC_SECRET>. Everything past this point is yours alone.
-  const auth = request.headers.get('Authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (!safeEqual(token, env.SYNC_SECRET)) {
-    return json({ error: 'Bad or missing sync key.' }, 401, env);
-  }
+  /* ---- /usync — sync for invited users, without the master key ----
 
-  /* ---- GET /requests — the approval queue ---- */
-  if (url.pathname === '/requests' && request.method === 'GET') {
-    const list = await env.PF_SYNC.list({ prefix: 'req:', limit: 500 });
-    const out = [];
-    for (const k of list.keys) {
-      const v = await env.PF_SYNC.get(k.name);
-      if (v) { try { out.push(JSON.parse(v)); } catch (e) {} }
+     The operator's sync is one shared secret over everything, which is exactly why it could never
+     be handed out. This is the per-user version: the invite code, already minted per person and
+     already carrying the pause flag, is the credential, and each code reads and writes only its own
+     uslot: key. Pausing someone kills their sync in the same click as everything else.
+
+     BE HONEST ABOUT THE TRUST MODEL. The code is a bearer token that travelled once by email.
+     Anyone holding it can read this one portfolio blob — the same class of exposure as the invite
+     itself, confined to the person's own data. It is NOT the operator's secret and grants nothing
+     shared. */
+  if (url.pathname === '/usync') {
+    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+    if (!(await activeGrant(code))) {
+      return json({ error: 'Sync needs a live invite code. If yours was paused, contact the person who issued it.' }, 401, env);
     }
-    out.sort((a, b) => b.createdAt - a.createdAt);
-    return json({ requests: out }, 200, env);
-  }
-
-  /* ---- DELETE /requests?id=... — clear a decided record ---- */
-  if (url.pathname === '/requests' && request.method === 'DELETE') {
-    const id = clean(url.searchParams.get('id'), 40);
-    if (!id) return json({ error: 'Missing id.' }, 400, env);
-    await env.PF_SYNC.delete('req:' + id);
-    return json({ ok: true }, 200, env);
-  }
-
-  /* ---- POST /decide — grant personal, grant business, or deny ----
-     Approval mints a single-use code with a 30-day expiry. Denial keeps the record: knowing who you
-     turned down, and why, is worth as much later as knowing who you let in. */
-  if (url.pathname === '/decide' && request.method === 'POST') {
-    let body;
-    try { body = await request.json(); }
-    catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    const id = clean(body.id, 40);
-    const decision = clean(body.decision, 12).toLowerCase();
-    const note = clean(body.note, 1000);
-    if (!['personal', 'business', 'denied'].includes(decision)) {
-      return json({ error: 'decision must be personal, business or denied.' }, 400, env);
+    const ukey = 'uslot:' + code;
+    if (request.method === 'GET') {
+      const stored = await env.PF_SYNC.get(ukey);
+      if (stored === null) return json({ empty: true }, 200, env);
+      return new Response(stored, { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(env) } });
     }
-    const stored = await env.PF_SYNC.get('req:' + id);
-    if (!stored) return json({ error: 'No such request.' }, 404, env);
-    const rec = JSON.parse(stored);
-
-    rec.status = decision;
-    rec.decidedAt = Date.now();
-    rec.note = note;
-
-    let code = null;
-    if (decision !== 'denied') {
-      code = makeCode();
-      rec.code = code;
-      await env.PF_SYNC.put('code:' + code, JSON.stringify({
-        code, tier: decision, email: rec.email, requestId: id,
-        issuedAt: Date.now(), expiresAt: Date.now() + 30 * 86400000, usedAt: null
-      }), { expirationTtl: 40 * 86400 });
-    }
-    await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
-    return json({ ok: true, decision, code }, 200, env);
-  }
-
-  /* ---- POST /pause — suspend or restore an issued grant ----
-
-     WHAT THIS CAN AND CANNOT DO, because the difference matters and the UI states it too.
-
-     CAN: stop an unredeemed code being used. The holder cannot create an account while paused, and
-     resuming restores the same code rather than forcing a new request through the queue.
-
-     CANNOT: remove access from someone who already redeemed it. The terminal is a public file that
-     keeps its data in the browser's own storage and is built to work offline — it does not phone
-     home, so there is no session to revoke. Anyone who has already created an account keeps it.
-
-     Shipping a button that implied otherwise would be the exact fault this product exists to
-     condemn, so the route reports which of the two cases applies and the admin screen prints it. */
-  if (url.pathname === '/pause' && request.method === 'POST') {
-    let body;
-    try { body = await request.json(); }
-    catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    const id = clean(body.id, 40);
-    const paused = !!body.paused;
-    const stored = await env.PF_SYNC.get('req:' + id);
-    if (!stored) return json({ error: 'No such request.' }, 404, env);
-    const rec = JSON.parse(stored);
-    if (rec.status !== 'personal' && rec.status !== 'business') {
-      return json({ error: 'Only a granted request can be paused.' }, 400, env);
-    }
-
-    rec.paused = paused;
-    rec.pausedAt = paused ? Date.now() : null;
-    await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
-
-    let effect = 'no code on this record';
-    if (rec.code) {
-      const cs = await env.PF_SYNC.get('code:' + rec.code);
-      if (cs) {
-        const inv = JSON.parse(cs);
-        inv.paused = paused;
-        await env.PF_SYNC.put('code:' + rec.code, JSON.stringify(inv),
-          { expirationTtl: 40 * 86400 });
-        effect = inv.usedAt
-          ? (paused ? 'already redeemed — they are locked out at next check-in'
-                    : 'already redeemed — access restored at next check-in')
-          : (paused ? 'the code can no longer be redeemed' : 'the code can be redeemed again');
-      } else {
-        effect = 'the code record has expired, but the grant below still governs access';
+    if (request.method === 'PUT') {
+      const raw = await request.text();
+      if (raw.length > MAX_BYTES) return json({ error: 'Payload too large.' }, 413, env);
+      let parsed;
+      try { parsed = JSON.parse(raw); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.updatedAt !== 'number') {
+        return json({ error: 'Body must be an object with a numeric updatedAt.' }, 400, env);
       }
-      /* THE ONE THAT ACTUALLY REVOKES. code: expires after 40 days; grant: does not, and it is what
-         /status answers from. Updating only the former would make Pause work for six weeks and then
-         silently stop. */
-      const gs = await env.PF_SYNC.get('grant:' + rec.code);
-      if (gs) {
-        const g = JSON.parse(gs);
-        g.paused = paused;
-        await env.PF_SYNC.put('grant:' + rec.code, JSON.stringify(g));
-        effect = paused ? 'they are locked out at their next check-in'
-                        : 'access restored at their next check-in';
-      }
+      await env.PF_SYNC.put(ukey, raw);
+      return json({ ok: true, updatedAt: parsed.updatedAt }, 200, env);
     }
-    return json({ ok: true, paused, effect }, 200, env);
+    return json({ error: 'Method not allowed.' }, 405, env);
   }
 
   /* ---- POST /summarise — attributable news summary ----
@@ -657,6 +572,22 @@ async function handle(request, env) {
        The cache key is a SHA-256 of the exact headline set, so identical inputs always return the
        identical summary and changed inputs always miss. Reproducible and cheaper at once. */
   if (url.pathname === '/summarise' && request.method === 'POST') {
+    /* Dual auth, like /fred: the operator's key, or a live invite code. The code path carries a
+       daily cap because the code is a bearer token that travelled by email — a leaked one should
+       cost at most a day's small allowance of summaries, never an open tap on the AI bill. The
+       operator's own key is uncapped. */
+    const auth2 = request.headers.get('Authorization') || '';
+    const tok2 = auth2.startsWith('Bearer ') ? auth2.slice(7) : '';
+    if (!safeEqual(tok2, env.SYNC_SECRET)) {
+      const code2 = clean(url.searchParams.get('code'), 12).toUpperCase();
+      if (!(await activeGrant(code2))) {
+        return json({ error: 'Summaries need a live invite code or the sync key.' }, 401, env);
+      }
+      const capKey = 'aiq:' + new Date().toISOString().slice(0, 10) + ':' + code2;
+      const used = parseInt((await env.PF_SYNC.get(capKey)) || '0', 10);
+      if (used >= 12) return json({ error: 'Daily summary limit reached for this account. It resets tomorrow.' }, 429, env);
+      await env.PF_SYNC.put(capKey, String(used + 1), { expirationTtl: 172800 });
+    }
     if (!env.AI_API_KEY) {
       return json({ error: 'Worker is missing AI_API_KEY. Add it under Settings > Variables and Secrets as a Secret, then Deploy. Without it the app falls back to its own keyword summary.' }, 500, env);
     }
@@ -796,7 +727,16 @@ async function handle(request, env) {
     return json(payload, 200, env);
   }
 
-  /* ---- Finnhub proxy ----
+
+
+  // Auth: Authorization: Bearer <SYNC_SECRET>. Everything past this point is yours alone.
+  const auth = request.headers.get('Authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!safeEqual(token, env.SYNC_SECRET)) {
+    return json({ error: 'Bad or missing sync key.' }, 401, env);
+  }
+
+/* ---- Finnhub proxy ----
      SO THAT NO DEVICE EVER HOLDS A MARKET-DATA KEY.
 
      The obvious way to make the key "already there" is to type it into terminal/index.html. That
@@ -850,6 +790,120 @@ async function handle(request, env) {
       status: 200,
       headers: { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders(env) }
     });
+  }
+
+  /* ---- GET /requests — the approval queue ---- */
+  if (url.pathname === '/requests' && request.method === 'GET') {
+    const list = await env.PF_SYNC.list({ prefix: 'req:', limit: 500 });
+    const out = [];
+    for (const k of list.keys) {
+      const v = await env.PF_SYNC.get(k.name);
+      if (v) { try { out.push(JSON.parse(v)); } catch (e) {} }
+    }
+    out.sort((a, b) => b.createdAt - a.createdAt);
+    return json({ requests: out }, 200, env);
+  }
+
+  /* ---- DELETE /requests?id=... — clear a decided record ---- */
+  if (url.pathname === '/requests' && request.method === 'DELETE') {
+    const id = clean(url.searchParams.get('id'), 40);
+    if (!id) return json({ error: 'Missing id.' }, 400, env);
+    await env.PF_SYNC.delete('req:' + id);
+    return json({ ok: true }, 200, env);
+  }
+
+  /* ---- POST /decide — grant personal, grant business, or deny ----
+     Approval mints a single-use code with a 30-day expiry. Denial keeps the record: knowing who you
+     turned down, and why, is worth as much later as knowing who you let in. */
+  if (url.pathname === '/decide' && request.method === 'POST') {
+    let body;
+    try { body = await request.json(); }
+    catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const id = clean(body.id, 40);
+    const decision = clean(body.decision, 12).toLowerCase();
+    const note = clean(body.note, 1000);
+    if (!['personal', 'business', 'denied'].includes(decision)) {
+      return json({ error: 'decision must be personal, business or denied.' }, 400, env);
+    }
+    const stored = await env.PF_SYNC.get('req:' + id);
+    if (!stored) return json({ error: 'No such request.' }, 404, env);
+    const rec = JSON.parse(stored);
+
+    rec.status = decision;
+    rec.decidedAt = Date.now();
+    rec.note = note;
+
+    let code = null;
+    if (decision !== 'denied') {
+      code = makeCode();
+      rec.code = code;
+      await env.PF_SYNC.put('code:' + code, JSON.stringify({
+        code, tier: decision, email: rec.email, requestId: id,
+        issuedAt: Date.now(), expiresAt: Date.now() + 30 * 86400000, usedAt: null
+      }), { expirationTtl: 40 * 86400 });
+    }
+    await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
+    return json({ ok: true, decision, code }, 200, env);
+  }
+
+  /* ---- POST /pause — suspend or restore an issued grant ----
+
+     WHAT THIS CAN AND CANNOT DO, because the difference matters and the UI states it too.
+
+     CAN: stop an unredeemed code being used. The holder cannot create an account while paused, and
+     resuming restores the same code rather than forcing a new request through the queue.
+
+     CANNOT: remove access from someone who already redeemed it. The terminal is a public file that
+     keeps its data in the browser's own storage and is built to work offline — it does not phone
+     home, so there is no session to revoke. Anyone who has already created an account keeps it.
+
+     Shipping a button that implied otherwise would be the exact fault this product exists to
+     condemn, so the route reports which of the two cases applies and the admin screen prints it. */
+  if (url.pathname === '/pause' && request.method === 'POST') {
+    let body;
+    try { body = await request.json(); }
+    catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const id = clean(body.id, 40);
+    const paused = !!body.paused;
+    const stored = await env.PF_SYNC.get('req:' + id);
+    if (!stored) return json({ error: 'No such request.' }, 404, env);
+    const rec = JSON.parse(stored);
+    if (rec.status !== 'personal' && rec.status !== 'business') {
+      return json({ error: 'Only a granted request can be paused.' }, 400, env);
+    }
+
+    rec.paused = paused;
+    rec.pausedAt = paused ? Date.now() : null;
+    await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
+
+    let effect = 'no code on this record';
+    if (rec.code) {
+      const cs = await env.PF_SYNC.get('code:' + rec.code);
+      if (cs) {
+        const inv = JSON.parse(cs);
+        inv.paused = paused;
+        await env.PF_SYNC.put('code:' + rec.code, JSON.stringify(inv),
+          { expirationTtl: 40 * 86400 });
+        effect = inv.usedAt
+          ? (paused ? 'already redeemed — they are locked out at next check-in'
+                    : 'already redeemed — access restored at next check-in')
+          : (paused ? 'the code can no longer be redeemed' : 'the code can be redeemed again');
+      } else {
+        effect = 'the code record has expired, but the grant below still governs access';
+      }
+      /* THE ONE THAT ACTUALLY REVOKES. code: expires after 40 days; grant: does not, and it is what
+         /status answers from. Updating only the former would make Pause work for six weeks and then
+         silently stop. */
+      const gs = await env.PF_SYNC.get('grant:' + rec.code);
+      if (gs) {
+        const g = JSON.parse(gs);
+        g.paused = paused;
+        await env.PF_SYNC.put('grant:' + rec.code, JSON.stringify(g));
+        effect = paused ? 'they are locked out at their next check-in'
+                        : 'access restored at their next check-in';
+      }
+    }
+    return json({ ok: true, paused, effect }, 200, env);
   }
 
   /* ---- Device sync ----

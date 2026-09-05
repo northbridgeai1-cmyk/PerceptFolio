@@ -1795,6 +1795,14 @@ body.touring header,body.touring #sidebar{z-index:201}
       <button class="btn btn-ghost" onclick="checkConnection()">Check connection</button>
       <button class="btn-danger btn btn-ghost" onclick="disableSync()">Turn off</button>
     </div>
+    <!-- Shown only to a profile that holds an invite code and is not already syncing. The operator's
+         own account has no invite, so this never appears for them — it is the invited user's route
+         to the one thing the master key used to be the only way to get. -->
+    <div id="codeSyncOffer" style="display:none;margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <b style="font-size:13.5px">Sync with your invite code</b>
+      <p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.55">Your invite code can sync this account across your own devices — no operator key needed. Be aware of the trade: your portfolio is stored on the worker under that code and is readable by anyone holding it, and sync stops the moment your access is paused.</p>
+      <button class="btn btn-sm" style="margin-top:8px" onclick="enableCodeSync()">Turn on code sync</button>
+    </div>
     <p class="muted" id="syncStatus" style="margin-top:10px;font-size:13px"></p>
     <!-- Answers "is any of this actually working" without a terminal, a curl command, or a guess.
          Every failure in this area so far has been one of four things — the worker not reachable,
@@ -2444,7 +2452,7 @@ async function finishLogin(email){
   enterSession();
   /* Pull once on login so you land on whatever the other device left. Deliberately not awaited —
      a slow or unreachable worker must never block getting into the app. */
-  if(syncConfigured()){
+  if(syncActive()){
     syncPull(false)
       .then(r=>{ if(!r.applied&&!r.pushedInstead&&r.empty)return syncPush(); })
       .catch(e=>setSyncStatus('✗ '+e.message,'neg'));
@@ -3016,7 +3024,7 @@ function showTab(t){
   if(t==='risk'){renderBenchmarks();renderRiskContrib();renderSharpe();renderVaR();}
   /* refreshMarketDataCard on every open, not just at login: whether the worker answers changes
      when sync is configured or a custom domain starts resolving, and the card must follow. */
-  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();}
+  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -4814,7 +4822,8 @@ async function summariseNews(sym){
     .filter(n=>n.datetime&&n.datetime*1000>=Date.now()-newsWindow*86400000)
     .sort((a,b)=>b.datetime-a.datetime);
   if(!items.length)return;
-  if(!syncConfigured()){
+  const _sumInvite=(DB.profiles[USER]||{}).invite;
+  if(!syncConfigured()&&!_sumInvite){
     aiSummaries[key]={error:'Written summaries need the Cloudflare Worker. Set it up under Settings → Sync Across Your Devices, then add an AI_API_KEY secret to it.'};
     renderNews();return;
   }
@@ -4822,10 +4831,15 @@ async function summariseNews(sym){
   const mv=moveOver(sym,newsWindow);
   let target='(url not built)';
   try{
-    target=workerUrl('summarise');
+    /* Operator devices authenticate with the key; invited users with their code, which the worker
+       caps per day so a leaked code cannot run up the AI bill. */
+    target=syncConfigured()
+      ? workerUrl('summarise')
+      : INVITE_WORKER+'/summarise?code='+encodeURIComponent(_sumInvite);
     const res=await fetch(target,{
       method:'POST',
-      headers:{'Authorization':'Bearer '+syncCfg.key,'Content-Type':'application/json'},
+      headers:Object.assign(syncConfigured()?{'Authorization':'Bearer '+syncCfg.key}:{},
+        {'Content-Type':'application/json'}),
       body:JSON.stringify({sym,days:newsWindow,move:mv?mv.pct:null,
         headlines:items.slice(0,25).map(n=>({
           t:n.headline||'',s:n.source||'',
@@ -10629,6 +10643,12 @@ function loadSyncCfg(){
   return syncCfg;
 }
 function syncConfigured(){return !!(syncCfg&&syncCfg.url&&syncCfg.key);}
+/* Code-mode sync: an invited user syncing with their invite code instead of the master key. The two
+   modes are kept as separate predicates on purpose — syncConfigured() gates operator-only things
+   (the Finnhub proxy, the request queue, /fred with a bearer) and must stay false in code mode, or
+   an invited device would send "Bearer undefined" at routes it was never meant to reach. */
+function codeSyncActive(){return !!(syncCfg&&syncCfg.url&&syncCfg.code&&!syncCfg.key);}
+function syncActive(){return syncConfigured()||codeSyncActive();}
 function setSyncStatus(msg,cls){
   const el=document.getElementById('syncStatus');
   if(el){el.textContent=msg;el.className=cls?cls:'muted';}
@@ -10640,6 +10660,7 @@ async function syncSlotId(){
 }
 function syncEndpoint(slot){
   const base=syncCfg.url.replace(/\/+$/,'');
+  if(codeSyncActive())return base+'/usync?code='+encodeURIComponent(syncCfg.code);
   return base+'/?slot='+encodeURIComponent(slot);
 }
 /* A single request that tells you which of the four usual failures you have.
@@ -10734,6 +10755,26 @@ async function checkConnection(){
   refreshMarketDataCard();
 }
 
+/* Code sync: the invited user's equivalent of Save & connect. Stores {url, code} with no key, which
+   is what codeSyncActive() keys off — deliberately a different shape from the operator's
+   {url, key}, so no gate can confuse the two. */
+function enableCodeSync(){
+  if(typeof isDemoUser==='function'&&isDemoUser())return toast('Sync is disabled on the test account by design.');
+  const inv=(DB.profiles[USER]||{}).invite;
+  if(!inv)return toast('This profile has no invite code on record.');
+  syncCfg={url:INVITE_WORKER,code:inv};
+  localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg));
+  setSyncStatus('Connecting with your invite code…');
+  refreshMarketDataCard();refreshCodeSyncOffer();
+  syncNow();
+}
+function refreshCodeSyncOffer(){
+  const el=document.getElementById('codeSyncOffer');
+  if(!el)return;
+  const inv=(DB.profiles[USER]||{}).invite;
+  const demo=(typeof isDemoUser==='function'&&isDemoUser());
+  el.style.display=(inv&&!syncActive()&&!demo)?'block':'none';
+}
 function saveSyncConfig(){
   /* Refused rather than ignored: silently accepting a config that will never be used is how you end
      up believing a device is syncing when it is not. */
@@ -10768,11 +10809,13 @@ function syncPayloadFromD(){
 async function syncFetch(method,slot,body){
   const res=await fetch(syncEndpoint(slot),{
     method,
-    headers:Object.assign({'Authorization':'Bearer '+syncCfg.key},
+    headers:Object.assign(syncCfg.key?{'Authorization':'Bearer '+syncCfg.key}:{},
       body?{'Content-Type':'application/json'}:{}),
     body:body||undefined
   });
-  if(res.status===401)throw new Error('Sync key rejected — check it matches SYNC_SECRET exactly.');
+  if(res.status===401)throw new Error(syncCfg.key
+    ?'Sync key rejected — check it matches SYNC_SECRET exactly.'
+    :'Your invite code was not accepted — if your access was paused, sync stops with it.');
   if(!res.ok){
     let detail='';
     try{const j=await res.json();detail=j.error||'';}catch(e){}
@@ -10785,7 +10828,7 @@ async function syncPush(){
      holding a sync key could overwrite the real portfolio with demo holdings — and last-write-wins
      means that would be silent and unrecoverable. Enforced here rather than by hiding buttons. */
   if(isDemoUser()){setSyncStatus('Test account — sync is disabled here.','muted');return{skipped:true};}
-  if(!syncConfigured()||!D)return;
+  if(!syncActive()||!D)return;
   const slot=await syncSlotId();
   const stamp=Date.now();
   const payload={updatedAt:stamp,user:USER,data:syncPayloadFromD()};
@@ -10799,7 +10842,7 @@ async function syncPush(){
 async function syncPull(force){
   // Pulling would drop the real portfolio into the sandbox, which is a data leak into a public login.
   if(isDemoUser()){setSyncStatus('Test account — sync is disabled here.','muted');return{skipped:true};}
-  if(!syncConfigured()||!D)return{applied:false,empty:true};
+  if(!syncActive()||!D)return{applied:false,empty:true};
   const slot=await syncSlotId();
   const remote=await syncFetch('GET',slot);
   if(remote.empty)return{applied:false,empty:true};
@@ -10824,7 +10867,7 @@ async function syncPull(force){
 }
 async function syncPullForce(){
   if(isDemoUser()){setSyncStatus('Test account — sync is disabled here.','muted');return;}
-  if(!syncConfigured())return toast('Set up sync first.');
+  if(!syncActive())return toast('Set up sync first.');
   if(!confirm('Replace everything on this device with the cloud copy? Anything here that hasn\'t been synced will be lost.'))return;
   try{
     setSyncStatus('Pulling…');
@@ -10835,7 +10878,7 @@ async function syncPullForce(){
 }
 async function syncNow(){
   if(isDemoUser()){setSyncStatus('Test account — sync is disabled here.','muted');return;}
-  if(!syncConfigured())return toast('Enter your sync URL and key first.');
+  if(!syncActive())return toast('Enter your sync URL and key first.');
   if(syncing)return;
   syncing=true;
   try{
@@ -10852,14 +10895,14 @@ async function syncNow(){
    so pushing on every save would burn through it in an afternoon. This waits for a lull instead. */
 function scheduleSync(){
   if(isDemoUser())return;   // nothing queued, so nothing can fire after a tab switch either
-  if(!syncConfigured())return;
+  if(!syncActive())return;
   if(syncTimer)clearTimeout(syncTimer);
   syncTimer=setTimeout(()=>{
     syncPush().catch(e=>setSyncStatus('✗ '+e.message,'neg'));
   },8000);
 }
 function flushSync(){
-  if(!syncConfigured()||!syncTimer)return;
+  if(!syncActive()||!syncTimer)return;
   clearTimeout(syncTimer);syncTimer=null;
   syncPush().catch(()=>{});
 }

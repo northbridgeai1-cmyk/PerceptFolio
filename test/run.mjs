@@ -420,9 +420,20 @@ G('Which routes sit above the auth check — a route on the wrong side fails sil
   for (const r of ['/request', '/version', '/invite', '/status', '/fred'])
     t(r + ' must be reachable without the sync key', isPublic(r));
 
-  /* These move money, mint codes, spend quota or read the queue. Operator only. */
-  for (const r of ['/requests', '/decide', '/pause', '/summarise', '/finnhub'])
+  /* Operator only — these read the queue, mint codes, or spend the shared 60/min Finnhub quota
+     that every user's market data depends on. /finnhub in particular must stay here: it was
+     briefly carried above the wall by an edit that sliced between two comment banners, which
+     would have let anyone exhaust the quota. */
+  for (const r of ['/requests', '/decide', '/pause', '/finnhub'])
     t(r + ' must require the sync key', exists(r) && !isPublic(r));
+
+  /* /summarise is dual-auth by design: operator key, or a live invite code under a daily cap. It
+     sits above the wall and does its own checking, so "requires the key" is the wrong assertion —
+     what matters is that it cannot be called with neither. */
+  t('/summarise authenticates itself rather than relying on the wall',
+    isPublic('/summarise') &&
+    /Summaries need a live invite code or the sync key/.test(worker) &&
+    /Daily summary limit reached/.test(worker));
 
   /* Every route the worker advertises must actually be implemented. This is the check that caught
      /finnhub being deleted by an edit that sliced from one comment banner to the next. */
@@ -494,6 +505,31 @@ t('throttled to one look per 15 minutes', /_pendingReqs\.at<15\*60\*1000/.test(t
 t('pending requests appear as a Command action', /kind:'ACCESS',sym:'QUEUE'/.test(term));
 t('no email is claimed, because the worker cannot send any',
   /the worker cannot send any/.test(term));
+
+/* ==================== PER-USER SYNC AND SUMMARIES ==================== */
+G('Invited users get sync and summaries without the master key');
+
+t('/usync exists and is keyed on the invite code', /url\.pathname === '\/usync'/.test(worker) &&
+  /const ukey = 'uslot:' \+ code/.test(worker));
+t('a paused grant loses sync with everything else', /if \(!\(await activeGrant\(code\)\)\)/.test(worker));
+/* Each code addresses only its own key, so one user cannot read another's blob. */
+t('one code cannot reach another code\'s slot',
+  !/uslot:' \+ (?!code)/.test(worker));
+t('the same 2MB ceiling and updatedAt contract as operator sync',
+  /raw\.length > MAX_BYTES/.test(worker) && /typeof parsed\.updatedAt !== 'number'/.test(worker));
+
+t('summaries are capped per code per day', /aiq:' \+ new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/.test(worker) &&
+  /used >= 12/.test(worker));
+t('the operator key is uncapped', /if \(!safeEqual\(tok2, env\.SYNC_SECRET\)\) \{/.test(worker));
+
+t('code sync is a distinct shape from operator sync', /function codeSyncActive/.test(term) &&
+  /syncCfg&&syncCfg\.url&&syncCfg\.code&&!syncCfg\.key/.test(term));
+t('operator-only gates still use syncConfigured, not syncActive',
+  /if\(!syncConfigured\(\)\|\|!syncCfg\.key\)return/.test(term));
+t('the offer is hidden from the operator and the demo', /const demo=\(typeof isDemoUser/.test(term));
+t('the trade-off is stated before they turn it on', /readable by anyone holding it/.test(term));
+t('a rejected code explains that a pause stops sync',
+  /if your access was paused, sync stops with it/i.test(term));
 
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
