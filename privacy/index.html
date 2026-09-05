@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Privacy | PerceptFolio</title>
+<meta name="description" content="What PerceptFolio does with data, written from the code rather than a template. No cookies, no analytics, no trackers.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#0b0c0f; --panel:#131519; --panel2:#1a1d23; --line:#24272f; --line2:#2f333c;
+  --text:#eef0f3; --dim:#8d939f; --faint:#5d636e;
+  --accent:#3b82f6; --green:#2ea043; --red:#e5534b; --amber:#d9a441;
+  --brand2:#1f9e8c;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);
+  font:15px/1.68 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:860px;margin:0 auto;padding:0 26px}
+nav{border-bottom:1px solid var(--line);background:rgba(11,12,15,.94);position:sticky;top:0;z-index:20;backdrop-filter:blur(12px)}
+.nav-in{display:flex;align-items:center;gap:14px;height:56px}
+.logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  display:inline-flex;align-items:center;gap:7px;text-decoration:none}
+.logo-word{display:inline-flex;letter-spacing:-.01em}
+.logo .c1{color:var(--text)} .logo .c2{color:var(--brand2)}
+.nav-back{margin-left:auto;font:11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--faint);text-decoration:none;padding:8px 11px;border-radius:5px}
+.nav-back:hover{color:var(--text);background:var(--panel)}
+header{padding:62px 0 44px;border-bottom:1px solid var(--line)}
+.eyebrow{font:11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+h1{font-size:clamp(29px,5vw,44px);line-height:1.08;letter-spacing:-.03em;font-weight:750;max-width:20ch}
+.lede{color:var(--dim);font-size:16px;line-height:1.7;max-width:66ch;margin-top:20px}
+.band{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:36px}
+.cell{background:var(--panel);padding:20px 18px}
+.cell-n{font:700 30px/1 var(--mono);letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.cell-l{font-size:11.5px;color:var(--faint);margin-top:9px;line-height:1.5}
+section{padding:52px 0;border-bottom:1px solid var(--line)}
+.sec-head{display:flex;align-items:baseline;gap:13px;margin-bottom:16px;flex-wrap:wrap}
+.sec-n{font:700 22px/1 var(--mono);letter-spacing:-.03em}
+.sec-k{font:11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+h2{font-size:23px;line-height:1.2;letter-spacing:-.02em;font-weight:700}
+.body{color:var(--dim);font-size:14.5px;line-height:1.8;margin-top:16px}
+.body b{color:var(--text);font-weight:620}
+.rule{border:1px solid rgba(59,130,246,.26);background:rgba(59,130,246,.05);border-radius:9px;padding:18px 20px;margin:44px 0}
+.rule b{color:#79a8f4;font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.rule p{color:var(--dim);font-size:14px;line-height:1.7;margin-top:9px}
+footer{padding:34px 0 48px;color:var(--faint);font-size:12.5px;line-height:1.7}
+footer a{color:var(--accent)}
+.g{color:var(--green)} .r{color:var(--red)} .f{color:var(--faint)}
+@media(max-width:760px){.band{grid-template-columns:repeat(2,1fr)}}
+</style>
+<style>
+.legal h2{font-size:19px;letter-spacing:-.015em;margin:34px 0 10px;font-weight:650}
+.legal h3{font-size:15px;margin:20px 0 6px;font-weight:650;color:var(--text)}
+.legal p{color:var(--dim);margin-bottom:12px}
+.legal ul{color:var(--dim);margin:0 0 12px 20px}
+.legal li{margin-bottom:7px}
+.legal b{color:var(--text)}
+.legal table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+.legal th,.legal td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.legal th{font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.legal td{color:var(--dim)}
+.updated{font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:26px}
+.callout{border:1px solid var(--line2);border-left:3px solid var(--amber);background:var(--panel);
+  border-radius:7px;padding:14px 16px;margin:18px 0}
+.callout p{margin:0;color:var(--dim);font-size:14px}
+header.legal-head{padding:52px 0 8px}
+header.legal-head h1{font-size:clamp(28px,4vw,40px);line-height:1.1;letter-spacing:-.03em;font-weight:750}
+footer{border-top:1px solid var(--line);margin-top:56px;padding:26px 0;color:var(--faint);font-size:13px}
+footer a{color:var(--dim)}
+</style>
+</head>
+<body>
+<nav><div class="wrap nav-in">
+  <a href="/" class="logo">
+    <svg width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--line2)" stroke-width="1.5"/>
+      <text x="5" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text>
+      <text x="20" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text>
+    </svg>
+    <span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span>
+  </a>
+  <a class="nav-back" href="/">Back to the site</a>
+</div></nav>
+<div class="wrap legal">
+<header class="legal-head"><h1>Privacy</h1></header>
+<div class="updated">Last updated 5 September 2026</div>
+
+<p class="lede">This describes what the software actually does with data, which is unusually little. It was written by reading the code, not by adapting a template, and every claim below is checkable against the source.</p>
+
+<div class="callout"><p><b>The short version.</b> Your portfolio never leaves your browser unless you switch on sync. There are no cookies, no analytics, no trackers and no advertising. Nobody at NorthBridge can see your holdings.</p></div>
+
+<h2>1. Where your data lives</h2>
+<p>The terminal is a single web page that runs entirely in your browser. Your holdings, cash, watchlists, theses, rules and the record of calls it has graded are stored in that browser's <b>localStorage</b>. They are not uploaded anywhere by default.</p>
+<p>This has a consequence worth stating plainly: <b>if you clear your browser storage, that data is gone.</b> We cannot recover it, because we never had it. Safari deletes site storage after seven days without a visit, which is why the app asks you to export a backup.</p>
+
+<h3>Account credentials</h3>
+<p>Your email and password create a profile in that same browser storage. The password is hashed with SHA-256 before it is stored and is never transmitted. There is no server-side account, and therefore no password reset.</p>
+
+<h2>2. What leaves your browser, and when</h2>
+<table>
+  <thead><tr><th>Goes to</th><th>What</th><th>When</th></tr></thead>
+  <tbody>
+    <tr><td>Finnhub</td><td>The ticker symbols you look up, plus your IP address</td><td>Whenever prices, fundamentals or news are fetched. Unavoidable: it is the market data source.</td></tr>
+    <tr><td>Our Cloudflare Worker</td><td>Access requests; invite validation; if you enable sync, your whole profile</td><td>Only on those actions. Sync is off unless you turn it on.</td></tr>
+    <tr><td>St. Louis Fed (via our worker)</td><td>Nothing about you. Four public economic series.</td><td>When the Market tab is open.</td></tr>
+    <tr><td>Anthropic (via our worker)</td><td>News headlines for a ticker you asked about. No portfolio data.</td><td>Only if you press "Write me a summary".</td></tr>
+  </tbody>
+</table>
+<p>Each of these is a separate company with its own privacy policy. We pass on no more than the table says.</p>
+
+<h2>3. What we store on our side</h2>
+<p>Our Cloudflare Worker holds only the following, and nothing else:</p>
+<ul>
+  <li><b>Access requests</b>: the email and description you submit, any optional call you write, plus your IP address and browser user-agent, which are recorded to rate-limit abuse.</li>
+  <li><b>Invite codes and grants</b>: the code issued to you, its tier, and whether it has been redeemed or paused.</li>
+  <li><b>Call registries and marks</b>: if you use the terminal, the ticker, date and entry price of calls awaiting a scheduled mark. No holdings, no share counts, no cash.</li>
+  <li><b>Sync data</b>: only if you enable sync. Then it is your profile as-is, stored under a key derived from your account.</li>
+</ul>
+<p>Cloudflare, as our infrastructure provider, sees the IP address of requests to the worker. We do not add analytics on top of that.</p>
+
+<h2>4. What we do not do</h2>
+<ul>
+  <li>No cookies are set by this site. You can verify that in your browser's storage inspector.</li>
+  <li>No analytics, no tag managers, no session recording, no fingerprinting.</li>
+  <li>No advertising, and no sale or sharing of data with advertisers or data brokers.</li>
+  <li>No connection to any brokerage. The terminal cannot see or place trades.</li>
+  <li>No marketing email. The only email you receive is a direct reply about your access request.</li>
+</ul>
+
+<h2>5. Retention and deletion</h2>
+<p>Data in your browser is deleted when you delete the profile in Settings, or when you clear site storage. That is immediate and total.</p>
+<p>On the worker: invite codes expire after 40 days; the record of a grant persists while the account exists. Access requests are kept until deleted, including refused ones, because knowing who was turned down and why is part of the record. Sync data is overwritten each time you sync and removed on request.</p>
+<p>To have anything on our side deleted, email <a href="mailto:northbridgeai1@gmail.com">northbridgeai1@gmail.com</a> from the address on the request. It is a small operation and requests are handled by a person.</p>
+
+<h2>6. Your rights</h2>
+<p>You can export everything the app holds about you at any time, from Settings, as a JSON file. That is the complete set, not a summary. If you are in the UK or EU, the rights of access, rectification, erasure and portability apply, and the export button already satisfies the first and last of them without asking anyone.</p>
+
+<h2>7. Changes</h2>
+<p>If this policy changes in a way that affects what leaves your browser, the change will be described here with the date. Silent broadening is exactly the practice this document exists to avoid.</p>
+<p>Questions: <a href="mailto:northbridgeai1@gmail.com">northbridgeai1@gmail.com</a>.</p>
+
+</div>
+<footer><div class="wrap">
+  <p>PerceptFolio is operated by NorthBridge's financial branch. Access is granted per person; there is no public version.
+  <a href="/">Front page</a> &nbsp;·&nbsp; <a href="/privacy/">Privacy</a> &nbsp;·&nbsp; <a href="/terms/">Terms</a></p>
+</div></footer>
+</body>
+</html>

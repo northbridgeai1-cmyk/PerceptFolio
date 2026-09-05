@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Access queue — PerceptFolio</title>
+<title>Access queue | PerceptFolio</title>
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#0b0c0f">
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
@@ -120,7 +120,7 @@ tr:last-child td{border-bottom:none}
       <div class="msg" id="connMsg"></div>
       <p class="dim" style="font-size:11.5px;margin-top:12px;line-height:1.55">
         Both values are stored in this browser only, under a separate key from the terminal's own sync settings.
-        This page is publicly reachable like every other file here — it is useless without the secret, but do not
+        This page is publicly reachable like every other file here; it is useless without the secret, but do not
         treat the URL as private.</p>
     </div>
   </div>
@@ -179,7 +179,7 @@ async function load(){
     if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
     requests=j.requests||[];
     render();
-    show('connMsg','ok','Queue reloaded — '+requests.length+' record'+(requests.length===1?'':'s')+'.');
+    show('connMsg','ok','Queue reloaded, '+requests.length+' record'+(requests.length===1?'':'s')+'.');
   }catch(e){show('connMsg','err','Reload failed: '+esc(e.message));}
 }
 
@@ -237,7 +237,7 @@ function render(){
         '<td>'+Number(c.target).toFixed(2)+'</td>'+
         '<td>'+Number(c.stop).toFixed(2)+'</td>'+
         '<td class="dim">'+esc(c.by)+'</td>'+
-        '<td class="'+(m&&m.ok?'':'warn')+'">'+(m?(m.ok?'coherent':'target on wrong side of stop'):'—')+'</td>'+
+        '<td class="'+(m&&m.ok?'':'warn')+'">'+(m?(m.ok?'coherent':'target on wrong side of stop'):'-')+'</td>'+
       '</tr>';
     }).join('');
     return '<div class="req" id="r-'+esc(r.id)+'">'+
@@ -305,7 +305,7 @@ async function decide(id,decision){
     const j=await r.json();
     if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
     await load();
-    if(j.code)show('connMsg','ok','Granted <b>'+esc(decision)+'</b>. Code <b>'+esc(j.code)+'</b> — single use, expires in 30 days. Opening the welcome email…');
+    if(j.code)show('connMsg','ok','Granted <b>'+esc(decision)+'</b>. Code <b>'+esc(j.code)+'</b>. Single use, expires in 30 days. Opening the welcome email…');
     else show('connMsg','ok','Request denied and recorded. Opening the decline email…');
     /* Deciding and telling them are one action in practice, so the draft opens straight away rather
        than waiting to be remembered. The button stays for redrafting. */
@@ -357,38 +357,38 @@ function mailReply(id){
      that has already been sent. */
   const origin='https://perceptfolio.com';
   const denied=r.status==='denied';
-  const tier=r.status==='business'?'Business — you can manage client portfolios as well as your own'
-                                  :'Personal — your own portfolio';
+  const tier=r.status==='business'?'Business, you can manage client portfolios as well as your own'
+                                  :'Personal. Your own portfolio';
 
   const subject=denied
     ? 'Your PerceptFolio application'
-    : 'Welcome to PerceptFolio — your invite code inside';
+    : 'Welcome to PerceptFolio. Your invite code inside';
 
   const body=denied
     ? 'Thanks for applying to PerceptFolio, and for taking the time to write.\n\n'+
       'We are not able to grant access at this time. That is a decision about fit and capacity right '+
       'now, not a judgement of you.\n\n'+
       'Your request stays on file. If that changes, we will be in touch.\n\n'+
-      '— NorthBridge, financial branch'
+      '- NorthBridge, financial branch'
 
-    : 'Congratulations — your access to PerceptFolio has been approved.\n\n'+
-      'YOUR INVITE CODE:  '+(r.code||'(missing — reissue from the admin queue)')+'\n'+
+    : 'Congratulations. Your access to PerceptFolio has been approved.\n\n'+
+      'YOUR INVITE CODE:  '+(r.code||'(missing. Reissue from the admin queue)')+'\n'+
       'This code works ONCE, and expires 30 days from today.\n\n'+
       'Account type: '+tier+'\n'+
       'Sign in here: '+origin+'/terminal/\n\n'+
       'To get started, choose Create account and enter your email, a password, and the code above. '+
-      'Because it is single use, it stops working the moment your account exists — so create the '+
+      'Because it is single use, it stops working the moment your account exists, so create the '+
       'account on the device you intend to use, and keep this email until you have.\n\n'+
       'Setup takes about ten minutes after that:\n\n'+
-      '1. Get a free API key at finnhub.io — two minutes, no card — and paste it into Settings. '+
+      '1. Get a free API key at finnhub.io, two minutes, no card, and paste it into Settings. '+
       'This is what loads prices and fundamentals.\n'+
       '2. Enter your holdings and your cash in Portfolio.\n'+
       '3. Set your buy bar, sell bar and position cap in Settings, then run a review from Command.\n\n'+
       'One thing to expect so it is not a surprise: the Call Scorecard will be empty for about ninety '+
-      'days. A fixed-horizon record cannot be built backwards — the terminal has to be open on the '+
+      'days. A fixed-horizon record cannot be built backwards, the terminal has to be open on the '+
       'anniversary to mark the price. Yours starts the day you begin.\n\n'+
       'Welcome aboard.\n\n'+
-      '— NorthBridge, financial branch';
+      '- NorthBridge, financial branch';
 
   location.href='mailto:'+encodeURIComponent(r.email)+
     '?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);

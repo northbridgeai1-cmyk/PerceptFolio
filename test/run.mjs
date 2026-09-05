@@ -99,6 +99,8 @@ G('Promise audit — the site may not claim what the code does not do');
    same trap that produced two false failures earlier in this suite's life. Only rendered text can
    make a promise, so only rendered text is audited. */
 const admin = read('admin.html');
+const privacy = read('privacy/index.html');
+const terms = read('terms/index.html');
 const stripComments = h => h
   .replace(/<!--[\s\S]*?-->/g, '')
   .replace(/\/\*[\s\S]*?\*\//g, '');
@@ -394,7 +396,7 @@ t('the access check cannot hang login — it aborts after 5s into the grace path
 
 t('there are two distinct email templates', /const denied=r\.status==='denied'/.test(admin));
 t('the approval email congratulates and leads with the code',
-  /Congratulations — your access to PerceptFolio has been approved/.test(admin) &&
+  /Congratulations[.,—]? ?[Yy]our access to PerceptFolio has been approved/.test(admin) &&
   /YOUR INVITE CODE:/.test(admin));
 t('single use is stated twice, once on the code line',
   /This code works ONCE, and expires 30 days from today/.test(admin) &&
@@ -543,12 +545,15 @@ t('the sign-up promise is checked against the live DOM, not asserted',
   /const gated=\/id="newInvite"\/\.test\(document\.documentElement\.innerHTML\)/.test(term));
 t('it reads the same record function as the headline strip, so they cannot drift',
   /const rec=callRecord\(90\)/.test(term));
+/* Punctuation-agnostic on purpose: these assert BEHAVIOUR, and a copy edit that changes a dash
+   to a comma must not read as a regression. */
 t('a missing cron trigger is reported as a breach, not silence',
-  /NEVER RUN — the Cron Trigger is missing/.test(term));
+  /NEVER RUN[^<]{0,4}the Cron Trigger is missing/.test(term));
 t('a stale cron is caught even if it once ran', /ageH>=36/.test(term));
 t('an unreachable worker says so rather than assuming the favourable answer',
   /could not read \/version/.test(term));
-t('a never-exported profile is a red row', /NEVER — everything here is one cleared cache from gone/.test(term));
+t('a never-exported profile is a red row',
+  /No backup exists\.<\/b> Everything here lives only in this browser/.test(term));
 
 /* CLEANUP */
 t('the dead version-skew fallback is gone', !/queue is mid-update/.test(idx));
@@ -626,6 +631,60 @@ t('Escape closes the open dialog', /e\.key==='Escape'&&_addOpen/.test(term));
 t('the backdrop closes it but a click inside does not',
   /e\.target\.id===_addOpen\)closeAddModal/.test(term));
 t('only one dialog can be open at a time', /function openAdd\(id\)\{\s*\n\s*closeAddModal\(\)/.test(term));
+
+/* ==================== HOUSE STYLE ==================== */
+G('No AI-template tells');
+
+{
+  const pages = {index:idx, terminal:term, refused:read('refused/index.html'),
+                 '404':read('404.html'), thanks:read('thanks.html'), admin, privacy, terms};
+  const rendered = h => h.replace(/<!--[\s\S]*?-->/g,'').replace(/\/\*[\s\S]*?\*\//g,'');
+
+  /* Em dashes are legitimate punctuation; the objection is to the density, which read as generated.
+     Source comments keep theirs, since only rendered text is seen. */
+  const dashes = Object.entries(pages).filter(([,h]) => rendered(h).includes('—')).map(([n]) => n);
+  t('no em dashes in rendered text', dashes.length === 0, dashes.length ? dashes.join(', ') : 'all pages clean');
+
+  /* Coloured emoji used as status icons. Monochrome dingbats (close, favourite, pass/fail) are
+     conventional UI marks and deliberately kept. */
+  const emoji = Object.entries(pages)
+    .filter(([,h]) => /[\u{1F300}-\u{1FAFF}]/u.test(rendered(h))).map(([n]) => n);
+  t('no coloured emoji icons', emoji.length === 0, emoji.length ? emoji.join(', ') : 'none');
+
+  t('no purple or violet gradient', !/gradient\([^)]*(?:purple|#[89ab][0-9a-f]{2}[0-9a-f]{2}f)/i.test(idx + term));
+  t('no pill-shaped buttons', !/\.btn[^{]*\{[^}]*border-radius:\s*(?:999|9999|50%)/.test(idx + term));
+  t('no scroll-triggered reveal animations', !/IntersectionObserver/.test(idx) && !/onscroll/.test(idx));
+  t('no testimonials or review widgets', !/testimonial|trusted by|customers say|★★★/i.test(rendered(idx)));
+
+  /* The headline counts must match the code they describe. */
+  const q = (term.match(/add\(out\.quality,/g)||[]).length;
+  const pr = (term.match(/add\(out\.priceChecks,/g)||[]).length;
+  const mo = (term.match(/add\(out\.momentum,/g)||[]).length;
+  t('the "22 checks" claim matches the code', q === 12 && pr === 6 && mo === 4 && q+pr+mo === 22,
+    `${q} quality + ${pr} value + ${mo} momentum`);
+}
+
+/* ==================== LEGAL PAGES ==================== */
+G('Privacy and Terms exist, are reachable, and are accepted at sign-up');
+
+t('both pages exist as folders with index.html (case-sensitive host, no rewrites)',
+  privacy.length > 3000 && terms.length > 3000);
+t('privacy states the no-cookie, no-analytics position', /no cookies, no analytics/i.test(privacy));
+t('privacy names every third party that receives anything',
+  /Finnhub/.test(privacy) && /Cloudflare/.test(privacy) && /Anthropic/.test(privacy) && /St\. Louis Fed/.test(privacy));
+t('terms lead with not-advice', /not investment advice/i.test(terms) &&
+  /not a registered investment adviser/i.test(terms));
+t('terms state that data loss is unrecoverable', /We cannot restore what we never had/.test(terms));
+t('the landing footer links both', /href="\/privacy\/"/.test(idx) && /href="\/terms\/"/.test(idx));
+
+t('sign-up has an acceptance checkbox', /id="agreeTerms"/.test(term));
+t('creation is refused without it', /if\(!agreed\)return toast/.test(term));
+/* Order matters: refusing after validation would burn a single-use invite code on a rejected
+   sign-up, and the applicant would need a new one. */
+t('acceptance is checked before the invite code is validated',
+  term.indexOf('if(!agreed)return toast') < term.indexOf("'/invite?code='"));
+t('what was accepted is recorded on the profile', /acceptedTerms:\{at:Date\.now\(\)/.test(term));
+t('the links open in a new tab so the form is not lost', /href="\/terms\/" target="_blank"/.test(term));
 
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');

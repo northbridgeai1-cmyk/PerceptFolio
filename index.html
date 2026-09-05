@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>PerceptFolio — NorthBridge internal terminal</title>
+<title>PerceptFolio | NorthBridge internal terminal</title>
 <meta name="description" content="Internal investment terminal operated by NorthBridge's financial branch. Access restricted to authorised personnel.">
 <meta name="theme-color" content="#0b0c0f">
 <!-- Out of search results, but CRAWLABLE. "nofollow" would have stopped a crawler ever
@@ -266,7 +266,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
   <div class="wrap" style="position:relative">
     <div class="cmdline">northbridge:financial $ <b>perceptfolio --status</b><span class="cur"></span></div>
     <h1>Internal investment terminal.</h1>
-    <p class="sub">The system NorthBridge's financial branch runs on. Every other tool in this category sells you signals. This one keeps a record of what it told you — marked against the index on a horizon it cannot move afterwards, and reported whether or not the result flatters the system.</p>
+    <p class="sub">The system NorthBridge's financial branch runs on. Every other tool in this category sells you signals. This one keeps a record of what it told you, marked against the index on a horizon it cannot move afterwards, and reported whether or not the result flatters the system.</p>
     <div class="cta">
       <a class="btn btn-p btn-lg" href="/terminal/">Sign in to the terminal</a>
       <a class="btn btn-lg" href="#access">Request access</a>
@@ -309,11 +309,11 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
          on a page view. -->
     <div class="demo" id="demo">
       <div class="demo-head">
-        <span class="demo-k">Try it — make a call on real history</span>
+        <span class="demo-k">Try it. Make a call on real history</span>
         <span class="demo-rec" id="demoRec"></span>
       </div>
       <div id="demoStage">
-        <p class="demo-intro">Three years of real daily closes, ticker hidden. Call it, set a horizon, and watch the mark land against the S&amp;P — the same way the terminal marks every verdict it issues.</p>
+        <p class="demo-intro">Three years of real daily closes, ticker hidden. Call it, set a horizon, and watch the mark land against the S&amp;P, the same way the terminal marks every verdict it issues.</p>
         <button class="btn btn-p" id="demoStart" type="button">Deal me a series</button>
       </div>
     </div>
@@ -324,13 +324,13 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
     </div>
 
     <div class="panel">
-      <div class="panel-h"><span class="pip" style="background:var(--green)"></span> call scorecard — structure</div>
+      <div class="panel-h"><span class="pip" style="background:var(--green)"></span> call scorecard. Structure</div>
       <table>
         <thead><tr><th>Ticker</th><th>Call</th><th>Held</th><th>vs index</th><th>Result</th></tr></thead>
         <tbody>
-          <tr><td class="dim">—</td><td class="dim">BUY</td><td class="dim">90d</td><td class="dim">—</td><td class="dim">awaiting mark</td></tr>
-          <tr><td class="dim">—</td><td class="dim">SELL</td><td class="dim">90d</td><td class="dim">—</td><td class="dim">awaiting mark</td></tr>
-          <tr><td class="dim">—</td><td class="dim">BUY</td><td class="dim">30d</td><td class="dim">—</td><td class="dim">awaiting mark</td></tr>
+          <tr><td class="dim">-</td><td class="dim">BUY</td><td class="dim">90d</td><td class="dim">-</td><td class="dim">awaiting mark</td></tr>
+          <tr><td class="dim">-</td><td class="dim">SELL</td><td class="dim">90d</td><td class="dim">-</td><td class="dim">awaiting mark</td></tr>
+          <tr><td class="dim">-</td><td class="dim">BUY</td><td class="dim">30d</td><td class="dim">-</td><td class="dim">awaiting mark</td></tr>
         </tbody>
       </table>
       <div class="panel-f">Empty by design. A fixed-horizon record cannot be reconstructed backwards, so every account's record begins the day it begins. Anything presenting a completed history on day one is presenting something it never had to live through.</div>
@@ -349,7 +349,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       </div>
       <div class="goal">
         <div class="goal-k">The constraint</div>
-        <p><b>A stated ruin tolerance that sizing is never allowed to breach.</b> Three limits bind every position — policy cap, volatility budget, distance to stop — and the smallest one wins. Being right about the company and wrong about the size is how accounts end.</p>
+        <p><b>A stated ruin tolerance that sizing is never allowed to breach.</b> Three limits bind every position, policy cap, volatility budget, distance to stop, and the smallest one wins. Being right about the company and wrong about the size is how accounts end.</p>
       </div>
       <div class="goal">
         <div class="goal-k">The threshold</div>
@@ -359,10 +359,10 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
              with 12-point dispersion is 138 — forty was optimistic by about 3.5x, and optimistic in
              the direction that declares an edge proven while it is still noise. The terminal now
              computes this live from the observed sample, so the target moves as the record does. -->
-        <p><b>The record counts as evidence when the arithmetic says so, not at a round number.</b> The calls needed to separate a real edge from luck is <span class="mono">(1.96 × dispersion ÷ edge)²</span> — roughly <b>138</b> at a two-point edge with twelve-point dispersion. The terminal computes it from your own marks as they accumulate and shows the gap. Below it, the interval straddles zero almost regardless of the point estimate, and the honest reading is <em>don't know</em>.</p>
+        <p><b>The record counts as evidence when the arithmetic says so, not at a round number.</b> The calls needed to separate a real edge from luck is <span class="mono">(1.96 × dispersion ÷ edge)²</span>. Roughly <b>138</b> at a two-point edge with twelve-point dispersion. The terminal computes it from your own marks as they accumulate and shows the gap. Below it, the interval straddles zero almost regardless of the point estimate, and the honest reading is <em>don't know</em>.</p>
       </div>
     </div>
-    <p class="lede" style="margin-top:26px">Why it is put this way: a hit rate is the most manufacturable statistic in finance. Sell covered calls, take profit at +0.5%, never stop out, hold the losers to recovery, and you can report being right nine times in ten while losing money on every third gap-down — 80% of wins at +1% against 20% of losses at −10% is an expectancy of <b class="neg">−1.2% per trade</b>. Right nearly always, and reliably bankrupt. Expectancy cannot be dressed up that way, because the large loss stays in the average.</p>
+    <p class="lede" style="margin-top:26px">Why it is put this way: a hit rate is the most manufacturable statistic in finance. Sell covered calls, take profit at +0.5%, never stop out, hold the losers to recovery, and you can report being right nine times in ten while losing money on every third gap-down, 80% of wins at +1% against 20% of losses at −10% is an expectancy of <b class="neg">−1.2% per trade</b>. Right nearly always, and reliably bankrupt. Expectancy cannot be dressed up that way, because the large loss stays in the average.</p>
   </div>
 </section>
 
@@ -370,7 +370,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
   <div class="wrap">
     <div class="sec-head"><span class="sec-no">02</span><span class="sec-k">Access</span></div>
     <h2>Access is granted per person.</h2>
-    <p class="lede">Tell us who you are and what you would use it for. Requests are read by someone who can act on them, and access is tied to what you will actually be doing with the terminal — if it is not the right tool for your work, you will be told that plainly.</p>
+    <p class="lede">Tell us who you are and what you would use it for. Requests are read by someone who can act on them, and access is tied to what you will actually be doing with the terminal. If it is not the right tool for your work, you will be told that plainly.</p>
 
     <form class="form" id="reqForm" autocomplete="off">
       <div class="form-h"><span class="pip" style="background:var(--accent)"></span> access request</div>
@@ -390,7 +390,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
              to anyone who wants to make a checkable claim, without making it a barrier. -->
         <div class="fg">
           <label for="rqCalls">A call you would stand behind <span class="muted" style="font-weight:400">(optional)</span></label>
-          <textarea id="rqCalls" rows="2" placeholder="e.g. BUY NVDA, target 260, stop 190, by 2027-03-01 — or leave blank"></textarea>
+          <textarea id="rqCalls" rows="2" placeholder="e.g. BUY NVDA, target 260, stop 190, by 2027-03-01, or leave blank"></textarea>
           <p class="hint">Not required, and not scored. A claim with a target, a stop and a date is simply harder to argue with later than a paragraph is.</p>
         </div>
         <button class="btn btn-p btn-lg" type="submit" id="rqBtn">Submit request</button>
@@ -404,7 +404,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       <div class="step"><h3><span class="step-n">2</span> Granted per person</h3>
         <p>Credentials are issued individually, never to a team, so every action in the ledger traces to someone. Approval specifies whether the account is personal or carries client books.</p></div>
       <div class="step"><h3><span class="step-n">3</span> Bring your own data key</h3>
-        <p>The terminal does not resell market data. You connect a free Finnhub key of your own — two minutes, no card. Client work additionally requires the shared macro proxy.</p></div>
+        <p>The terminal does not resell market data. You connect a free Finnhub key of your own. Two minutes, no card. Client work additionally requires the shared macro proxy.</p></div>
       <div class="step"><h3><span class="step-n">4</span> Thesis before position</h3>
         <p>Any position taken through the terminal carries a written thesis, a stop and a deadline recorded when it is opened. A reason invented after the price moves is not a reason.</p></div>
     </div>
@@ -422,7 +422,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       <div class="tile"><div class="tile-h"><span class="tag t2">Scorecard</span></div>
         <p>Every verdict the system has issued, marked against the index at 30, 90, 180 and 365 days. Reported with a confidence interval, so a thin sample reads as a thin sample rather than a result.</p></div>
       <div class="tile"><div class="tile-h"><span class="tag t3">Sizing</span></div>
-        <p>Three limits before any trade — policy cap, volatility budget, distance to stop — and the smallest one binds. Being right about the company and wrong about the size is how accounts end.</p></div>
+        <p>Three limits before any trade, policy cap, volatility budget, distance to stop, and the smallest one binds. Being right about the company and wrong about the size is how accounts end.</p></div>
       <div class="tile"><div class="tile-h"><span class="tag t3">Drawdown</span></div>
         <p>Not where the book might finish but the hole it passes through. Sampled from real market history rather than a normal curve, because losses arrive in runs and a bell curve cannot represent that.</p></div>
       <div class="tile"><div class="tile-h"><span class="tag t4">Supply map</span></div>
@@ -440,9 +440,9 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
     <p class="lede">Forty-five modules were considered for this terminal. Eighteen are live. Sixteen are impossible on retail market data at any effort. Eleven were declined on evidence.</p>
 
     <div class="band-g" style="margin-top:34px;border:1px solid var(--line);border-radius:9px;overflow:hidden">
-      <div class="cell"><div class="cell-n" style="color:var(--green)">18</div><div class="cell-l">live — running in<br>the terminal today</div></div>
-      <div class="cell"><div class="cell-n" style="color:var(--faint)">16</div><div class="cell-l">impossible — the data<br>does not exist at this tier</div></div>
-      <div class="cell"><div class="cell-n" style="color:var(--red)">11</div><div class="cell-l">declined — on evidence,<br>with the reason recorded</div></div>
+      <div class="cell"><div class="cell-n" style="color:var(--green)">18</div><div class="cell-l">live, running in<br>the terminal today</div></div>
+      <div class="cell"><div class="cell-n" style="color:var(--faint)">16</div><div class="cell-l">impossible, the data<br>does not exist at this tier</div></div>
+      <div class="cell"><div class="cell-n" style="color:var(--red)">11</div><div class="cell-l">declined. On evidence,<br>with the reason recorded</div></div>
       <div class="cell"><div class="cell-n">0</div><div class="cell-l">built to look<br>impressive</div></div>
     </div>
 
@@ -463,7 +463,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
 
     <div class="notice" style="margin-top:30px;border-color:rgba(59,130,246,.26);background:rgba(59,130,246,.05)">
       <b style="color:#79a8f4">The rule that governs this list</b>
-      <p>No further analytics are added until the call scorecard holds enough marks for its own arithmetic to clear zero — a figure the terminal derives from the observed edge and dispersion rather than asserting, and which is nearer 138 than the 40 first guessed here. Evidence arrives at one day per day and no amount of building accelerates it, so every module added before then would change the interface without changing what is known. Most of the list is risk machinery — it exists to make being wrong survivable, not to make being right more frequent, and treating it as the second thing is the most common error made with it.</p>
+      <p>No further analytics are added until the call scorecard holds enough marks for its own arithmetic to clear zero, a figure the terminal derives from the observed edge and dispersion rather than asserting, and which is nearer 138 than the 40 first guessed here. Evidence arrives at one day per day and no amount of building accelerates it, so every module added before then would change the interface without changing what is known. Most of the list is risk machinery; it exists to make being wrong survivable, not to make being right more frequent, and treating it as the second thing is the most common error made with it.</p>
     </div>
   </div>
 </section>
@@ -478,7 +478,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       <details><summary>Is any of this investment advice?</summary>
         <p>No. The terminal applies rules its operator configures to public data and shows the arithmetic. When it says BUY, that means the position cleared the bar that operator set. It has no view on anyone's circumstances, makes no recommendation, and takes no custody. Judgement stays with the person at the keyboard.</p></details>
       <details><summary>Does it promise to beat the market?</summary>
-        <p>It promises nothing about returns, and you will not find a performance figure anywhere in this product. What it does is measure — every call marked against the index on a fixed horizon, reported with a confidence interval wide enough to show when the sample is too thin to mean anything. A tool that tells you it wins is selling. A tool that tells you how often it was wrong is working.</p></details>
+        <p>It promises nothing about returns, and you will not find a performance figure anywhere in this product. What it does is measure. Every call marked against the index on a fixed horizon, reported with a confidence interval wide enough to show when the sample is too thin to mean anything. A tool that tells you it wins is selling. A tool that tells you how often it was wrong is working.</p></details>
       <details><summary>Where does my data live?</summary>
         <p>In your own browser. Holdings, prices, notes and history are stored locally on the device you use. With sync enabled it goes to a private store controlled by NorthBridge, protected by a key held per device. There is no central database holding anyone's book.</p></details>
       <details><summary>Why is my scorecard empty when I start?</summary>
@@ -505,6 +505,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
       © <span id="yr">2026</span> NorthBridge. PerceptFolio is internal software for organising research and applying rules set by its operator. It is not offered to the public, is not investment advice, does not take custody of assets and does not execute trades. Nothing here is a recommendation to buy or sell any security. Investing carries risk, including loss of principal. Past performance, including any record shown inside the terminal, does not predict future results.
     </div>
   </div>
+  <p style="margin-top:12px;font-size:12.5px"><a href="/privacy/">Privacy</a> &nbsp;·&nbsp; <a href="/terms/">Terms of use</a> &nbsp;·&nbsp; <a href="/refused/">What we refused to build</a></p>
 </footer>
 
 <div class="statusbar">
@@ -514,7 +515,7 @@ footer{padding:44px 0 54px;font-size:12.5px;color:var(--faint)}
        implied one. If the header is absent the browser substitutes the current time, so the value is
        checked for plausibility and the field hides itself rather than showing today's date as if it
        meant something. -->
-  <div class="sb opt" id="sbBuildWrap"><b>DEPLOYED</b> <span id="sbBuild">—</span></div>
+  <div class="sb opt" id="sbBuildWrap"><b>DEPLOYED</b> <span id="sbBuild">-</span></div>
   <div class="sb opt"><b>ACCESS</b> restricted</div>
   <div class="sb"><b id="sbClock">--:--:--</b> <span id="sbZone">UTC</span></div>
 </div>
@@ -721,7 +722,7 @@ function demoMark(){
     '<canvas class="demo-canvas" id="demoCv"></canvas>'+
     '<div class="demo-out">'+
       '<div class="demo-verdict '+(good?'pos':'neg')+'">'+
-        (good?'Right — and ahead of the index.':'Wrong against the index.')+'</div>'+
+        (good?'Right, and ahead of the index.':'Wrong against the index.')+'</div>'+
       '<div class="demo-nums">'+
         '<div><div class="demo-n '+(stockRet>=0?'pos':'neg')+'">'+(stockRet>=0?'+':'')+stockRet.toFixed(1)+'%</div><div class="demo-l">the series, '+hz+'d</div></div>'+
         '<div><div class="demo-n '+(spyRet>=0?'pos':'neg')+'">'+(spyRet>=0?'+':'')+spyRet.toFixed(1)+'%</div><div class="demo-l">S&amp;P, same days</div></div>'+
@@ -744,11 +745,11 @@ function demoMark(){
    right about the direction and still behind the index, or wrong and rescued by the market. */
 function demoSay(edge,hit,stockRet,spyRet,dir){
   if(edge>0&&stockRet>0&&spyRet>0&&dir==='BUY')
-    return 'It rose <b>and</b> beat the index. Both halves are needed — a rise that trails the S&amp;P is a position you would have done better without.';
+    return 'It rose <b>and</b> beat the index. Both halves are needed, a rise that trails the S&amp;P is a position you would have done better without.';
   if(edge>0)return 'The call earned its place against the benchmark, which is the only comparison that decides whether holding it was worth doing.';
   if(stockRet>0&&dir==='BUY')
     return 'It went <b>up</b>, and you were still behind the index. This is the outcome that flatters every tool that reports raw return, and it is why the scorecard reports edge instead.';
-  if(!hit)return 'The target was never touched and the horizon expired. Neither right nor wrong — the thesis simply never happened, and the money sat there. That is the third outcome nobody plans for.';
+  if(!hit)return 'The target was never touched and the horizon expired. Neither right nor wrong, the thesis simply never happened, and the money sat there. That is the third outcome nobody plans for.';
   return 'Marked against the index and it did not work. Recorded as-is: this is the number the terminal would show you, whether or not it flattered the system.';
 }
 
@@ -781,10 +782,10 @@ function demoSummary(){
           ? 'On '+n+' call'+(n===1?'':'s')+' this number means nothing at all, and it is worth sitting with that. '
           : (straddles
             ? 'The 95% interval runs '+lo.toFixed(1)+' to +'+hi.toFixed(1)+' and <b>crosses zero</b>, so on this evidence you are indistinguishable from chance. '
-            : 'The 95% interval is '+lo.toFixed(1)+' to '+hi.toFixed(1)+', which does not cross zero. On this handful of calls that is a real signal — and a handful is still a handful. '))+
+            : 'The 95% interval is '+lo.toFixed(1)+' to '+hi.toFixed(1)+', which does not cross zero. On this handful of calls that is a real signal, and a handful is still a handful. '))+
         'That is the entire idea. The terminal does this to every verdict it issues, on fixed horizons set in advance that cannot be moved afterwards, and reports the answer whether or not it flatters the system. '+
         '<b>Its own scorecard is empty</b>, because a record cannot be reconstructed backwards.</p>'+
-      '<p class="demo-say" style="color:var(--faint);font-size:12px"><b>How this demo can mislead you:</b> ten large US listings over three particular years, and you chose the horizon after seeing the history — a freedom the real thing does not give you, since the deadline is fixed before the outcome is known. It shows you the mechanism, not your skill.</p>'+
+      '<p class="demo-say" style="color:var(--faint);font-size:12px"><b>How this demo can mislead you:</b> ten large US listings over three particular years, and you chose the horizon after seeing the history, a freedom the real thing does not give you, since the deadline is fixed before the outcome is known. It shows you the mechanism, not your skill.</p>'+
     '</div>'+
     '<div class="demo-row"><button class="btn btn-p" type="button" id="demoAgain2">Go again</button>'+
       '<a class="btn" href="#access">Request access</a></div>';
