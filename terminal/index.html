@@ -2364,8 +2364,17 @@ async function checkAccess(email){
   const last=(st[key]&&st[key].at)||0;
   const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
   try{
-    const r=await fetch(base+'/status?code='+encodeURIComponent(code),{cache:'no-store'});
-    const j=await r.json();
+    /* Five-second ceiling. A worker that FAILS falls into the grace path below — but a worker that
+       HANGS would hang this await, and this await sits between the sign-in button and the app. A
+       slow server must never be able to hold the door shut, so a timeout converts a hang into the
+       same offline path a failure takes. */
+    const ctl=new AbortController();
+    const tm=setTimeout(()=>ctl.abort(),5000);
+    let r,j;
+    try{
+      r=await fetch(base+'/status?code='+encodeURIComponent(code),{cache:'no-store',signal:ctl.signal});
+      j=await r.json();
+    }finally{clearTimeout(tm);}
     if(j&&j.known&&j.active===false){
       st[key]={at:Date.now(),paused:true};setAccessState(st);
       return{allow:false,reason:'paused'};

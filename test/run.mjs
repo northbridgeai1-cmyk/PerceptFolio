@@ -389,6 +389,8 @@ t('the durable grant record has no TTL',
 t('pausing updates the durable grant, not just the expiring code',
   /await env\.PF_SYNC\.put\('grant:' \+ rec\.code, JSON\.stringify\(g\)\)/.test(worker));
 t('a locked-out user can still export their own data', /blockedExport/.test(term));
+t('the access check cannot hang login — it aborts after 5s into the grace path',
+  /new AbortController\(\)/.test(term) && /setTimeout\(\(\)=>ctl\.abort\(\),5000\)/.test(term));
 
 t('there are two distinct email templates', /const denied=r\.status==='denied'/.test(admin));
 t('the approval email congratulates and leads with the code',
