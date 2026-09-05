@@ -241,6 +241,26 @@ t('the no-VIX path no longer keys off mere existence either',
 t('a stale close is never labelled "right now"',
   /moveDay==='today'&&live&&liveOwn/.test(term));
 
+/* ==================== C1 — BETA-ADJUSTED MARKS ==================== */
+G('C1 acceptance: no mark renders anywhere without a beta beside it');
+
+t('Jensen alpha exists and follows r_p - [r_f + beta(r_m - r_f)]',
+  /function jensenAlpha/.test(term) && /stockRet-\(rf\+beta\*\(spyRet-rf\)\)/.test(term));
+t('beta is estimated as cov/var from the stored series',
+  /function betaVsSpy/.test(term) && /cov\/varm/.test(term));
+t('the risk-free leg is scaled to the holding period, not annualised',
+  /RF_ANNUAL\*\(heldDays\/365\)/.test(term));
+t('a call with no beta is not graded', /if\(stockRet==null\|\|spyRet==null\|\|beta==null/.test(term));
+t('the scorecard table carries a beta column', /<th title="Sensitivity to the market[^>]*>&beta;<\/th>/.test(term));
+t('raw excess return is kept but labelled unadjusted',
+  /vs SPY <span style="font-weight:400;opacity:\.6">\(raw\)<\/span>/.test(term));
+t('an ungraded row says "no beta" rather than showing a number',
+  /no beta<\/span>/.test(term));
+t('the headline no longer calls raw excess return an edge vs SPY',
+  /pts per call, beta-adjusted/.test(term) && !/pts per call vs SPY/.test(term));
+t('the aggregate is beta-adjusted too, not just the rows',
+  /callEdge\(c,jensenAlpha\(stockRet,spyRet,bi\?bi\.beta:null,held\)\)/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

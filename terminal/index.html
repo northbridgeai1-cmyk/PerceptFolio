@@ -1362,7 +1362,7 @@ body.touring header,body.touring #sidebar{z-index:201}
     <div id="scorecardSummary"></div>
     <div style="overflow-x:auto;margin-top:14px">
       <table>
-        <thead><tr><th>Ticker</th><th>Called</th><th>Call</th><th>Scores</th><th>Held</th><th>Price then</th><th>At mark</th><th>Stock</th><th>SPY</th><th>vs SPY</th><th>Verdict</th></tr></thead>
+        <thead><tr><th>Ticker</th><th>Called</th><th>Call</th><th>Scores</th><th>Held</th><th>Price then</th><th>At mark</th><th>Stock</th><th>SPY</th><th title="Return minus SPY, with no adjustment for the risk taken to get it">vs SPY <span style="font-weight:400;opacity:.6">(raw)</span></th><th title="Sensitivity to the market, estimated from daily closes">&beta;</th><th title="Jensen's alpha: return in excess of what this beta earned you for free">&alpha;</th><th>Verdict</th></tr></thead>
         <tbody id="scorecardBody"></tbody>
       </table>
     </div>
@@ -9750,6 +9750,59 @@ function expectancyStats(edges){
     hi:se!=null?expectancy+1.96*se:null
   };
 }
+/* ================= C1 — JENSEN'S ALPHA =================
+
+   THE ERROR THIS REPLACES, because it is the specific kind that feels like evidence.
+
+   The scorecard reported r_portfolio - r_SPY and called it alpha. That is raw excess return, and it
+   credits the operator for risk they merely took. A book with beta 1.5 in a market returning 10% is
+   EXPECTED to return 15%; deliver 12% and the old screen printed "+2% vs SPY" while true alpha was
+   about -3%. It reported success on a failure.
+
+   Worse, the error scales with concentration. A more concentrated, higher-beta book shows a larger
+   fake edge, so the number pushed toward exactly the behaviour it should have warned about, and it
+   arrived wearing the authority of a measured result.
+
+     beta  = cov(r_s, r_m) / var(r_m)
+     alpha = r_p - [ r_f + beta*(r_m - r_f) ]
+
+   The risk-free leg is scaled to the holding period rather than annualised, because a 30-day mark
+   and a 365-day mark cannot share one r_f.
+
+   NO MARK IS GRADED WITHOUT A BETA. Where history is too short to estimate one, the row renders as
+   ungraded and says so, rather than silently falling back to the raw difference — falling back is
+   how the old number would quietly return. */
+const RF_ANNUAL=4.5;                       // per cent, same assumption the risk screens already use
+const BETA_MIN_OBS=40;                     // below this the estimate is noise, not a number
+let _betaCache={},_betaCacheAt=0;
+
+function betaVsSpy(sym){
+  if(Date.now()-_betaCacheAt>5*60*1000){_betaCache={};_betaCacheAt=Date.now();}
+  if(sym in _betaCache)return _betaCache[sym];
+  let out=null;
+  if(sym==='SPY'){out={beta:1,n:null,assumed:true};}
+  else{
+    const al=alignedReturns([sym,'SPY']);
+    if(al&&al.rets[0].length>=BETA_MIN_OBS){
+      const rs=al.rets[0],rm=al.rets[1];
+      const ms=rs.reduce((a,b)=>a+b,0)/rs.length, mm=rm.reduce((a,b)=>a+b,0)/rm.length;
+      let cov=0,varm=0;
+      for(let i=0;i<rs.length;i++){cov+=(rs[i]-ms)*(rm[i]-mm);varm+=(rm[i]-mm)*(rm[i]-mm);}
+      if(varm>0)out={beta:cov/varm,n:rs.length,assumed:false};
+    }
+  }
+  _betaCache[sym]=out;
+  return out;
+}
+
+/* Holding-period Jensen's alpha. Returns null when beta is unknown, which is what suppresses the
+   mark downstream. */
+function jensenAlpha(stockRet,spyRet,beta,heldDays){
+  if(stockRet==null||spyRet==null||beta==null||!(heldDays>0))return null;
+  const rf=RF_ANNUAL*(heldDays/365);
+  return stockRet-(rf+beta*(spyRet-rf));
+}
+
 function callEdge(c,alpha){
   if(alpha==null)return null;
   if(c.verdict==='buy')return alpha;
@@ -9782,8 +9835,15 @@ function scorecardRows(){
       }
       const stockRet=(c.price>0&&now!=null)?((now-c.price)/c.price*100):null;
       const spyRet=(c.spy>0&&bench!=null)?((bench-c.spy)/c.spy*100):null;
-      const alpha=(stockRet!=null&&spyRet!=null)?(stockRet-spyRet):null;
-      return{c,now,stockRet,spyRet,alpha,edge:callEdge(c,alpha),heldDays,pending,missed};
+      /* raw is kept and shown, clearly labelled unadjusted, so the adjustment can be checked
+         rather than taken on trust. alpha is the beta-adjusted figure and the only one graded. */
+      const raw=(stockRet!=null&&spyRet!=null)?(stockRet-spyRet):null;
+      const bi=betaVsSpy(c.sym);
+      const beta=bi?bi.beta:null;
+      const alpha=jensenAlpha(stockRet,spyRet,beta,heldDays);
+      return{c,now,stockRet,spyRet,raw,beta,betaN:bi?bi.n:null,alpha,
+             edge:callEdge(c,alpha),heldDays,pending,missed,
+             ungraded:(raw!=null&&alpha==null)};
     })
     .sort((a,b)=>b.c.ts-a.c.ts);
 }
@@ -9812,7 +9872,11 @@ function callRecord(days){
     if(!mk||mk.missed||!(c.price>0)||!(c.spy>0))return;
     const stockRet=(mk.price-c.price)/c.price*100;
     const spyRet=(mk.spy-c.spy)/c.spy*100;
-    const edge=callEdge(c,stockRet-spyRet);
+    /* Same rule in the aggregate as on the row: unadjusted excess return is not an edge, so a call
+       whose beta cannot be estimated contributes nothing rather than contributing a wrong number. */
+    const bi=betaVsSpy(c.sym);
+    const held=days+((mk.lag||0));
+    const edge=callEdge(c,jensenAlpha(stockRet,spyRet,bi?bi.beta:null,held));
     if(edge==null)return;
     marked.push({c,edge});
   });
@@ -9882,7 +9946,7 @@ function recordStripHTML(){
   return '<div class="rec-head">Track record · 90-day marks</div>'+
     '<div class="rec-top">'+
       '<span class="rec-val '+(straddles?'':(e>=0?'pos':'neg'))+'">'+sign(e)+
-        '<span class="rec-unit">pts per call vs SPY</span></span>'+
+        '<span class="rec-unit">pts per call, beta-adjusted</span></span>'+
       '<span class="rec-ci">95% CI '+(st.lo!=null?sign(st.lo)+' to '+sign(st.hi):'n too small')+'</span>'+
     '</div>'+
     '<div class="rec-read '+cls+'">'+read+'</div>'+
@@ -10050,7 +10114,7 @@ function renderScorecard(){
       (missed?'<p class="muted" style="font-size:12px;margin-top:8px">'+missed+' call'+(missed===1?' was':'s were')+' excluded: their anniversary passed while the app was closed, so no honest mark exists. Counting them at whatever price happened to be next would fake the holding period.</p>':'');
   }
 
-  tb.innerHTML=graded.map(({c,now,stockRet,spyRet,alpha,edge,heldDays})=>{
+  tb.innerHTML=graded.map(({c,now,stockRet,spyRet,raw,beta,betaN,alpha,edge,heldDays,ungraded})=>{
     const pill=c.verdict==='buy'?'pill-buy':c.verdict==='sell'?'pill-sell':c.verdict==='watch'?'pill-watch':'pill-na';
     return '<tr>'+
       '<td><b>'+esc(c.sym)+'</b></td>'+
@@ -10062,8 +10126,17 @@ function renderScorecard(){
       '<td>'+(now!=null?fmt$(now):'—')+'</td>'+
       '<td class="'+(stockRet>=0?'pos':'neg')+'">'+(stockRet>=0?'+':'')+stockRet.toFixed(2)+'%</td>'+
       '<td class="muted">'+(spyRet>=0?'+':'')+spyRet.toFixed(2)+'%</td>'+
-      '<td class="'+(alpha>=0?'pos':'neg')+'">'+(alpha>=0?'+':'')+alpha.toFixed(2)+'</td>'+
-      '<td>'+(edge==null?'<span class="muted">not scored</span>'
+      /* raw excess return, kept visible and explicitly marked unadjusted so the beta adjustment can
+         be checked against it rather than believed. */
+      '<td class="muted" title="Unadjusted: return minus SPY, no beta">'+(raw==null?'—':(raw>=0?'+':'')+raw.toFixed(2))+'</td>'+
+      /* THE ACCEPTANCE CRITERION: a beta sits beside every mark, and where there is none the row
+         says so instead of showing a number that would be read as alpha. */
+      '<td class="'+(beta==null?'muted':'')+'" title="'+(betaN?betaN+' daily observations':'insufficient history')+'">'+
+        (beta==null?'—':beta.toFixed(2))+'</td>'+
+      '<td class="'+(alpha==null?'muted':(alpha>=0?'pos':'neg'))+'">'+
+        (alpha==null?'—':(alpha>=0?'+':'')+alpha.toFixed(2))+'</td>'+
+      '<td>'+(ungraded?'<span class="warn" title="Needs '+BETA_MIN_OBS+' daily closes to estimate beta">no beta</span>'
+        :edge==null?'<span class="muted">not scored</span>'
         :'<b class="'+(edge>0?'pos':'neg')+'">'+(edge>0?'right':'wrong')+'</b>')+'</td>'+
     '</tr>';
   }).join('');
