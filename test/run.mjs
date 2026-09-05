@@ -218,6 +218,29 @@ t('returns are date-aligned across every ticker', /dates\.every\?|dates=Object\.
 t('tracking error is never presented as a standalone verdict',
   /how different, not how good/.test(term));
 
+/* ==================== 4e. THE DAY TOGGLE ==================== */
+G('Today vs Yesterday — broken three times, so the shape of the fix is asserted');
+
+/* The bug each time was asking "is there a live quote" instead of "which session does it
+   describe". Outside market hours Finnhub returns the last completed session — the same one
+   FRED's newest row holds — so the two tabs rendered one number twice. */
+t('session identity is decided by date, not by whether a quote exists',
+  /function liveIsOwnSession\(data,spx\)/.test(term) && /sd>spx\[0\]\.date/.test(term));
+t('a quote with no timestamp falls back to comparing the moves',
+  /Math\.abs\(fredMove-data\.LIVE\.pct\)>0\.005/.test(term));
+t('the FRED path no longer keys the offset off mere existence of a quote',
+  !/const off=\(moveDay==='yesterday'&&!data\.LIVE\)\?1:0/.test(term));
+t('the FRED path offsets from what today actually rendered',
+  /const todayShowsSpx0=!\(data\.LIVE&&ownSession\)/.test(term));
+t('"today" only uses the live quote when it is its own session',
+  /moveDay==='today'&&data\.LIVE&&ownSession/.test(term));
+t('the no-VIX path applies the same test against its own log',
+  /const liveOwnSession=!!\(live&&\(!newest\|\|Math\.abs\(newest\.pct-live\.pct\)>0\.005\)\)/.test(term));
+t('the no-VIX path no longer keys off mere existence either',
+  !/const off=\(moveDay==='yesterday'&&live\)\?0:/.test(term));
+t('a stale close is never labelled "right now"',
+  /moveDay==='today'&&live&&liveOwn/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

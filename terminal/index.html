@@ -9075,7 +9075,13 @@ async function loadMarketData(force){
         try{
           const q=await getQuote('SPY');
           if(q&&isFinite(q.c)&&isFinite(q.pc)&&q.pc>0){
-            solo.LIVE={price:q.c,prevClose:q.pc,pct:(q.c-q.pc)/q.pc*100,at:Date.now()};
+            solo.LIVE={price:q.c,prevClose:q.pc,pct:(q.c-q.pc)/q.pc*100,at:Date.now(),
+              /* WHICH SESSION this quote describes, which is not the same as when it was fetched.
+                 Outside market hours Finnhub returns the last close against the one before it, so
+                 the quote is a COMPLETED session — the very session FRED's newest row also holds.
+                 Without this date the two are indistinguishable and "today" and "yesterday" render
+                 the same number. q.t is the exchange timestamp for the quote. */
+              sessionDate:(q.t&&isFinite(q.t))?new Date(q.t*1000).toISOString().slice(0,10):null};
             macroCache.LIVE=solo.LIVE;
             logPrice('SPY',q.c);
             try{ await backfillPrices('SPY'); }catch(e){}
@@ -9109,7 +9115,13 @@ async function loadMarketData(force){
       try{
         const q=await getQuote('SPY');
         if(q&&isFinite(q.c)&&isFinite(q.pc)&&q.pc>0){
-          out.LIVE={price:q.c,prevClose:q.pc,pct:(q.c-q.pc)/q.pc*100,at:Date.now()};
+          out.LIVE={price:q.c,prevClose:q.pc,pct:(q.c-q.pc)/q.pc*100,at:Date.now(),
+              /* WHICH SESSION this quote describes, which is not the same as when it was fetched.
+                 Outside market hours Finnhub returns the last close against the one before it, so
+                 the quote is a COMPLETED session — the very session FRED's newest row also holds.
+                 Without this date the two are indistinguishable and "today" and "yesterday" render
+                 the same number. q.t is the exchange timestamp for the quote. */
+              sessionDate:(q.t&&isFinite(q.t))?new Date(q.t*1000).toISOString().slice(0,10):null};
           macroCache.LIVE=out.LIVE;
           /* SPY closes go into the app's own price log, exactly as ticker prices do.
              THE POINT: the volatility ruler on this panel used to come only from FRED, so no
@@ -9223,10 +9235,19 @@ function renderMoveWithoutVix(el,data,errMsg){
        live quote present -> today is live, so yesterday is the newest logged session (offset 0)
        no live quote      -> today is already offset 0, so yesterday is offset 1 */
   let actual=null,shownDate=null,isLive=false;
-  if(moveDay==='today'&&live){
+  const newest0=spySessionMove(0);
+  const liveOwn=!!(live&&(!newest0||Math.abs(newest0.pct-live.pct)>0.005));
+  if(moveDay==='today'&&live&&liveOwn){
     actual=live.pct;isLive=true;
   }else{
-    const off=(moveDay==='yesterday'&&live)?0:(moveDay==='yesterday'?1:0);
+    /* Same trap as the FRED path, same fix. `live` being present says nothing about WHICH session
+       it describes: with the market shut it is the newest logged close, i.e. spySessionMove(0). If
+       it matches that to within half a basis point it is that session, so yesterday steps back one
+       further. Checked against the log rather than against FRED, which is absent on this path. */
+    const newest=spySessionMove(0);
+    const liveOwnSession=!!(live&&(!newest||Math.abs(newest.pct-live.pct)>0.005));
+    const todayShowsNewest=!liveOwnSession;
+    const off=(moveDay==='yesterday')?(todayShowsNewest?1:0):0;
     const mv=spySessionMove(off);
     if(mv){actual=mv.pct;shownDate=mv.date;}
   }
@@ -9268,6 +9289,28 @@ function renderMoveWithoutVix(el,data,errMsg){
       '<b>Cloudflare worker</b> (not to this app\'s Settings). See SYNC-SETUP.md, step 5b.'+
       (errMsg?'<br><span style="opacity:.75">Worker said: '+esc(errMsg)+'</span>':'')+
     '</div>';
+}
+
+/* THE DISTINCTION THE DAY TOGGLE TURNS ON.
+
+   A live quote is only a separate day from FRED's newest close while the market is OPEN. Once it
+   shuts, Finnhub hands back that same session's close against the prior one — identical to
+   spx[0] vs spx[1]. Two earlier attempts at this bug asked "is there a live quote", which is the
+   wrong question and is why the toggle kept showing one number twice.
+
+   Prefer the exchange timestamp. Fall back to comparing the moves themselves, because a quote with
+   no usable timestamp still gives itself away: if it matches FRED's newest session to within half a
+   basis point, it IS that session. */
+function liveIsOwnSession(data,spx){
+  if(!data||!data.LIVE)return false;
+  if(!spx||spx.error||!spx.length)return true;
+  const sd=data.LIVE.sessionDate;
+  if(sd)return sd>spx[0].date;
+  if(spx.length>=2&&spx[1].value>0){
+    const fredMove=(spx[0].value-spx[1].value)/spx[1].value*100;
+    return Math.abs(fredMove-data.LIVE.pct)>0.005;
+  }
+  return true;
 }
 
 function renderTodaysMove(data){
@@ -9353,9 +9396,12 @@ function renderTodaysMove(data){
     return;
   }
 
+  /* Only treat the quote as "today" when it is genuinely a session of its own. With the market shut
+     it is the last completed session, which is what the FRED branch below already renders — showing
+     it as "right now" was both a duplicate and a lie about freshness. */
+  const ownSession=liveIsOwnSession(data,spx);
   let actual=null,spxDate=null,live=false;
-  if(moveDay==='today'&&data.LIVE){
-    // Live SPY from Finnhub — the only genuinely "today" number available.
+  if(moveDay==='today'&&data.LIVE&&ownSession){
     actual=data.LIVE.pct;spxDate='live';live=true;
   }else if(spx&&!spx.error&&spx.length>=2){
     /* YESTERDAY HAS TO STEP BACK A SESSION, and which session depends on what "today" showed.
@@ -9367,7 +9413,11 @@ function renderTodaysMove(data){
        FRED publishes end-of-day about a day in arrears, so spx[0] is the last COMPLETED session:
          - live quote present -> "today" is the live figure, so "yesterday" is spx[0] vs spx[1].
          - no live quote      -> "today" already shows spx[0], so "yesterday" must be spx[1] vs spx[2]. */
-    const off=(moveDay==='yesterday'&&!data.LIVE)?1:0;
+    /* "Yesterday" is one session before whatever "today" showed. If today rendered the live quote,
+       today is newer than spx[0], so yesterday IS spx[0]. If today fell through to here, today is
+       already spx[0], so yesterday must be spx[1]. */
+    const todayShowsSpx0=!(data.LIVE&&ownSession);
+    const off=(moveDay==='yesterday')?(todayShowsSpx0?1:0):0;
     if(spx.length>=off+2){
       actual=(spx[off].value-spx[off+1].value)/spx[off+1].value*100;
       spxDate=spx[off].date;
