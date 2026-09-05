@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Terms | PerceptFolio</title>
-<meta name="description" content="Terms for PerceptFolio, a private research terminal. Not investment advice; NorthBridge is not a registered adviser.">
+<title>Terms of Use | PerceptFolio</title>
+<meta name="description" content="Terms of Use for PerceptFolio, a private research terminal. Not investment advice; NorthBridge is not a registered adviser.">
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
@@ -78,24 +78,50 @@ a:focus-visible,button:focus-visible,summary:focus-visible,
 }
 </style>
 <style>
-.legal h2{font-size:19px;letter-spacing:-.015em;margin:34px 0 10px;font-weight:650}
-.legal h3{font-size:15px;margin:20px 0 6px;font-weight:650;color:var(--text)}
-.legal p{color:var(--dim);margin-bottom:12px}
-.legal ul{color:var(--dim);margin:0 0 12px 20px}
-.legal li{margin-bottom:7px}
-.legal b{color:var(--text)}
-.legal table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
-.legal th,.legal td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-.legal th{font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.legal{max-width:760px}
+.legal-body{font-family:Georgia,"Times New Roman",Times,serif;font-size:15.5px;line-height:1.72}
+.legal-body p{color:var(--dim);margin-bottom:13px}
+.doc-title{font-family:Georgia,"Times New Roman",serif;font-size:clamp(26px,3.4vw,36px);
+  line-height:1.15;letter-spacing:-.01em;font-weight:700;margin-bottom:6px}
+.doc-meta{font:10.5px/1.6 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0;margin:22px 0 30px;
+  display:flex;gap:26px;flex-wrap:wrap}
+.doc-meta span b{color:var(--dim);font-weight:400}
+.preamble{border:1px solid var(--line2);background:var(--panel);border-radius:6px;padding:18px 20px;margin-bottom:32px}
+.preamble p{margin:0;font-size:14.5px;color:var(--dim)}
+.preamble p+p{margin-top:10px}
+.clause{margin:30px 0 0}
+.clause h2{font-family:Georgia,"Times New Roman",serif;font-size:17px;font-weight:700;color:var(--text);
+  margin-bottom:10px;letter-spacing:0}
+.clause h2 .num{font-family:var(--mono);font-size:13px;color:var(--faint);margin-right:10px;font-weight:400}
+.clause h3{font-family:Georgia,serif;font-size:15px;font-weight:700;color:var(--text);margin:16px 0 6px}
+.sub{counter-reset:none;margin:0 0 12px 0;padding-left:28px}
+.sub li{color:var(--dim);margin-bottom:8px;font-size:15px;line-height:1.7}
+.defs{border-left:2px solid var(--line2);padding-left:16px;margin:16px 0}
+.defs dt{font-weight:700;color:var(--text);font-size:14.5px;margin-top:10px;font-family:Georgia,serif}
+.defs dd{color:var(--dim);margin:3px 0 0;font-size:14.5px}
+.legal table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.legal th,.legal td{text-align:left;padding:10px 12px;border:1px solid var(--line);vertical-align:top}
+.legal th{font:10.5px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  background:var(--panel)}
 .legal td{color:var(--dim)}
-.updated{font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:26px}
-.callout{border:1px solid var(--line2);border-left:3px solid var(--amber);background:var(--panel);
-  border-radius:7px;padding:14px 16px;margin:18px 0}
-.callout p{margin:0;color:var(--dim);font-size:14px}
-header.legal-head{padding:52px 0 8px}
-header.legal-head h1{font-size:clamp(28px,4vw,40px);line-height:1.1;letter-spacing:-.03em;font-weight:750}
-footer{border-top:1px solid var(--line);margin-top:56px;padding:26px 0;color:var(--faint);font-size:13px}
-footer a{color:var(--dim)}
+.notice{border:1px solid var(--line2);border-left:3px solid var(--amber);background:var(--panel);
+  padding:15px 18px;margin:20px 0;border-radius:4px}
+.notice p{margin:0;font-size:14.5px;color:var(--dim)}
+.notice .cap{font:10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--amber);
+  display:block;margin-bottom:8px}
+.legal-foot{border-top:1px solid var(--line);margin-top:44px;padding-top:18px;font-size:13.5px;color:var(--faint)}
+</style>
+
+<style>
+a:focus-visible,button:focus-visible,summary:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media(hover:none),(max-width:760px){
+  .nav-links a{display:inline-block;padding:11px 12px;line-height:1.1}
+  footer a,.foot-l a{display:inline-block;padding:12px 10px}
+  .logo{display:inline-flex;padding:6px 0}
+}
 </style>
 </head>
 <body>
@@ -110,58 +136,99 @@ footer a{color:var(--dim)}
   </a>
   <a class="nav-back" href="/">Back to the site</a>
 </div></nav>
-<div class="wrap legal">
-<header class="legal-head"><h1>Terms of use</h1></header>
-<div class="updated">Last updated 5 September 2026</div>
+<main class="wrap legal">
+  <div class="legal-body">
+    <h1 class="doc-title">Terms of Use</h1>
+    <div class="doc-meta">
+      <span><b>Document</b> PF-TERM-001</span>
+      <span><b>Effective</b> 5 September 2026</span>
+      <span><b>Version</b> 1.0</span>
+      <span><b>Operator</b> NorthBridge, financial branch</span>
+    </div>
 
-<p class="lede">Plain terms for a private research tool. Read section 2 in particular; it is the one that matters most and the one most often skipped.</p>
+    <div class="preamble">
+      <p>These Terms govern access to and use of the PerceptFolio research terminal (the "Service"), operated by NorthBridge's financial branch ("NorthBridge"). By creating an account the User accepts these Terms and the Privacy Notice.</p>
+      <p>Clause 3 restricts the nature of the Service and clause 8 limits liability. The User's attention is drawn to both.</p>
+    </div>
 
-<div class="callout"><p><b>PerceptFolio is research software, not investment advice.</b> NorthBridge is not a registered investment adviser, broker or dealer. Nothing the terminal outputs is a recommendation, and no output should be treated as a reason to buy or sell anything.</p></div>
+    <section class="clause"><h2><span class="num">1.</span>Definitions</h2>
+      <dl class="defs">
+        <dt>Service</dt><dd>The PerceptFolio research terminal and associated pages published at perceptfolio.com.</dd>
+        <dt>User</dt><dd>An individual to whom an invitation has been issued and who has created an account.</dd>
+        <dt>Invitation</dt><dd>A single-use code issued by NorthBridge permitting the creation of one account.</dd>
+        <dt>Market Data</dt><dd>Prices, fundamentals, news and economic series obtained from third-party providers.</dd>
+      </dl>
+    </section>
 
-<h2>1. Who may use it</h2>
-<p>Access is by invitation and is granted per person. There is no public version, no trial and no self-service sign-up. An invite code is single use and issued to one named individual; sharing it, or the account it creates, is not permitted.</p>
-<p>You must be old enough to enter a contract where you live, and you must not be barred from using financial software under any law that applies to you.</p>
+    <section class="clause"><h2><span class="num">2.</span>Eligibility and access</h2>
+      <p>2.1 Access is by Invitation and is granted to a named individual. There is no public version of the Service, no trial and no self-service registration.</p>
+      <p>2.2 An Invitation is single-use and personal. The User shall not transfer an Invitation, nor permit any other person to use an account created with it.</p>
+      <p>2.3 The User warrants that they have capacity to enter into these Terms in their jurisdiction and are not prohibited from using financial software under any law applicable to them.</p>
+    </section>
 
-<h2>2. It is not advice, and it does not know your circumstances</h2>
-<p>The terminal scores companies against rules you set, sizes positions against limits you choose, and grades what it told you afterwards. All of that is arithmetic on inputs you supply. It does not know your income, tax position, obligations, time horizon or risk tolerance, and it makes no attempt to.</p>
-<p>A "BUY" verdict means a company passed a checklist you configured. It is not a recommendation and carries no opinion about whether the position is suitable for you. <b>Every decision to buy or sell is yours alone, and so is every outcome.</b></p>
-<p>If you want advice, engage a regulated adviser. This is not that, and nothing here should be relied on as a substitute.</p>
+    <section class="clause"><h2><span class="num">3.</span>Nature of the Service</h2>
+      <div class="notice"><span class="cap">Important</span>
+        <p>The Service is research software. It is not investment advice. NorthBridge is not a registered investment adviser, broker or dealer, and nothing produced by the Service constitutes a recommendation to buy, sell or hold any security.</p></div>
+      <p>3.1 The Service evaluates securities against criteria configured by the User, sizes positions against limits chosen by the User, and records and grades the outputs it has produced. All such operations are arithmetic performed upon inputs supplied by the User.</p>
+      <p>3.2 The Service has no knowledge of the User's income, tax position, liabilities, investment horizon or tolerance for risk, and makes no assessment of suitability.</p>
+      <p>3.3 A verdict expressed by the Service, including one expressed as "BUY", denotes only that a security satisfied criteria configured by the User. It is not a recommendation.</p>
+      <p>3.4 Every decision to acquire or dispose of any security is the User's own, as is the outcome of that decision.</p>
+      <p>3.5 A User requiring investment advice should obtain it from a person authorised to give it.</p>
+    </section>
 
-<h2>3. Market data is provided as-is</h2>
-<p>Prices, fundamentals and news come from Finnhub's free tier, and macroeconomic series from the St. Louis Fed. Both are third parties. Data may be delayed, incomplete, revised or wrong, and coverage is limited to US equities. We do not verify it and cannot warrant it.</p>
-<p>Any figure the terminal computes inherits the quality of the data it was computed from. Check anything you intend to act on against your broker or the company's own filings.</p>
+    <section class="clause"><h2><span class="num">4.</span>Market Data</h2>
+      <p>4.1 Market Data is supplied by third parties, principally Finnhub Inc. and the Federal Reserve Bank of St. Louis. It is provided to the User as received.</p>
+      <p>4.2 Market Data may be delayed, incomplete, subsequently revised or incorrect, and coverage is limited to United States listed equities. NorthBridge does not verify Market Data and gives no warranty as to it.</p>
+      <p>4.3 Any figure computed by the Service takes the quality of the Market Data from which it is derived. The User should verify against their broker or the issuer's filings before acting.</p>
+    </section>
 
-<h2>4. Your data is your responsibility</h2>
-<p>The terminal stores your portfolio in your browser. We do not hold a copy unless you enable sync, and even then it is a convenience rather than a backup service. Clearing your browser storage deletes your data permanently, including a record of graded calls that cannot be reconstructed, because marks are taken on their anniversary and never backfilled.</p>
-<p><b>Export a backup regularly.</b> The app will remind you. We cannot restore what we never had.</p>
+    <section class="clause"><h2><span class="num">5.</span>User data and backups</h2>
+      <p>5.1 Data entered into the Service is stored in the User's browser. NorthBridge retains no copy unless synchronisation is enabled, and synchronisation is a convenience and not a backup service.</p>
+      <p>5.2 Clearing browser storage destroys that data permanently, including the record of graded calls, which cannot be reconstructed because marks are taken upon their anniversary and are never backfilled.</p>
+      <p>5.3 The User is responsible for maintaining backups. An export facility is provided and the Service prompts its use. NorthBridge cannot restore data it has never held.</p>
+    </section>
 
-<h2>5. Availability and changes</h2>
-<p>This is a small operation running on free infrastructure tiers. There is no uptime guarantee, no support commitment and no service level. Features may change or be removed. Access may be suspended or withdrawn at any time, with or without notice, and a suspended account stops working at its next check-in.</p>
-<p>The terminal is built to keep working offline for a period, but that is a design property, not a promise.</p>
+    <section class="clause"><h2><span class="num">6.</span>Availability</h2>
+      <p>6.1 The Service is provided without any commitment as to availability, support or service level, and operates on free infrastructure tiers.</p>
+      <p>6.2 Features may be altered or withdrawn. Access may be suspended or terminated at any time, with or without notice; a suspended account ceases to function upon its next verification.</p>
+      <p>6.3 The Service is designed to continue operating offline for a limited period. That is a property of its design and not a commitment.</p>
+    </section>
 
-<h2>6. Acceptable use</h2>
-<ul>
-  <li>Do not share your invite code or account credentials.</li>
-  <li>Do not attempt to scrape, overload or reverse the worker, or use it as a proxy for anything other than the terminal.</li>
-  <li>Do not present the terminal's output to third parties as advice, or as the output of a regulated service.</li>
-  <li>If you manage client portfolios using a business account, the regulatory obligations of doing so are entirely yours.</li>
-</ul>
+    <section class="clause"><h2><span class="num">7.</span>Acceptable use</h2>
+      <p>7.1 The User shall not:</p>
+      <ol class="sub">
+        <li>disclose an Invitation or account credentials to any other person;</li>
+        <li>scrape, overload, reverse engineer or circumvent the Worker, or employ it as a proxy for any purpose other than operation of the Service;</li>
+        <li>present output of the Service to any third party as investment advice or as the output of a regulated service; or</li>
+        <li>use the Service in contravention of any law or regulation applicable to them.</li>
+      </ol>
+      <p>7.2 Where a User administers portfolios on behalf of clients, all regulatory obligations arising from that activity rest with the User alone.</p>
+    </section>
 
-<h2>7. Liability</h2>
-<p>The software is provided "as is", without warranty of any kind, express or implied. To the fullest extent the law allows, NorthBridge is not liable for any trading loss, lost profit, lost data or consequential damage arising from use of this software or reliance on anything it displays.</p>
-<p>Nothing in these terms limits liability for fraud, or for anything that cannot lawfully be limited.</p>
+    <section class="clause"><h2><span class="num">8.</span>Disclaimer and limitation of liability</h2>
+      <p>8.1 The Service is provided "as is" and "as available", without warranty of any kind, whether express or implied, including any implied warranty of merchantability, fitness for a particular purpose or non-infringement.</p>
+      <p>8.2 To the fullest extent permitted by law, NorthBridge shall not be liable for any trading loss, loss of profit, loss of data, or any indirect or consequential loss arising out of or in connection with use of the Service or reliance upon anything it displays.</p>
+      <p>8.3 Nothing in these Terms excludes or limits liability for fraud or fraudulent misrepresentation, or for any other liability which may not lawfully be excluded or limited.</p>
+    </section>
 
-<h2>8. Intellectual property</h2>
-<p>The terminal, its content and its methodology remain the property of NorthBridge. Your own data, entered by you, remains yours.</p>
+    <section class="clause"><h2><span class="num">9.</span>Intellectual property</h2>
+      <p>9.1 The Service, its content and its methodology remain the property of NorthBridge.</p>
+      <p>9.2 Data entered by the User remains the property of the User.</p>
+    </section>
 
-<h2>9. Changes to these terms</h2>
-<p>Material changes will be posted here with a date. Continued use after that means you accept them. If you do not, stop using the terminal and export your data.</p>
-<p>Questions: <a href="mailto:northbridgeai1@gmail.com">northbridgeai1@gmail.com</a>.</p>
+    <section class="clause"><h2><span class="num">10.</span>Amendment and termination</h2>
+      <p>10.1 Material amendments to these Terms will be published here together with their date. Continued use of the Service following publication constitutes acceptance.</p>
+      <p>10.2 A User who does not accept an amendment should cease using the Service and export their data.</p>
+    </section>
 
-</div>
+    <p class="legal-foot">Enquiries concerning this document should be addressed to
+      <a href="mailto:northbridgeai1@gmail.com">northbridgeai1@gmail.com</a>.
+      This document is published at perceptfolio.com/terms/ and supersedes any prior version.</p>
+  </div>
+</main>
 <footer><div class="wrap">
-  <p>PerceptFolio is operated by NorthBridge's financial branch. Access is granted per person; there is no public version.
-  <a href="/">Front page</a> &nbsp;·&nbsp; <a href="/privacy/">Privacy</a> &nbsp;·&nbsp; <a href="/terms/">Terms</a></p>
+  <p>PerceptFolio is operated by NorthBridge's financial branch. Access is granted per person; there is no public version.</p>
+  <p style="margin-top:10px"><a href="/">Front page</a> &nbsp;·&nbsp; <a href="/privacy/">Privacy Notice</a> &nbsp;·&nbsp; <a href="/terms/">Terms of Use</a></p>
 </div></footer>
 </body>
 </html>

@@ -373,6 +373,35 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
   line-height:1.5;color:var(--muted)}
 .agree-row input{width:auto;margin-top:2px;flex:none}
 .agree-row a{color:var(--accent)}
+.ovf-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:5px;
+  display:inline-flex;align-items:center;line-height:1}
+.ovf-btn:hover{color:var(--text);background:var(--panel2)}
+.ovf-btn svg{fill:currentColor}
+.ovf-menu{position:fixed;z-index:500;min-width:170px;background:var(--panel);border:1px solid var(--line2);
+  border-radius:9px;padding:5px;box-shadow:0 12px 34px rgba(0,0,0,.5)}
+.ovf-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);
+  font:inherit;font-size:13px;padding:8px 10px;border-radius:6px;cursor:pointer}
+.ovf-item:hover{background:var(--panel2)}
+.ovf-item.danger{color:var(--red)}
+.ovf-swatches{display:flex;gap:5px;padding:8px 10px 6px;border-top:1px solid var(--line);margin-top:4px}
+.ovf-swatches button{width:15px;height:15px;border-radius:50%;cursor:pointer;padding:0}
+
+/* list rows */
+.list-rows{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel)}
+.list-row{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);
+  cursor:pointer;transition:background .12s}
+.list-row:last-child{border-bottom:none}
+.list-row:hover{background:var(--panel2)}
+.list-row-dot{width:9px;height:9px;border-radius:50%;flex:none}
+.list-row-name{font-size:14.5px;font-weight:600}
+.list-row-tag{font:9.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+  border:1px solid var(--border);border-radius:4px;padding:3px 5px}
+.list-row-n{margin-left:auto;font:12.5px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:14px}
+.crumb a{cursor:pointer;color:var(--muted)}
+.crumb a:hover{color:var(--text)}
+.crumb .sep{opacity:.5}
+.crumb .cur{color:var(--text);font-weight:650}
 .list-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
 .list-card{display:flex;flex-direction:column;gap:6px;text-align:left;cursor:pointer;
   background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 16px 14px;
@@ -745,14 +774,9 @@ body.touring header,body.touring #sidebar{z-index:201}
           <label>Password</label>
           <input type="password" id="newPassword" placeholder="Choose a password" autocomplete="new-password" onkeydown="if(event.key==='Enter')createProfile()">
         </div>
-        <div class="field">
-          <label>Account type</label>
-          <select id="newAccountType">
-            <option value="personal">Personal. My own portfolio</option>
-            <option value="business">Business. I manage client portfolios too</option>
-          </select>
-          <p class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.5">Your invite decides this. If it was issued as personal, the account is personal whatever is selected here.</p>
-        </div>
+        <!-- The account-type control is gone. The invite decides the tier, so offering a choice that is
+             then overridden is theatre: it looks like a decision and is not one. The tier is shown
+             after sign-in instead, where it is a fact rather than a question. -->
         <!-- C2. The landing page states there is no self-service sign-up. Until now this form was
              exactly that, so the site made a claim about itself that the software contradicted.
              The Worker has had /invite validate and burn routes the whole time; nothing called them. -->
@@ -2326,7 +2350,8 @@ const INVITE_WORKER='https://crimson-hat-6ad9.northbridgeai1.workers.dev';
 async function createProfile(){
   const email=document.getElementById('newEmail').value.trim().toLowerCase();
   const pw=document.getElementById('newPassword').value;
-  const accountType=document.getElementById('newAccountType').value||'personal';
+  /* No dropdown to read. A grant that somehow carries no tier falls back to personal, the
+     lesser of the two, rather than to whatever the form last showed. */
   const code=(document.getElementById('newInvite').value||'').trim().toUpperCase();
   if(!email||!email.includes('@'))return toast('Enter a valid email.');
   if(DB.profiles[email])return toast('An account with that email already exists, log in above.');
@@ -2366,7 +2391,7 @@ async function createProfile(){
      instead meant anyone granted "personal" could select "business" on this screen and unlock the
      Clients tab — a decision the operator had explicitly made the other way. The dropdown is now a
      fallback for the case where a grant carries no tier at all. */
-  const grantedTier=(inv.tier==='business'||inv.tier==='personal')?inv.tier:accountType;
+  const grantedTier=(inv.tier==='business'||inv.tier==='personal')?inv.tier:'personal';
   DB.profiles[email]={pinHash:pw?await sha(pw):'',data:defaultData(),accountType:grantedTier,userId:makeUserId(),
                       invite:code,inviteTier:inv.tier||null,
                       /* Recorded on the profile: which documents were accepted and when. An
@@ -3958,6 +3983,50 @@ function toggleListOpen(id){
   D.listOpen[id]=!D.listOpen[id];
   saveDB();renderAll();
 }
+/* ================= THE OVERFLOW MENU =================
+
+   One menu implementation for every row that has actions. Rows used to carry three or four buttons
+   each, which meant the eye had to skip past a wall of controls to read the data the row exists to
+   show. The actions have not gone anywhere; they are one click behind a single glyph.
+
+   Closed by Escape, by a click anywhere else, and by choosing something. Positioned by the button
+   it belongs to so it cannot be clipped by a scrolling table. */
+let _menuOpen=null;
+function closeMenu(){
+  if(_menuOpen){const e=document.getElementById(_menuOpen);if(e)e.remove();_menuOpen=null;}
+}
+/* items: [{label, run, danger}] . `run` is a string evaluated on click, so it survives the innerHTML
+   rebuilds the tables do on every render. */
+function openMenu(btn,items){
+  const wasOpen=_menuOpen;
+  closeMenu();
+  if(wasOpen===btn.dataset.menuId)return;          // clicking the same trigger closes it
+  const id='menu-'+Math.random().toString(36).slice(2,8);
+  btn.dataset.menuId=id;
+  const r=btn.getBoundingClientRect();
+  const el=document.createElement('div');
+  el.id=id; el.className='ovf-menu';
+  el.innerHTML=items.map(it=>
+    '<button class="ovf-item'+(it.danger?' danger':'')+'" onclick="closeMenu();'+it.run+'">'+esc(it.label)+'</button>'
+  ).join('');
+  document.body.appendChild(el);
+  /* Flip upward when there is not room below, so a menu on the last row is never cut off. */
+  const h=el.offsetHeight, below=window.innerHeight-r.bottom;
+  el.style.top=(below<h+12? r.top-h-6 : r.bottom+6)+'px';
+  el.style.left=Math.max(8,Math.min(r.right-el.offsetWidth,window.innerWidth-el.offsetWidth-8))+'px';
+  _menuOpen=id;
+}
+document.addEventListener('click',e=>{ if(_menuOpen&&!e.target.closest('.ovf-menu,.ovf-btn'))closeMenu(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeMenu(); });
+window.addEventListener('scroll',()=>closeMenu(),true);
+
+function ovfButton(onclickExpr,title){
+  return '<button class="ovf-btn" title="'+esc(title||'More')+'" aria-label="'+esc(title||'More')+'" onclick="event.stopPropagation();'+onclickExpr+'">'+
+    '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">'+
+      '<circle cx="8" cy="3" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="13" r="1.4"/>'+
+    '</svg></button>';
+}
+
 /* WATCHLIST IS A LIST. Everything not filed into a named list belongs to it, and it is shown and
    labelled as a list rather than as leftovers called "Unlisted". That is what it always was; the
    old label just made the default bucket sound like a failure state. */
@@ -3978,7 +4047,52 @@ function openList(id){ listView=id; renderAll();
   const t=document.getElementById('tab-watchlist'); if(t)t.scrollIntoView({block:'start'}); }
 function closeList(){ listView=null; renderAll(); }
 
-/* The overview: every list as a card, the default one first. Clicking opens it. */
+/* The menu offered on a list: colour, rename, delete. The default Watchlist has no menu, because
+   none of the three can apply to it. */
+/* Everything that can be done to a ticker from a table row. Analyze first because it is what the
+   row is usually opened for; remove last and marked as destructive. Filing into lists is generated
+   from the lists that exist, so a new list appears here without touching this function. */
+/* The same treatment for a holding. Sell sits above the destructive item and is not itself marked
+   destructive: selling is a normal operation that records a transaction, while removing the row
+   deletes it from the book without one. */
+function holdingMenu(btn,sym,idx){
+  openMenu(btn,[
+    {label:'Analyze '+sym, run:"analyzeStock('"+sym+"')"},
+    {label:'Sell / trim',  run:"toggleSellRow("+idx+")"},
+    {label:isFavorite(sym)?'Remove from favourites':'Add to favourites', run:"toggleFavorite('"+sym+"')"},
+    {label:'Remove holding', run:"removeHolding("+idx+")", danger:true}
+  ]);
+}
+
+function tickerMenu(btn,sym,idx){
+  const items=[{label:'Analyze '+sym, run:"analyzeStock('"+sym+"')"}];
+  items.push({label:isFavorite(sym)?'Remove from favourites':'Add to favourites',
+              run:"toggleFavorite('"+sym+"')"});
+  allLists().forEach(l=>{
+    const inIt=(l.syms||[]).includes(sym);
+    items.push({label:(inIt?'Remove from ':'Add to ')+l.name,
+                run:(inIt?"removeFromList('":"addToList('")+sym+"','"+l.id+"')"});
+  });
+  items.push({label:'Remove from watchlist', run:"removeWatch("+idx+")", danger:true});
+  openMenu(btn,items);
+}
+
+function listMenu(btn,id){
+  const l=listById(id); if(!l||l.isDefault)return;
+  const swatches='<div class="ovf-swatches">'+LIST_COLORS.map(c=>
+    '<button title="'+c.k+'" onclick="closeMenu();setListColor(\''+esc(id)+'\',\''+c.k+'\')" '+
+    'style="background:'+c.v+';border:'+(l.color===c.k?'2px solid var(--text)':'1px solid var(--border)')+'"></button>').join('')+'</div>';
+  openMenu(btn,[
+    {label:'Rename',      run:"renameList('"+id+"')"},
+    {label:'Delete list', run:"deleteList('"+id+"')", danger:true}
+  ]);
+  const m=document.getElementById(_menuOpen);
+  if(m)m.insertAdjacentHTML('afterbegin','<div style="font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:7px 10px 4px">Colour</div>'+swatches);
+}
+
+/* The overview: one row per list, name on the left, count and menu on the right. Cards were prettier
+   and worse: a list is a row in a directory, and a grid of tiles made four lists look like a
+   dashboard. */
 function renderListOverview(){
   const ov=document.getElementById('listOverview');
   const hd=document.getElementById('listHeader');
@@ -3989,57 +4103,52 @@ function renderListOverview(){
   if(!ov||!hd)return;
 
   const open=listView?listById(listView):null;
-  if(listView&&!open)listView=null;      // list was deleted while open
+  if(listView&&!open)listView=null;
+
+  if(title)title.style.display='none';
+  if(filters)filters.style.display='none';
 
   if(listView){
     ov.style.display='none'; hd.style.display='block';
     if(topA)topA.style.display='none';
     if(openA)openA.style.display='flex';
-    if(title)title.style.display='none';
-    if(filters)filters.style.display='none';
     const n=(open.syms||[]).length;
-    hd.innerHTML='<div class="list-head">'+
-      '<button class="btn btn-ghost btn-sm" onclick="closeList()">Back to lists</button>'+
-      '<div class="list-head-main">'+
-        '<span class="list-head-dot" style="background:'+listColor(open.color)+'"></span>'+
-        '<h2 class="list-head-name">'+esc(open.name)+'</h2>'+
-        '<span class="muted" style="font-size:13px">'+n+' ticker'+(n===1?'':'s')+'</span>'+
+    hd.innerHTML=
+      '<div class="crumb">'+
+        '<a onclick="closeList()">Lists</a><span class="sep">/</span>'+
+        '<span class="cur">'+esc(open.name)+'</span>'+
+        (open.isDefault?'':ovfButton("listMenu(this,'"+esc(open.id)+"')",'List options'))+
       '</div>'+
-      (open.isDefault
-        ? '<p class="muted" style="font-size:12.5px;margin-top:8px">Anything you are watching that is not filed into another list. It is scored exactly like the rest.</p>'
-        : '<div class="row" style="gap:6px;margin-top:10px;align-items:center">'+
-            LIST_COLORS.map(c=>'<button title="'+c.k+'" onclick="setListColor(\''+esc(open.id)+'\',\''+c.k+'\')" '+
-              'style="width:15px;height:15px;border-radius:50%;border:'+(open.color===c.k?'2px solid var(--text)':'1px solid var(--border)')+
-              ';background:'+c.v+';cursor:pointer;padding:0"></button>').join('')+
-            '<span style="flex:1"></span>'+
-            '<button class="btn btn-ghost btn-sm" onclick="renameList(\''+esc(open.id)+'\')">Rename</button>'+
-            '<button class="btn-danger btn btn-sm" onclick="deleteList(\''+esc(open.id)+'\')">Delete list</button>'+
-          '</div>')+
-    '</div>';
+      '<div class="list-head">'+
+        '<div class="list-head-main" style="margin-top:0">'+
+          '<span class="list-head-dot" style="background:'+listColor(open.color)+'"></span>'+
+          '<h2 class="list-head-name">'+esc(open.name)+'</h2>'+
+          '<span class="muted" style="font-size:13px">'+n+' ticker'+(n===1?'':'s')+'</span>'+
+        '</div>'+
+        (open.isDefault
+          ? '<p class="muted" style="font-size:12.5px;margin-top:8px">Anything you are watching that is not filed into another list. Scored exactly like the rest.</p>'
+          : '')+
+      '</div>';
     return;
   }
 
   hd.style.display='none'; ov.style.display='block';
   if(topA)topA.style.display='flex';
   if(openA)openA.style.display='none';
-  if(title)title.style.display='none';
-  if(filters)filters.style.display='none';
 
-  const cards=[watchlistList(),...allLists()];
-  ov.innerHTML='<div class="list-grid">'+cards.map(l=>{
+  const rows=[watchlistList(),...allLists()];
+  ov.innerHTML='<div class="list-rows">'+rows.map(l=>{
     const n=(l.syms||[]).length;
-    const preview=(l.syms||[]).slice(0,5).join(', ')+((l.syms||[]).length>5?', …':'');
-    return '<button class="list-card" onclick="openList(\''+esc(l.id)+'\')">'+
-      '<span class="list-card-top">'+
-        '<span class="list-card-dot" style="background:'+listColor(l.color)+'"></span>'+
-        '<b>'+esc(l.name)+'</b>'+
-        (l.isDefault?'<span class="list-card-tag">default</span>':'')+
-      '</span>'+
-      '<span class="list-card-n">'+n+'</span>'+
-      '<span class="list-card-sub">'+(n?esc(preview):'empty')+'</span>'+
-    '</button>';
+    return '<div class="list-row" onclick="openList(\''+esc(l.id)+'\')">'+
+      '<span class="list-row-dot" style="background:'+listColor(l.color)+'"></span>'+
+      '<span class="list-row-name">'+esc(l.name)+'</span>'+
+      (l.isDefault?'<span class="list-row-tag">default</span>':'')+
+      '<span class="list-row-n">'+n+'</span>'+
+      (l.isDefault?'<span style="width:28px"></span>'
+                  :ovfButton("listMenu(this,'"+esc(l.id)+"')",'List options'))+
+    '</div>';
   }).join('')+'</div>'+
-  '<p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.5">Every ticker here is scored on each refresh whether or not it is filed into a list. Deleting a list keeps its tickers; they return to <b>Watchlist</b>.</p>';
+  '<p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.5">Every ticker is scored on each refresh whether or not it is filed into a list. Deleting a list keeps its tickers; they return to <b>Watchlist</b>.</p>';
 }
 
 /* The coloured dots shown on a ticker row. Read-only; the select beside them does the editing. */
@@ -7391,7 +7500,7 @@ function renderAll(){
           :pmask(fmt$(gl))+(glPct!=null?'<div style="font-size:11px;opacity:.8">'+(glPct>=0?'+':'')+glPct.toFixed(2)+'%</div>':''))+'</td>'+
       '<td>'+(v?'<span class="pill '+v.cls+'">'+v.label+'</span>':(h.type!=='Stock'?'<span class="pill pill-na">'+h.type+'</span>':'<span class="muted">refresh</span>'))+'</td>'+
       '<td class="mycall-cell">'+myTagSelect(h.sym)+'</td>'+
-      '<td class="row"><button class="btn btn-ghost btn-sm" onclick="toggleFavorite(\''+esc(h.sym)+'\')" title="'+(isFavorite(h.sym)?'Remove from Favorites':'Add to Favorites')+'">'+(isFavorite(h.sym)?'★':'☆')+'</button> <button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(h.sym)+'\')">Analyze</button> <button class="btn btn-ghost btn-sm" onclick="toggleSellRow('+i+')">Sell</button> <button class="btn-danger btn btn-sm" onclick="removeHolding('+i+')">✕</button></td>';
+      '<td style="text-align:right">'+ovfButton("holdingMenu(this,'"+esc(h.sym)+"',"+i+")",h.sym+' options')+'</td>';
     hb.appendChild(tr);
     if(sellingIndex===i){
       const sellTr=document.createElement('tr');
@@ -7464,9 +7573,11 @@ function renderAll(){
       '<td>'+(v?'<span class="pill '+v.cls+'">'+v.label+'</span>':'<span class="muted">refresh to score</span>')+'</td>'+
       /* Lists BEFORE My Call, matching the header order. They were the other way round, which
          silently swapped two columns' contents under the wrong headings. */
-      '<td style="white-space:nowrap">'+listDotsHtml(s)+' '+listMenuHtml(s)+'</td>'+
+      /* Lists shown as read-only dots. Filing is now in the row menu, so the cell carries
+         information rather than a control competing with it. */
+      '<td style="white-space:nowrap">'+listDotsHtml(s)+'</td>'+
       '<td class="mycall-cell">'+myTagSelect(s)+'</td>'+
-      '<td class="row"><button class="btn btn-ghost btn-sm" onclick="toggleFavorite(\''+esc(s)+'\')" title="'+(isFavorite(s)?'Remove from Favorites':'Add to Favorites')+'">'+(isFavorite(s)?'★':'☆')+'</button> <button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(s)+'\')">Analyze</button> <button class="btn-danger btn btn-sm" onclick="removeWatch('+i+')">✕</button></td>';
+      '<td style="text-align:right">'+ovfButton("tickerMenu(this,'"+esc(s)+"',"+i+")",s+' options')+'</td>';
     wb.appendChild(tr);
     });
   });

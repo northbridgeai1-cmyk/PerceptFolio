@@ -469,11 +469,12 @@ t('a paused grant loses macro data too', /return rec\.paused \? null : rec/.test
 t('the terminal presents its invite code when it has no sync key',
   /codeParam=syncConfigured\(\)\?'':'&code='/.test(term));
 
-t('the invite grant decides the account tier, not the sign-up dropdown',
-  /const grantedTier=\(inv\.tier==='business'\|\|inv\.tier==='personal'\)\?inv\.tier:accountType/.test(term) &&
+/* Stronger than before: the dropdown is gone entirely rather than present-but-overridden. A control
+   whose value is discarded looks like a decision and is not one. */
+t('there is no account-type control to override', !/newAccountType/.test(term));
+t('the tier comes only from the grant, defaulting to the lesser of the two',
+  /const grantedTier=\(inv\.tier==='business'\|\|inv\.tier==='personal'\)\?inv\.tier:'personal'/.test(term) &&
   /accountType:grantedTier/.test(term));
-t('the sign-up screen says the invite governs the tier',
-  /Your invite decides this/.test(term));
 t('first-run setup does not assume the reader owns the worker',
   !/Skip it if your worker already holds one/.test(term));
 
@@ -695,10 +696,18 @@ t('both pages exist as folders with index.html (case-sensitive host, no rewrites
   privacy.length > 3000 && terms.length > 3000);
 t('privacy states the no-cookie, no-analytics position', /no cookies, no analytics/i.test(privacy));
 t('privacy names every third party that receives anything',
-  /Finnhub/.test(privacy) && /Cloudflare/.test(privacy) && /Anthropic/.test(privacy) && /St\. Louis Fed/.test(privacy));
+  /Finnhub/.test(privacy) && /Cloudflare/.test(privacy) && /Anthropic/.test(privacy) &&
+  /St\. Louis/.test(privacy));
 t('terms lead with not-advice', /not investment advice/i.test(terms) &&
   /not a registered investment adviser/i.test(terms));
-t('terms state that data loss is unrecoverable', /We cannot restore what we never had/.test(terms));
+t('terms state that data loss is unrecoverable',
+  /cannot restore data it has never held/.test(terms) && /destroys that data permanently/.test(terms));
+t('the documents are formally structured, not marketing pages',
+  /class="doc-meta"/.test(privacy) && /class="clause"/.test(terms) &&
+  /PF-PRIV-001/.test(privacy) && /PF-TERM-001/.test(terms) &&
+  /<dl class="defs">/.test(terms));
+t('terms draw attention to the limiting clauses up front',
+  /attention is drawn to both/.test(terms));
 t('the landing footer links both', /href="\/privacy\/"/.test(idx) && /href="\/terms\/"/.test(idx));
 
 t('sign-up has an acceptance checkbox', /id="agreeTerms"/.test(term));
@@ -734,6 +743,28 @@ G('Craft: focus, contrast, landmarks, touch targets');
   t('footer links are targeted by their own class, not a losing generic selector',
     /footer a,\.foot-l a\{display:inline-block;padding:12px 10px\}/.test(read('index.html')));
 }
+
+/* ==================== OVERFLOW MENUS ==================== */
+G('Row actions collapse into one control');
+
+t('a single menu implementation serves every row', /function openMenu\(btn,items\)/.test(term));
+t('the trigger is a three-dot glyph, drawn not typed',
+  /function ovfButton/.test(term) && /<circle cx="8" cy="3"/.test(term));
+t('lists use it', /function listMenu\(btn,id\)/.test(term));
+t('tickers use it', /function tickerMenu\(btn,sym,idx\)/.test(term));
+t('holdings use it', /function holdingMenu\(btn,sym,idx\)/.test(term));
+/* The default list cannot be renamed, recoloured or deleted, so offering the menu would present
+   three actions that all fail. */
+t('the default Watchlist has no list menu', /if\(!l\|\|l\.isDefault\)return/.test(term));
+t('destructive items are marked as such', /danger:true/.test(term));
+t('the menu flips upward when there is no room below', /below<h\+12\? r\.top-h-6 : r\.bottom\+6/.test(term));
+t('Escape and an outside click close it',
+  /if\(e\.key==='Escape'\)closeMenu\(\)/.test(term) && /!e\.target\.closest\('\.ovf-menu,\.ovf-btn'\)/.test(term));
+t('scrolling closes it, so it cannot detach from its row', /window\.addEventListener\('scroll',\(\)=>closeMenu\(\),true\)/.test(term));
+
+t('the lists overview is a row list, not a card grid', /class="list-rows"/.test(term) && /class="list-row"/.test(term));
+t('an open list shows a breadcrumb back to Lists',
+  /class="crumb"/.test(term) && /onclick="closeList\(\)">Lists<\/a>/.test(term));
 
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
