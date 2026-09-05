@@ -350,6 +350,8 @@ body.is-demo #app::before{content:"TEST ACCOUNT — sandbox data, sync disabled.
 .welcome-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px}
 .welcome-card h2{font-size:18px;margin-bottom:6px;font-weight:700}
 .step-num{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);color:var(--text);align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:8px;flex-shrink:0}
+.list-pick{background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+  border-radius:6px;padding:2px 6px;font-size:11.5px;max-width:110px}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th{font-family:var(--mono);text-align:left;color:var(--muted);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--border)}
 th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
@@ -860,7 +862,7 @@ body.touring header,body.touring #sidebar{z-index:201}
     <button data-tab="dashboard" class="active" onclick="showTab('dashboard')" data-tip="Dashboard"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-dash"/></svg></span><span class="lbl">Dashboard</span></button>
     <button data-tab="command" id="navCommand" onclick="showTab('command')" data-tip="Command"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-command"/></svg></span><span class="lbl">Command</span></button>
     <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')" data-tip="Portfolio"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"/></svg></span><span class="lbl">Portfolio</span></button>
-    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Watchlist"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Watchlist</span></button>
+    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Lists"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Lists</span></button>
     <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="History"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">History</span></button>
     <div class="nav-sep"></div>
     <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="Market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">Market</span></button>
@@ -1162,13 +1164,29 @@ body.touring header,body.touring #sidebar{z-index:201}
 <!-- WATCHLIST -->
 <div id="tab-watchlist" class="tabs-hidden">
   <div class="card">
-    <h3>Add to Watchlist</h3>
+    <h3>Add a ticker</h3>
     <div class="row">
       <input id="wTicker" placeholder="Ticker (e.g. MSFT)" style="max-width:170px">
       <button class="btn" onclick="addWatch()">Add</button>
-      <span class="muted">Watchlist stocks are auto-scored on every refresh. When one passes your buy criteria, you get an alert.</span>
+      <span class="muted">Everything here is auto-scored on every refresh, in a list or not. When one passes your buy criteria, you get an alert.</span>
     </div>
   </div>
+
+  <!-- Lists are an organisational layer: a ticker is watched whether or not it belongs to one, and
+       deleting a list never deletes tickers. Both facts are stated on screen, because a grouping
+       control that might silently drop holdings is one people will not trust enough to use. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Your lists</h3>
+      <div class="row" style="gap:6px">
+        <input id="newListName" placeholder="New list name" maxlength="40" style="max-width:190px"
+               onkeydown="if(event.key==='Enter')createList()">
+        <button class="btn btn-sm" onclick="createList()">Create</button>
+      </div>
+    </div>
+    <div id="listManager" style="margin-top:12px"></div>
+  </div>
+
   <div class="section-title">Watching</div>
   <div class="card" style="margin-bottom:14px">
     <div class="row">
@@ -1179,6 +1197,10 @@ body.touring header,body.touring #sidebar{z-index:201}
       <select id="wlFilterVerdict" style="max-width:170px" onchange="renderAll()">
         <option value="All">All verdicts</option><option value="buy">BUY candidate</option><option value="watch">Watch</option><option value="no">Doesn't qualify</option><option value="na">No data yet</option>
       </select>
+      <select id="wlFilterList" style="max-width:170px" onchange="renderAll()"></select>
+      <label class="muted" style="display:flex;align-items:center;gap:6px;font-size:12.5px">
+        <input type="checkbox" id="wlGroup" checked onchange="renderAll()"> Group by list
+      </label>
       <button class="btn-ghost btn btn-sm" onclick="clearWatchlistFilters()">Clear</button>
     </div>
   </div>
@@ -1191,6 +1213,7 @@ body.touring header,body.touring #sidebar{z-index:201}
         <th class="sortable th-value" id="wlTh_pricescore" onclick="sortWatchlist('pricescore')">Value <span class="th-den">/6</span></th>
         <th class="sortable th-momentum" id="wlTh_momentum" onclick="sortWatchlist('momentum')">Momentum <span class="th-den">/4</span></th>
         <th class="sortable th-ai" id="wlTh_signal" onclick="sortWatchlist('signal')">Verdict</th>
+        <th>Lists</th>
         <th class="th-mine">My Call</th>
         <th></th>
       </tr></thead>
@@ -1990,7 +2013,21 @@ function saveDB(){
   localStorage.setItem(STORE_KEY,JSON.stringify(DB));
   if(typeof scheduleSync==='function')scheduleSync();
 }
-function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorites:[],alerts:[],priceAlerts:[],analyses:{},manual:{},myTags:{},privacyMode:false,history:[],
+function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorites:[],
+  /* LISTS ARE AN ORGANISATIONAL LAYER OVER watchlist, NOT A REPLACEMENT FOR IT.
+     watchlist stays the flat array of every symbol being followed, because two dozen other places
+     read it — scoring, the screener, news, the command queue, refresh, copy-to-account. Rebuilding
+     it as a nested structure would mean touching all of them to gain nothing, and each touch is a
+     chance to silently stop scoring a ticker someone is watching.
+     A list therefore holds symbol references. A symbol may sit in several lists or none; anything
+     in none appears under Unlisted. Deleting a list never deletes the symbols. */
+  lists:[],                                     // [{id,name,color,syms:[]}]
+  /* Line comments are deliberately NOT used inside this object literal: it is written on
+     continued lines, and a // comment swallows everything after it on the same line. Doing exactly
+     that here silently deleted alerts, analyses, manual, myTags and history from every new
+     profile. */
+  listOpen:{},
+  alerts:[],priceAlerts:[],analyses:{},manual:{},myTags:{},privacyMode:false,history:[],
   displayName:'',avatarColor:'',avatarImage:'',weeklyPicks:{weekKey:'',tickers:[],newCount:0},
   transactions:[],dividends:[],theme:'dark',
   syncedAt:0,lastLocalEdit:0,
@@ -3744,6 +3781,130 @@ function setCash(){
   if(!isFinite(v)||v<0)return toast('Enter a valid cash amount.');
   D.cash=v;recordHistorySnapshot();saveDB();renderAll();toast('Cash updated.');
 }
+/* ================= LISTS =================
+   Colour comes from a fixed palette rather than a free picker: these dots sit beside verdict pills
+   that already carry meaning through colour, and an arbitrary hue would collide with them. */
+const LIST_COLORS=[
+  {k:'blue',v:'#3b82f6'},{k:'teal',v:'#1f9e8c'},{k:'violet',v:'#8b5cf6'},{k:'amber',v:'#d9a441'},
+  {k:'rose',v:'#e5679a'},{k:'slate',v:'#7c8598'},{k:'lime',v:'#84cc16'},{k:'cyan',v:'#22b8cf'}
+];
+function listColor(k){const c=LIST_COLORS.find(x=>x.k===k);return c?c.v:LIST_COLORS[0].v;}
+function allLists(){if(!Array.isArray(D.lists))D.lists=[];return D.lists;}
+function listsFor(sym){return allLists().filter(l=>(l.syms||[]).includes(sym));}
+function makeListId(){return 'L'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
+
+function createList(){
+  const el=document.getElementById('newListName');
+  const name=((el&&el.value)||'').trim().slice(0,40);
+  if(!name)return toast('Give the list a name.');
+  if(allLists().some(l=>l.name.toLowerCase()===name.toLowerCase()))return toast('You already have a list called that.');
+  const used=allLists().map(l=>l.color);
+  const free=LIST_COLORS.find(c=>!used.includes(c.k))||LIST_COLORS[allLists().length%LIST_COLORS.length];
+  allLists().push({id:makeListId(),name,color:free.k,syms:[]});
+  if(el)el.value='';
+  saveDB();renderAll();toast('List "'+name+'" created.');
+}
+function renameList(id){
+  const l=allLists().find(x=>x.id===id); if(!l)return;
+  const name=(prompt('Rename this list',l.name)||'').trim().slice(0,40);
+  if(!name||name===l.name)return;
+  l.name=name;saveDB();renderAll();
+}
+function setListColor(id,k){
+  const l=allLists().find(x=>x.id===id); if(!l)return;
+  l.color=k;saveDB();renderAll();
+}
+/* Deleting a list never deletes tickers — they fall back to Unlisted and keep being scored. A
+   destructive default here would make people afraid to reorganise. */
+function deleteList(id){
+  const l=allLists().find(x=>x.id===id); if(!l)return;
+  if(!confirm('Delete the list "'+l.name+'"?\n\nThe '+((l.syms||[]).length)+' ticker(s) in it stay on your watchlist and keep being scored — they just move to Unlisted.'))return;
+  D.lists=allLists().filter(x=>x.id!==id);
+  saveDB();renderAll();toast('List deleted. Tickers kept.');
+}
+/* Adding to a list implies watching, so the symbol joins watchlist too — otherwise a ticker could
+   sit in a list and never be scored, which reads as the app ignoring it. */
+function addToList(sym,id){
+  sym=(sym||'').trim().toUpperCase(); if(!sym)return;
+  const l=allLists().find(x=>x.id===id); if(!l)return;
+  if(!l.syms)l.syms=[];
+  if(!l.syms.includes(sym))l.syms.push(sym);
+  if(!D.watchlist.includes(sym))D.watchlist.push(sym);
+  saveDB();renderAll();
+}
+function removeFromList(sym,id){
+  const l=allLists().find(x=>x.id===id); if(!l||!l.syms)return;
+  l.syms=l.syms.filter(x=>x!==sym);
+  saveDB();renderAll();
+}
+function toggleListOpen(id){
+  if(!D.listOpen)D.listOpen={};
+  D.listOpen[id]=!D.listOpen[id];
+  saveDB();renderAll();
+}
+function renderListManager(){
+  const el=document.getElementById('listManager');
+  if(!el)return;
+  const ls=allLists();
+  if(!ls.length){
+    el.innerHTML='<div class="empty" style="text-align:left">No lists yet. Create one above — for example <b>Semis</b>, <b>Dividend</b>, or <b>Watching closely</b>. A ticker can sit in several lists, or none.</div>';
+  }else{
+    el.innerHTML=ls.map(l=>{
+      const n=(l.syms||[]).length;
+      const swatches=LIST_COLORS.map(c=>
+        '<button title="'+c.k+'" onclick="setListColor(\''+esc(l.id)+'\',\''+c.k+'\')" '+
+        'style="width:14px;height:14px;border-radius:50%;border:'+(l.color===c.k?'2px solid var(--text)':'1px solid var(--border)')+
+        ';background:'+c.v+';cursor:pointer;padding:0"></button>').join('');
+      return '<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;padding:8px 0;border-top:1px solid var(--border)">'+
+        '<span class="row" style="gap:8px;align-items:center">'+
+          '<span style="width:10px;height:10px;border-radius:50%;background:'+listColor(l.color)+';flex:none"></span>'+
+          '<b>'+esc(l.name)+'</b>'+
+          '<span class="muted" style="font-size:12px">'+n+' ticker'+(n===1?'':'s')+'</span>'+
+        '</span>'+
+        '<span class="row" style="gap:6px;align-items:center">'+
+          swatches+
+          '<button class="btn btn-ghost btn-sm" onclick="renameList(\''+esc(l.id)+'\')">Rename</button>'+
+          '<button class="btn-danger btn btn-sm" onclick="deleteList(\''+esc(l.id)+'\')">Delete</button>'+
+        '</span>'+
+      '</div>';
+    }).join('')+
+    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.5">Deleting a list keeps its tickers — they move to <b>Unlisted</b> and carry on being scored. A ticker leaves your watchlist only when you remove it from the table below.</p>';
+  }
+  /* The filter select is rebuilt here rather than in the table render, so it stays correct even
+     when the table is empty and never renders. */
+  const f=document.getElementById('wlFilterList');
+  if(f){
+    const cur=f.value;
+    f.innerHTML='<option value="All">All lists</option>'+
+      ls.map(l=>'<option value="'+esc(l.id)+'">'+esc(l.name)+'</option>').join('')+
+      '<option value="__none">Unlisted</option>';
+    f.value=[...f.options].some(o=>o.value===cur)?cur:'All';
+  }
+}
+/* The coloured dots shown on a ticker row. Read-only; the select beside them does the editing. */
+function listDotsHtml(sym){
+  const ls=listsFor(sym);
+  if(!ls.length)return '<span class="muted" style="font-size:11.5px">—</span>';
+  return ls.map(l=>'<span title="'+esc(l.name)+'" style="display:inline-flex;align-items:center;gap:4px;margin-right:7px;font-size:11.5px">'+
+    '<span style="width:8px;height:8px;border-radius:50%;background:'+listColor(l.color)+'"></span>'+esc(l.name)+'</span>').join('');
+}
+
+function listMenuHtml(sym){
+  const ls=allLists();
+  if(!ls.length)return '';
+  const inSome=listsFor(sym).map(l=>l.id);
+  return '<select class="list-pick" onchange="onListPick(\''+esc(sym)+'\',this)" onclick="event.stopPropagation()">'+
+    '<option value="">+ list…</option>'+
+    ls.map(l=>'<option value="'+esc(l.id)+'">'+(inSome.includes(l.id)?'✓ ':'')+esc(l.name)+'</option>').join('')+
+  '</select>';
+}
+function onListPick(sym,sel){
+  const id=sel.value; sel.value='';
+  if(!id)return;
+  const l=allLists().find(x=>x.id===id); if(!l)return;
+  if((l.syms||[]).includes(sym))removeFromList(sym,id); else addToList(sym,id);
+}
+
 function addWatch(){
   if(isBizOwnView())return toast('A business account doesn\'t hold its own watchlist in PerceptFolio — switch into a client to add to theirs.');
   const t=document.getElementById('wTicker').value.trim().toUpperCase();
@@ -3752,7 +3913,15 @@ function addWatch(){
   D.watchlist.push(t);document.getElementById('wTicker').value='';
   saveDB();renderAll();refreshAll();
 }
-function removeWatch(i){D.watchlist.splice(i,1);saveDB();renderAll();}
+function removeWatch(i){
+  /* Removing from the watchlist must also strip the symbol out of every list, or a list would keep
+     counting a ticker the app no longer scores — a phantom entry that looks like a bug and slowly
+     makes the list counts lie. */
+  const sym=D.watchlist[i];
+  D.watchlist.splice(i,1);
+  if(sym)allLists().forEach(l=>{ if(l.syms)l.syms=l.syms.filter(x=>x!==sym); });
+  saveDB();renderAll();
+}
 function clearPortfolioFilters(){
   ['pfFilterQ'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['pfFilterType','pfFilterBroker','pfFilterSignal','pfFilterMine'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='All';});
@@ -3763,6 +3932,7 @@ function clearWatchlistFilters(){
   const q=document.getElementById('wlFilterQ');if(q)q.value='';
   const v=document.getElementById('wlFilterVerdict');if(v)v.value='All';
   const m=document.getElementById('wlFilterMine');if(m)m.value='All';
+  const L=document.getElementById('wlFilterList');if(L)L.value='All';
   renderAll();
 }
 
@@ -7065,8 +7235,12 @@ function renderAll(){
   const wlQ=(document.getElementById('wlFilterQ')?.value||'').trim().toUpperCase();
   const wlVerdict=document.getElementById('wlFilterVerdict')?.value||'All';
   const wlMine=document.getElementById('wlFilterMine')?.value||'All';
+  const wlList=document.getElementById('wlFilterList')?.value||'All';
+  renderListManager();
   const filteredWatch=D.watchlist.map((s,i)=>({s,i})).filter(({s})=>{
     if(wlQ&&!s.includes(wlQ))return false;
+    if(wlList==='__none'&&listsFor(s).length)return false;
+    if(wlList!=='All'&&wlList!=='__none'&&!listsFor(s).some(l=>l.id===wlList))return false;
     if(!matchesMyCall(s,wlMine))return false;
     if(wlVerdict!=='All'){
       const sc0=D.analyses[s];const v0=sc0?verdictOf(sc0,false):null;
@@ -7076,7 +7250,7 @@ function renderAll(){
     return true;
   });
   if(D.watchlist.length&&!filteredWatch.length){
-    wb.innerHTML='<tr><td colspan="8" class="empty">No watchlist stocks match your filters.</td></tr>';
+    wb.innerHTML='<tr><td colspan="9" class="empty">Nothing matches these filters.</td></tr>';
   }
   const wlGetters={
     sym:x=>x.s,
@@ -7087,15 +7261,43 @@ function renderAll(){
     signal:x=>{const sc=D.analyses[x.s];const v=sc?verdictOf(sc,false):null;return v?SIGNAL_RANK[v.key]:null;}
   };
   updateSortHeaders('wlTh',wlSort,{sym:'Ticker',price:'Share Price',quality:'Quality /12',pricescore:'Value /6',momentum:'Momentum /4',signal:'Verdict'});
-  applySort(filteredWatch,wlSort,wlGetters).forEach(({s,i})=>{
+  /* Grouping inserts a header row per list and repeats a ticker under every list it belongs to —
+     a symbol in two lists genuinely appears twice, which is the honest rendering of "it is in
+     both". Ungrouped is the flat view, one row per ticker. */
+  const sorted=applySort(filteredWatch,wlSort,wlGetters);
+  const grouped=document.getElementById('wlGroup')?.checked&&allLists().length&&wlList==='All';
+  const groups=[];
+  if(grouped){
+    allLists().forEach(l=>{
+      const rows=sorted.filter(({s})=>(l.syms||[]).includes(s));
+      if(rows.length)groups.push({label:l.name,color:listColor(l.color),rows});
+    });
+    const loose=sorted.filter(({s})=>!listsFor(s).length);
+    if(loose.length)groups.push({label:'Unlisted',color:'var(--muted)',rows:loose});
+  }else{
+    groups.push({label:null,rows:sorted});
+  }
+  groups.forEach(g=>{
+    if(g.label){
+      const hr=document.createElement('tr');
+      hr.innerHTML='<td colspan="9" style="background:var(--panel2);font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:8px 10px">'+
+        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+g.color+';margin-right:8px"></span>'+
+        esc(g.label)+' <span class="muted">· '+g.rows.length+'</span></td>';
+      wb.appendChild(hr);
+    }
+    g.rows.forEach(({s,i})=>{
     const sc=D.analyses[s];const v=sc?verdictOf(sc,false):null;
     const tr=document.createElement('tr');
     tr.innerHTML='<td><b>'+esc(s)+'</b></td><td>'+(sc&&sc.price?fmt$(sc.price):'—')+'</td>'+
       '<td>'+(sc&&!sc.error?sc.qScore+'/12':'—')+'</td><td>'+(sc&&!sc.error?sc.pScore+'/6':'—')+'</td><td>'+(sc&&!sc.error?sc.mScore+'/4':'—')+'</td>'+
       '<td>'+(v?'<span class="pill '+v.cls+'">'+v.label+'</span>':'<span class="muted">refresh to score</span>')+'</td>'+
+      /* Lists BEFORE My Call, matching the header order. They were the other way round, which
+         silently swapped two columns' contents under the wrong headings. */
+      '<td style="white-space:nowrap">'+listDotsHtml(s)+' '+listMenuHtml(s)+'</td>'+
       '<td class="mycall-cell">'+myTagSelect(s)+'</td>'+
       '<td class="row"><button class="btn btn-ghost btn-sm" onclick="toggleFavorite(\''+esc(s)+'\')" title="'+(isFavorite(s)?'Remove from Favorites':'Add to Favorites')+'">'+(isFavorite(s)?'★':'☆')+'</button> <button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(s)+'\')">Analyze</button> <button class="btn-danger btn btn-sm" onclick="removeWatch('+i+')">✕</button></td>';
     wb.appendChild(tr);
+    });
   });
 
   /* favorites */

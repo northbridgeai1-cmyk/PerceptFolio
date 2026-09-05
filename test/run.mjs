@@ -555,6 +555,54 @@ t('the dead version-skew fallback is gone', !/queue is mid-update/.test(idx));
 t('the request form still distinguishes rejection from unreachable',
   /err\.rejected=true/.test(idx) && /mailFallback\('<b>The request queue is not reachable/.test(idx));
 
+/* ==================== SCHEMA INTEGRITY ==================== */
+G('defaultData must keep every key — a missing one is silent data loss');
+
+{
+  /* This exists because a // line comment inserted into the object literal — which is written
+     across continued lines — swallowed the rest of its line and deleted alerts, analyses, manual,
+     myTags and history from every new profile. Nothing failed loudly; the portfolio table simply
+     threw on the next render. Keys are cheap to assert and the failure mode is not. */
+  const i = term.indexOf('function defaultData');
+  let j = term.indexOf('{', i), d = 0, k = j;
+  while (true) { if (term[k] === '{') d++; else if (term[k] === '}') { d--; if (!d) break; } k++; }
+  const shape = new Function(term.slice(i, k + 1) + ';return defaultData();')();
+  const need = ['apiKey','cash','holdings','watchlist','favorites','lists','listOpen','alerts',
+    'priceAlerts','analyses','manual','myTags','privacyMode','history','displayName','transactions',
+    'dividends','theme','calls','scoreLog','priceLog','strategies','theses','policy','rules',
+    'ruleChanges','syncedAt','lastLocalEdit','tourSeen','macro','relations'];
+  const missing = need.filter(x => !(x in shape));
+  t('every expected key survives in defaultData', missing.length === 0,
+    missing.length ? 'MISSING: ' + missing.join(', ') : Object.keys(shape).length + ' keys');
+  /* An earlier version of this block also tried to spot a swallowed key by regex. It could not
+     distinguish a hidden key from a comment whose TEXT mentions one, and flagged a correct line.
+     The evaluation above is the real check: if a key is swallowed it is simply absent, whatever
+     the syntax that hid it. A test that cannot tell right from wrong is noise, so it is gone. */
+}
+
+/* ==================== LISTS ==================== */
+G('Lists: an organisational layer that cannot lose tickers');
+
+t('the tab is labelled Lists', /<span class="lbl">Lists<\/span>/.test(term));
+t('lists are additive to watchlist, which keeps its shape',
+  /lists:\[\],/.test(term) && /watchlist:\[\],/.test(term));
+/* The whole safety argument: two dozen features read D.watchlist, so it must stay a flat array. */
+t('watchlist is still a flat array of symbols, not restructured',
+  /D\.watchlist\.includes\(sym\)/.test(term) && !/D\.watchlist\.syms/.test(term));
+t('adding to a list also adds to the watchlist, so it gets scored',
+  /if\(!D\.watchlist\.includes\(sym\)\)D\.watchlist\.push\(sym\)/.test(term));
+t('deleting a list keeps its tickers', /they just move to Unlisted/.test(term) &&
+  /D\.lists=allLists\(\)\.filter\(x=>x\.id!==id\)/.test(term));
+t('removing from the watchlist strips the symbol from every list',
+  /if\(sym\)allLists\(\)\.forEach\(l=>\{ if\(l\.syms\)l\.syms=l\.syms\.filter/.test(term));
+t('a fixed colour palette, not a free picker', /const LIST_COLORS=\[/.test(term));
+t('new lists get an unused colour where one is free', /LIST_COLORS\.find\(c=>!used\.includes\(c\.k\)\)/.test(term));
+t('duplicate list names are refused', /You already have a list called that/.test(term));
+t('symbols in no list are grouped as Unlisted', /label:'Unlisted'/.test(term));
+t('the Lists column is rendered before My Call, matching the header',
+  term.indexOf("listDotsHtml(s)+' '+listMenuHtml(s)") < term.indexOf("'<td class=\"mycall-cell\">'+myTagSelect(s)"));
+t('the empty-state colspan matches the column count', /colspan="9" class="empty"/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 
