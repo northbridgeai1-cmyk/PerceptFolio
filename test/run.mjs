@@ -403,6 +403,42 @@ t('the decline email issues no code and makes no promise',
 t('the sign-in link is the public site, not location.origin',
   /const origin='https:\/\/perceptfolio\.com'/.test(admin));
 
+/* ==================== WORKER ROUTE BOUNDARY ==================== */
+G('Which routes sit above the auth check — a route on the wrong side fails silently');
+
+{
+  const auth = worker.indexOf('safeEqual(token, env.SYNC_SECRET)');
+  const at = r => worker.indexOf("url.pathname === '" + r + "'");
+  const isPublic = r => { const i = at(r); return i !== -1 && i < auth; };
+  const exists = r => at(r) !== -1;
+
+  /* These are called by clients holding no credentials. Behind the auth check they return 401,
+     and the caller cannot tell that apart from the worker being down — so the feature fails
+     silently rather than loudly. /status behind auth meant Pause never locked anyone out. */
+  for (const r of ['/request', '/version', '/invite', '/status', '/fred'])
+    t(r + ' must be reachable without the sync key', isPublic(r));
+
+  /* These move money, mint codes, spend quota or read the queue. Operator only. */
+  for (const r of ['/requests', '/decide', '/pause', '/summarise', '/finnhub'])
+    t(r + ' must require the sync key', exists(r) && !isPublic(r));
+
+  /* Every route the worker advertises must actually be implemented. This is the check that caught
+     /finnhub being deleted by an edit that sliced from one comment banner to the next. */
+  const advertised = (/routes: \[([^\]]*)\]/.exec(worker) || [, ''])[1]
+    .split(',').map(x => x.trim().replace(/'/g, '')).filter(x => x.startsWith('/') && x !== '/?slot=');
+  const missing = advertised.filter(r => !exists(r));
+  t('every advertised route is implemented', missing.length === 0,
+    missing.length ? 'MISSING: ' + missing.join(', ') : advertised.length + ' routes');
+}
+
+t('macro data is gated on a live grant, not the sync key',
+  /Macro data needs a live invite code, or the sync key/.test(worker));
+t('the FRED series allowlist is closed',
+  /FRED_ALLOWED = new Set\(\['VIXCLS', 'SP500', 'WILL5000PR', 'GDP'\]\)/.test(worker));
+t('a paused grant loses macro data too', /return rec\.paused \? null : rec/.test(worker));
+t('the terminal presents its invite code when it has no sync key',
+  /codeParam=syncConfigured\(\)\?'':'&code='/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

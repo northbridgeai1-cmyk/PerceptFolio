@@ -9263,12 +9263,24 @@ function renderRelList(){
 let macroCache={};        // series -> {observations, fetchedAt}
 let macroLoading=false;
 
+/* Macro data no longer needs the operator's sync key.
+
+   It used to, which meant an invited user could only have the VIX and the Buffett indicator if they
+   were handed a secret that also grants read and write over every synced portfolio. Nobody should
+   trade that for a volatility reading.
+
+   Two ways in now: the operator's key if sync is configured, otherwise this profile's invite code.
+   The worker accepts either, restricts the series to four public national statistics, and refuses a
+   code whose grant has been paused — so suspending someone takes their macro data with it. */
 async function fredSeries(series,limit){
-  if(!syncConfigured())throw new Error('NEEDS_WORKER');
-  const base=syncCfg.url.replace(/\/+$/,'');
-  const res=await fetch(base+'/fred?series='+encodeURIComponent(series)+'&limit='+(limit||1),{
-    headers:{'Authorization':'Bearer '+syncCfg.key}
-  });
+  const invite=(DB.profiles[USER]||{}).invite;
+  if(!syncConfigured()&&!invite)throw new Error('NEEDS_WORKER');
+  const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
+  const auth=syncConfigured()
+    ? {headers:{'Authorization':'Bearer '+syncCfg.key}}
+    : {};
+  const codeParam=syncConfigured()?'':'&code='+encodeURIComponent(invite);
+  const res=await fetch(base+'/fred?series='+encodeURIComponent(series)+'&limit='+(limit||1)+codeParam,auth);
   if(res.status===401)throw new Error('Sync key rejected — check it matches SYNC_SECRET.');
   if(!res.ok){
     let d='';try{const j=await res.json();d=j.error||'';}catch(e){}
@@ -9298,7 +9310,9 @@ async function loadMarketData(force){
        threw away a live SPY quote that needs no worker at all — Finnhub is called directly from the
        browser. The regime banner and the weather map genuinely do need FRED and still say so; the
        move panel does not, so it now gets whatever can actually be fetched. */
-    if(!syncConfigured()){
+    /* An invite code is now enough for macro data, so the worker-less path is only taken when there
+       is neither a sync key nor a code to present. */
+    if(!syncConfigured()&&!(DB.profiles[USER]||{}).invite){
       const solo={};
       if(hasMarketData()){
         try{

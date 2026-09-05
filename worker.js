@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-05.3';
+const WORKER_VERSION = '2026-09-05.4';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -238,6 +238,113 @@ async function handle(request, env) {
     return json({ valid: true, tier: inv.tier, email: inv.email }, 200, env);
   }
 
+  /* Is this code a live, unpaused grant? Used by anything an invited user may reach without ever
+     holding SYNC_SECRET. */
+  async function activeGrant(code) {
+    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return null;
+    const g = await env.PF_SYNC.get('grant:' + code);
+    if (!g) return null;
+    const rec = JSON.parse(g);
+    return rec.paused ? null : rec;
+  }
+
+  /* ---- FRED proxy ----
+     The St. Louis Fed's API sends no CORS headers, so a browser cannot call it directly no matter
+     what the app does. This route fetches it server-side with the key kept here.
+
+     WHO MAY CALL IT, and why this is not the same decision as the Finnhub proxy.
+     Either the operator with SYNC_SECRET, or any holder of a live invite code. It used to require
+     the secret, which meant an invited user could not have macro data unless they were handed a key
+     that also grants read and write over every synced portfolio. That is far too much to trade for
+     a VIX reading.
+
+     Opening it is safe here specifically because of the shape of this data:
+       - the series allowlist is four public, national statistics — nothing user-specific
+       - results are cached 12 hours, so repeated calls cost KV reads rather than FRED requests
+       - the FRED key never leaves the worker
+       - a paused grant fails activeGrant(), so suspending someone removes macro data too
+
+     THE SAME REASONING DOES NOT EXTEND TO /finnhub, which is why that route was left alone: it is
+     per-ticker and per-user against a 60-per-minute shared quota, so a handful of invited users
+     calling it would exhaust the limit and break market data for everybody including the operator. */
+  if (url.pathname === '/fred') {
+    const FRED_ALLOWED = new Set(['VIXCLS', 'SP500', 'WILL5000PR', 'GDP']);
+    const auth0 = request.headers.get('Authorization') || '';
+    const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
+    let allowed = safeEqual(tok0, env.SYNC_SECRET);
+    if (!allowed) {
+      const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+      allowed = !!(await activeGrant(code));
+      if (!allowed) {
+        return json({ error: 'Macro data needs a live invite code, or the sync key.' }, 401, env);
+      }
+    }
+    if (!env.FRED_API_KEY) {
+      return json({ error: 'Worker is missing FRED_API_KEY. Get a free key at fred.stlouisfed.org/docs/api/api_key.html and add it under Settings > Variables and Secrets, then Deploy.' }, 500, env);
+    }
+    const series = (url.searchParams.get('series') || '').trim();
+    if (!FRED_ALLOWED.has(series)) {
+      return json({ error: 'Series not permitted: ' + clean(series, 40) }, 400, env);
+    }
+    const limit = Math.min(3000, Math.max(1, parseInt(url.searchParams.get('limit') || '1', 10) || 1));
+    const cacheKey = 'fred:' + series + ':' + limit;
+
+    const cached = await env.PF_SYNC.get(cacheKey);
+    if (cached !== null) {
+      const parsedCache = JSON.parse(cached);
+      if (Date.now() - parsedCache.fetchedAt < 12 * 60 * 60 * 1000) {
+        return json({ series, cached: true, fetchedAt: parsedCache.fetchedAt, observations: parsedCache.observations }, 200, env);
+      }
+    }
+    const fredUrl = 'https://api.stlouisfed.org/fred/series/observations'
+      + '?series_id=' + encodeURIComponent(series)
+      + '&api_key=' + encodeURIComponent(env.FRED_API_KEY)
+      + '&file_type=json&sort_order=desc&limit=' + limit;
+    const res = await fetch(fredUrl);
+    if (!res.ok) {
+      let detail = '';
+      try { const e = await res.json(); detail = e.error_message || ''; } catch (e) {}
+      return json({ error: 'FRED rejected the request (' + res.status + ')' + (detail ? ': ' + detail : '') + '. Check the series ID exists.' }, 502, env);
+    }
+    const data = await res.json();
+    const observations = (data.observations || [])
+      .filter(o => o.value !== '.' && o.value !== '' && isFinite(parseFloat(o.value)))
+      .map(o => ({ date: o.date, value: parseFloat(o.value) }));
+    const payload = { fetchedAt: Date.now(), observations };
+    await env.PF_SYNC.put(cacheKey, JSON.stringify(payload), { expirationTtl: 86400 });
+    return json({ series, cached: false, fetchedAt: payload.fetchedAt, observations }, 200, env);
+  }
+
+  /* ---- GET /status?code=XXXXX-XXXXX — is this account still allowed in? ----
+
+     PUBLIC, and it must be: the terminal calls it before anyone has authenticated, which is the
+     whole point. It reveals only whether one code is currently active, to someone who already holds
+     that code.
+
+     This is what makes Pause mean something. Without it the terminal never spoke to the server
+     again after signup, so a paused grant could not reach an account that already existed.
+
+     Answers on the durable grant: record, never the 40-day code: record. */
+  if (url.pathname === '/status' && request.method === 'GET') {
+    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) {
+      return json({ known: false, active: true, reason: 'malformed' }, 200, env);
+    }
+    const g = await env.PF_SYNC.get('grant:' + code);
+    if (!g) {
+      /* Not a refusal. Accounts created before grant: records existed have nothing to look up, and
+         locking them out over a bookkeeping gap would be the worst possible failure mode. */
+      return json({ known: false, active: true, reason: 'no grant record' }, 200, env);
+    }
+    const rec = JSON.parse(g);
+    return json({
+      known: true,
+      active: !rec.paused,
+      reason: rec.paused ? 'paused' : 'active',
+      tier: rec.tier || null
+    }, 200, env);
+  }
+
   // Auth: Authorization: Bearer <SYNC_SECRET>. Everything past this point is yours alone.
   const auth = request.headers.get('Authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
@@ -357,36 +464,6 @@ async function handle(request, env) {
       }
     }
     return json({ ok: true, paused, effect }, 200, env);
-  }
-
-  /* ---- GET /status?code=XXXXX-XXXXX — is this account still allowed in? ----
-
-     PUBLIC, and it must be: the terminal calls it before anyone has authenticated, which is the
-     whole point. It reveals only whether one code is currently active, to someone who already holds
-     that code.
-
-     This is what makes Pause mean something. Without it the terminal never spoke to the server
-     again after signup, so a paused grant could not reach an account that already existed.
-
-     Answers on the durable grant: record, never the 40-day code: record. */
-  if (url.pathname === '/status' && request.method === 'GET') {
-    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
-    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) {
-      return json({ known: false, active: true, reason: 'malformed' }, 200, env);
-    }
-    const g = await env.PF_SYNC.get('grant:' + code);
-    if (!g) {
-      /* Not a refusal. Accounts created before grant: records existed have nothing to look up, and
-         locking them out over a bookkeeping gap would be the worst possible failure mode. */
-      return json({ known: false, active: true, reason: 'no grant record' }, 200, env);
-    }
-    const rec = JSON.parse(g);
-    return json({
-      known: true,
-      active: !rec.paused,
-      reason: rec.paused ? 'paused' : 'active',
-      tier: rec.tier || null
-    }, 200, env);
   }
 
   /* ---- POST /summarise — attributable news summary ----
@@ -569,59 +646,6 @@ async function handle(request, env) {
     /* 7 days: the key is the content, so an entry can only be re-read by an identical request. */
     await env.PF_SYNC.put(cacheKey, JSON.stringify(payload), { expirationTtl: 604800 });
     return json(payload, 200, env);
-  }
-
-  /* ---- FRED proxy ----
-     The St. Louis Fed's API sends no CORS headers, so a browser cannot call it directly no matter
-     what the app does. This route fetches it server-side and hands the result back with headers the
-     browser will accept. The FRED key stays here in the worker and is never exposed to the page.
-
-     Results are cached in KV for 12 hours. Macro series update monthly or quarterly, so caching
-     costs nothing in freshness and keeps this comfortably inside the free tier's write limit. */
-  if (url.pathname === '/fred') {
-    if (!env.FRED_API_KEY) {
-      return json({ error: 'Worker is missing FRED_API_KEY. Get a free key at fred.stlouisfed.org/docs/api/api_key.html and add it under Settings > Variables and Secrets, then Deploy.' }, 500, env);
-    }
-    const series = (url.searchParams.get('series') || '').trim();
-    // FRED series IDs are alphanumeric; restricting the charset stops this being used as an open
-    // proxy to arbitrary URLs.
-    if (!/^[A-Za-z0-9_]{2,40}$/.test(series)) {
-      return json({ error: 'Missing or malformed series parameter.' }, 400, env);
-    }
-    /* 3000 rather than 2000: FRED's licence caps the S&P and Dow daily series at exactly 10 years of
-       history, which is about 2,520 trading days. The old ceiling silently threw away the oldest two
-       years of a series that is already short, and those are the years the drawdown bootstrap most
-       needs. Requests above the cap are clamped rather than rejected. */
-    const limit = Math.min(3000, Math.max(1, parseInt(url.searchParams.get('limit') || '1', 10) || 1));
-    const cacheKey = 'fred:' + series + ':' + limit;
-
-    const cached = await env.PF_SYNC.get(cacheKey);
-    if (cached !== null) {
-      const parsedCache = JSON.parse(cached);
-      if (Date.now() - parsedCache.fetchedAt < 12 * 60 * 60 * 1000) {
-        return json({ series, cached: true, fetchedAt: parsedCache.fetchedAt, observations: parsedCache.observations }, 200, env);
-      }
-    }
-
-    const fredUrl = 'https://api.stlouisfed.org/fred/series/observations'
-      + '?series_id=' + encodeURIComponent(series)
-      + '&api_key=' + encodeURIComponent(env.FRED_API_KEY)
-      + '&file_type=json&sort_order=desc&limit=' + limit;
-    const res = await fetch(fredUrl);
-    if (!res.ok) {
-      // Surface FRED's own message; a bad series ID is the most common cause and worth seeing.
-      let detail = '';
-      try { const e = await res.json(); detail = e.error_message || ''; } catch (e) {}
-      return json({ error: 'FRED rejected the request (' + res.status + ')' + (detail ? ': ' + detail : '') + '. Check the series ID exists.' }, 502, env);
-    }
-    const data = await res.json();
-    // Drop FRED's "." placeholders for missing readings rather than letting NaN reach the app.
-    const observations = (data.observations || [])
-      .filter(o => o.value !== '.' && o.value !== '' && isFinite(parseFloat(o.value)))
-      .map(o => ({ date: o.date, value: parseFloat(o.value) }));
-    const payload = { fetchedAt: Date.now(), observations };
-    await env.PF_SYNC.put(cacheKey, JSON.stringify(payload), { expirationTtl: 86400 });
-    return json({ series, cached: false, fetchedAt: payload.fetchedAt, observations }, 200, env);
   }
 
   /* ---- Finnhub proxy ----
