@@ -204,8 +204,11 @@ t('demo holdings are seeded with prices so screens render with no API',
 /* ==================== 4d. ACTIVE RETURN / INFORMATION RATIO ==================== */
 G('Active return — tracking error must never stand alone, and IR never without its interval');
 
+/* The mean subtraction is the C7 guarantee and must not move. The annualisation multiplier moved
+   in C6 from a bare sqrt(252) to the Lo-adjusted scale, which is why this no longer pins the whole
+   expression — only the part that carries the promise. */
 t('tracking error subtracts the mean (stdev, not RMS)',
-  /\(b-m\)\*\(b-m\)/.test(term) && /const te=Math\.sqrt\(v\)\*Math\.sqrt\(TRADING_DAYS\)/.test(term));
+  /\(b-m\)\*\(b-m\)/.test(term) && /const te=Math\.sqrt\(v\)\*annualScale\(d,TRADING_DAYS\)\.scale/.test(term));
 t('IR is active return over tracking error', /const ir=meanAnn\/te/.test(term));
 t('a confidence interval is always computed', /lo=se==null\?null:ir-1\.96\*se/.test(term));
 t('the straddle case is detected explicitly', /straddles:/.test(term));
@@ -301,18 +304,38 @@ t('a floor stops dispersion being estimated from nothing', /RECORD_FLOOR=20/.tes
 t('the landing page states the formula rather than a round number',
   /1\.96 × dispersion ÷ edge/.test(idx));
 
+/* ==================== C6 — AUTOCORRELATION-ADJUSTED ANNUALISATION ==================== */
+G('C6: sqrt(252) is only right for iid returns');
+
+t('the Lo scale exists and reduces to sqrt(q) when no lag is significant',
+  /function annualScale/.test(term) && /const plain=Math\.sqrt\(q\)/.test(term));
+t('autocorrelations are estimated from the series', /function autocorr/.test(term));
+t('only individually significant lags contribute', /Math\.abs\(r\)>bound\?r:0/.test(term));
+t('Sharpe uses q/scale, not sqrt(q)', /const rt=TRADING_DAYS\/as\.scale/.test(term));
+t('annualised volatility uses the same scale', /volAnnual:sd\*as\.scale/.test(term));
+t('GARCH output is corrected too', /const gScale=annualScale\(rets,TRADING_DAYS\)\.scale/.test(term));
+t('the Monte Carlo de-annualisation is excluded on purpose, with a reason',
+  /C6 EXCLUSION[\s\S]{0,300}iid by\s*\n?\s*construction/.test(term));
+t('the VIX de-annualisation is excluded on purpose, with a reason',
+  /C6 EXCLUSION[\s\S]{0,300}options market's own annualised number/.test(term));
+t('no empirical series is still annualised by a bare sqrt', 
+  !/const te=Math\.sqrt\(v\)\*Math\.sqrt\(TRADING_DAYS\)/.test(term) &&
+  !/sigma=Math\.sqrt\(variance\)\*Math\.sqrt\(252\)/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 
 const M = new Function(`
-  let D; const TRADING_DAYS=252;
+  let D; const TRADING_DAYS=252; const LO_MAXLAG=10, LO_MINOBS=60;
   ${grab(term, 'toReturns')}
   ${grab(term, 'normCdf')}
+  ${grab(term, 'autocorr')}
+  ${grab(term, 'annualScale')}
   ${grab(term, 'thesisSigma')}
   ${grab(term, 'thesisProbability')}
   ${grab(term, 'spyRealisedVol')}
   ${grab(term, 'expectancyStats')}
-  return {setD:d=>{D=d}, toReturns, normCdf, thesisSigma, thesisProbability, spyRealisedVol, expectancyStats};
+  return {setD:d=>{D=d}, toReturns, normCdf, autocorr, annualScale, thesisSigma, thesisProbability, spyRealisedVol, expectancyStats};
 `)();
 
 for (const [x, want] of [[0, .5], [1, .8413447], [-1, .1586553], [1.96, .9750021], [3, .9986501]])

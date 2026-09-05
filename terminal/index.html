@@ -4135,6 +4135,68 @@ function portfolioReturns(){
   }
   return out;
 }
+/* ================= C6 — AUTOCORRELATION-ADJUSTED ANNUALISATION (Lo, 2002) =================
+
+   Multiplying a daily figure by sqrt(252) is correct only if returns are independent. Portfolio
+   returns are not: momentum, mean reversion, stale pricing in thinly traded names and the simple
+   fact that a thesis plays out over weeks all put serial correlation into the series.
+
+   Lo (2002) gives the general factor. For q periods with autocorrelations rho_k:
+
+       scale(q) = sqrt( q + 2 * SUM_{k=1..q-1} (q - k) * rho_k )
+
+   which reduces to exactly sqrt(q) when every rho_k is zero, so the iid case is unchanged and this
+   can be applied without special-casing.
+
+       SR_annual    = q * SR_daily / scale(q)
+       sigma_annual = sigma_daily * scale(q)
+
+   WHICH DIRECTION THE ERROR RUNS, since it is not symmetric. Positive autocorrelation — a trending
+   book — makes scale(q) LARGER than sqrt(q), so the naive figure UNDERSTATES volatility and
+   OVERSTATES Sharpe. A trending portfolio therefore looks better than it is, which is the flattering
+   direction and the one worth removing.
+
+   PRACTICAL LIMITS. Estimating 251 autocorrelations from a year of data is noise, so only the first
+   MAXLAG lags are used and each is required to clear its own significance bound of roughly
+   2/sqrt(n) before it contributes. Below MINOBS the correction is not attempted at all and plain
+   sqrt(q) is returned, because a badly estimated correction is worse than none. */
+const LO_MAXLAG=10, LO_MINOBS=60;
+
+function autocorr(rets,k){
+  const n=rets.length;
+  if(n<=k+1)return 0;
+  const m=rets.reduce((a,b)=>a+b,0)/n;
+  let num=0,den=0;
+  for(let i=0;i<n;i++){const d=rets[i]-m;den+=d*d;}
+  for(let i=k;i<n;i++)num+=(rets[i]-m)*(rets[i-k]-m);
+  return den>0?num/den:0;
+}
+
+/* The annualisation multiplier for this series. Returns sqrt(q) unchanged when there is too little
+   data, or when no lag is individually significant. */
+function annualScale(rets,q){
+  q=q||TRADING_DAYS;
+  const plain=Math.sqrt(q);
+  if(!Array.isArray(rets)||rets.length<LO_MINOBS)return{scale:plain,adjusted:false,rho:[],n:rets?rets.length:0};
+  const n=rets.length;
+  const bound=2/Math.sqrt(n);
+  const lags=Math.min(LO_MAXLAG,Math.max(1,Math.floor(n/4)),q-1);
+  const rho=[];
+  let sum=0;
+  for(let k=1;k<=lags;k++){
+    const r=autocorr(rets,k);
+    const use=Math.abs(r)>bound?r:0;      // insignificant lags contribute nothing
+    rho.push({k,r,used:use!==0});
+    sum+=(q-k)*use;
+  }
+  const inner=q+2*sum;
+  /* Heavy negative autocorrelation can drive the variance term non-positive, which is a sign the
+     estimate has broken down rather than a real result. Fall back rather than return a NaN. */
+  if(!(inner>0))return{scale:plain,adjusted:false,rho,n,degenerate:true};
+  const scale=Math.sqrt(inner);
+  return{scale,adjusted:rho.some(x=>x.used),rho,n,ratio:scale/plain};
+}
+
 function sharpeOf(dailyRets,rfAnnual){
   const n=dailyRets.length;
   if(n<20)return null;
@@ -4148,13 +4210,17 @@ function sharpeOf(dailyRets,rfAnnual){
   // which penalises exactly the outcome you want.
   const down=dailyRets.filter(r=>r<rfD).map(r=>r-rfD);
   const dsd=down.length>1?Math.sqrt(down.reduce((a,b)=>a+b*b,0)/down.length):null;
-  const rt=Math.sqrt(TRADING_DAYS);
+  /* C6. SR_annual = q*SR_daily/scale, which is srD*(q/scale). With no autocorrelation
+     q/scale = q/sqrt(q) = sqrt(q) and this is identical to the old line. */
+  const as=annualScale(dailyRets,TRADING_DAYS);
+  const rt=TRADING_DAYS/as.scale;
   const seD=Math.sqrt((1+srD*srD/2)/n);
   return{
     n, sharpe:srD*rt,
     lo:(srD-1.96*seD)*rt, hi:(srD+1.96*seD)*rt,
     sortino:dsd>0?((mean-rfD)/dsd)*rt:null,
-    volAnnual:sd*rt, retAnnual:mean*TRADING_DAYS
+    volAnnual:sd*as.scale, retAnnual:mean*TRADING_DAYS,
+    loAdjusted:as.adjusted, loRatio:as.ratio||1, loRho:as.rho
   };
 }
 function renderSharpe(){
@@ -4857,11 +4923,15 @@ function garchFit(rets){
   let s2=lrVar;
   for(let i=0;i<n;i++)s2=omega+best.a*dev[i]*dev[i]+best.b*s2;
   const persist=best.a+best.b;
+  /* C6. GARCH models variance CLUSTERING; Lo's factor corrects for autocorrelation in the RETURNS.
+     They are different phenomena and both are present, so the daily-to-annual step needs the
+     correction here for the same reason it needs it on a plain sample deviation. */
+  const gScale=annualScale(rets,TRADING_DAYS).scale;
   return{
     alpha:best.a,beta:best.b,omega,persist,
-    sigmaNext:Math.sqrt(s2)*Math.sqrt(TRADING_DAYS),
-    sigmaLR:Math.sqrt(lrVar)*Math.sqrt(TRADING_DAYS),
-    sigmaTrail:Math.sqrt(lrVar)*Math.sqrt(TRADING_DAYS),
+    sigmaNext:Math.sqrt(s2)*gScale,
+    sigmaLR:Math.sqrt(lrVar)*gScale,
+    sigmaTrail:Math.sqrt(lrVar)*gScale,
     halfLife:persist<1?Math.log(0.5)/Math.log(persist):null,
     n
   };
@@ -4987,7 +5057,7 @@ function activeStats(port,bench){
   const d=[];for(let i=0;i<n;i++)d.push(port[i]-bench[i]);
   const m=d.reduce((a,b)=>a+b,0)/d.length;
   const v=d.reduce((a,b)=>a+(b-m)*(b-m),0)/(d.length-1);   // MEAN SUBTRACTED
-  const te=Math.sqrt(v)*Math.sqrt(TRADING_DAYS);
+  const te=Math.sqrt(v)*annualScale(d,TRADING_DAYS).scale;   // C6
   const meanAnn=m*TRADING_DAYS;
   if(!(te>0))return null;
   const ir=meanAnn/te;
@@ -5783,7 +5853,7 @@ async function computeRiskOutlook(sym,mOpt){
     if(rets.length>20){
       const meanR=rets.reduce((a,b)=>a+b,0)/rets.length;
       const variance=rets.reduce((a,b)=>a+(b-meanR)*(b-meanR),0)/(rets.length-1);
-      sigma=Math.sqrt(variance)*Math.sqrt(252);
+      sigma=Math.sqrt(variance)*annualScale(rets,TRADING_DAYS).scale;   // C6
       sigmaSource='historical (6mo daily)';
     }
   }catch(e){}
@@ -6110,7 +6180,7 @@ async function getAssetStats(sym,type,rf,mktRet){
       if(rets.length>20){
         const meanR=rets.reduce((a,b)=>a+b,0)/rets.length;
         const variance=rets.reduce((a,b)=>a+(b-meanR)*(b-meanR),0)/(rets.length-1);
-        sigma=Math.sqrt(variance)*Math.sqrt(252);
+        sigma=Math.sqrt(variance)*annualScale(rets,TRADING_DAYS).scale;   // C6
         sigmaSource='historical (6mo daily)';
       }
     }catch(e){}
@@ -6196,6 +6266,9 @@ function blockBootstrapMaxDD(rets,days,sims,blockLen,scale){
 /* The same measurement under the assumption the Monte Carlo above makes, purely so the two can be
    compared. This is not a second opinion — it is the control. */
 function gaussianMaxDD(mu,sigma,days,sims){
+  /* C6 EXCLUSION, deliberate. This DE-annualises to seed a simulation whose draws are iid by
+     construction. Feeding an autocorrelation correction into a generator that then produces
+     uncorrelated paths would put the adjustment in on one side and take it out on the other. */
   const dMu=mu/TRADING_DAYS,dSig=sigma/Math.sqrt(TRADING_DAYS),out=new Float64Array(sims);
   for(let s=0;s<sims;s++){
     let v=1,peak=1,mdd=0;
@@ -6224,7 +6297,7 @@ async function runDrawdown(){
   el.innerHTML='<div class="empty">Pulling real S&amp;P history…</div>';
   try{
     const spx=await spxDailyReturns();
-    const mktSigma=stdev(spx.rets)*Math.sqrt(TRADING_DAYS);
+    const mktSigma=stdev(spx.rets)*annualScale(spx.rets,TRADING_DAYS).scale;   // C6
     const r=lastMcResult;
     const scale=mktSigma>0?(r.sigmaP/mktSigma):1;
     const days=Math.round(r.years*TRADING_DAYS);
@@ -7650,7 +7723,7 @@ function thesisSigma(sym){
     if(rets.length>20){
       const m=rets.reduce((a,b)=>a+b,0)/rets.length;
       const v=rets.reduce((a,b)=>a+(b-m)*(b-m),0)/(rets.length-1);
-      const sig=Math.sqrt(v)*Math.sqrt(252);
+      const sig=Math.sqrt(v)*annualScale(rets,TRADING_DAYS).scale;   // C6
       if(sig>0.01&&sig<3) return{sigma:sig,source:'measured from '+closes.length+' of your own logged closes'};
     }
   }
@@ -9210,7 +9283,7 @@ function spyRealisedVol(sessions){
   const v=rets.reduce((a,b)=>a+(b-m)*(b-m),0)/(rets.length-1);
   const dailyPct=Math.sqrt(v)*100;
   if(!(dailyPct>0))return null;
-  return{daily:dailyPct,annual:dailyPct*Math.sqrt(TRADING_DAYS),n:rets.length};
+  return{daily:dailyPct,annual:dailyPct*annualScale(rets,TRADING_DAYS).scale,n:rets.length};   // C6
 }
 
 /* The panel, minus the options market. Everything here comes from Finnhub and the app's own log,
@@ -9386,6 +9459,10 @@ function renderTodaysMove(data){
   }
   updateMoveButtons();
   const vixNow=vix[0].value;
+  /* C6 EXCLUSION, deliberate. The VIX is the options market's own annualised number, and dividing
+     by sqrt(252) is that market's convention for reading it as a daily move. Applying our
+     autocorrelation estimate — measured on a different series entirely — would silently restate
+     someone else's figure as if it were ours. */
   const expected=vixNow/Math.sqrt(TRADING_DAYS);      // implied daily move, %
 
   /* SECOND PROJECTION — realized volatility.
@@ -9404,7 +9481,7 @@ function renderTodaysMove(data){
         const m=r.reduce((x,y)=>x+y,0)/r.length;
         const v=r.reduce((x,y)=>x+(y-m)*(y-m),0)/(r.length-1);
         const dailyPct=Math.sqrt(v)*100;
-        return{daily:dailyPct,annual:dailyPct*Math.sqrt(TRADING_DAYS),src:'S&P via FRED'};
+        return{daily:dailyPct,annual:dailyPct*annualScale(r,TRADING_DAYS).scale,src:'S&P via FRED'};   // C6
       }
     }
     /* FRED's index series can be short, throttled or refused while the VIX still loads fine — and
