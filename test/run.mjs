@@ -470,6 +470,20 @@ t('adoption never overwrites a local mark', /if\(c\.marks\[h\]\|\|!wm\[h\]\)retu
 t('the demo account registers nothing', /isDemoUser\(\)\)return null/.test(term));
 t('/version reports the last cron run so a missing trigger is observable', /body\.cron = cl/.test(worker));
 
+/* ==================== B2 — BACKUP PROTECTION ==================== */
+G('B2: a record that cannot be rebuilt must nag before it can be lost');
+
+t('exports are timestamped', /D\.lastExportAt=Date\.now\(\)/.test(term));
+t('a never-exported profile with data gets the red banner', /No backup exists\./.test(term));
+t('a stale backup gets the amber banner with the age', /Last backup '\+st\.days\+' days ago/.test(term));
+t('the never-exported banner cannot be snoozed, the stale one can',
+  /st\.level==='stale'&&sessionStorage\.getItem\('pf_backup_snooze'\)/.test(term) &&
+  /never\?'':'<button[^>]*pf_backup_snooze/.test(term));
+t('iOS Safari uninstalled adds the 7-day eviction warning',
+  /iosSafariUninstalled/.test(term) && /deletes this site\\'s storage after 7 days/.test(term));
+t('an empty profile is never nagged', /hasData=\(D\.holdings\|\|\[\]\)\.length>0/.test(term));
+t('the demo account is never nagged', /backupState\(\)\{\s*\n?\s*if\(typeof isDemoUser/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

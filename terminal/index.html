@@ -772,6 +772,11 @@ body.touring header,body.touring #sidebar{z-index:201}
 </defs></svg>
 
 <div id="app" style="display:none">
+<!-- B2. The whole product lives in this browser's localStorage. Safari evicts localStorage for
+     sites not visited in 7 days; a cleared cache does it anywhere; and the record being protected
+     cannot be rebuilt afterwards — the marks are forward-only by design. So the app nags, in
+     proportion to what would actually be lost. -->
+<div id="backupBanner" style="display:none"></div>
 <header>
   <button id="sideToggle" onclick="toggleSidebar()" aria-label="Toggle sidebar" title="Collapse the sidebar  ·  [">
     <svg viewBox="0 0 24 24"><use href="#i-chev"/></svg>
@@ -2560,6 +2565,7 @@ function setAuthMode(m){
 }
 function enterSession(){
   resetTransientState();
+  renderBackupBanner();
   /* Adopt marks the worker stamped while this app was closed, then tell it what is still open.
      Both silent and unawaited: session entry must not wait on a network round-trip. */
   reconcileWorkerMarks().then(()=>pushCallRegistry());
@@ -6873,6 +6879,7 @@ function renderBizDashboard(){
   if(emptyEl)emptyEl.style.display=clients.length?'none':'block';
 }
 function renderAll(){
+  renderBackupBanner();
   if(!D)return;
   /* Business account's own view (not switched into a client) gets a completely different dashboard —
      earnings + client list, not the personal onboarding/portfolio dashboard, so it can't be used as a
@@ -7762,7 +7769,57 @@ function exportData(){
   const blob=new Blob([JSON.stringify({profile:USER,data:D},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='perceptfolio-'+USER+'-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  /* B2. The download was fired, which is as much as a page can know — the browser may still cancel
+     the save dialog, so this is "an export was initiated", not proof a file landed on disk. It is
+     the honest best available, and it is what the staleness banner keys on. */
+  D.lastExportAt=Date.now();
+  saveDB();
+  renderBackupBanner();
 }
+/* Which warning, if any, this profile has earned. Severity is proportional to loss:
+     - data exists, never exported          -> permanent red banner until the first export
+     - last export older than 14 days       -> amber banner, dismissable for the session
+     - iOS Safari, not installed to home    -> one extra sentence: the 7-day eviction rule
+   No data worth losing means no banner at all — nagging an empty account teaches people to
+   dismiss the banner that will one day matter. */
+function backupState(){
+  if(typeof isDemoUser==='function'&&isDemoUser())return null;   // sandbox data is disposable
+  const hasData=(D.holdings||[]).length>0||(D.calls||[]).length>0||(D.transactions||[]).length>0;
+  if(!hasData)return null;
+  const last=D.lastExportAt||0;
+  const days=last?(Date.now()-last)/86400000:null;
+  if(!last)return{level:'never'};
+  if(days>14)return{level:'stale',days:Math.floor(days)};
+  return null;
+}
+function iosSafariUninstalled(){
+  const ua=navigator.userAgent||'';
+  const ios=/iPhone|iPad|iPod/.test(ua)&&!window.MSStream;
+  const safari=/Safari/.test(ua)&&!/CriOS|FxiOS|EdgiOS/.test(ua);
+  const installed=window.navigator.standalone===true;
+  return ios&&safari&&!installed;
+}
+function renderBackupBanner(){
+  const el=document.getElementById('backupBanner');
+  if(!el)return;
+  const st=backupState();
+  if(!st||(st.level==='stale'&&sessionStorage.getItem('pf_backup_snooze'))){el.style.display='none';return;}
+  const never=st.level==='never';
+  const ios=iosSafariUninstalled();
+  el.style.display='block';
+  el.style.cssText+=';padding:9px 14px;font-size:12.5px;line-height:1.5;display:flex;gap:12px;align-items:center;flex-wrap:wrap;'+
+    (never?'background:rgba(229,83,75,.14);border-bottom:1px solid rgba(229,83,75,.4);color:var(--text)'
+          :'background:rgba(217,164,65,.12);border-bottom:1px solid rgba(217,164,65,.35);color:var(--text)');
+  el.innerHTML=
+    '<span>'+(never
+      ? '<b>No backup exists.</b> Everything here lives only in this browser — a cleared cache deletes it, and the record cannot be rebuilt.'
+      : '<b>Last backup '+st.days+' days ago.</b> Everything since lives only in this browser.')+
+      (ios?' <b>On iPhone Safari this is urgent:</b> iOS deletes this site\'s storage after 7 days without a visit unless the app is added to the home screen.':'')+
+    '</span>'+
+    '<button class="btn btn-sm" onclick="exportData()">Export backup</button>'+
+    (never?'':'<button class="btn btn-ghost btn-sm" onclick="sessionStorage.setItem(\'pf_backup_snooze\',\'1\');renderBackupBanner()">Later</button>');
+}
+
 function importData(ev){
   const f=ev.target.files[0];if(!f)return;
   const r=new FileReader();
