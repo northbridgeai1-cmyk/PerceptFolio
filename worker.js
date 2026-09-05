@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-05.4';
+const WORKER_VERSION = '2026-09-05.5';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -243,9 +243,20 @@ async function handle(request, env) {
   async function activeGrant(code) {
     if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return null;
     const g = await env.PF_SYNC.get('grant:' + code);
-    if (!g) return null;
-    const rec = JSON.parse(g);
-    return rec.paused ? null : rec;
+    if (g) {
+      const rec = JSON.parse(g);
+      return rec.paused ? null : rec;
+    }
+    /* FALLBACK for a code redeemed before grant: records existed. Those accounts hold a perfectly
+       valid code and would otherwise be refused macro data over a bookkeeping gap they had no part
+       in. code: records last 40 days and carry the same paused flag, so they answer correctly for
+       exactly the window in which such an account can exist. Beyond that the grant record is
+       authoritative and this branch never fires. */
+    const c = await env.PF_SYNC.get('code:' + code);
+    if (!c) return null;
+    const inv = JSON.parse(c);
+    if (inv.paused) return null;
+    return { code, tier: inv.tier || null, legacy: true };
   }
 
   /* ---- FRED proxy ----

@@ -431,6 +431,11 @@ G('Which routes sit above the auth check — a route on the wrong side fails sil
     missing.length ? 'MISSING: ' + missing.join(', ') : advertised.length + ' routes');
 }
 
+t('a code redeemed before grant records existed still gets macro data',
+  /const c = await env\.PF_SYNC\.get\('code:' \+ code\)/.test(worker) && /legacy: true/.test(worker));
+t('a paused code is refused on both lookup paths',
+  (worker.match(/if \(inv\.paused\) return null/g)||[]).length >= 1 &&
+  /return rec\.paused \? null : rec/.test(worker));
 t('macro data is gated on a live grant, not the sync key',
   /Macro data needs a live invite code, or the sync key/.test(worker));
 t('the FRED series allowlist is closed',
