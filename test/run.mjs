@@ -531,6 +531,27 @@ t('the trade-off is stated before they turn it on', /readable by anyone holding 
 t('a rejected code explains that a pause stops sync',
   /if your access was paused, sync stops with it/i.test(term));
 
+/* ==================== P2 — THE AUDIT SCREEN ==================== */
+G('P2: the terminal publishes its own breaches');
+
+t('the audit screen exists and is re-checkable', /function renderAudit/.test(term) && /id="auditBody"/.test(term));
+t('it renders on opening Settings', /refreshCodeSyncOffer\(\);renderAudit\(\)/.test(term));
+t('the sign-up promise is checked against the live DOM, not asserted',
+  /const gated=\/id="newInvite"\/\.test\(document\.documentElement\.innerHTML\)/.test(term));
+t('it reads the same record function as the headline strip, so they cannot drift',
+  /const rec=callRecord\(90\)/.test(term));
+t('a missing cron trigger is reported as a breach, not silence',
+  /NEVER RUN — the Cron Trigger is missing/.test(term));
+t('a stale cron is caught even if it once ran', /ageH>=36/.test(term));
+t('an unreachable worker says so rather than assuming the favourable answer',
+  /could not read \/version/.test(term));
+t('a never-exported profile is a red row', /NEVER — everything here is one cleared cache from gone/.test(term));
+
+/* CLEANUP */
+t('the dead version-skew fallback is gone', !/queue is mid-update/.test(idx));
+t('the request form still distinguishes rejection from unreachable',
+  /err\.rejected=true/.test(idx) && /mailFallback\('<b>The request queue is not reachable/.test(idx));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

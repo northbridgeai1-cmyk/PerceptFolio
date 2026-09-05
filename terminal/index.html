@@ -1678,6 +1678,19 @@ body.touring header,body.touring #sidebar{z-index:201}
 
 <!-- SETTINGS -->
 <div id="tab-settings" class="tabs-hidden">
+
+  <!-- P2. The terminal grades itself and publishes its own breaches. A product that argues numbers
+       must be checkable, and then cannot report on its own state, is making an exception for the one
+       claim it controls entirely. Every row here is read live — none is a stored assertion. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Audit</h3>
+      <button class="btn btn-ghost btn-sm" onclick="renderAudit()">Re-check</button>
+    </div>
+    <p class="muted" style="margin-top:6px;font-size:13px">What this install actually is, as opposed to what any screen claims. Anything red is a promise this copy is not currently keeping.</p>
+    <div id="auditBody" style="margin-top:14px"></div>
+  </div>
+
   <div class="card" id="installCard" style="display:none">
     <h3>Install PerceptFolio</h3>
     <p class="muted" style="margin-bottom:12px">Install it and PerceptFolio gets its own icon, opens without browser chrome, and keeps working offline. On iPhone this also matters for your data: Safari clears storage for sites you haven't opened in 7 days, but installed apps are exempt.</p>
@@ -3024,7 +3037,7 @@ function showTab(t){
   if(t==='risk'){renderBenchmarks();renderRiskContrib();renderSharpe();renderVaR();}
   /* refreshMarketDataCard on every open, not just at login: whether the worker answers changes
      when sync is configured or a custom domain starts resolving, and the card must follow. */
-  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();}
+  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();renderAudit();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -10445,6 +10458,111 @@ function recordStripHTML(){
 
 /* Rendered into BOTH mounts. It was previously on Command only, which meant the screen everyone
    actually lands on led with portfolio value and a compliment. */
+/* ================= P2 — THE AUDIT SCREEN =================
+
+   Three sections, and the rule for all of them is that a row states what IS, never what was
+   intended. Where a thing cannot be checked from the browser, the row says so rather than assuming
+   the favourable answer — an audit that guesses in its own favour is worse than none.
+
+   The worker rows come from /version, which reports its build and which secrets are bound. A red
+   row there is actionable in one place; a grey one means the browser could not reach the worker to
+   find out, which is a different statement and is printed as such. */
+async function renderAudit(){
+  const el=document.getElementById('auditBody');
+  if(!el)return;
+  el.innerHTML='<p class="muted" style="font-size:13px">Checking…</p>';
+
+  const row=(state,label,detail)=>{
+    const mark=state==='ok'?'✓':state==='bad'?'✗':state==='wait'?'⧗':'—';
+    const cls=state==='ok'?'pos':state==='bad'?'neg':state==='wait'?'warn':'muted';
+    return '<div style="display:grid;grid-template-columns:18px 1fr;gap:10px;padding:6px 0;border-top:1px solid var(--border)">'+
+      '<span class="'+cls+'" style="font-family:var(--mono);font-size:13px">'+mark+'</span>'+
+      '<span style="font-size:13px;line-height:1.5"><b>'+esc(label)+'</b>'+
+        (detail?'<br><span class="muted" style="font-size:12px">'+detail+'</span>':'')+'</span></div>';
+  };
+  const head=t=>'<div style="font:10.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:16px 0 4px">'+t+'</div>';
+
+  let out='';
+
+  /* ---- PROMISES: claims the site makes, checked against this install ---- */
+  out+=head('Promises');
+  const gated=/id="newInvite"/.test(document.documentElement.innerHTML);
+  out+=row(gated?'ok':'bad','No self-service sign-up',
+    gated?'account creation requires an invite code':'BREACHED — accounts can be created without a code');
+
+  const marked=(D.calls||[]).reduce((n,c)=>n+CALL_HORIZONS.filter(h=>(c.marks||{})[h]&&!(c.marks||{})[h].missed).length,0);
+  const missed=(D.calls||[]).reduce((n,c)=>n+CALL_HORIZONS.filter(h=>((c.marks||{})[h]||{}).missed).length,0);
+  out+=row(missed===0?'ok':'wait','Marks are taken on a fixed horizon',
+    marked+' marked, '+missed+' dropped'+(missed?' — a dropped mark is one whose anniversary passed with nothing able to price it':''));
+
+  /* callRecord(90) is the same 90-day aggregate the record strip reports, so this row cannot drift
+     from the headline figure — it reads the identical function rather than recomputing. */
+  const rec=callRecord(90);
+  const need=requiredSample(rec&&rec.st?rec.st:null).n;
+  const have=rec?rec.n:0;
+  out+=row(have>=need?'ok':'wait','Enough marks for the record to mean anything',
+    have+' of about '+need+' — below this the interval straddles zero almost regardless of the estimate');
+
+  /* ---- DATA: what this device can actually reach ---- */
+  out+=head('Data');
+  out+=row(D.apiKey?'ok':(syncConfigured()?'ok':'bad'),'Market data',
+    D.apiKey?'own Finnhub key on this device':(syncConfigured()?'through the worker':'no key and no worker — prices cannot load'));
+
+  const lastExp=D.lastExportAt||0;
+  const expDays=lastExp?Math.floor((Date.now()-lastExp)/86400000):null;
+  out+=row(!lastExp?'bad':(expDays>14?'wait':'ok'),'Backup',
+    !lastExp?'NEVER — everything here is one cleared cache from gone'
+            :'last export '+expDays+' day'+(expDays===1?'':'s')+' ago');
+
+  out+=row(syncActive()?'ok':'wait','Sync',
+    syncConfigured()?'operator key, this device':(codeSyncActive()?'invite code, this device only':'off — this browser is the only copy'));
+
+  /* ---- NUMBERS: whether the maths on screen is currently readable ---- */
+  out+=head('Numbers');
+  const betaOk=(D.calls||[]).length===0||(D.calls||[]).some(c=>betaVsSpy(c.sym));
+  out+=row((D.calls||[]).length===0?'wait':(betaOk?'ok':'bad'),'Marks are beta-adjusted',
+    (D.calls||[]).length===0?'no calls logged yet':(betaOk?'alpha is Jensen, not raw excess return':'no beta estimable — marks are ungraded'));
+
+  out+=row(have>0?'ok':'wait','Expectancy has an interval',
+    have>0?'reported with a 95% range':'nothing to report yet, and the screen says so');
+
+  el.innerHTML=out;
+
+  /* ---- the worker, if it can be reached ---- */
+  try{
+    const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
+    const r=await fetch(base+'/version',syncConfigured()?{headers:{'Authorization':'Bearer '+syncCfg.key}}:{});
+    const j=await r.json();
+    let w=head('Worker');
+    w+=row('ok','Reachable','build '+esc(j.version||'unknown'));
+    if(j.configured){
+      const c=j.configured;
+      w+=row(c.FINNHUB_API_KEY?'ok':'wait','Finnhub key on the worker',c.FINNHUB_API_KEY?'devices need no key of their own':'not set — each device needs its own');
+      w+=row(c.FRED_API_KEY?'ok':'wait','FRED key',c.FRED_API_KEY?'VIX and macro available':'not set — the Market tab falls back to measured volatility');
+      w+=row(c.AI_API_KEY?'ok':'wait','AI key',c.AI_API_KEY?'written news summaries available':'not set — News falls back to keyword matching');
+      const originOk=/^https:\/\/perceptfolio\.com$/.test(c.ALLOWED_ORIGIN||'');
+      w+=row(originOk?'ok':'bad','ALLOWED_ORIGIN',originOk?esc(c.ALLOWED_ORIGIN):'is '+esc(String(c.ALLOWED_ORIGIN))+' — must be exactly https://perceptfolio.com');
+      /* The cron row is the one that matters most and the one most likely to be wrong, because the
+         trigger is added by hand in the dashboard and nothing in the code can create it. */
+      if(j.cron===undefined) w+=row('na','Scheduled marking','this build does not report it');
+      else if(!j.cron) w+=row('bad','Scheduled marking','NEVER RUN — the Cron Trigger is missing from the dashboard, so marks still depend on this app being open');
+      else{
+        const ageH=(Date.now()-j.cron.at)/3600000;
+        w+=row(ageH<36?'ok':'bad','Scheduled marking',
+          'last ran '+(ageH<1?'under an hour':Math.round(ageH)+' hours')+' ago · '+j.cron.marked+' marked'+
+          (j.cron.errors&&j.cron.errors.length?' · <span class="neg">'+esc(j.cron.errors[0])+'</span>':'')+
+          (ageH>=36?' — overdue, the trigger may have been removed':''));
+      }
+    }else{
+      w+=row('na','Worker configuration','not readable from this device — it needs the operator key');
+    }
+    el.innerHTML=out+w;
+  }catch(e){
+    el.innerHTML=out+head('Worker')+row('na','Not reachable from here',
+      'could not read /version — the worker may be down, or this device may have no route to it');
+  }
+}
+
 function renderRecordStrip(){
   if(!D)return;
   const html=recordStripHTML();
