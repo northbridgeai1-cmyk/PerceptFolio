@@ -603,6 +603,30 @@ t('the Lists column is rendered before My Call, matching the header',
   term.indexOf("listDotsHtml(s)+' '+listMenuHtml(s)") < term.indexOf("'<td class=\"mycall-cell\">'+myTagSelect(s)"));
 t('the empty-state colspan matches the column count', /colspan="9" class="empty"/.test(term));
 
+/* ==================== "+ ADD" DIALOGS ==================== */
+G('Add forms are dialogs, not permanent fixtures at the top of every tab');
+
+for (const id of ['add-holding','add-ticker','add-list','add-alert'])
+  t(id + ' is a hidden dialog until asked for', new RegExp('class="addwrap" id="' + id + '"').test(term));
+t('every dialog has a close control', (term.match(/class="add-close"/g)||[]).length >= 4);
+t('the tabs carry a + Add button', (term.match(/class="btn-add"/g)||[]).length >= 4);
+
+/* Success closes; failure must not, or a rejected entry silently loses what was typed. */
+t('a successful ticker add closes the dialog',
+  /D\.watchlist\.push\(t\);document\.getElementById\('wTicker'\)\.value='';\s*\n\s*closeAddModal\(\)/.test(term));
+t('a successful alert closes the dialog', /paPrice'\)\.value='';\s*\n\s*closeAddModal\(\)/.test(term));
+t('a successful list closes the dialog', /if\(el\)el\.value='';\s*\n\s*closeAddModal\(\)/.test(term));
+t('a successful holding closes the dialog via clearForm, which only runs on success',
+  /const clearForm=\(\)=>\{\[.*?\]\.forEach\(id=>document\.getElementById\(id\)\.value=''\);closeAddModal\(\);\}/.test(term));
+/* Every rejection path returns before reaching the close, so no explicit test can assert absence —
+   what is asserted is that closing is tied to the success statement, not to the click. */
+t('closing is never wired to the button itself', !/onclick="addWatch\(\);closeAddModal/.test(term));
+
+t('Escape closes the open dialog', /e\.key==='Escape'&&_addOpen/.test(term));
+t('the backdrop closes it but a click inside does not',
+  /e\.target\.id===_addOpen\)closeAddModal/.test(term));
+t('only one dialog can be open at a time', /function openAdd\(id\)\{\s*\n\s*closeAddModal\(\)/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

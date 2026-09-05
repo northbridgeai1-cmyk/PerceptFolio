@@ -350,6 +350,25 @@ body.is-demo #app::before{content:"TEST ACCOUNT — sandbox data, sync disabled.
 .welcome-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px}
 .welcome-card h2{font-size:18px;margin-bottom:6px;font-weight:700}
 .step-num{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);color:var(--text);align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:8px;flex-shrink:0}
+/* ---- "+ Add" dialogs ----
+   The add forms used to sit permanently at the top of their tabs, so the first thing you saw on
+   Portfolio was a data-entry row rather than your portfolio. They are unchanged internally — same
+   markup, same element ids, same functions — and are simply hidden until asked for, then shown as
+   a centred sheet. Nothing about how an add works changed; only when the form is on screen. */
+.tab-actions{display:flex;justify-content:flex-end;margin-bottom:12px}
+.btn-add{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;
+  font-size:13px;font-weight:600;border:1px solid var(--border);background:var(--panel);
+  color:var(--text);cursor:pointer;font-family:inherit}
+.btn-add:hover{border-color:#3d434f;background:var(--panel2)}
+.btn-add .plus{font-size:15px;line-height:1;color:var(--accent)}
+.addwrap{display:none}
+.addwrap.open{display:block;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6);
+  padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.addwrap.open>.card{max-width:560px;margin:8vh auto 40px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.addwrap .add-close{position:absolute;top:14px;right:16px;background:none;border:none;
+  color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:4px 8px}
+.addwrap .add-close:hover{color:var(--text)}
+@media(max-width:600px){.addwrap.open>.card{margin:4vh auto 40px}}
 .list-pick{background:var(--panel2);border:1px solid var(--border);color:var(--muted);
   border-radius:6px;padding:2px 6px;font-size:11.5px;max-width:110px}
 table{width:100%;border-collapse:collapse;font-size:14px}
@@ -988,7 +1007,10 @@ body.touring header,body.touring #sidebar{z-index:201}
 
 <!-- PORTFOLIO -->
 <div id="tab-portfolio" class="tabs-hidden">
-  <div class="card">
+  <div class="tab-actions"><button class="btn-add" onclick="openAdd('add-holding')"><span class="plus">+</span> Add holding</button></div>
+  <div class="addwrap" id="add-holding">
+  <div class="card" style="position:relative">
+    <button class="add-close" onclick="closeAddModal()" title="Close">✕</button>
     <h3>Add Holding</h3>
     <div class="row">
       <input id="hTicker" placeholder="Ticker (e.g. AAPL, VOO)" style="max-width:150px">
@@ -1012,6 +1034,7 @@ body.touring header,body.touring #sidebar{z-index:201}
       <span class="muted" id="buyPreview" style="font-size:13px"></span>
     </div>
     <p class="muted" style="margin-top:8px">Switch to <b>Enter dollars</b> to buy by amount instead of share count — PerceptFolio works out the fractional shares from the price. Mutual funds (e.g. FSKAX, FXAIX, FZILX) don't have a live exchange quote, so add them as <b>Mutual Fund</b> and enter the NAV yourself in the table below.</p>
+  </div>
   </div>
   <!-- TRADE IMPACT — the sizing step the app never had -->
   <div class="card" style="margin-top:16px">
@@ -1163,13 +1186,20 @@ body.touring header,body.touring #sidebar{z-index:201}
 
 <!-- WATCHLIST -->
 <div id="tab-watchlist" class="tabs-hidden">
-  <div class="card">
+  <div class="tab-actions">
+    <button class="btn-add" onclick="openAdd('add-ticker')"><span class="plus">+</span> Add ticker</button>
+    <button class="btn-add" style="margin-left:8px" onclick="openAdd('add-list')"><span class="plus">+</span> New list</button>
+  </div>
+  <div class="addwrap" id="add-ticker">
+  <div class="card" style="position:relative">
+    <button class="add-close" onclick="closeAddModal()" title="Close">✕</button>
     <h3>Add a ticker</h3>
     <div class="row">
-      <input id="wTicker" placeholder="Ticker (e.g. MSFT)" style="max-width:170px">
+      <input id="wTicker" placeholder="Ticker (e.g. MSFT)" style="max-width:170px" onkeydown="if(event.key==='Enter')addWatch()">
       <button class="btn" onclick="addWatch()">Add</button>
-      <span class="muted">Everything here is auto-scored on every refresh, in a list or not. When one passes your buy criteria, you get an alert.</span>
     </div>
+    <p class="muted" style="margin-top:10px;font-size:12.5px">Everything here is auto-scored on every refresh, in a list or not. When one passes your buy criteria, you get an alert.</p>
+  </div>
   </div>
 
   <!-- Lists are an organisational layer: a ticker is watched whether or not it belongs to one, and
@@ -1178,13 +1208,22 @@ body.touring header,body.touring #sidebar{z-index:201}
   <div class="card">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap">
       <h3 style="margin:0">Your lists</h3>
-      <div class="row" style="gap:6px">
-        <input id="newListName" placeholder="New list name" maxlength="40" style="max-width:190px"
-               onkeydown="if(event.key==='Enter')createList()">
-        <button class="btn btn-sm" onclick="createList()">Create</button>
-      </div>
+      <button class="btn btn-sm btn-ghost" onclick="openAdd('add-list')">+ New list</button>
     </div>
     <div id="listManager" style="margin-top:12px"></div>
+  </div>
+
+  <div class="addwrap" id="add-list">
+  <div class="card" style="position:relative">
+    <button class="add-close" onclick="closeAddModal()" title="Close">✕</button>
+    <h3>New list</h3>
+    <div class="row" style="margin-top:8px">
+      <input id="newListName" placeholder="e.g. Semis, Dividend, Watching closely" maxlength="40" style="max-width:280px"
+             onkeydown="if(event.key==='Enter')createList()">
+      <button class="btn" onclick="createList()">Create</button>
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:12.5px">A ticker can sit in several lists or none. Deleting a list never deletes its tickers — they move to Unlisted and carry on being scored.</p>
+  </div>
   </div>
 
   <div class="section-title">Watching</div>
@@ -1653,6 +1692,7 @@ body.touring header,body.touring #sidebar{z-index:201}
 
 <!-- ALERTS -->
 <div id="tab-alerts" class="tabs-hidden">
+  <div class="tab-actions"><button class="btn-add" onclick="openAdd('add-alert')"><span class="plus">+</span> Add price alert</button></div>
   <div class="row" style="margin-bottom:14px">
     <div class="section-title" style="margin:0">Alerts</div>
     <div class="spacer"></div>
@@ -1660,14 +1700,20 @@ body.touring header,body.touring #sidebar{z-index:201}
     <button class="btn btn-ghost btn-sm" onclick="clearAlerts()">Clear All</button>
   </div>
   <div id="alertsList"><div class="empty">No alerts yet. Alerts fire when a watchlist stock becomes a buy candidate, a holding turns into a sell candidate, or a price target you set is hit.</div></div>
-  <div class="card" style="margin-top:16px">
+  <div class="addwrap" id="add-alert">
+  <div class="card" style="position:relative">
+    <button class="add-close" onclick="closeAddModal()" title="Close">✕</button>
     <h3>Set a Price Alert</h3>
-    <div class="row">
+    <div class="row" style="margin-top:8px">
       <input id="paTicker" placeholder="Ticker" style="max-width:120px">
       <select id="paDir" style="max-width:130px"><option value="above">Rises above</option><option value="below">Falls below</option></select>
-      <input id="paPrice" type="number" step="any" placeholder="$ price" style="max-width:130px">
+      <input id="paPrice" type="number" step="any" placeholder="$ price" style="max-width:130px" onkeydown="if(event.key==='Enter')addPriceAlert()">
       <button class="btn" onclick="addPriceAlert()">Set Alert</button>
     </div>
+  </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Price alerts you have set</h3>
     <div id="priceAlertsList" style="margin-top:12px"></div>
   </div>
 </div>
@@ -3699,7 +3745,9 @@ function addHolding(){
   if(deduct&&spend>(D.cash||0)+1e-9){
     if(!confirm('This costs '+fmt$(spend)+' but you only have '+fmt$(D.cash||0)+' in cash.\n\nOK = buy anyway and let cash go negative.\nCancel = go back (untick "Take this out of my cash" to record a purchase made with outside money).'))return;
   }
-  const clearForm=()=>['hTicker','hAmount','hCost'].forEach(id=>document.getElementById(id).value='');
+  /* Runs only after a holding is successfully added, so it is the honest place to close the
+     dialog — a rejected entry keeps the sheet open with the values still in it. */
+  const clearForm=()=>{['hTicker','hAmount','hCost'].forEach(id=>document.getElementById(id).value='');closeAddModal();};
   // Buying moves money from cash into a position — the total is unchanged, which is why this must
   // never touch gain. Sells do the reverse via confirmSell.
   const applyCash=()=>{if(deduct)D.cash=+(((D.cash||0)-spend).toFixed(2));};
@@ -3793,6 +3841,33 @@ function allLists(){if(!Array.isArray(D.lists))D.lists=[];return D.lists;}
 function listsFor(sym){return allLists().filter(l=>(l.syms||[]).includes(sym));}
 function makeListId(){return 'L'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
 
+/* One dialog open at a time, closed by Escape, by the backdrop, or by a successful add. The forms
+   themselves are untouched — this only toggles a wrapper class, so every existing add function
+   keeps working on the same element ids it always used. */
+let _addOpen=null;
+function openAdd(id){
+  closeAddModal();
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.add('open');
+  _addOpen=id;
+  const first=el.querySelector('input:not([type=checkbox]),select');
+  if(first)setTimeout(()=>first.focus(),40);
+}
+function closeAddModal(){
+  if(!_addOpen)return;
+  const el=document.getElementById(_addOpen);
+  if(el)el.classList.remove('open');
+  _addOpen=null;
+}
+/* Backdrop only — a click inside the card must not dismiss a half-filled form. */
+document.addEventListener('click',e=>{
+  if(_addOpen&&e.target&&e.target.id===_addOpen)closeAddModal();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&_addOpen)closeAddModal();
+});
+
 function createList(){
   const el=document.getElementById('newListName');
   const name=((el&&el.value)||'').trim().slice(0,40);
@@ -3802,6 +3877,7 @@ function createList(){
   const free=LIST_COLORS.find(c=>!used.includes(c.k))||LIST_COLORS[allLists().length%LIST_COLORS.length];
   allLists().push({id:makeListId(),name,color:free.k,syms:[]});
   if(el)el.value='';
+  closeAddModal();
   saveDB();renderAll();toast('List "'+name+'" created.');
 }
 function renameList(id){
@@ -3911,6 +3987,7 @@ function addWatch(){
   if(!t)return;
   if(D.watchlist.includes(t))return toast(t+' is already on your watchlist.');
   D.watchlist.push(t);document.getElementById('wTicker').value='';
+  closeAddModal();
   saveDB();renderAll();refreshAll();
 }
 function removeWatch(i){
@@ -6005,6 +6082,7 @@ function addPriceAlert(){
   if(!t||!isFinite(p))return toast('Fill ticker and price.');
   D.priceAlerts.push({sym:t,dir,price:p});
   document.getElementById('paTicker').value='';document.getElementById('paPrice').value='';
+  closeAddModal();
   saveDB();renderAll();toast('Price alert set for '+t+'.');
 }
 function removePriceAlert(i){D.priceAlerts.splice(i,1);saveDB();renderAll();}
