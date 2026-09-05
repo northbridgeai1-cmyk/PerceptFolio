@@ -536,6 +536,9 @@ G('P2: the terminal publishes its own breaches');
 
 t('the audit screen exists and is re-checkable', /function renderAudit/.test(term) && /id="auditBody"/.test(term));
 t('it renders on opening Settings', /refreshCodeSyncOffer\(\);renderAudit\(\)/.test(term));
+/* Placement is deliberate: diagnostics belong after the controls, not in front of them. */
+t('the audit card sits last in Settings, after Danger Zone',
+  term.indexOf('<h3>Danger Zone</h3>') < term.indexOf('<h3 style="margin:0">Audit</h3>'));
 t('the sign-up promise is checked against the live DOM, not asserted',
   /const gated=\/id="newInvite"\/\.test\(document\.documentElement\.innerHTML\)/.test(term));
 t('it reads the same record function as the headline strip, so they cannot drift',

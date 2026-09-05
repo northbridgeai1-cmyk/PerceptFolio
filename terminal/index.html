@@ -1679,18 +1679,6 @@ body.touring header,body.touring #sidebar{z-index:201}
 <!-- SETTINGS -->
 <div id="tab-settings" class="tabs-hidden">
 
-  <!-- P2. The terminal grades itself and publishes its own breaches. A product that argues numbers
-       must be checkable, and then cannot report on its own state, is making an exception for the one
-       claim it controls entirely. Every row here is read live — none is a stored assertion. -->
-  <div class="card">
-    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-      <h3 style="margin:0">Audit</h3>
-      <button class="btn btn-ghost btn-sm" onclick="renderAudit()">Re-check</button>
-    </div>
-    <p class="muted" style="margin-top:6px;font-size:13px">What this install actually is, as opposed to what any screen claims. Anything red is a promise this copy is not currently keeping.</p>
-    <div id="auditBody" style="margin-top:14px"></div>
-  </div>
-
   <div class="card" id="installCard" style="display:none">
     <h3>Install PerceptFolio</h3>
     <p class="muted" style="margin-bottom:12px">Install it and PerceptFolio gets its own icon, opens without browser chrome, and keeps working offline. On iPhone this also matters for your data: Safari clears storage for sites you haven't opened in 7 days, but installed apps are exempt.</p>
@@ -1837,6 +1825,17 @@ body.touring header,body.touring #sidebar{z-index:201}
   <div class="card" style="margin-top:16px">
     <h3>Danger Zone</h3>
     <button class="btn-danger btn" onclick="deleteProfile()">Delete This Profile</button>
+  </div>
+  <!-- P2. The terminal grades itself and publishes its own breaches. A product that argues numbers
+       must be checkable, and then cannot report on its own state, is making an exception for the one
+       claim it controls entirely. Every row here is read live — none is a stored assertion. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Audit</h3>
+      <button class="btn btn-ghost btn-sm" onclick="renderAudit()">Re-check</button>
+    </div>
+    <p class="muted" style="margin-top:6px;font-size:13px">What this install actually is, as opposed to what any screen claims. Anything red is a promise this copy is not currently keeping.</p>
+    <div id="auditBody" style="margin-top:14px"></div>
   </div>
 </div>
 
