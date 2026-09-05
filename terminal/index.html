@@ -2312,8 +2312,106 @@ async function doLogin(){
   if(p.pinHash&&p.pinHash!==await sha(pw))return toast('Wrong password.');
   await finishLogin(email);
 }
+/* ================= ACCESS CHECK-IN =================
+
+   WHAT THIS CHANGES. Until now the terminal never contacted the server again after signup, so
+   pausing someone's access could not reach an account that already existed — the button worked only
+   against codes nobody had redeemed yet. This is the check that makes it real.
+
+   THE TENSION, AND HOW IT IS RESOLVED. This app is offline-first on purpose: it must keep working on
+   a plane, on a bad connection, and if the worker is down. So a failed check is NOT a lockout. The
+   rule is:
+
+     - worker says paused        -> locked out now
+     - worker says active        -> stamp the time and carry on
+     - worker unreachable        -> carry on, for up to GRACE_DAYS since the last SUCCESSFUL check
+     - unreachable past the grace -> locked out, with the reason stated
+
+   So a revocation lands the next time they open the app with a connection, and at the latest when
+   the grace runs out. Offline use survives; indefinite offline use does not.
+
+   BE HONEST ABOUT WHAT THIS IS. terminal/index.html is a public file. Someone who edits their local
+   copy can remove this check, and no client-side gate can prevent that. What it does do is make
+   Pause work for every ordinary user, which is the difference between a control and a decoration.
+   The genuine boundary remains the worker: sync, market data and summaries all live behind it. */
+const GRACE_DAYS=7;
+const ACCESS_KEY='pf_access_state';
+
+function accessState(){
+  try{ return JSON.parse(localStorage.getItem(ACCESS_KEY))||{}; }catch(e){ return {}; }
+}
+function setAccessState(o){
+  try{ localStorage.setItem(ACCESS_KEY,JSON.stringify(o)); }catch(e){}
+}
+
+/* Returns {allow:true} or {allow:false, reason}. Never throws — a bug in here must not be able to
+   lock someone out of their own terminal. */
+async function checkAccess(email){
+  const p=DB.profiles[email]||{};
+  const code=p.invite;
+  /* No code means the profile predates the invite gate. Grandfathered: refusing them over a
+     bookkeeping gap would lock out the operator's own account first. */
+  if(!code)return{allow:true,reason:'no invite on this profile'};
+
+  const st=accessState(), key='c:'+code;
+  const last=(st[key]&&st[key].at)||0;
+  const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
+  try{
+    const r=await fetch(base+'/status?code='+encodeURIComponent(code),{cache:'no-store'});
+    const j=await r.json();
+    if(j&&j.known&&j.active===false){
+      st[key]={at:Date.now(),paused:true};setAccessState(st);
+      return{allow:false,reason:'paused'};
+    }
+    st[key]={at:Date.now(),paused:false};setAccessState(st);
+    return{allow:true};
+  }catch(e){
+    /* Unreachable. Allowed until the grace expires, measured from the last time the worker actually
+       answered — not from now, or an offline device would renew its own licence forever. */
+    if(st[key]&&st[key].paused)return{allow:false,reason:'paused'};
+    if(!last)return{allow:true,reason:'never verified yet'};
+    const days=(Date.now()-last)/86400000;
+    if(days>GRACE_DAYS)return{allow:false,reason:'offline',days:Math.floor(days)};
+    return{allow:true};
+  }
+}
+
+function showAccessBlocked(info){
+  const el=document.getElementById('loginScreen');
+  if(!el)return;
+  const paused=info.reason==='paused';
+  const box=document.createElement('div');
+  box.id='accessBlocked';
+  box.style.cssText='position:fixed;inset:0;z-index:9999;background:var(--bg,#0e0f12);display:grid;place-items:center;padding:24px';
+  box.innerHTML='<div style="max-width:560px;text-align:left;line-height:1.65">'+
+    '<div style="font:11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--red,#e5534b);margin-bottom:14px">'+
+      (paused?'Access paused':'Access could not be verified')+'</div>'+
+    '<h1 style="font-size:26px;letter-spacing:-.02em;margin-bottom:14px">'+
+      (paused?'Your access has been paused.':'This device has been offline too long.')+'</h1>'+
+    '<p class="muted" style="margin-bottom:14px">'+
+      (paused
+        ? 'The person who issued your invite has suspended this account. Contact them to have it restored — nothing you entered has been deleted.'
+        : 'Access is re-checked when you open the terminal. This device has not reached the server in '+
+          (info.days||GRACE_DAYS)+' days, so it cannot confirm the account is still active. Reconnect and reopen.')+
+    '</p>'+
+    /* Their portfolio is their own work. Locking the app is the point; withholding their data is
+       not, and would turn a suspension into something punitive. */
+    '<p class="muted" style="font-size:12.5px;margin-bottom:18px">Your data is still on this device and is not affected. You can take a copy with you.</p>'+
+    '<button class="btn" id="blockedExport">Export my data</button>'+
+    '</div>';
+  document.body.appendChild(box);
+  const b=document.getElementById('blockedExport');
+  if(b)b.onclick=()=>{ try{ exportData(); }catch(e){ toast('Export failed: '+e.message); } };
+}
+
 async function finishLogin(email){
   const p=DB.profiles[email];
+  /* Checked before the app is revealed, and skipped entirely for the sandbox account, which has no
+     invite and never touches the worker. */
+  if(email!==DEMO_ID){
+    const acc=await checkAccess(email);
+    if(!acc.allow){ showAccessBlocked(acc); return; }
+  }
   if(!p.userId){p.userId=makeUserId();localStorage.setItem(STORE_KEY,JSON.stringify(DB));}
   USER=email;D=Object.assign(defaultData(),p.data||{});
   /* Impossible to confuse the sandbox with the real account at a glance. Checked on every login

@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-05.2';
+const WORKER_VERSION = '2026-09-05.3';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -190,7 +190,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/summarise', '/fred', '/finnhub', '/?slot=']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/summarise', '/fred', '/finnhub', '/?slot=']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -225,6 +225,15 @@ async function handle(request, env) {
     if (request.method === 'POST') {
       inv.usedAt = Date.now();
       await env.PF_SYNC.put('code:' + code, JSON.stringify(inv));
+      /* A DURABLE record of the redemption, with no TTL.
+         code: records expire after 40 days. If /status keyed off those, every account would fail
+         its check six weeks after signing up and lock itself out — turning an access control into
+         a time bomb. This record is what the terminal checks against for the life of the account. */
+      await env.PF_SYNC.put('grant:' + code, JSON.stringify({
+        code, tier: inv.tier || null, email: inv.email || null,
+        requestId: inv.requestId || null,
+        redeemedAt: inv.usedAt, paused: !!inv.paused
+      }));
     }
     return json({ valid: true, tier: inv.tier, email: inv.email }, 200, env);
   }
@@ -329,13 +338,55 @@ async function handle(request, env) {
         await env.PF_SYNC.put('code:' + rec.code, JSON.stringify(inv),
           { expirationTtl: 40 * 86400 });
         effect = inv.usedAt
-          ? 'already redeemed — their existing account is unaffected'
+          ? (paused ? 'already redeemed — they are locked out at next check-in'
+                    : 'already redeemed — access restored at next check-in')
           : (paused ? 'the code can no longer be redeemed' : 'the code can be redeemed again');
       } else {
-        effect = 'the code has expired out of storage';
+        effect = 'the code record has expired, but the grant below still governs access';
+      }
+      /* THE ONE THAT ACTUALLY REVOKES. code: expires after 40 days; grant: does not, and it is what
+         /status answers from. Updating only the former would make Pause work for six weeks and then
+         silently stop. */
+      const gs = await env.PF_SYNC.get('grant:' + rec.code);
+      if (gs) {
+        const g = JSON.parse(gs);
+        g.paused = paused;
+        await env.PF_SYNC.put('grant:' + rec.code, JSON.stringify(g));
+        effect = paused ? 'they are locked out at their next check-in'
+                        : 'access restored at their next check-in';
       }
     }
     return json({ ok: true, paused, effect }, 200, env);
+  }
+
+  /* ---- GET /status?code=XXXXX-XXXXX — is this account still allowed in? ----
+
+     PUBLIC, and it must be: the terminal calls it before anyone has authenticated, which is the
+     whole point. It reveals only whether one code is currently active, to someone who already holds
+     that code.
+
+     This is what makes Pause mean something. Without it the terminal never spoke to the server
+     again after signup, so a paused grant could not reach an account that already existed.
+
+     Answers on the durable grant: record, never the 40-day code: record. */
+  if (url.pathname === '/status' && request.method === 'GET') {
+    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) {
+      return json({ known: false, active: true, reason: 'malformed' }, 200, env);
+    }
+    const g = await env.PF_SYNC.get('grant:' + code);
+    if (!g) {
+      /* Not a refusal. Accounts created before grant: records existed have nothing to look up, and
+         locking them out over a bookkeeping gap would be the worst possible failure mode. */
+      return json({ known: false, active: true, reason: 'no grant record' }, 200, env);
+    }
+    const rec = JSON.parse(g);
+    return json({
+      known: true,
+      active: !rec.paused,
+      reason: rec.paused ? 'paused' : 'active',
+      tier: rec.tier || null
+    }, 200, env);
   }
 
   /* ---- POST /summarise — attributable news summary ----

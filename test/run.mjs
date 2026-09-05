@@ -365,12 +365,30 @@ t('each tab shows a count', /\['pending','accepted','denied','all'\]\.forEach/.t
 
 t('the worker refuses a paused code', /if \(inv\.paused\) return json/.test(worker));
 t('only a granted request can be paused', /Only a granted request can be paused/.test(worker));
-t('pausing reports which case applied', /already redeemed — their existing account is unaffected/.test(worker));
+/* Was: "already redeemed — their existing account is unaffected". That sentence described the old
+   limitation and had to change when Pause started reaching redeemed accounts. */
+t('pausing reports which case applied',
+  /already redeemed — they are locked out at next check-in/.test(worker) &&
+  /already redeemed — access restored at next check-in/.test(worker));
 /* The honest limit, stated in the UI and not only in a comment: an already-created account cannot
    be revoked, because the terminal is local and offline by design. */
-t('the admin screen states that a redeemed account keeps working',
-  /that account still works/.test(admin));
-t('the confirm dialog says the same before you click', /there is nothing to revoke remotely/.test(admin));
+/* Pause now reaches redeemed accounts, so the copy that said otherwise had to change with it —
+   an interface describing an older limit is the same fault as one describing a false capability. */
+t('the admin screen states that a redeemed account IS locked out',
+  /locked out at its next check-in/.test(admin));
+t('the confirm dialog states the offline grace before you click',
+  /keeps working for up to 7 days, then locks itself/.test(admin));
+t('the terminal actually checks in on login', /const acc=await checkAccess\(email\)/.test(term));
+t('a paused verdict is cached so going offline cannot dodge it',
+  /if\(st\[key\]&&st\[key\]\.paused\)return\{allow:false,reason:'paused'\}/.test(term));
+t('the grace is measured from the last SUCCESSFUL check, not from now',
+  /const days=\(Date\.now\(\)-last\)\/86400000/.test(term));
+t('an unknown grant is never a lockout', /known: false, active: true/.test(worker));
+t('the durable grant record has no TTL',
+  /put\('grant:' \+ code, JSON\.stringify\(\{[\s\S]{0,240}\}\)\);/.test(worker));
+t('pausing updates the durable grant, not just the expiring code',
+  /await env\.PF_SYNC\.put\('grant:' \+ rec\.code, JSON\.stringify\(g\)\)/.test(worker));
+t('a locked-out user can still export their own data', /blockedExport/.test(term));
 
 t('there are two distinct email templates', /const denied=r\.status==='denied'/.test(admin));
 t('the approval email congratulates and leads with the code',

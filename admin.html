@@ -276,9 +276,10 @@ function render(){
             (r.paused
               ? '<div class="paused-note"><b>Access paused.</b> '+
                 (r.code
-                  ? 'The code <b>'+esc(r.code)+'</b> cannot be redeemed while this is on. '
+                  ? 'The code <b>'+esc(r.code)+'</b> cannot be redeemed, and any account created with it is '+
+                    'locked out at its next check-in. '
                   : '')+
-                'If they already created an account, <b>that account still works</b> — the terminal keeps its data in their own browser and runs offline, so there is no session to revoke.</div>'
+                'The terminal verifies access each time it opens. If their device is offline it keeps working for up to 7 days, then locks itself. Their data stays on their machine and they can still export it.</div>'
               : '')+
             '<div class="row" style="margin-top:11px">'+
               '<button class="btn btn-sm" onclick="mailReply(\''+esc(r.id)+'\')">Draft the '+(r.status==='denied'?'decline':'welcome')+' email</button>'+
@@ -314,7 +315,7 @@ async function decide(id,decision){
 
 async function setPaused(id,paused){
   const st=$('s-'+id);
-  if(paused&&!confirm('Pause access for this person?\n\nAn unredeemed code stops working immediately.\nIf they have already created an account, that account keeps working — the terminal stores data in their browser and runs offline, so there is nothing to revoke remotely.'))return;
+  if(paused&&!confirm('Pause access for this person?\n\nTheir invite code stops working, and an account already created with it is locked out the next time the terminal is opened with a connection.\n\nAn offline device keeps working for up to 7 days, then locks itself. Their data is not deleted and they can still export it.'))return;
   if(st)st.textContent=paused?'Pausing…':'Resuming…';
   try{
     const r=await fetch(base()+'/pause',{method:'POST',headers:hdrs(),body:JSON.stringify({id,paused})});
