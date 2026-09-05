@@ -261,6 +261,24 @@ t('the headline no longer calls raw excess return an edge vs SPY',
 t('the aggregate is beta-adjusted too, not just the rows',
   /callEdge\(c,jensenAlpha\(stockRet,spyRet,bi\?bi\.beta:null,held\)\)/.test(term));
 
+/* ==================== C2 — INVITE GATE ==================== */
+G('C2 acceptance: account creation is impossible without a valid unburned code');
+
+t('the create-account form has an invite field', /id="newInvite"/.test(term));
+t('the code is format-checked before any network call',
+  /\^\[A-Z0-9\]\{5\}-\[A-Z0-9\]\{5\}\$\/\.test\(code\)/.test(term));
+t('the worker validates it', /\/invite\?code='\+encodeURIComponent\(code\)/.test(term));
+t('creation is refused unless the worker says valid', /if\(!r\.ok\|\|!inv\.valid\)return toast/.test(term));
+t('the worker\'s own error text is surfaced, not a paraphrase', /toast\(inv\.error\|\|/.test(term));
+/* Burn AFTER the profile is stored. The reverse strands someone with a spent code and no
+   account, which is the unrecoverable direction. */
+t('the code is burned only after the profile is written',
+  term.indexOf('localStorage.setItem(STORE_KEY,JSON.stringify(DB));\n  /* Burned after') <
+  term.indexOf("method:'POST'"));
+t('validation works without sync configured (the /invite route is public)',
+  /const INVITE_WORKER=/.test(term) && /syncConfigured\(\)\?syncCfg\.url:INVITE_WORKER/.test(term));
+t('a network failure fails closed, never open', /Could not reach the worker to check that code/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 

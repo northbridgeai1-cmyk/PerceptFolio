@@ -711,6 +711,16 @@ body.touring header,body.touring #sidebar{z-index:201}
             <option value="business">Business — I manage client portfolios too</option>
           </select>
         </div>
+        <!-- C2. The landing page states there is no self-service sign-up. Until now this form was
+             exactly that, so the site made a claim about itself that the software contradicted.
+             The Worker has had /invite validate and burn routes the whole time; nothing called them. -->
+        <div class="field">
+          <label for="newInvite">Invite code</label>
+          <input id="newInvite" placeholder="XXXXX-XXXXX" maxlength="11" autocomplete="off"
+                 style="text-transform:uppercase;font-family:var(--mono);letter-spacing:.08em"
+                 onkeydown="if(event.key==='Enter')createProfile()">
+          <p class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.5">Issued when an access request is approved. Request one from the front page.</p>
+        </div>
         <button class="btn" style="width:100%" onclick="createProfile()">Create account</button>
       </div>
 
@@ -2167,14 +2177,56 @@ async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncod
 function makeUserId(){
   return 'PF-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,7).toUpperCase();
 }
+/* The worker's public address, used only to validate an invite before this device has any sync
+   configuration. Not a secret — index.html publishes the same hostname. Kept beside the gate it
+   serves so the two cannot drift apart. */
+const INVITE_WORKER='https://crimson-hat-6ad9.northbridgeai1.workers.dev';
+
 async function createProfile(){
   const email=document.getElementById('newEmail').value.trim().toLowerCase();
   const pw=document.getElementById('newPassword').value;
   const accountType=document.getElementById('newAccountType').value||'personal';
+  const code=(document.getElementById('newInvite').value||'').trim().toUpperCase();
   if(!email||!email.includes('@'))return toast('Enter a valid email.');
   if(DB.profiles[email])return toast('An account with that email already exists — log in above.');
-  DB.profiles[email]={pinHash:pw?await sha(pw):'',data:defaultData(),accountType,userId:makeUserId()};
+
+  /* C2 — THE INVITE GATE.
+     Validated first, burned only after the profile is created, so a network failure between the two
+     cannot consume a code and leave the person with nothing. The Worker's own error text is shown
+     rather than a paraphrase: it distinguishes unknown, already-redeemed and expired, and those need
+     different responses from whoever issued the code.
+
+     Be clear about what this is. It is a workflow control, not a security boundary — terminal/index.html
+     is a public file and anyone can save it and run it offline. What it enforces is that the front
+     page's claim about itself is true, and that everyone who holds an account came through the queue. */
+  if(!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)){
+    return toast('An invite code is required — format XXXXX-XXXXX. Request one from the front page.');
+  }
+  /* /invite is a PUBLIC worker route — it has to be, because the person redeeming a code does not
+     yet have credentials. Requiring sync here would have locked out exactly the new operator the
+     code exists for, which is the chicken-and-egg this gate must not create. The worker hostname is
+     not secret (the landing page carries it in plain text), so it falls back to the known address
+     when this device has no sync configured yet. */
+  let inv;
+  try{
+    const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
+    const r=await fetch(base+'/invite?code='+encodeURIComponent(code));
+    inv=await r.json().catch(()=>({}));
+    if(!r.ok||!inv.valid)return toast(inv.error||'That invite code was not accepted.');
+  }catch(e){
+    return toast('Could not reach the worker to check that code ('+e.message+').');
+  }
+
+  DB.profiles[email]={pinHash:pw?await sha(pw):'',data:defaultData(),accountType,userId:makeUserId(),
+                      invite:code,inviteTier:inv.tier||null};
   localStorage.setItem(STORE_KEY,JSON.stringify(DB));
+  /* Burned after the profile is safely stored. If this call fails the account still exists and the
+     code stays live — the recoverable direction. The reverse would strand someone with a spent code
+     and no account. */
+  try{
+    const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
+    await fetch(base+'/invite?code='+encodeURIComponent(code),{method:'POST'});
+  }catch(e){}
   toast('Account created. Logging in…');
   await finishLogin(email);
 }
