@@ -2569,6 +2569,7 @@ function enterSession(){
   /* Adopt marks the worker stamped while this app was closed, then tell it what is still open.
      Both silent and unawaited: session entry must not wait on a network round-trip. */
   reconcileWorkerMarks().then(()=>pushCallRegistry());
+  checkPendingRequests();                                   // operator devices only; silent otherwise
   const acctEl=document.getElementById('acctEmail');if(acctEl)acctEl.textContent=USER;
   updateGreeting();
   refreshMarketDataCard();
@@ -8733,8 +8734,48 @@ function renderTradeImpact(){
 
    Deliberately NOT an execution system. It has no broker connection and never will from a static
    page. It tells you what your rules flagged and shows the numbers; you decide and you trade. */
+/* ================= THE QUEUE IS NO LONGER SILENT =================
+
+   An access request used to land in KV and wait, invisibly, until admin.html happened to be opened.
+   The operator's own terminal now checks the queue and surfaces pending applications on Command —
+   the screen already built to answer "what needs me today".
+
+   OPERATOR DEVICES ONLY. The check needs SYNC_SECRET, which only the operator's sync settings hold;
+   invited users and the demo account never make this request. Throttled to one look per 15 minutes,
+   silent on failure — a broken queue check must never damage the screen that reports stops hit.
+
+   Email would be the pushier fix, and the worker cannot send any: there is no mail service bound to
+   it, and pretending otherwise means notifications that silently do not arrive. If a mail provider
+   is ever added, this cache is where its trigger belongs. */
+let _pendingReqs={count:0,at:0};
+async function checkPendingRequests(){
+  try{
+    if(!syncConfigured()||!syncCfg.key)return;
+    if(typeof isDemoUser==='function'&&isDemoUser())return;
+    if(Date.now()-_pendingReqs.at<15*60*1000)return;
+    _pendingReqs.at=Date.now();
+    const r=await fetch(syncCfg.url.replace(/\/+$/,'')+'/requests',{headers:{'Authorization':'Bearer '+syncCfg.key}});
+    if(!r.ok)return;
+    const j=await r.json();
+    const n=(j.requests||[]).filter(x=>(x.status||'pending')==='pending').length;
+    const was=_pendingReqs.count;
+    _pendingReqs.count=n;
+    if(n>0&&n!==was){
+      toast(n+' access request'+(n===1?'':'s')+' waiting in the queue.');
+      renderCommand();
+    }
+  }catch(e){}
+}
+
 function buildActionQueue(){
   const A=[];
+  if(_pendingReqs.count>0){
+    A.push({pri:2,kind:'ACCESS',sym:'QUEUE',
+      summary:_pendingReqs.count+' access request'+(_pendingReqs.count===1?'':'s')+' waiting for a decision',
+      detail:'Someone applied through the front page and the request is sitting unread. Granting mints their invite code and opens the welcome email; denying keeps the record. Requests are read by a person — that is the promise the front page makes.',
+      evidence:String(_pendingReqs.count),
+      action:"window.open('https://perceptfolio.com/admin.html','_blank')",actionLabel:'Open the queue'});
+  }
   const holdings=D.holdings||[];
   const totalVal=holdings.reduce((a,h)=>a+(h.price??h.cost)*h.shares,0)+(D.cash||0);
   const pol=policy();

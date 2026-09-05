@@ -484,6 +484,17 @@ t('iOS Safari uninstalled adds the 7-day eviction warning',
 t('an empty profile is never nagged', /hasData=\(D\.holdings\|\|\[\]\)\.length>0/.test(term));
 t('the demo account is never nagged', /backupState\(\)\{\s*\n?\s*if\(typeof isDemoUser/.test(term));
 
+/* ==================== QUEUE NOTIFICATION ==================== */
+G('The queue is no longer silent');
+
+t('the operator terminal checks for pending requests', /function checkPendingRequests/.test(term));
+t('only devices holding the sync key make the check', /if\(!syncConfigured\(\)\|\|!syncCfg\.key\)return/.test(term));
+t('the demo account never checks', /checkPendingRequests[\s\S]{0,300}isDemoUser\(\)\)return/.test(term));
+t('throttled to one look per 15 minutes', /_pendingReqs\.at<15\*60\*1000/.test(term));
+t('pending requests appear as a Command action', /kind:'ACCESS',sym:'QUEUE'/.test(term));
+t('no email is claimed, because the worker cannot send any',
+  /the worker cannot send any/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 
