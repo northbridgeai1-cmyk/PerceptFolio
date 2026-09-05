@@ -852,7 +852,21 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
     /* A non-OK response is the worker TALKING to us — a bad ticker, a missing stop, the
        daily rate limit. That is real feedback and the applicant has to see it, so it is
        thrown as a REJECTED error and shown rather than buried in a mailto. */
-    if(!res.ok){ const err=new Error(j.error||('HTTP '+res.status)); err.rejected=true; throw err; }
+    if(!res.ok){
+      /* VERSION SKEW BETWEEN THIS PAGE AND THE WORKER.
+         This page and worker.js deploy separately — the page from the repo, the worker by hand — so
+         a worker predating the change that made calls optional still answers "Three calls are
+         required" to a form that no longer collects them. The applicant would see a demand they
+         cannot satisfy and no way forward.
+
+         Treated as unreachable rather than as a rejection, so it falls through to the mail client
+         with everything they typed. Nothing is lost while the worker is behind, and the fallback
+         disappears on its own the moment it is updated. */
+      if(/three calls are required/i.test(j.error||'')){
+        return mailFallback('<b>The request queue is mid-update.</b> ');
+      }
+      const err=new Error(j.error||('HTTP '+res.status)); err.rejected=true; throw err;
+    }
     /* Hand off to thanks.html rather than printing a line under the button.
        That page explains what actually happens next — who reads it, how access
        is granted, and that the scorecard starts empty — which is the part people
