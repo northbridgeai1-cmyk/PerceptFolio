@@ -1287,10 +1287,10 @@ body.touring header,body.touring #sidebar{z-index:201}
       <select id="wlFilterVerdict" style="max-width:170px" onchange="renderAll()">
         <option value="All">All verdicts</option><option value="buy">BUY candidate</option><option value="watch">Watch</option><option value="no">Doesn't qualify</option><option value="na">No data yet</option>
       </select>
-      <select id="wlFilterList" style="max-width:170px" onchange="renderAll()"></select>
-      <label class="muted" style="display:flex;align-items:center;gap:6px;font-size:12.5px">
-        <input type="checkbox" id="wlGroup" checked onchange="renderAll()"> Group by list
-      </label>
+      <!-- The list picker and the group-by-list toggle are gone: inside a single list, one filters
+           to the list you are already in and the other groups a single group. -->
+      <span class="spacer"></span>
+      <span class="muted" id="wlCount" style="font-size:12.5px"></span>
       <button class="btn-ghost btn btn-sm" onclick="clearWatchlistFilters()">Clear</button>
     </div>
   </div>
@@ -4106,12 +4106,14 @@ function renderListOverview(){
   if(listView&&!open)listView=null;
 
   if(title)title.style.display='none';
-  if(filters)filters.style.display='none';
+  /* Filters belong to the table, so they follow it: shown inside a list, gone on the overview. */
+  if(filters)filters.style.display=listView?'block':'none';
 
   if(listView){
     ov.style.display='none'; hd.style.display='block';
     if(topA)topA.style.display='none';
     if(openA)openA.style.display='flex';
+    if(filters)filters.style.display='block';
     const n=(open.syms||[]).length;
     hd.innerHTML=
       '<div class="crumb">'+
@@ -4217,7 +4219,6 @@ function clearWatchlistFilters(){
   const q=document.getElementById('wlFilterQ');if(q)q.value='';
   const v=document.getElementById('wlFilterVerdict');if(v)v.value='All';
   const m=document.getElementById('wlFilterMine');if(m)m.value='All';
-  const L=document.getElementById('wlFilterList');if(L)L.value='All';
   renderAll();
 }
 
@@ -7556,6 +7557,14 @@ function renderAll(){
      a symbol in two lists genuinely appears twice, which is the honest rendering of "it is in
      both". Ungrouped is the flat view, one row per ticker. */
   const sorted=applySort(filteredWatch,wlSort,wlGetters);
+  /* Says what the filters actually did. "3 of 12" is the difference between a filter that found
+     nothing and a list that is empty, which otherwise look identical. */
+  const cntEl=document.getElementById('wlCount');
+  if(cntEl){
+    const total=openL?(openL.syms||[]).length:0;
+    cntEl.textContent=sorted.length===total?total+' ticker'+(total===1?'':'s')
+                                           :sorted.length+' of '+total;
+  }
   const groups=[{label:null,rows:sorted}];
   groups.forEach(g=>{
     if(g.label){

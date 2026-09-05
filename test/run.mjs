@@ -762,6 +762,13 @@ t('Escape and an outside click close it',
   /if\(e\.key==='Escape'\)closeMenu\(\)/.test(term) && /!e\.target\.closest\('\.ovf-menu,\.ovf-btn'\)/.test(term));
 t('scrolling closes it, so it cannot detach from its row', /window\.addEventListener\('scroll',\(\)=>closeMenu\(\),true\)/.test(term));
 
+t('filters appear inside a list and not on the overview',
+  /if\(filters\)filters\.style\.display=listView\?'block':'none'/.test(term));
+/* Filtering to nothing and opening an empty list look identical without this. */
+t('the count distinguishes a filtered result from an empty list',
+  /sorted\.length===total\?total\+' ticker'/.test(term) && /sorted\.length\+' of '\+total/.test(term));
+t('the list picker and group-by toggle are gone, being meaningless inside one list',
+  !/wlFilterList/.test(term) && !/wlGroup/.test(term));
 t('the lists overview is a row list, not a card grid', /class="list-rows"/.test(term) && /class="list-row"/.test(term));
 t('an open list shows a breadcrumb back to Lists',
   /class="crumb"/.test(term) && /onclick="closeList\(\)">Lists<\/a>/.test(term));
