@@ -6241,6 +6241,27 @@ function varStats(rets,conf){
    Why bother: your Monte Carlo and volatility budget currently treat volatility as one constant
    number. It isn't — it clusters, which is the single most reliably documented feature of return
    series. A model that knows last week was violent expects this week to be violent too. */
+/* ============================ M8. GJR-GARCH ============================
+   Hansen and Lunde compared 330 volatility models and found nothing beating GARCH(1,1) on exchange
+   rates. Their equity result is the one that applies here: on IBM returns GARCH(1,1) is clearly
+   inferior to models that accommodate the leverage effect, which is that volatility rises more
+   after a fall than after an equal-sized rise.
+
+   This book is concentrated in a handful of correlated technology names. Leverage asymmetry is the
+   dominant feature of their volatility and plain GARCH is structurally blind to it: it squares the
+   shock and throws the sign away.
+
+       sigma2_t = omega + (alpha + gamma*I) * eps2_{t-1} + beta * sigma2_{t-1},   I = 1 if eps < 0
+
+   One extra parameter, published by Glosten, Jagannathan and Runkle in 1993. Variance targeting is
+   kept, so omega is pinned to make the model's long-run variance equal the sample variance and
+   only the dynamics are fitted. With gamma present the persistence that omega must offset is
+   alpha + gamma/2 + beta, because the indicator fires on about half the observations.
+
+   GAMMA IS REPORTED AND TESTED, NOT ASSUMED. A likelihood-ratio test against the same model with
+   gamma pinned to zero says whether the extra parameter earned its place on this sample. If it did
+   not, the screen says so and the fit falls back, because an unjustified parameter is exactly the
+   false precision this product exists to expose. */
 function garchFit(rets){
   const n=rets.length;
   if(n<60)return null;
@@ -6248,42 +6269,63 @@ function garchFit(rets){
   const dev=rets.map(r=>r-mean);
   const lrVar=dev.reduce((a,b)=>a+b*b,0)/(n-1);
   if(!(lrVar>0))return null;
-  const ll=(alpha,beta)=>{
-    const omega=lrVar*(1-alpha-beta);
+  /* gamma=0 recovers plain GARCH(1,1) exactly, which is what makes the comparison below fair. */
+  const ll=(alpha,beta,gamma)=>{
+    const g=gamma||0;
+    const omega=lrVar*(1-alpha-g/2-beta);
     if(omega<=0)return -Infinity;
     let s2=lrVar,sum=0;
     for(let i=0;i<n;i++){
       if(s2<=0)return -Infinity;
       sum+=-0.5*(Math.log(s2)+dev[i]*dev[i]/s2);
-      s2=omega+alpha*dev[i]*dev[i]+beta*s2;
+      const neg=dev[i]<0?1:0;
+      s2=omega+(alpha+g*neg)*dev[i]*dev[i]+beta*s2;
     }
     return sum;
   };
   // Coarse grid then a local refine. Cheap, deterministic, and good enough at this sample size -
   // a proper optimiser would give false precision on 60 to 300 observations.
-  let best={a:0.08,b:0.90,l:-Infinity};
-  for(let a=0.02;a<=0.30001;a+=0.02)
-    for(let b=0.60;b<=0.97001;b+=0.02){
-      if(a+b>=0.999)continue;
-      const l=ll(a,b);
-      if(l>best.l)best={a,b,l};
-    }
-  for(let a=Math.max(0.005,best.a-0.02);a<=best.a+0.02;a+=0.005)
-    for(let b=Math.max(0.50,best.b-0.02);b<=Math.min(0.98,best.b+0.02);b+=0.005){
-      if(a+b>=0.999)continue;
-      const l=ll(a,b);
-      if(l>best.l)best={a,b,l};
-    }
-  const omega=lrVar*(1-best.a-best.b);
+  const search=(gammaOn)=>{
+    let best={a:0.08,b:0.90,g:0,l:-Infinity};
+    const gs=gammaOn?[0,0.04,0.08,0.12,0.16,0.20,0.25,0.30]:[0];
+    for(const g of gs)
+      for(let a=0.01;a<=0.30001;a+=0.02)
+        for(let b=0.60;b<=0.97001;b+=0.02){
+          if(a+g/2+b>=0.999)continue;
+          const l=ll(a,b,g);
+          if(l>best.l)best={a,b,g,l};
+        }
+    for(let a=Math.max(0.002,best.a-0.02);a<=best.a+0.02;a+=0.005)
+      for(let b=Math.max(0.50,best.b-0.02);b<=Math.min(0.98,best.b+0.02);b+=0.005)
+        for(let g=Math.max(0,best.g-0.04);g<=best.g+0.04+1e-9;g+=0.01){
+          if(!gammaOn&&g>0)continue;
+          if(a+g/2+b>=0.999)continue;
+          const l=ll(a,b,g);
+          if(l>best.l)best={a,b,g,l};
+        }
+    return best;
+  };
+  const gjr=search(true);
+  const plain=search(false);
+  /* Likelihood ratio against one restriction. 3.841 is the 95th percentile of chi-square with one
+     degree of freedom, so gamma must buy at least that much log-likelihood to be kept. */
+  const lr=2*(gjr.l-plain.l);
+  const leverage=lr>3.841&&gjr.g>0;
+  const best=leverage?gjr:{a:plain.a,b:plain.b,g:0,l:plain.l};
+  const omega=lrVar*(1-best.a-best.g/2-best.b);
   let s2=lrVar;
-  for(let i=0;i<n;i++)s2=omega+best.a*dev[i]*dev[i]+best.b*s2;
-  const persist=best.a+best.b;
+  for(let i=0;i<n;i++){
+    const neg=dev[i]<0?1:0;
+    s2=omega+(best.a+best.g*neg)*dev[i]*dev[i]+best.b*s2;
+  }
+  const persist=best.a+best.g/2+best.b;
   /* C6. GARCH models variance CLUSTERING; Lo's factor corrects for autocorrelation in the RETURNS.
      They are different phenomena and both are present, so the daily-to-annual step needs the
      correction here for the same reason it needs it on a plain sample deviation. */
   const gScale=annualScale(rets,TRADING_DAYS).scale;
   return{
-    alpha:best.a,beta:best.b,omega,persist,
+    alpha:best.a,beta:best.b,gamma:best.g,omega,persist,
+    leverage,lrStat:lr,gammaTried:gjr.g,
     sigmaNext:Math.sqrt(s2)*gScale,
     sigmaLR:Math.sqrt(lrVar)*gScale,
     sigmaTrail:Math.sqrt(lrVar)*gScale,
@@ -6331,8 +6373,12 @@ function renderVaR(){
       '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
         '<div class="stat s-profit"><span class="stat-label">Forecast next day</span><span class="stat-value '+(g.sigmaNext>g.sigmaLR?'neg':'pos')+'">'+(g.sigmaNext*100).toFixed(1)+'%</span></div>'+
         '<div class="stat s-in"><span class="stat-label">Long-run average</span><span class="stat-value">'+(g.sigmaLR*100).toFixed(1)+'%</span></div>'+
-        '<div class="stat s-count"><span class="stat-label">Persistence α+β</span><span class="stat-value">'+g.persist.toFixed(3)+'</span></div>'+
+        '<div class="stat s-count"><span class="stat-label">Persistence</span><span class="stat-value">'+g.persist.toFixed(3)+'</span></div>'+
         '<div class="stat"><span class="stat-label">Shock half-life</span><span class="stat-value">'+(g.halfLife?Math.round(g.halfLife)+'d':'-')+'</span></div>'+
+        /* M8. Gamma is the whole point of the model, so it is on the face of the panel rather than
+           in the footnote, including when it was rejected. */
+        '<div class="stat"><span class="stat-label">Leverage γ</span><span class="stat-value '+(g.leverage?'neg':'muted')+'" style="font-size:'+(g.leverage?'18px':'15px')+'">'+
+          (g.leverage?g.gamma.toFixed(3):'not found')+'</span></div>'+
       '</div>'+
       '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">'+
         (g.sigmaNext>g.sigmaLR*1.15
@@ -6341,7 +6387,20 @@ function renderVaR(){
             ? 'The model expects the next day to be <b class="pos">calmer than usual</b>. Worth knowing that calm periods are when volatility-based sizing is most generous and most likely to be wrong.'
             : 'The forecast sits near the long-run average, so there is no volatility signal either way right now.')+
         ' Persistence of '+g.persist.toFixed(3)+' means a shock decays'+(g.halfLife?' to half its size in about '+Math.round(g.halfLife)+' trading days':'')+'. Values close to 1 mean volatility shocks last a long time.</p>'+
-      '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Fitted by variance targeting on '+g.n+' days. Omega is pinned so the model\'s long-run variance matches the sample, leaving two parameters instead of three. That is standard on short samples and stops the fit implying a long-run volatility the data never showed. It is a forecast of <b>how much things move</b>, never of <b>which way</b>.</p>'+
+      /* M8, stated in full because the honest outcome here is often "the extra parameter did not
+         earn its place", and that has to read as a result rather than a failure. */
+      '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.68">'+
+        (g.leverage
+          ? '<b>Falls hit this book harder than rises of the same size.</b> A down day adds '+
+            ((g.alpha+g.gamma)/(g.alpha||1e-9)).toFixed(1)+' times as much to tomorrow\'s expected variance as an up day of identical size '+
+            '(γ of '+g.gamma.toFixed(3)+' on top of an α of '+g.alpha.toFixed(3)+'). '+
+            'Plain GARCH squares the shock and throws the sign away, so it cannot see this at all. '+
+            'The extra parameter earned its place on this sample: a likelihood-ratio test returns '+g.lrStat.toFixed(1)+' against a threshold of 3.84.'
+          : '<b>No leverage effect found on this sample.</b> The asymmetric model was fitted and rejected: it bought '+
+            (g.lrStat>0?g.lrStat.toFixed(1):'no')+' likelihood against a threshold of 3.84, so the fit above is plain GARCH(1,1) and γ is pinned at zero. '+
+            'This is the result the model is supposed to be able to return. Keeping an unjustified parameter because it is fashionable is how a fit starts flattering itself.')+
+        ' <b>Falsification:</b> if γ is not significantly positive, this is GARCH(1,1) with an extra parameter and should be dropped, which is exactly what the test above decides each time it runs.</p>'+
+      '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Fitted by variance targeting on '+g.n+' days. Omega is pinned so the model\'s long-run variance matches the sample, leaving the dynamics to be fitted rather than the level. That is standard on short samples and stops the fit implying a long-run volatility the data never showed. It is a forecast of <b>how much things move</b>, never of <b>which way</b>.</p>'+
     '</div>':'<p class="muted" style="font-size:12.5px;margin-top:14px">Volatility forecasting needs about 60 days of history. There are '+rets.length+'.</p>')+
     '<p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6"><b>None of this predicts a return.</b> VaR, Expected Shortfall and GARCH measure how bad and how wild, never which direction. Banks build them to survive being wrong, not to be right more often, and reading them as a win-rate tool is the most common mistake made with them.</p>';
 }

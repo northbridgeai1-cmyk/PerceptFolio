@@ -946,6 +946,49 @@ t('both refresh paths check it', (term.match(/if\(!sessionAlive\(\)\)return/g)||
 t('the failure branch is guarded as well as the success branch',
   /catch\(e\)\{\s*\n\s*if\(!sessionAlive\(\)\)return;/.test(term));
 
+/* ==================== M8. GJR-GARCH ==================== */
+G('Falls hit harder than rises, or say they do not');
+
+const S9 = new Function(`
+  ${grab(term, 'garchFit')}
+  ${grab(term, 'autocorr')}
+  ${grab(term, 'annualScale')}
+  const TRADING_DAYS=252, LO_MAXLAG=10, LO_MINOBS=60;
+  return {garchFit};
+`)();
+function xs(seed){let x=seed>>>0;return()=>{x^=x<<13;x>>>=0;x^=x>>17;x^=x<<5;x>>>=0;return x/4294967296;};}
+function simGjr(alpha,beta,gamma,n,seed){
+  const rnd=xs(seed);
+  const gauss=()=>{let u=0,v=0;while(!u)u=rnd();while(!v)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+  const lr=0.0001, om=lr*(1-alpha-gamma/2-beta);
+  if(!(om>0))throw new Error('non-stationary fixture');
+  let s2=lr; const out=[];
+  for(let i=0;i<n;i++){const e=Math.sqrt(s2)*gauss();out.push(e);s2=om+(alpha+(e<0?gamma:0))*e*e+beta*s2;}
+  return out;
+}
+/* Simulate a series that genuinely has the leverage effect, and one that genuinely does not. */
+const gjrYes=S9.garchFit(simGjr(0.02,0.90,0.10,1200,12345));
+const gjrNo =S9.garchFit(simGjr(0.07,0.90,0.00,1200,999));
+t('a real leverage effect is detected', gjrYes.leverage===true && gjrYes.gamma>0.05,
+  'gamma '+gjrYes.gamma.toFixed(3)+', LR '+gjrYes.lrStat.toFixed(1));
+/* The important half: the model must be able to say the extra parameter did not earn its place. */
+t('no leverage effect is rejected, not fitted anyway', gjrNo.leverage===false && gjrNo.gamma===0,
+  'LR '+gjrNo.lrStat.toFixed(2)+' against 3.841');
+t('a rejected gamma falls back to plain GARCH(1,1)', gjrNo.gamma===0 && gjrNo.alpha>0 && gjrNo.beta>0);
+t('the decision is a likelihood-ratio test at chi-square one degree', /lr>3\.841/.test(term));
+t('the indicator fires on down days only', /const neg=dev\[i\]<0\?1:0/.test(term));
+/* Variance targeting must account for gamma or omega is wrong by half of it. */
+t('variance targeting accounts for the asymmetric term',
+  /lrVar\*\(1-alpha-g\/2-beta\)/.test(term) && /best\.a\+best\.g\/2\+best\.b/.test(term));
+t('the fit stays stationary', gjrYes.persist<1 && gjrNo.persist<1);
+t('too few observations returns null rather than a fit', S9.garchFit(new Array(30).fill(0.01))===null);
+t('gamma is on the face of the panel, including when rejected',
+  /Leverage γ/.test(term) && /'not found'/.test(term));
+t('a rejection is written as a result, not a failure',
+  /This is the result the model is supposed to be able to return/.test(term));
+t('it states the exact falsification the spec asks for',
+  /if γ is not significantly positive, this is GARCH\(1,1\) with an extra parameter and should be dropped/.test(term));
+
 /* ==================== M6. PSR, DEFLATED SHARPE, MinTRL ==================== */
 G('Whether the Sharpe is believable at all');
 
