@@ -1049,6 +1049,48 @@ t('it states its own falsification', /this whole panel collapses to the plain in
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
 
+/* ==================== P1. THE PROVENANCE CONTRACT ==================== */
+G('A number that cannot show its working');
+
+const SC = new Function(`
+  const PROV={}; let _provSeq=0;
+  ${grab(term, 'prov')}
+  ${grab(term, 'provStale')}
+  return {prov, provStale, PROV};
+`)();
+/* A contract that silently degrades is not a contract. */
+t('a figure without a formula is refused, not rendered bare', (() => {
+  try{ SC.prov('42',{inputs:'x'}); return false; }catch(e){ return /formula/.test(e.message); }
+})());
+t('a figure without inputs is refused', (() => {
+  try{ SC.prov('42',{formula:'x'}); return false; }catch(e){ return true; }
+})());
+t('all six fields are stored', (() => {
+  const h=SC.prov('42',{formula:'a/b',inputs:'a and b',n:10,ci:'1 to 2',asOf:'today'});
+  const d=SC.PROV[h.match(/data-prov="(pv\d+)"/)[1]];
+  return ['value','formula','inputs','n','ci','asOf'].every(k=>k in d);
+})());
+t('absent optional fields become null rather than undefined', (() => {
+  const h=SC.prov('42',{formula:'a/b',inputs:'a and b'});
+  const d=SC.PROV[h.match(/data-prov="(pv\d+)"/)[1]];
+  return d.n===null && d.ci===null && d.asOf===null;
+})());
+/* Staleness is the failure mode a terminal actually has: not a wrong number, an old one. */
+t('staleness measures when inputs were observed, not when the div rendered',
+  SC.provStale(Date.now()-2*864e5)==='2 days ago' && SC.provStale(Date.now())==='today');
+t('the figure is reachable by keyboard, not only by mouse',
+  /tabindex="0"/.test(term) && /event\.key==='Enter'/.test(term));
+t('the affordance is visible rather than hidden', /\.prov\{border-bottom:1px dotted/.test(term));
+/* The claim-making figures, which are the ones that matter. */
+t('expectancy carries its derivation', /formula:'mean\(edge_i\)/.test(term));
+t('the Sharpe carries the Lo correction it actually uses', /Lo \(2002\)'/.test(term));
+t('the deflated PSR names its benchmark', /being the expected best of '\+m6\.trials/.test(term));
+t('effective bets names whether the covariance was shrunk',
+  /Ledoit-Wolf shrunk by '\+\(R\.shrunk\.delta\*100\)/.test(term));
+/* The spec asks for every number; this ships the mechanism plus the claim-making figures, and
+   says so rather than overstating coverage. */
+t('the file states its own scope honestly', /HONEST SCOPE, because the spec says/.test(term));
+
 /* ==================== M7. LEDOIT-WOLF SHRINKAGE ==================== */
 G('The covariance estimate is biased, and by how much is measurable');
 
