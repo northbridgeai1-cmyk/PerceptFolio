@@ -915,6 +915,49 @@ t('the audit compares the threshold against independent observations, not raw ma
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
 
+/* ==================== D4. MARKS ARE APPEND-ONLY ==================== */
+G('A mark survives the merge, because it cannot be rebuilt');
+
+const S4 = new Function(`
+  ${grab(term, 'callId')}
+  ${grab(term, 'betterMark')}
+  ${grab(term, 'unionMarked')}
+  ${grab(term, 'mergeRecordInto')}
+  return {betterMark, unionMarked, mergeRecordInto, callId};
+`)();
+const T4 = Date.parse('2026-01-05T15:00:00Z');
+const c4 = (ts,sym,marks) => ({ts,sym,track:'checklist',verdict:'buy',price:100,spy:400,marks});
+const clone = o => JSON.parse(JSON.stringify(o));
+
+/* The scenario the spec names: the Worker stamps a 90-day mark, this device holds older state. */
+const cloud4  = {calls:[c4(T4,'AAA',{30:{price:105,spy:410,at:1},90:{price:112,spy:420,at:2}})]};
+const laptop4 = {calls:[c4(T4,'AAA',{30:{price:105,spy:410,at:1}})]};
+t('a pull keeps the mark this device never saw',
+  Object.keys(S4.mergeRecordInto(clone(cloud4),laptop4).calls[0].marks).join()==='30,90');
+const lap4=clone(laptop4); S4.mergeRecordInto(lap4,cloud4);
+t('a push cannot clobber a mark stamped elsewhere',
+  Object.keys(lap4.calls[0].marks).join()==='30,90');
+const localOnly4={calls:[c4(T4,'AAA',{180:{price:130,spy:440,at:9}})]};
+t('a mark made only on this device survives taking the cloud copy',
+  Object.keys(S4.mergeRecordInto(clone(cloud4),localOnly4).calls[0].marks).join()==='30,90,180');
+
+/* Neither of these is a real conflict, but both need a rule. */
+const missed4={90:{missed:true,lag:40}}, real4={90:{price:112,spy:420,at:2}};
+t('a real mark beats a missed one, whichever side holds it',
+  S4.betterMark(missed4[90],real4[90]).price===112 && S4.betterMark(real4[90],missed4[90]).price===112);
+/* A later re-stamp would be a re-mark, which I11 forbids. */
+t('between two real marks the earlier observation wins',
+  S4.betterMark({price:112,at:1000},{price:999,at:9000}).price===112 &&
+  S4.betterMark({price:999,at:9000},{price:112,at:1000}).price===112);
+t('calls present on only one side are all kept',
+  S4.mergeRecordInto({calls:[c4(T4,'AAA',{}),c4(T4+1,'BBB',{})]},{calls:[c4(T4+2,'CCC',{})]})
+    .calls.map(c=>c.sym).join()==='AAA,BBB,CCC');
+t('sell marks on transactions are unioned too', /next\.transactions=unionMarked/.test(term));
+/* Everything that is not a mark still takes the newer copy, which is what it should do. */
+t('only the record is unioned; the rest stays last-write-wins',
+  /D=mergeRecordInto\(Object\.assign\(defaultData\(\),remote\.data\|\|\{\}\),D\)/.test(term));
+t('the push reads before it writes', /const cur=await syncFetch\('GET',slot\)/.test(term));
+
 /* ==================== D3. ANNIVERSARY RESOLUTION ==================== */
 G('One rule for what a horizon means');
 

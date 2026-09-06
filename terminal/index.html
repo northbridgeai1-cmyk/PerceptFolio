@@ -12119,6 +12119,62 @@ function syncPayloadFromD(){
   // Straight copy of the profile. Nothing device-specific lives in D, so nothing needs stripping.
   return JSON.parse(JSON.stringify(D));
 }
+
+/* ============================ D4. MARKS ARE APPEND-ONLY ============================
+   Sync is whole-account last-write-wins, and that is fine for everything except marks. The failure
+   is specific and permanent:
+
+     the Worker stamps a 90-day mark on Tuesday; this laptop still holds Monday's state; it is
+     opened on Wednesday and pushes; the newer copy loses to the older one and the mark is gone.
+
+   I11 forbids reconstructing it, and rightly: a mark rebuilt from a price nobody observed on the
+   day is not a record, it is a reconstruction. So the mark has to survive the merge rather than be
+   recoverable after it.
+
+   IT NEEDS NO CONFLICT RESOLUTION. A mark never changes once stamped, so the sets are unioned
+   rather than compared, keyed by (callId, horizon). Never overwrite, never delete. Everything else
+   in the profile stays last-write-wins, which is what it should be.
+
+   TWO CASES WHERE THE SAME KEY HOLDS TWO ENTRIES, neither of which is a real conflict:
+     a real mark against a MISSED one   the real one wins; somewhere it was marked in time
+     two real marks                     the earlier stamp wins, because it is the first observation
+                                        and a later re-stamp would be a re-mark, which I11 forbids */
+function betterMark(a,b){
+  if(!a)return b;
+  if(!b)return a;
+  if(a.missed&&!b.missed)return b;
+  if(b.missed&&!a.missed)return a;
+  return ((a.at||0)<=(b.at||0))?a:b;
+}
+/* keyOf lets the same union serve calls and sell-marked transactions; both carry a marks object
+   and losing either one is the same unrecoverable loss. */
+function unionMarked(local,remote,keyOf){
+  const out=[],idx=new Map();
+  const take=row=>{
+    if(!row)return;
+    const k=keyOf(row);
+    if(!idx.has(k)){
+      const copy=Object.assign({},row);
+      copy.marks=Object.assign({},row.marks||{});
+      idx.set(k,copy); out.push(copy); return;
+    }
+    const cur=idx.get(k);
+    const inc=row.marks||{};
+    Object.keys(inc).forEach(h=>{cur.marks[h]=betterMark(cur.marks[h],inc[h]);});
+  };
+  (local||[]).forEach(take);
+  (remote||[]).forEach(take);
+  return out.sort((a,b)=>(a.ts||0)-(b.ts||0));
+}
+/* Applied to a freshly pulled profile before it becomes D. */
+function mergeRecordInto(next,localD){
+  if(!localD)return next;
+  next.calls=unionMarked(localD.calls,next.calls,callId);
+  if(next.calls.length>2000)next.calls=next.calls.slice(next.calls.length-2000);
+  const txKey=t=>t.ts+':'+t.sym+':'+(t.action||'');
+  next.transactions=unionMarked(localD.transactions,next.transactions,txKey);
+  return next;
+}
 async function syncFetch(method,slot,body){
   const res=await fetch(syncEndpoint(slot),{
     method,
@@ -12143,6 +12199,13 @@ async function syncPush(){
   if(isDemoUser()){setSyncStatus('Test account. Sync is disabled here.','muted');return{skipped:true};}
   if(!syncActive()||!D)return;
   const slot=await syncSlotId();
+  /* One extra read before every push. Without it this device's copy of the record overwrites
+     whatever the Worker or another device stamped since, which is the exact loss D4 exists to
+     prevent and which I11 makes permanent. A request is cheap; the mark is not replaceable. */
+  try{
+    const cur=await syncFetch('GET',slot);
+    if(cur&&!cur.empty&&cur.data)mergeRecordInto(D,cur.data);
+  }catch(e){}
   const stamp=Date.now();
   const payload={updatedAt:stamp,user:USER,data:syncPayloadFromD()};
   await syncFetch('PUT',slot,JSON.stringify(payload));
@@ -12170,7 +12233,9 @@ async function syncPull(force){
       return{applied:false,pushedInstead:true};
     }
   }
-  D=Object.assign(defaultData(),remote.data||{});
+  /* D4: everything else takes the cloud copy; the record is unioned so nothing stamped on this
+     device is dropped by a copy that predates it. */
+  D=mergeRecordInto(Object.assign(defaultData(),remote.data||{}),D);
   D.syncedAt=remote.updatedAt;
   DB.profiles[USER].data=D;
   persistDB();
