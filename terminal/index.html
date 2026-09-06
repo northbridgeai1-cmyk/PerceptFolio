@@ -2183,7 +2183,10 @@ function persistDB(opts){
   return true;
 }
 function saveDB(){
-  if(USER){
+  /* The profile must still exist. It does not during the moment between deleting an account and
+     the reload that follows, and saveDB is called from everywhere, so assuming otherwise threw an
+     uncaught TypeError and left the session half torn down. */
+  if(USER&&DB.profiles[USER]){
     // Timestamp every local change so a pull can tell whether taking the cloud copy would
     // silently destroy work done on this device since the last successful sync.
     if(D)D.lastLocalEdit=Date.now();
@@ -3318,7 +3321,13 @@ function switchAccount(){
 
 function deleteProfile(){
   if(!confirm('Delete profile "'+USER+'" and ALL its data? This cannot be undone.'))return;
-  delete DB.profiles[USER];persistDB({deleting:true});logout();
+  delete DB.profiles[USER];
+  if(!persistDB({deleting:true}))return;      // the write was refused; the account still exists
+  /* Session state is cleared here rather than left to logout(), which saves on the way out and
+     would try to write a profile that no longer exists. */
+  USER=null; D=null; bizContext=null;
+  try{ sessionStorage.removeItem('qf_user'); }catch(e){}
+  location.reload();
 }
 
 /* ================= UI HELPERS ================= */
@@ -4594,14 +4603,28 @@ function renderScreenerTable(){
 }
 
 /* ================= REFRESH ================= */
+/* A network round trip takes seconds, and a session can end inside one. Sign out, switch client,
+   or delete the account while a refresh is in flight and the continuation resumes against a USER
+   whose profile is gone and a D that is null. That threw an uncaught TypeError, left the failure
+   invisible to the operator, and abandoned whatever else the continuation was going to do.
+
+   Found by racing a refresh against a delete on purpose, not by reading: the first symptom was a
+   crash on the delete button, and fixing only that left the async path still broken. */
+function sessionAlive(){return !!(USER&&D&&DB.profiles&&DB.profiles[USER]);}
 let refreshing=false;
 async function refreshPrices(symbols){
   for(const s of symbols){
+    if(!sessionAlive())return;                 // the account went away mid-flight
     const h0=D.holdings.find(h=>h.sym===s);
     if(h0&&h0.type==='Fund')continue; // mutual funds: no exchange quote, manual only
-    try{const q=await getQuote(s);D.holdings.forEach(h=>{if(h.sym===s){h.price=q.c;h.dayPct=q.dp;h.prevClose=(isFinite(q.pc)&&q.pc>0)?q.pc:null;h.autoFailed=false;h.manualPrice=false;h.priceDate=Date.now();}});}
-    catch(e){D.holdings.forEach(h=>{if(h.sym===s)h.autoFailed=true;});handleApiErr(e,s);}
+    try{const q=await getQuote(s);
+      if(!sessionAlive())return;               // resolved after the session ended
+      D.holdings.forEach(h=>{if(h.sym===s){h.price=q.c;h.dayPct=q.dp;h.prevClose=(isFinite(q.pc)&&q.pc>0)?q.pc:null;h.autoFailed=false;h.manualPrice=false;h.priceDate=Date.now();}});}
+    catch(e){
+      if(!sessionAlive())return;               // the failure path resumes just as late
+      D.holdings.forEach(h=>{if(h.sym===s)h.autoFailed=true;});handleApiErr(e,s);}
   }
+  if(!sessionAlive())return;
   saveDB();renderAll();
 }
 async function refreshAll(){
@@ -4613,8 +4636,13 @@ async function refreshAll(){
     // Prices for all holdings (skip mutual funds. Finnhub has no NAV/exchange quote for them)
     const syms=[...new Set(D.holdings.filter(h=>h.type!=='Fund').map(h=>h.sym))];
     for(const s of syms){
-      try{const q=await getQuote(s);D.holdings.forEach(h=>{if(h.sym===s){h.price=q.c;h.dayPct=q.dp;h.prevClose=(isFinite(q.pc)&&q.pc>0)?q.pc:null;h.autoFailed=false;h.manualPrice=false;h.priceDate=Date.now();}});}
-      catch(e){D.holdings.forEach(h=>{if(h.sym===s)h.autoFailed=true;});handleApiErr(e,s);}
+      if(!sessionAlive())return;
+      try{const q=await getQuote(s);
+        if(!sessionAlive())return;
+        D.holdings.forEach(h=>{if(h.sym===s){h.price=q.c;h.dayPct=q.dp;h.prevClose=(isFinite(q.pc)&&q.pc>0)?q.pc:null;h.autoFailed=false;h.manualPrice=false;h.priceDate=Date.now();}});}
+      catch(e){
+        if(!sessionAlive())return;
+        D.holdings.forEach(h=>{if(h.sym===s)h.autoFailed=true;});handleApiErr(e,s);}
     }
     /* SPY is fetched BEFORE scoring, not after. Every call recorded during scoring stamps SPY's
        price alongside it so the scorecard can measure the call against the market over the same
@@ -4622,6 +4650,7 @@ async function refreshAll(){
     let spyClose=null;
     try{
       const sq=await getQuote('SPY');
+      if(!sessionAlive())return;
       if(sq&&isFinite(sq.c)){spyClose=sq.c;_spyPriceCache={price:sq.c,at:Date.now()};}
     }catch(e){}
     // Score watchlist + stock holdings
@@ -4630,6 +4659,7 @@ async function refreshAll(){
       try{
         const prev=D.analyses[s];
         const sc=await scoreStock(s);
+        if(!sessionAlive())return;
         D.analyses[s]=sc;
         /* Price history before signals: the momentum track needs the log populated before
            evaluateSignals asks it for a verdict, or the first run silently records nothing. */
@@ -4643,6 +4673,7 @@ async function refreshAll(){
        run's. A mark stamped with a stale price is worse than no mark. The extra fetch covers calls on
        tickers that are no longer on any of your lists but still have an anniversary coming due. */
     const markPrices=await fetchMarkPrices();
+    if(!sessionAlive())return;
     markCalls(markPrices);
     markSells(markPrices);
     /* Sealed after stamping, not during: crypto.subtle is async and markCalls must stay

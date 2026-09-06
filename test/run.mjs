@@ -926,6 +926,26 @@ t('the audit compares the threshold against independent observations, not raw ma
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
 
+/* ==================== SESSION TEARDOWN ==================== */
+G('Nothing resumes into a session that ended');
+
+/* Found by racing a refresh against a delete, not by reading. The delete button itself threw:
+   deleteProfile removed the profile and then called logout, which saves, which wrote to the
+   profile it had just removed. */
+t('saveDB requires the profile to still exist', /if\(USER&&DB\.profiles\[USER\]\)\{/.test(term));
+t('deleteProfile clears the session itself rather than leaving it to logout',
+  /delete DB\.profiles\[USER\];\s*\n\s*if\(!persistDB\(\{deleting:true\}\)\)return;/.test(term) &&
+  /USER=null; D=null; bizContext=null;/.test(term));
+t('a refused write leaves the account intact', /the write was refused; the account still exists/.test(term));
+/* A network round trip takes seconds and a session can end inside one. */
+t('there is one test for a live session',
+  /function sessionAlive\(\)\{return !!\(USER&&D&&DB\.profiles&&DB\.profiles\[USER\]\);\}/.test(term));
+t('both refresh paths check it', (term.match(/if\(!sessionAlive\(\)\)return/g)||[]).length >= 8);
+/* The first fix guarded only the success branch; the crash was coming from the catch, which
+   resumes just as late. */
+t('the failure branch is guarded as well as the success branch',
+  /catch\(e\)\{\s*\n\s*if\(!sessionAlive\(\)\)return;/.test(term));
+
 /* ==================== M9. THE CASH ASYMMETRY ==================== */
 G('A smaller size is not a better size');
 
