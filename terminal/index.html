@@ -2211,6 +2211,7 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   transactions:[],dividends:[],theme:'dark',
   syncedAt:0,lastLocalEdit:0,
   calls:[],                                     // graded in the Market tab's scorecard
+  pendingCalls:{},                              // D1 hysteresis: unconfirmed verdicts, keyed sym|track
   scoreLog:{},                                  // ticker -> [{d,q,p,m,t,mx}] one row per day, for quality drift
   priceLog:{},                                  // ticker -> [{d,p}] daily closes, for the momentum score
   strategies:[],                                // the registry: what is being graded, and what died
@@ -4590,25 +4591,124 @@ function pushAlert(type,sym,msg){
 /* track: 'checklist' | 'herizen' | 'gated'. Three systems logged side by side so the question of
    whether the momentum rule adds anything gets answered by measurement rather than by argument.
    Dedup is per track — the checklist changing its mind must not suppress a herizen entry. */
+/* ---- D1. WHAT COUNTS AS A CALL ----
+   Recording on every verdict change sounds right and is not. A stock sitting on the buy bar flips
+   the verdict on a rounding difference in one input, and four oscillations become four calls on
+   what is plainly one opinion. Every one of them then enters the record as an independent
+   observation, which inflates the sample, and inflating the sample is how a confidence interval
+   becomes a lie.
+
+   TWO GATES, AND THE GAP BETWEEN THEM IS THE HYSTERESIS BAND.
+     enter  a verdict only after it has held for CONFIRM_REFRESHES consecutive refreshes
+     leave  BUY only once quality has fallen a clear EXIT_MARGIN below the bar it entered on
+
+   Oscillation inside the band changes nothing, which is the point: the opinion did not change, so
+   the record should not say it did.
+
+   FLICKERS ARE STILL RECORDED, JUST NOT AS CONVICTION. A verdict that appears and reverts before
+   confirming is written with conviction:'flickering' instead of being thrown away. Discarding them
+   would answer the question by assumption; keeping them separate lets the scorecard grade the two
+   apart and settle whether conviction that survives three refreshes actually beats conviction that
+   does not. If it does not, that is worth knowing and costs nothing to find out. */
+const CONFIRM_REFRESHES=3;
+const EXIT_MARGIN=2;
+
+/* An operator's own thesis condition is not an oscillation and is not held for three refreshes.
+   They set that number deliberately; the app does not second-guess it. */
+function bypassesHysteresis(sc,verdictKey,sym){
+  if(verdictKey!=='sell')return false;
+  const th=sym?thesisFor(sym):null;
+  return !!(th&&isFinite(th.sellBelow)&&th.sellBelow>0&&sc&&sc.qScore<th.sellBelow);
+}
+
 function recordCall(sym,sc,verdictKey,verdictLabel,track){
   if(!D.calls)D.calls=[];
+  if(!D.pendingCalls)D.pendingCalls={};
   track=track||'checklist';
   /* THE CAP IS ENFORCED HERE, not in the UI. A retired strategy stops recording immediately, and a
      proposed one records nothing at all — otherwise the registry would be decoration and the track
      count would drift right back up. */
   if(!trackIsLive(track))return;
-  const last=[...D.calls].reverse().find(c=>c.sym===sym&&(c.track||'checklist')===track);
-  if(last&&last.verdict===verdictKey)return;      // unchanged opinion, nothing new to grade
-  D.calls.push({
-    track,
-    sym,verdict:verdictKey,label:verdictLabel,
-    ts:Date.now(),date:new Date().toISOString().slice(0,10),
-    price:(sc&&isFinite(sc.price))?sc.price:null,
-    spy:(_spyPriceCache&&isFinite(_spyPriceCache.price))?_spyPriceCache.price:null,
-    q:sc?sc.qScore:null,p:sc?sc.pScore:null,m:sc?sc.mScore:null,
-    mOk:!!(sc&&D.rules&&sc.mScore>=(D.rules.mBuy||0))
-  });
-  if(D.calls.length>2000)D.calls=D.calls.slice(D.calls.length-2000);
+  const key=sym+'|'+track;
+  const pend=D.pendingCalls;
+  const mine=(c)=>c.sym===sym&&(c.track||'checklist')===track;
+  /* A flicker is an observation, not an opinion. If it were treated as the standing verdict, one
+     brief BUY would suppress the genuine sustained BUY that followed, and the record would keep
+     the noise and lose the signal. So the standing opinion is the last CONFIRMED call, and the
+     flickering rows sit beside it. */
+  let firmIdx=-1;
+  for(let i=D.calls.length-1;i>=0;i--){ if(mine(D.calls[i])&&D.calls[i].conviction!=='flickering'){firmIdx=i;break;} }
+  const last=firmIdx>=0?D.calls[firmIdx]:null;
+
+  const write=(conviction,refreshes)=>{
+    D.calls.push({
+      track,
+      sym,verdict:verdictKey,label:verdictLabel,
+      ts:Date.now(),date:new Date().toISOString().slice(0,10),
+      price:(sc&&isFinite(sc.price))?sc.price:null,
+      spy:(_spyPriceCache&&isFinite(_spyPriceCache.price))?_spyPriceCache.price:null,
+      q:sc?sc.qScore:null,p:sc?sc.pScore:null,m:sc?sc.mScore:null,
+      mOk:!!(sc&&D.rules&&sc.mScore>=(D.rules.mBuy||0)),
+      conviction,refreshes
+    });
+    if(D.calls.length>2000)D.calls=D.calls.slice(D.calls.length-2000);
+  };
+
+  /* One row per episode of indecision, not one per swing. Eight refreshes oscillating around the
+     bar are a single unresolved opinion and must not enter the record eight times, which is the
+     sample inflation this gate exists to stop. A confirmation ends the episode, so the next
+     oscillation is recorded again. */
+  const flickeredSince=()=>D.calls.some((c,i)=>i>firmIdx&&mine(c)&&c.conviction==='flickering');
+  const flickerOut=(cur)=>{
+    if(!cur||!(cur.n>0))return;
+    if(cur.verdict===(last&&last.verdict))return;
+    if(flickeredSince())return;
+    const held=verdictKey,heldLabel=verdictLabel;
+    verdictKey=cur.verdict; verdictLabel=cur.label;
+    write('flickering',cur.n);
+    verdictKey=held; verdictLabel=heldLabel;
+  };
+
+  if(last&&last.verdict===verdictKey){
+    /* The standing opinion reasserted itself, which also means whatever was building against it
+       just died. That death is the flicker, and dropping it silently here would lose every
+       oscillation that happens to land back on the standing verdict. */
+    flickerOut(pend[key]);
+    delete pend[key];
+    return;
+  }
+
+  /* THE EXIT GATE. Leaving a BUY needs the score to have fallen clear of the bar, not merely to
+     have touched the wrong side of it. Without this the entry gate alone would still let a stock
+     sitting on the bar leave BUY every other refresh. */
+  if(last&&last.verdict==='buy'&&verdictKey!=='buy'&&!bypassesHysteresis(sc,verdictKey,sym)){
+    const bar=(D.rules&&D.rules.qBuy)||0;
+    if(!(sc&&isFinite(sc.qScore)&&sc.qScore<=bar-EXIT_MARGIN)){
+      delete pend[key];
+      return;                                     // inside the band: the opinion has not changed
+    }
+  }
+
+  if(bypassesHysteresis(sc,verdictKey,sym)){
+    delete pend[key];
+    write('thesis',1);
+    return;
+  }
+
+  const cur=pend[key];
+  if(cur&&cur.verdict===verdictKey){
+    cur.n++;
+  }else{
+    /* A different candidate displaced the last one before it could confirm. That is exactly the
+       oscillation this gate exists to catch, and it is recorded rather than discarded. */
+    flickerOut(cur);
+    pend[key]={verdict:verdictKey,label:verdictLabel,n:1,since:Date.now()};
+    return;
+  }
+  if(cur.n<CONFIRM_REFRESHES)return;              // still provisional
+
+  delete pend[key];
+  write('persistent',CONFIRM_REFRESHES);
 }
 /* ---- Fixed-horizon marks ----
    The original scorecard filtered to calls OLDER than the chosen window and then measured them to
@@ -11491,7 +11591,13 @@ function renderScorecard(){
   const open=winRaw==='since';
   const rows=scorecardRows();
   const graded=rows.filter(r=>r.alpha!=null);
-  const scored=graded.filter(r=>r.edge!=null);          // buy/sell only, the directional claims
+  const scoredAll=graded.filter(r=>r.edge!=null);       // buy/sell only, the directional claims
+  /* D1: conviction that survived three refreshes is graded apart from conviction that flickered.
+     Calls recorded before the hysteresis gate existed carry no conviction field; they are counted
+     as firm because that is what the old rule recorded, and the note below says so rather than
+     quietly folding them into either group. */
+  const scored=scoredAll.filter(r=>r.c.conviction!=='flickering');
+  const flick=scoredAll.filter(r=>r.c.conviction==='flickering');
   const pending=rows.filter(r=>r.pending).length;
   const missed=rows.filter(r=>r.missed).length;
   const emptyEl=document.getElementById('scorecardEmpty');
@@ -11517,6 +11623,7 @@ function renderScorecard(){
   if(emptyEl)emptyEl.style.display='none';
 
   const st=expectancyStats(scored.map(r=>r.edge));
+  const stFlick=flick.length?expectancyStats(flick.map(r=>r.edge)):null;
   const medHeld=median(graded.filter(r=>r.heldDays!=null).map(r=>r.heldDays));
 
   // Does requiring momentum actually help? Split the same set and compare. On edge, not raw alpha,
@@ -11540,7 +11647,8 @@ function renderScorecard(){
         '<div class="stat s-count"><span class="stat-label">Payoff ratio</span><span class="stat-value '+(st&&st.payoff!=null?(st.payoff>=1?'pos':'neg'):'')+'">'+(st&&st.payoff!=null?st.payoff.toFixed(2)+'×':'-')+'</span></div>'+
       '</div>'+
       '<div class="stat-row" style="margin-bottom:0">'+
-        '<div class="stat"><span class="stat-label">Calls graded</span><span class="stat-value">'+graded.length+'</span></div>'+
+        '<div class="stat"><span class="stat-label">Calls graded</span><span class="stat-value">'+graded.length+
+          (flick.length?' <span class="muted" style="font-size:12px;font-weight:400">'+flick.length+' flickering, scored apart</span>':'')+'</span></div>'+
         '<div class="stat"><span class="stat-label">Hit rate</span><span class="stat-value">'+(st?st.hitRate.toFixed(0)+'%':'-')+' <span class="muted" style="font-size:12px;font-weight:400">'+(st?st.wins+'/'+st.n:'')+'</span></span></div>'+
         '<div class="stat"><span class="stat-label">Median holding</span><span class="stat-value">'+(medHeld!=null?Math.round(medHeld)+'d':'-')+'</span></div>'+
         '<div class="stat"><span class="stat-label">95% range</span><span class="stat-value" style="font-size:15px">'+(st&&st.lo!=null?pts(st.lo)+' to '+pts(st.hi):'needs 2+')+'</span></div>'+
@@ -11559,6 +11667,22 @@ function renderScorecard(){
       (mA!=null&&nA!=null&&withM.length>=5&&withoutM.length>=5
         ? '<p class="muted" style="font-size:13px;margin-top:8px">Calls that cleared your momentum minimum ran <b class="'+(mA>=nA?'pos':'neg')+'">'+(mA-nA>=0?'+':'')+(mA-nA).toFixed(2)+'pts</b> '+(mA>=nA?'better':'worse')+' than those that didn\'t ('+withM.length+' vs '+withoutM.length+' calls).</p>'
         : '')+
+      /* THE FREE FINDING. Whether an opinion that survives three refreshes is worth more than one
+         that does not is answered here by measurement. If the two are indistinguishable, the
+         hysteresis gate is filtering noise from the sample without adding information, which is
+         still worth knowing and is stated rather than hidden. */
+      (stFlick&&st
+        ? '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65"><b>Conviction, graded apart.</b> '+
+          'Verdicts that held for three consecutive refreshes returned <b class="'+(st.expectancy>=0?'pos':'neg')+'">'+pts(st.expectancy)+'</b> per call ('+st.n+'). '+
+          'Verdicts that appeared and reverted returned <b class="'+(stFlick.expectancy>=0?'pos':'neg')+'">'+pts(stFlick.expectancy)+'</b> ('+stFlick.n+'). '+
+          (Math.min(st.n,stFlick.n)<10
+            ? 'Too few of one kind to read yet; this line becomes meaningful at roughly ten of each.'
+            : (st.expectancy>stFlick.expectancy
+               ? 'Persistent conviction is ahead, which is the result the gate assumes. '
+               : 'Flickering conviction is ahead, which is evidence against the gate as configured. ')+
+              'Falsification: if this difference stays inside its own confidence interval as the sample grows, the three-refresh rule is filtering the record without informing it and should be reconsidered.')+
+          '</p>'
+        : '')+
       trackComparison(winRaw)+
       ruleChangeWarning()+
       (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+scored.length+' scoreable call'+(scored.length===1?'':'s')+' is not evidence.</b> Under roughly 20, two lucky picks dominate every number above. Treat it as a running tally, not a verdict on the checklist.</p>':'')+
@@ -11570,7 +11694,8 @@ function renderScorecard(){
     return '<tr>'+
       '<td><b>'+esc(c.sym)+'</b></td>'+
       '<td class="muted" style="white-space:nowrap">'+esc(c.date)+'</td>'+
-      '<td><span class="pill '+pill+'">'+esc((c.verdict||'').toUpperCase())+'</span></td>'+
+      '<td><span class="pill '+pill+'">'+esc((c.verdict||'').toUpperCase())+'</span>'+
+        (c.conviction==='flickering'?'<span class="muted" style="font-size:11px;display:block;margin-top:2px" title="Appeared and reverted before holding for three refreshes. Graded separately.">flickering</span>':'')+'</td>'+
       '<td class="muted" style="font-size:12px;white-space:nowrap">'+(c.q!=null?c.q+'/12 · '+c.p+'/6 · '+c.m+'/4':'-')+'</td>'+
       '<td class="muted">'+(heldDays!=null?heldDays+'d':'-')+'</td>'+
       '<td>'+(c.price!=null?fmt$(c.price):'-')+'</td>'+

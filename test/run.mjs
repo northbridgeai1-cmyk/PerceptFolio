@@ -853,6 +853,40 @@ t('all five quarantine categories reach the audit screen',
   ['split','split-repaired','split-suspected','no-quote','bad-value']
     .every(r=>term.includes("==='"+r+"'")));
 
+/* ==================== D1. WHAT COUNTS AS A CALL ==================== */
+G('One opinion is one call');
+
+t('a verdict must hold before it is recorded', /const CONFIRM_REFRESHES=3/.test(term));
+t('leaving BUY needs a clear margin, not a touch', /const EXIT_MARGIN=2/.test(term));
+t('the exit gate reads the score, not just the flipped verdict',
+  /sc\.qScore<=bar-EXIT_MARGIN/.test(term));
+t('unconfirmed verdicts survive a reload', /pendingCalls:\{\}/.test(term));
+/* Discarding flickers would answer by assumption whether conviction is worth anything. */
+t('flickers are recorded, not discarded', /write\('flickering'/.test(term));
+t('confirmed calls are marked as such', /write\('persistent',CONFIRM_REFRESHES\)/.test(term));
+/* A flicker is an observation, not the standing opinion: treating it as the latter would let one
+   brief BUY suppress the genuine sustained BUY behind it. */
+t('the standing opinion ignores flickering rows',
+  /conviction!=='flickering'\)\{firmIdx=i;break;\}/.test(term));
+t('one flicker row per episode, not one per swing', /const flickeredSince=\(\)=>/.test(term));
+/* An oscillation that lands back on the standing verdict still killed a candidate. */
+t('a candidate killed by the standing verdict is still recorded',
+  /flickerOut\(pend\[key\]\);\s*\n\s*delete pend\[key\];/.test(term));
+t("an operator's own thesis condition is not held for three refreshes",
+  /function bypassesHysteresis/.test(term) && /write\('thesis',1\)/.test(term));
+
+t('the scorecard grades the two apart',
+  /scoredAll\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term) &&
+  /scoredAll\.filter\(r=>r\.c\.conviction==='flickering'\)/.test(term));
+t('the headline expectancy excludes flickers but says how many', /flickering, scored apart/.test(term));
+t('legacy calls without a conviction field are not silently reclassified',
+  /Calls recorded before the hysteresis gate existed carry no conviction field/.test(term));
+/* THE STANDING CONTRACT: the module states how it could be shown to be wrong, on screen. */
+t('the conviction split states its own falsification',
+  /Falsification: if this difference stays inside its own confidence interval/.test(term));
+t('it refuses to read the comparison on too small a sample',
+  /Math\.min\(st\.n,stFlick\.n\)<10/.test(term));
+
 /* ==================== TOTAL RETURN ==================== */
 G('Marks credit distributions, on both legs');
 
