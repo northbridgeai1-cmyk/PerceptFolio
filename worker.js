@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-06.3';
+const WORKER_VERSION = '2026-09-06.4';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -58,6 +58,89 @@ const SECURITY_HEADERS = {
   'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
   'Cache-Control': 'no-store'
 };
+
+/* ---- Transactional mail ----
+   The access queue mints a code and then required the operator to send it by hand from a mailto
+   link, which is the one genuinely manual step left in this product and the reason the front page
+   could not promise applicants a reply. One HTTPS POST removes it. No SDK: a fetch is the whole
+   integration, which keeps the worker a single pasteable file.
+
+   The plain-text body is deliberate. A code arriving as plain text cannot be mangled by an HTML
+   mail client, is readable in every reader, and does not look like the phishing it would otherwise
+   resemble: an unexpected message containing a credential. */
+function escHtml(x) {
+  return String(x == null ? '' : x).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function decisionEmailBody(rec, decision, code, note) {
+  const tier = decision === 'business' ? 'business' : 'personal';
+  if (decision === 'denied') {
+    return {
+      subject: 'Your PerceptFolio access request',
+      text:
+`Thank you for requesting access to PerceptFolio.
+
+I am not able to offer you an account at this time.
+
+${note ? note + '\n\n' : ''}PerceptFolio is invite-only and deliberately small. This is not a judgement of you or your investing; it is a limit on how many accounts I can support properly.
+
+You are welcome to request again later.
+
+Pierce
+perceptfolio.com`
+    };
+  }
+  return {
+    subject: 'Your PerceptFolio invite code',
+    text:
+`Your request for PerceptFolio access has been accepted.
+
+Invite code: ${code}
+Account type: ${tier}
+
+This code can be redeemed once, and expires 30 days from today.
+
+To use it:
+  1. Go to https://perceptfolio.com/terminal/
+  2. Choose "Create account"
+  3. Enter your email, a password, and the code above
+
+${note ? note + '\n\n' : ''}Two things worth knowing before you start.
+
+Everything lives in your own browser. There is no server holding your portfolio, which is the point, and it means an export is your only backup. The app will ask you to take one when you add your first holding; please do.
+
+It records what it tells you and marks it on a fixed horizon it cannot move afterwards. Early on it will mostly tell you that it does not have enough data to say anything yet. That is the product working, not failing.
+
+Pierce
+perceptfolio.com`
+  };
+}
+async function sendDecisionEmail(env, rec, decision, code, note) {
+  const body = decisionEmailBody(rec, decision, code, note);
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + env.RESEND_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: env.MAIL_FROM,
+        to: [rec.email],
+        subject: body.subject,
+        text: body.text
+      })
+    });
+    if (!r.ok) {
+      const detail = await r.text().catch(() => '');
+      return { attempted: true, ok: false, status: r.status, error: detail.slice(0, 300), at: Date.now() };
+    }
+    const j = await r.json().catch(() => ({}));
+    return { attempted: true, ok: true, id: j.id || null, at: Date.now() };
+  } catch (e) {
+    return { attempted: true, ok: false, error: String((e && e.message) || e).slice(0, 300), at: Date.now() };
+  }
+}
 
 function corsHeaders(env) {
   /* NO WILDCARD FALLBACK. This previously answered '*' whenever ALLOWED_ORIGIN was unset, which
@@ -376,7 +459,9 @@ async function handle(request, env) {
         FRED_API_KEY: !!env.FRED_API_KEY,
         FINNHUB_API_KEY: !!env.FINNHUB_API_KEY,
         AI_API_KEY: !!env.AI_API_KEY,
-        ALLOWED_ORIGIN: env.ALLOWED_ORIGIN || '(unset — cross-origin reads are DENIED until this is set)'
+        ALLOWED_ORIGIN: env.ALLOWED_ORIGIN || '(unset — cross-origin reads are DENIED until this is set)',
+        RESEND_API_KEY: !!env.RESEND_API_KEY,
+        MAIL_FROM: env.MAIL_FROM || null
       };
     }
     return json(body, 200, env);
@@ -956,8 +1041,18 @@ async function handle(request, env) {
         issuedAt: Date.now(), expiresAt: Date.now() + 30 * 86400000, usedAt: null
       }), { expirationTtl: 40 * 86400 });
     }
+    /* ---- Send the decision, if a mail provider is configured ----
+       The code is minted and stored BEFORE this runs and is returned regardless of the outcome.
+       A failed send must never cost the operator an invite code, and the admin page keeps its
+       mailto fallback for exactly that case. Optional by design: with no RESEND_API_KEY the flow
+       is byte-for-byte what it was, which is what makes this safe to add to a working system. */
+    let mail = { attempted: false };
+    if (env.RESEND_API_KEY && env.MAIL_FROM) {
+      mail = await sendDecisionEmail(env, rec, decision, code, note);
+      rec.mail = mail;
+    }
     await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
-    return json({ ok: true, decision, code }, 200, env);
+    return json({ ok: true, decision, code, mail }, 200, env);
   }
 
   /* ---- POST /pause — suspend or restore an issued grant ----

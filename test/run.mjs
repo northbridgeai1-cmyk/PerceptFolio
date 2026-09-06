@@ -1049,6 +1049,66 @@ t('it states its own falsification', /this whole panel collapses to the plain in
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
 
+/* ==================== TRANSACTIONAL MAIL ==================== */
+G('The last manual step in the access flow');
+
+t('a decision can be emailed automatically', /async function sendDecisionEmail/.test(worker) &&
+  /api\.resend\.com\/emails/.test(worker));
+/* Optional by design: with no key the flow is byte-for-byte what it was. */
+t('it is optional and does nothing without a key and a from address',
+  /if \(env\.RESEND_API_KEY && env\.MAIL_FROM\) \{/.test(worker));
+/* A failed send must never cost an invite code. */
+/* Compare against the CALL site, not the function definition, which appears earlier in the file. */
+t('the code is minted and stored before mail is attempted, and returned either way',
+  worker.indexOf("code = makeCode()") < worker.indexOf('mail = await sendDecisionEmail(') &&
+  /return json\(\{ ok: true, decision, code, mail \}/.test(worker));
+t('a send failure is recorded rather than thrown', /return \{ attempted: true, ok: false/.test(worker));
+t('the outcome is stored on the request', /rec\.mail = mail;/.test(worker));
+/* A code minted and never delivered looks identical to one that was. */
+t('the admin queue shows whether the email actually went', /Automatic email FAILED/.test(admin) &&
+  /Emailed automatically on/.test(admin));
+t('and says when no provider is configured at all', /No mail provider configured/.test(admin));
+t('the audit page reports whether applicant mail is live', /'Applicant email',/.test(term));
+t('the code arrives as plain text, not HTML', /subject: body\.subject,\s*\n\s*text: body\.text/.test(worker));
+t('both decisions have a body', /function decisionEmailBody/.test(worker) &&
+  /Your PerceptFolio invite code/.test(worker) && /Your PerceptFolio access request/.test(worker));
+
+/* ==================== ERROR LOG ==================== */
+G('Crashes nobody would otherwise see');
+
+const SE = new Function(`
+  const localStorage={_v:{},getItem(k){return this._v[k]||null},setItem(k,v){this._v[k]=v},removeItem(k){delete this._v[k]}};
+  const ERRLOG_KEY='pf_errlog', ERRLOG_MAX=40;
+  ${grab(term, 'readErrLog')}
+  ${grab(term, 'logError')}
+  return {readErrLog, logError, localStorage};
+`)();
+t('errors are captured', (() => { SE.logError('error','boom','f.js:1'); return SE.readErrLog().length===1; })());
+/* One repeating error must not flush the others out of a capped log. */
+t('a repeating error is counted, not duplicated', (() => {
+  for(let i=0;i<12;i++)SE.logError('error','same message','x');
+  const l=SE.readErrLog();
+  const d=l.find(e=>e.message==='same message');
+  return d && d.count>=12 && l.length<=3;
+})());
+t('the log is capped', /while\(log\.length>ERRLOG_MAX\)log\.shift\(\)/.test(term));
+/* A logger that throws is worse than no logger, and storage failing is exactly when it matters. */
+t('the logger swallows its own failures',
+  /catch\(e\)\{ \/\* a logger that throws is worse than no logger \*\/ \}/.test(term));
+/* Kept out of D so a crash inside saveDB does not make the log unsaveable. */
+t('it is stored under its own key, not inside the profile',
+  /const ERRLOG_KEY='pf_errlog'/.test(term) && !/D\.errLog/.test(term));
+t('both uncaught errors and unhandled rejections are caught',
+  /addEventListener\('error'/.test(term) && /addEventListener\('unhandledrejection'/.test(term));
+t('it surfaces on the audit screen', /'Errors caught on this device'/.test(term));
+/* The privacy bargain is the reason this is local rather than hosted. */
+t('nothing is transmitted, and the screen says so',
+  /Stored on this device only and never transmitted/.test(term));
+t('the file records why a hosted reporter was refused',
+  /it contradicts a privacy policy that/.test(term));
+t('an export carries it so a bug report has something attached',
+  /errors:readErrLog\(\)/.test(term));
+
 /* ==================== CRAFT ADDITIONS ==================== */
 G('The small things, where they earn their place');
 

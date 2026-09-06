@@ -327,6 +327,17 @@ function render(){
           '<tbody>'+calls+'</tbody></table></div>':'')+
         (r.note?'<p class="dim" style="font-size:12.5px">Note: '+esc(r.note)+'</p>':'')+
         (r.code?'<div style="margin-top:12px"><label>Invite code issued</label><span class="code">'+esc(r.code)+'</span>'+copyBtn(r.code)+'</div>':'')+
+        /* Whether the decision actually reached them. A code minted and never delivered looks
+           identical to one that was, which is the failure this line exists to make visible. */
+        (r.mail
+          ? '<div style="margin-top:8px;font-size:12px" class="'+(r.mail.ok?'ok':'bad')+'">'+
+            (r.mail.ok
+              ? 'Emailed automatically on '+esc(new Date(r.mail.at).toLocaleString())+'. No need to send anything.'
+              : 'Automatic email FAILED ('+esc(String(r.mail.error||r.mail.status||'unknown'))+'). Use the button below to send it by hand.')+
+            '</div>'
+          : (r.status&&r.status!=='pending'
+             ? '<div style="margin-top:8px;font-size:12px" class="muted">No mail provider configured, so nothing was sent automatically. Use the button below.</div>'
+             : ''))+
       '</div>'+
       (st==='pending'
         ? '<div class="decide">'+

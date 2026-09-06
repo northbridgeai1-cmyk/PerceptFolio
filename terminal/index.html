@@ -4524,6 +4524,58 @@ if(document.readyState==='loading')
 else{try{initPasswordToggles();initToTop();}catch(e){}}
 
 
+/* ============================ ERROR LOG ============================
+   Three real crashes were found in this codebase by driving it deliberately: the delete button
+   threw every time, and two async paths resumed into a session that had ended. In production none
+   of them would have been visible to anyone. An operator hits a bug, the screen does nothing, and
+   the information needed to fix it evaporates when the tab closes.
+
+   That is the problem a crash reporter solves, and it is a real problem. What is not appropriate
+   here is the usual answer. A hosted reporter is a third-party script on a page displaying
+   somebody's positions; it would ship stack frames, URLs and often DOM context off the device, it
+   needs the content security policy loosened to allow it, and it contradicts a privacy policy that
+   says this product does not send your data anywhere. For a single-operator terminal that is a
+   large privacy cost for a small convenience.
+
+   So the log is local. Errors are captured, kept, shown on the audit screen, and included in an
+   export the operator can send if they choose. Nothing leaves the device unless a person decides
+   it should, which is the same bargain the rest of the product makes.
+
+   Kept OUT of D on purpose: a crash inside saveDB would make the log unsaveable, which is exactly
+   when it matters most. Separate key, its own write, failures swallowed. */
+const ERRLOG_KEY='pf_errlog';
+const ERRLOG_MAX=40;
+function readErrLog(){
+  try{ return JSON.parse(localStorage.getItem(ERRLOG_KEY)||'[]'); }catch(e){ return []; }
+}
+function logError(kind,message,detail){
+  try{
+    const log=readErrLog();
+    const now=Date.now();
+    const msg=String(message||'').slice(0,300);
+    /* Do not let one repeating error fill the log and push out the others. */
+    const dup=log.find(e=>e.message===msg&&now-e.last<60000);
+    if(dup){ dup.count++; dup.last=now; }
+    else log.push({kind,message:msg,detail:String(detail||'').slice(0,400),
+                   first:now,last:now,count:1,build:(typeof CACHE_TAG!=='undefined'?CACHE_TAG:null)});
+    while(log.length>ERRLOG_MAX)log.shift();
+    localStorage.setItem(ERRLOG_KEY,JSON.stringify(log));
+  }catch(e){ /* a logger that throws is worse than no logger */ }
+}
+window.addEventListener('error',ev=>{
+  logError('error',(ev&&ev.message)||'Unknown error',
+    ev&&ev.filename?(ev.filename.split('/').pop()+':'+ev.lineno+':'+ev.colno):'');
+});
+window.addEventListener('unhandledrejection',ev=>{
+  const r=ev&&ev.reason;
+  logError('promise',(r&&r.message)||String(r||'Unhandled rejection'),
+    (r&&r.stack)?String(r.stack).split('\n')[1]||'':'');
+});
+function clearErrLog(){
+  try{ localStorage.removeItem(ERRLOG_KEY); }catch(e){}
+  if(typeof renderAudit==='function')renderAudit();
+}
+
 /* P4. One skeleton helper rather than a bespoke placeholder per panel, so a new panel gets the
    right loading state by default instead of a blank div or a spinner. */
 function skeleton(kind,rows){
@@ -10631,7 +10683,9 @@ function renderRuleLog(){
     '</tbody></table></div>';
 }
 function exportData(){
-  const blob=new Blob([JSON.stringify({profile:USER,data:D},null,2)],{type:'application/json'});
+  /* The error log rides along so an operator reporting a bug has something to attach. It lives
+     outside D, so it has to be added here explicitly rather than arriving for free. */
+  const blob=new Blob([JSON.stringify({profile:USER,data:D,errors:readErrLog()},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='perceptfolio-'+USER+'-'+new Date().toISOString().slice(0,10)+'.json';a.click();
   /* B2. The download was fired, which is as much as a page can know — the browser may still cancel
@@ -13566,6 +13620,23 @@ async function renderAudit(){
       q.slice(-12).reverse().map(x=>esc(x.d)+'  '+esc(x.sym)+'  '+fmt$(x.prev)+' to '+fmt$(x.price)+'  '+esc(x.detail)).join('<br>')+
       '</div></details></div>';
   }
+  /* Crashes the operator hit but nobody saw. */
+  const errs=readErrLog();
+  const recent=errs.filter(e=>Date.now()-e.last<7*864e5);
+  out+=row(recent.length===0?'ok':'bad','Errors caught on this device',
+    recent.length===0
+      ? 'none in the last seven days'
+      : recent.length+' distinct error'+(recent.length===1?'':'s')+' in the last seven days'+
+        (recent.some(e=>e.count>1)?', some repeating':'')+'. '+
+        '<details style="display:inline"><summary style="cursor:pointer;color:var(--accent)">Show them</summary>'+
+        '<div style="margin-top:8px;font:11.5px/1.7 var(--mono);color:var(--muted)">'+
+        recent.slice(-8).reverse().map(e=>
+          esc(new Date(e.last).toLocaleString())+'  '+esc(e.kind)+'  '+esc(e.message)+
+          (e.count>1?'  ('+e.count+'\u00d7)':'')+(e.detail?'  '+esc(e.detail):'')).join('<br>')+
+        '</div><button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="clearErrLog()">Clear the log</button>'+
+        '<p style="font-size:11.5px;margin-top:6px">Stored on this device only and never transmitted. It travels in an export if you choose to send one.</p>'+
+        '</details>');
+
   out+=row('wait','Self-test','<span id="selfTestRow">running…</span> '+
     '<a href="?selftest=1" style="color:var(--accent)">Open the full report</a>');
 
@@ -13606,6 +13677,13 @@ async function renderAudit(){
       w+=row(c.FINNHUB_API_KEY?'ok':'wait','Finnhub key on the worker',c.FINNHUB_API_KEY?'devices need no key of their own':'not set. Each device needs its own');
       w+=row(c.FRED_API_KEY?'ok':'wait','FRED key',c.FRED_API_KEY?'VIX and macro available':'not set, the Market tab falls back to measured volatility');
       w+=row(c.AI_API_KEY?'ok':'wait','AI key',c.AI_API_KEY?'written news summaries available':'not set. News falls back to keyword matching');
+      /* An access decision that is minted but never delivered is indistinguishable from one that
+         was, so whether mail is configured belongs on the page that publishes breaches. */
+      if(c.RESEND_API_KEY!==undefined)
+        w+=row(c.RESEND_API_KEY&&c.MAIL_FROM?'ok':'wait','Applicant email',
+          (c.RESEND_API_KEY&&c.MAIL_FROM)
+            ? 'decisions are sent automatically from '+esc(String(c.MAIL_FROM))
+            : 'not configured. Every accepted or declined applicant has to be emailed by hand from the admin page');
       const originOk=/^https:\/\/perceptfolio\.com$/.test(c.ALLOWED_ORIGIN||'');
       w+=row(originOk?'ok':'bad','ALLOWED_ORIGIN',originOk?esc(c.ALLOWED_ORIGIN):'is '+esc(String(c.ALLOWED_ORIGIN))+', must be exactly https://perceptfolio.com');
       /* The cron row is the one that matters most and the one most likely to be wrong, because the
