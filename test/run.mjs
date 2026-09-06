@@ -1049,6 +1049,36 @@ t('it states its own falsification', /this whole panel collapses to the plain in
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
 
+/* ==================== E1. THE MONTHLY CLOSE ==================== */
+G('The likeliest failure is not being wrong, it is being unused');
+
+t('there is a monthly close', /function renderMonthlyClose/.test(term) && /function monthlyCloseData/.test(term));
+/* Firing once on the 1st and vanishing would miss anyone who did not open the app that day. */
+t('it persists until read rather than firing on one day',
+  /\(D\.closeSeen\|\|''\)>=mk/.test(term) && /function dismissMonthlyClose/.test(term));
+t('being read is remembered across sessions', /D\.closeSeen=prevMonthKey\(\);\s*\n\s*saveDB\(\)/.test(term));
+/* It reports what RESOLVED in the month, not what was called in it: those are different questions
+   and the second one cannot be answered until the horizons come due. */
+t('it counts marks stamped during the month, whatever month the call was made in',
+  /if\(!m\|\|m\.missed\|\|!m\.at\|\|!inMonth\(m\.at\)\)return/.test(term));
+t('it separates flickering calls from conviction', /c\.flickers\?/.test(term));
+t('it surfaces what was held out of the return series', /bad or unexplained prices/.test(term));
+/* The instinct to wait until the sample is rigorous is what guarantees the sample never grows. */
+t('it refuses to read a thin month as a result', /<b>This is too few marks to read as a result\.<\/b>/.test(term));
+t('and says why it reports anyway', /rather than only in two years/.test(term));
+t('a month with nothing in it does not interrupt', /if\(!c\.calls&&!c\.marked\.length&&!c\.trades\)/.test(term));
+t('a month where nothing marked names the reason', /marks only happen if the app is open when a call comes due/.test(term));
+
+/* ==================== P2. THE AUDIT SCREEN ==================== */
+G('A product that publishes its own breaches cannot rot quietly');
+
+t('effective bets reaches the audit page', /'Effective bets',/.test(term));
+/* The page claimed to report quota; now it counts rather than estimates. */
+t('Finnhub usage is counted, not guessed', /function fhUsage/.test(term) &&
+  /_fhCalls\.push\(Date\.now\(\)\)/.test(term));
+t('the call window cannot grow without bound', /if\(_fhCalls\.length>200\)_fhCalls=_fhCalls\.slice\(-120\)/.test(term));
+t('the quota row shows both numbers', /' calls in the last minute'/.test(term));
+
 /* ==================== P1. THE PROVENANCE CONTRACT ==================== */
 G('A number that cannot show its working');
 

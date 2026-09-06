@@ -989,6 +989,8 @@ body.touring header,body.touring #sidebar{z-index:201}
 
 <!-- COMMAND — the morning screen -->
 <div id="tab-command" class="tabs-hidden">
+  <!-- E1. The monthly close. Appears on the 1st and stays until it is read. -->
+  <div id="monthlyClose" style="display:none"></div>
   <div class="cmd-head">
     <div>
       <div class="greeting" id="cmdGreeting">Good morning</div>
@@ -2928,6 +2930,7 @@ function enterSession(){
   /* Repairs anything already contaminated before a single statistic is computed from it. */
   try{ repairAllSeries(); }catch(e){}
   try{ renderSyncBlocked(); }catch(e){}
+  try{ renderMonthlyClose(); }catch(e){}
   renderBackupBanner();
   /* Adopt marks the worker stamped while this app was closed, then tell it what is still open.
      Both silent and unawaited: session entry must not wait on a network round-trip. */
@@ -3530,7 +3533,18 @@ const FH='https://finnhub.io/api/v1';
    served from a public host and would hand it to anyone who opens View Source.
 
    With neither, NO_KEY is thrown exactly as before and the app's existing prompts apply. */
+/* P2. Finnhub allows 60 calls a minute on the free tier and the audit page claims to report
+   usage, so usage has to actually be counted rather than estimated. A rolling window of call
+   timestamps, capped so it cannot grow. */
+let _fhCalls=[];
+function fhUsage(){
+  const cut=Date.now()-60000;
+  _fhCalls=_fhCalls.filter(t=>t>cut);
+  return{used:_fhCalls.length,limit:60};
+}
 async function fh(path){
+  _fhCalls.push(Date.now());
+  if(_fhCalls.length>200)_fhCalls=_fhCalls.slice(-120);
   if(!D.apiKey&&syncConfigured()){
     const qi=path.indexOf('?');
     const base=qi<0?path:path.slice(0,qi);
@@ -4219,6 +4233,114 @@ function closeMenu(){
 }
 /* items: [{label, run, danger}] . `run` is a string evaluated on click, so it survives the innerHTML
    rebuilds the tables do on every render. */
+/* ============================ E1. THE MONTHLY CLOSE ============================
+   The highest-probability failure of this project is not being wrong. It is being unused. The
+   record needs on the order of a hundred and forty marked calls, corrected upward for
+   independence, which is two to three years of daily use, and every statistic in this file is dead
+   weight until then. Nothing else here pays off before year two.
+
+   So this is the thing that pays in month two. On the first of the month, one page: what was
+   called, what marked, what was right, what was surprising, and one number that moved.
+
+   A RECORD BECOMES A HABIT AT THE POINT IT TELLS YOU SOMETHING YOU DID NOT KNOW. A database that
+   silently accumulates does not do that, and the instinct to wait until the sample is big enough
+   to be rigorous is precisely what guarantees the sample never gets big. So this reports on
+   whatever exists, says plainly how little that is, and refuses to dress a month of noise as a
+   finding.
+
+   It appears on the 1st and stays until dismissed, rather than firing once and vanishing if the
+   app was closed that day. */
+function monthKey(ts){const d=new Date(ts);return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');}
+function prevMonthKey(){
+  const n=new Date();
+  const d=new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth()-1,1));
+  return monthKey(d.getTime());
+}
+function monthlyCloseData(mk){
+  const inMonth=(ts)=>monthKey(ts)===mk;
+  const calls=(D.calls||[]).filter(c=>(c.track||'checklist')==='checklist'&&inMonth(c.ts));
+  const persistent=calls.filter(c=>c.conviction!=='flickering');
+  /* Marks STAMPED during the month, whatever month the call was made in. That is what actually
+     resolved, which is the question the close answers. */
+  const marked=[];
+  (D.calls||[]).forEach(c=>{
+    Object.keys(c.marks||{}).forEach(h=>{
+      const m=c.marks[h];
+      if(!m||m.missed||!m.at||!inMonth(m.at))return;
+      if(!(c.price>0)||!(c.spy>0))return;
+      const held=markHeldDays(m,+h);
+      const stockRet=(m.price-c.price)/c.price*100+accruedYield(yieldPctFor(c.sym),held);
+      const spyRet=(m.spy-c.spy)/c.spy*100+accruedYield(SPY_YIELD_PCT,held);
+      const bi=betaVsSpy(c.sym);
+      const edge=callEdge(c,jensenAlpha(stockRet,spyRet,bi?bi.beta:null,held));
+      if(edge==null)return;
+      marked.push({sym:c.sym,horizon:+h,edge,verdict:c.verdict});
+    });
+  });
+  const trades=(D.transactions||[]).filter(t=>inMonth(t.ts));
+  const quarantined=(D.quarantine||[]).filter(q=>inMonth(q.at));
+  const best=marked.slice().sort((a,b)=>b.edge-a.edge)[0];
+  const worst=marked.slice().sort((a,b)=>a.edge-b.edge)[0];
+  const st=marked.length?expectancyStats(marked.map(r=>r.edge)):null;
+  return{mk,calls:calls.length,persistent:persistent.length,
+         flickers:calls.length-persistent.length,marked,st,best,worst,
+         trades:trades.length,quarantined:quarantined.length};
+}
+function renderMonthlyClose(){
+  const el=document.getElementById('monthlyClose');
+  if(!el||!D)return;
+  const mk=prevMonthKey();
+  if((D.closeSeen||'')>=mk){el.style.display='none';return;}
+  const c=monthlyCloseData(mk);
+  /* Nothing happened at all is not worth an interruption. */
+  if(!c.calls&&!c.marked.length&&!c.trades){el.style.display='none';return;}
+  const label=new Date(mk+'-02T00:00:00Z').toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  const pts=x=>(x>=0?'+':'')+x.toFixed(2)+'pts';
+  /* One number that moved, chosen as the one the operator could not have known without the
+     record: the gap between what conviction promised and what it delivered. */
+  let moved='';
+  if(c.st&&c.marked.length>=3){
+    moved=c.st.expectancy>=0
+      ? 'What marked in '+label+' came in at <b class="pos">'+pts(c.st.expectancy)+'</b> per call across '+c.marked.length+'.'
+      : 'What marked in '+label+' came in at <b class="neg">'+pts(c.st.expectancy)+'</b> per call across '+c.marked.length+'.';
+  }
+  el.style.display='block';
+  el.innerHTML='<div style="border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:16px 18px;margin-bottom:16px;background:var(--panel)">'+
+    '<div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">'+
+      '<b style="font-size:15px">'+esc(label)+', closed</b>'+
+      '<span style="flex:1"></span>'+
+      '<button class="btn btn-ghost btn-sm" onclick="dismissMonthlyClose()">Mark as read</button>'+
+    '</div>'+
+    '<div class="stat-row" style="margin:12px 0 0;border-top:none;padding-top:0">'+
+      '<div class="stat"><span class="stat-label">Calls made</span><span class="stat-value">'+c.calls+
+        (c.flickers?'<span class="muted" style="font-size:12px;font-weight:400"> · '+c.flickers+' flickered</span>':'')+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Marks resolved</span><span class="stat-value">'+c.marked.length+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Trades</span><span class="stat-value">'+c.trades+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Held back</span><span class="stat-value '+(c.quarantined?'warn':'')+'">'+c.quarantined+'</span>'+
+        '<span class="muted" style="font-size:11px">bad or unexplained prices</span></div>'+
+    '</div>'+
+    (c.marked.length
+      ? '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.68">'+
+        (moved?moved+' ':'')+
+        (c.best?'Best was <b>'+esc(c.best.sym)+'</b> at <b class="pos">'+pts(c.best.edge)+'</b> on its '+c.best.horizon+'-day mark. ':'')+
+        (c.worst&&c.worst!==c.best?'Worst was <b>'+esc(c.worst.sym)+'</b> at <b class="neg">'+pts(c.worst.edge)+'</b>. ':'')+
+        (c.marked.length<10
+          ? '<b>This is too few marks to read as a result.</b> It is here so the record says something to you every month rather than only in two years, which is the point at which most records like this quietly stop being kept.'
+          : 'Read it against the full scorecard rather than on its own: one month is one draw.')+
+        '</p>'
+      : '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.68">Nothing reached a horizon in '+esc(label)+'. '+
+        'That is normal early on, and it is also the failure mode worth watching: marks only happen if the app is open when a call comes due.</p>')+
+    (c.quarantined?'<p class="muted" style="font-size:12px;margin-top:8px">'+c.quarantined+' observation'+(c.quarantined===1?' was':'s were')+
+      ' held out of the return series this month. The Audit screen lists them.</p>':'')+
+    '</div>';
+}
+function dismissMonthlyClose(){
+  if(!D)return;
+  D.closeSeen=prevMonthKey();
+  saveDB();
+  renderMonthlyClose();
+}
+
 /* ============================ P1. THE PROVENANCE CONTRACT ============================
    No number in this product should be readable without its derivation. Not because a reader will
    check every one, but because a number that cannot show its working is indistinguishable from a
@@ -12854,6 +12976,19 @@ async function renderAudit(){
 
   /* ---- DATA: what this device can actually reach ---- */
   out+=head('Data');
+  /* P2. Effective bets belongs on the audit page because it is the number most likely to be
+     quietly worse than the position count implies. */
+  const rc=(typeof riskContributions==='function')?riskContributions():null;
+  out+=row(!rc?'wait':(rc.bets&&rc.bets.breadth<rc.n*0.5?'bad':'ok'),'Effective bets',
+    !rc?'needs two or more holdings with volatility estimates'
+       :(rc.bets?rc.bets.breadth.toFixed(1)+' of '+rc.n+' held'+
+          (rc.bets.breadth<rc.n*0.5?'. Fewer than half the positions are independent bets':'')
+        :rc.n+' holdings, independence not estimable'));
+
+  const fu=fhUsage();
+  out+=row(fu.used<fu.limit*0.8?'ok':'wait','Finnhub quota',
+    fu.used+'/'+fu.limit+' calls in the last minute');
+
   out+=row(D.apiKey?'ok':(syncConfigured()?'ok':'bad'),'Market data',
     D.apiKey?'own Finnhub key on this device':(syncConfigured()?'through the worker':'no key and no worker. Prices cannot load'));
 
