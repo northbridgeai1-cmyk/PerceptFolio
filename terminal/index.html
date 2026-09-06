@@ -4813,7 +4813,12 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
          myTags is a current map with no history and I11 forbids reconstructing one later. Without
          this stamp the agreement matrix could only ever be built from today's opinion applied to
          last year's calls, which would grade the operator on hindsight. */
-      myCall:(typeof myTag==='function'?myTag(sym):'')||null
+      myCall:(typeof myTag==='function'?myTag(sym):'')||null,
+      /* M3/M4. Which of the 22 checks passed at the moment the call was made. Stamped rather than
+         recomputed later, for the same reason as myCall: today's fundamentals are not the ones the
+         call was made on, and I11 forbids reconstructing them. One character per check keeps 2000
+         calls to about 44KB. */
+      checks:(typeof checkBitmap==='function')?checkBitmap(sc):null
     });
     if(D.calls.length>2000)D.calls=D.calls.slice(D.calls.length-2000);
   };
@@ -4874,6 +4879,131 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
   delete pend[key];
   write('persistent',CONFIRM_REFRESHES);
 }
+/* ============================ M3 + M4. AUDITING THE CHECKS THEMSELVES ============================
+   Twenty-two checks, equal-weighted, summed into a score that drives every verdict, and never once
+   asked whether any individual one predicts anything. That is an assumption wearing the clothes of
+   a measurement, and it is the assumption this file is least entitled to make.
+
+   M3, PER-CHECK EFFICACY. Each check is a pass/fail; the outcome is a continuous edge. The
+   correlation between the two is the point-biserial:
+
+       r_pb = (mean_pass - mean_fail) / sd_pop * sqrt(n_pass * n_fail / n^2)
+
+   with a Fisher-z interval, because a correlation from thirty observations is not a finding. The
+   honest expectation is that most of the twenty-two are indistinguishable from noise, and the
+   screen is built to say that rather than to rank them into a league table.
+
+   M4, REDUNDANCY. Three of the twelve quality checks are margin variants that move together, so
+   twenty-two checks are nowhere near twenty-two independent opinions. The correlation matrix
+   across the checks, reduced by the same eigenvalue-entropy used for effective bets, says how many
+   independent checks there actually are. Counting a company's margin three times and calling it
+   three points of quality is how an equal-weighted score quietly triple-weights one idea. */
+const CHECK_ORDER=[
+  'Revenue Growth (YoY)','Gross Margin','Operating Margin','Free Cash Flow','Cash vs Debt',
+  'Current Ratio','ROE','EPS Beats','Revenue Guidance','Insider Buying','Clear Growth Runway',
+  'Competitive Moat',
+  'P/E vs Own History','Comp Analysis','DCF Value','P/E','Forward P/E','PEG Ratio',
+  '6-Month Return','12-Month Return','Near 52-Week High','Beating the Market'
+];
+/* '1' passed, '0' failed, '-' not evaluable. Position is fixed by CHECK_ORDER so a stamp stays
+   readable even if the checklist is reordered later. */
+function checkBitmap(sc){
+  if(!sc||sc.error)return null;
+  const all=[].concat(sc.quality||[],sc.priceChecks||[],sc.momentum||[]);
+  const by={};
+  all.forEach(c=>{if(c&&c.name&&!(c.name in by))by[c.name]=c.pass;});
+  return CHECK_ORDER.map(n=>{
+    const v=by[n];
+    return v===true?'1':v===false?'0':'-';
+  }).join('');
+}
+function pointBiserial(pairs){
+  /* pairs: [{hit:0|1, edge:number}] */
+  const n=pairs.length;
+  if(n<8)return null;
+  const pass=pairs.filter(p=>p.hit===1),fail=pairs.filter(p=>p.hit===0);
+  if(pass.length<3||fail.length<3)return null;      // no contrast, no correlation
+  const mean=a=>a.reduce((x,y)=>x+y.edge,0)/a.length;
+  const mAll=mean(pairs);
+  const sdPop=Math.sqrt(pairs.reduce((a,p)=>a+(p.edge-mAll)*(p.edge-mAll),0)/n);
+  if(!(sdPop>0))return null;
+  const r=((mean(pass)-mean(fail))/sdPop)*Math.sqrt(pass.length*fail.length/(n*n));
+  if(!isFinite(r))return null;
+  /* Fisher z for the interval. Undefined at |r|=1, which a tiny sample can produce. */
+  let lo=null,hi=null;
+  if(n>3&&Math.abs(r)<0.999){
+    const z=0.5*Math.log((1+r)/(1-r)),se=1/Math.sqrt(n-3);
+    const t=x=>(Math.exp(2*x)-1)/(Math.exp(2*x)+1);
+    lo=t(z-1.96*se); hi=t(z+1.96*se);
+  }
+  /* Tri-state on purpose. true means the interval excludes zero; false means it includes zero;
+     null means no interval could be computed, which happens when |r| is essentially 1 and the
+     Fisher transform diverges. Collapsing null into false would print "noise" next to a check that
+     separated the outcomes perfectly, which is the opposite of what the data said. */
+  const signal=(lo==null)?null:((lo>0&&hi>0)||(lo<0&&hi<0));
+  return{r,lo,hi,n,nPass:pass.length,nFail:fail.length,signal};
+}
+/* Reads the marked record at one horizon and grades every check against it. */
+function checkEfficacy(days){
+  const rows=[];
+  (D.calls||[]).forEach(c=>{
+    if((c.track||'checklist')!=='checklist')return;
+    if(c.conviction==='flickering')return;
+    if(!c.checks||c.checks.length!==CHECK_ORDER.length)return;
+    const mk=(c.marks||{})[days];
+    if(!mk||mk.missed||!(c.price>0)||!(c.spy>0))return;
+    const held=markHeldDays(mk,days);
+    const stockRet=(mk.price-c.price)/c.price*100+accruedYield(yieldPctFor(c.sym),held);
+    const spyRet=(mk.spy-c.spy)/c.spy*100+accruedYield(SPY_YIELD_PCT,held);
+    const bi=betaVsSpy(c.sym);
+    const edge=callEdge(c,jensenAlpha(stockRet,spyRet,bi?bi.beta:null,held));
+    if(edge==null)return;
+    rows.push({checks:c.checks,edge});
+  });
+  if(rows.length<8)return{ok:false,n:rows.length};
+  const per=CHECK_ORDER.map((name,i)=>{
+    const pairs=[];
+    rows.forEach(r=>{
+      const ch=r.checks[i];
+      if(ch==='1')pairs.push({hit:1,edge:r.edge});
+      else if(ch==='0')pairs.push({hit:0,edge:r.edge});
+    });
+    return Object.assign({name,i},pointBiserial(pairs)||{r:null,n:pairs.length});
+  });
+  /* M4. Correlation between the checks themselves, over the same calls. */
+  const usable=CHECK_ORDER.map((_,i)=>i).filter(i=>{
+    let ones=0,zeros=0;
+    rows.forEach(r=>{if(r.checks[i]==='1')ones++;else if(r.checks[i]==='0')zeros++;});
+    return ones>=3&&zeros>=3;
+  });
+  let redundancy=null;
+  if(usable.length>=2){
+    const col=i=>rows.map(r=>r.checks[i]==='1'?1:r.checks[i]==='0'?0:null);
+    const C=[];
+    for(let a=0;a<usable.length;a++){
+      C.push([]);
+      for(let b=0;b<usable.length;b++){
+        if(a===b){C[a].push(1);continue;}
+        const x=col(usable[a]),y=col(usable[b]);
+        const idx=[];for(let k=0;k<rows.length;k++)if(x[k]!=null&&y[k]!=null)idx.push(k);
+        if(idx.length<8){C[a].push(0);continue;}
+        const mx=idx.reduce((s,k)=>s+x[k],0)/idx.length, my=idx.reduce((s,k)=>s+y[k],0)/idx.length;
+        let sxy=0,sxx=0,syy=0;
+        idx.forEach(k=>{const dx=x[k]-mx,dy=y[k]-my;sxy+=dx*dy;sxx+=dx*dx;syy+=dy*dy;});
+        C[a].push((sxx>0&&syy>0)?sxy/Math.sqrt(sxx*syy):0);
+      }
+    }
+    const ev=jacobiEigenvalues(C).map(v=>Math.max(v,0));
+    const tot=ev.reduce((a,b)=>a+b,0);
+    if(tot>0){
+      let h=0;
+      ev.forEach(e=>{const pI=e/tot;if(pI>1e-12)h-=pI*Math.log(pI);});
+      redundancy={counted:usable.length,independent:Math.exp(h)};
+    }
+  }
+  return{ok:true,n:rows.length,per,redundancy};
+}
+
 /* ============================ M1. OPERATOR vs SYSTEM ============================
    Verdict and My Call have sat side by side in the Portfolio table since the beginning, both
    populated, and nothing has ever read them together. This is the query.
@@ -13014,6 +13144,63 @@ function trackStats(track,winRaw){
   });
   return expectancyStats(edges);
 }
+/* M3/M4 rendered. Ordered by |r| but presented as a noise list first, because the honest headline
+   is how few of the twenty-two do anything, and a table sorted best-first invites reading the top
+   row as a finding. */
+function checkAuditHTML(winRaw){
+  if(winRaw==='since')return '';
+  const days=parseInt(winRaw,10);
+  if(!days)return '';
+  const E=checkEfficacy(days);
+  if(!E.ok){
+    return '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">'+
+      '<b>The 22 checks have not been audited yet.</b> That needs marked calls carrying the check results they were made on, which are recorded from now on; there are '+
+      E.n+' so far and it takes at least 8 before any per-check correlation means anything. '+
+      'Until then every check is weighted equally because nothing yet says otherwise, not because anything says it should be.</p>';
+  }
+  const withR=E.per.filter(p=>p.r!=null);
+  const real=withR.filter(p=>p.signal===true);
+  const noise=withR.filter(p=>p.signal===false);
+  const extreme=withR.filter(p=>p.signal===null);
+  const sorted=withR.slice().sort((a,b)=>Math.abs(b.r)-Math.abs(a.r));
+  const fr=x=>(x>=0?'+':'')+x.toFixed(2);
+  return '<div style="margin-top:16px;border:1px solid var(--border);border-radius:9px;overflow:hidden">'+
+    '<div style="padding:11px 15px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
+      'Do the 22 checks predict anything · '+esc(winRaw)+'-day marks</div>'+
+    '<div style="overflow-x:auto"><table><thead><tr>'+
+      '<th>Check</th><th>Correlation with edge</th><th>95% range</th><th>Passed</th><th>Failed</th><th>Reading</th>'+
+    '</tr></thead><tbody>'+sorted.map(p=>
+      '<tr><td>'+esc(p.name)+'</td>'+
+      '<td class="'+(p.signal===true?(p.r>=0?'pos':'neg'):'muted')+'"><b>'+fr(p.r)+'</b></td>'+
+      '<td class="muted">'+(p.lo!=null?fr(p.lo)+' to '+fr(p.hi):'not estimable')+'</td>'+
+      '<td class="muted">'+p.nPass+'</td><td class="muted">'+p.nFail+'</td>'+
+      '<td class="'+(p.signal===true?'':'muted')+'">'+
+        (p.signal===true?(p.r>0?'predicts':'predicts, inverted'):p.signal===false?'noise':'no interval')+
+      '</td></tr>').join('')+'</tbody></table></div>'+
+    '<div style="padding:11px 15px;border-top:1px solid var(--border)">'+
+      '<p class="muted" style="font-size:12.5px;line-height:1.68;margin:0 0 8px">'+
+      /* Three states, all reported. Counting only the first and calling the rest noise would hide a
+         check that separated the outcomes so cleanly that its interval could not be computed,
+         which is the opposite of noise. */
+      '<b>'+real.length+' of '+withR.length+' checks separate winners from losers on this sample'+(real.length===0&&!extreme.length?', none at all':'')+'.</b> '+
+      (extreme.length?extreme.length+' separated them so completely that no interval could be fitted, which on a record this thin usually means the check and the outcome are the same fact twice. ':'')+
+      (noise.length?noise.length+' have an interval spanning zero, which means they are indistinguishable from a coin toss here and are still contributing a full point each to every score. ':'')+
+      'That is the expected result on a thin record and it is not an argument for deleting them yet; it is an argument against believing the total is 22 pieces of evidence.'+
+      '</p>'+
+      (E.redundancy
+        ? '<p class="muted" style="font-size:12.5px;line-height:1.68;margin:0 0 8px">'+
+          '<b>'+E.redundancy.counted+' checks are carrying about '+E.redundancy.independent.toFixed(1)+' independent opinions.</b> '+
+          'Several move together by construction: three of the quality checks are margin variants, and a company with an expanding operating margin usually has a healthy gross margin too. '+
+          'Counting one idea three times and calling it three points is how an equal-weighted score quietly triple-weights whatever is most correlated with itself.'+
+          '</p>'
+        : '')+
+      '<p class="muted" style="font-size:12px;line-height:1.6;margin:0">'+
+      'Correlation is point-biserial between each check passing and the beta-adjusted edge of the call, over '+E.n+' marked calls. '+
+      'A check needs at least three passes and three failures to be measurable at all; the rest are omitted rather than shown at zero. '+
+      '<b>Falsification:</b> if every interval still spans zero once the record is several times this size, the checklist is not selecting stocks and the score is arithmetic on noise.'+
+      '</p></div></div>';
+}
+
 /* M2 rendered. Gross and net side by side, with the cost measured from the operator's own ledger
    rather than modelled. Silent until at least one decision price has been entered, because an
    implementation cost of zero is a claim, and the wrong one. */
@@ -13257,6 +13444,7 @@ function renderScorecard(){
         : '')+
       shortfallHTML(st)+
       operatorMatrixHTML(winRaw)+
+      checkAuditHTML(winRaw)+
       trackComparison(winRaw)+
       ruleChangeWarning()+
       (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+scored.length+' scoreable call'+(scored.length===1?'':'s')+' is not evidence.</b> Under roughly 20, two lucky picks dominate every number above. Treat it as a running tally, not a verdict on the checklist.</p>':'')+

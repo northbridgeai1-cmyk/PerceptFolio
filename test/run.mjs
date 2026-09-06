@@ -1049,6 +1049,58 @@ t('it states its own falsification', /this whole panel collapses to the plain in
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
 
+/* ==================== M3 + M4. AUDITING THE CHECKS ==================== */
+G('Twenty-two checks are not twenty-two opinions');
+
+const SA = new Function(`
+  ${grab(term, 'pointBiserial')}
+  return {pointBiserial};
+`)();
+const mkPairs=(nPass,nFail,sep)=>{
+  const out=[];
+  for(let i=0;i<nPass;i++)out.push({hit:1,edge:sep+((i%5)-2)});
+  for(let i=0;i<nFail;i++)out.push({hit:0,edge:-sep+((i%5)-2)});
+  return out;
+};
+t('a check that separates outcomes shows a strong correlation', (() => {
+  const r=SA.pointBiserial(mkPairs(30,30,3));
+  return r.r>0.5 && r.signal===true;
+})());
+t('a check uncorrelated with the outcome reads as noise', (() => {
+  const noise=[]; for(let i=0;i<40;i++)noise.push({hit:i%2,edge:(i%7)-3});
+  const r=SA.pointBiserial(noise);
+  return Math.abs(r.r)<0.2 && r.signal===false && r.lo<0 && r.hi>0;
+})());
+/* Fisher z diverges at |r|=1. Collapsing that into "noise" would print the opposite of what the
+   data said, so the third state is carried through to the screen. */
+t('an un-intervalable correlation is null, never false', (() => {
+  const perfect=[]; for(let i=0;i<20;i++)perfect.push({hit:1,edge:5}); for(let i=0;i<20;i++)perfect.push({hit:0,edge:-5});
+  const r=SA.pointBiserial(perfect);
+  return r.signal===null && r.lo===null;
+})());
+t('the screen reports that third state separately', /no interval could be fitted/.test(term));
+t('a check with no contrast is omitted rather than shown at zero',
+  SA.pointBiserial(Array.from({length:20},(_,i)=>({hit:1,edge:i})))===null);
+t('too few observations returns null', SA.pointBiserial([{hit:1,edge:1},{hit:0,edge:2}])===null);
+/* Check results must be stamped, not recomputed: today's fundamentals are not the ones the call
+   was made on, and I11 forbids reconstructing them. */
+t('check outcomes are recorded onto the call', /checks:\(typeof checkBitmap==='function'\)\?checkBitmap\(sc\):null/.test(term));
+t('the bitmap has a fixed position for each of the 22 checks', (() => {
+  const m=term.match(/const CHECK_ORDER=(\[[\s\S]*?\]);/);
+  if(!m)return false;
+  return new Function('return '+m[1])().length===22;
+})());
+t('unevaluable checks are a third symbol, not a fail',
+  /v===true\?'1':v===false\?'0':'-'/.test(term));
+t('M4 reduces the check correlation matrix the same way effective bets does',
+  /jacobiEigenvalues\(C\)/.test(term) && /redundancy=\{counted:usable\.length,independent:Math\.exp\(h\)\}/.test(term));
+t('it says what redundancy costs an equal-weighted score',
+  /Counting one idea three times and calling it three points/.test(term));
+t('with too few marked calls it says so rather than ranking noise',
+  /The 22 checks have not been audited yet/.test(term));
+t('it states its own falsification',
+  /the checklist is not selecting stocks and the score is arithmetic on noise/.test(term));
+
 /* ==================== M5. EFFECTIVE NUMBER OF BETS ==================== */
 G('Nine tickers is not nine bets');
 
@@ -1389,7 +1441,7 @@ t('older marks fall back rather than being invented', /function markHeldDays/.te
 /* Every place that turns a mark into a return must use the stored calendar span, not re-derive it.
    Counted rather than named, so a new consumer that skips it fails here. */
 t('every consumer uses the stored span',
-  (term.match(/=markHeldDays\(mk,days\)/g)||[]).length === 3);
+  (term.match(/=markHeldDays\(mk,days\)/g)||[]).length === 4);
 /* One schedule, or the sell marks drift away from the call marks. */
 t('sell marks run on the same calendar', /const sch=markSchedule\(tx\.ts,h\)/.test(term));
 t('nothing schedules a mark by millisecond age any more',
