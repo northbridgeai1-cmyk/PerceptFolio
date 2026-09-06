@@ -800,7 +800,11 @@ t('a refusal reads differently from a storage failure',
   /const refused=kind==='refused'/.test(term) &&
   /Save stopped to protect your data/.test(term));
 t('the count only advances after a successful write', /_profileCount=n;\s*\n\s*_saveFailed=false;/.test(term));
-t('deliberate deletion passes the intent explicitly', (term.match(/persistDB\(\{deleting:true\}\)/g)||[]).length === 2);
+/* Named rather than counted: the self-test harness legitimately uses it too, and a bare count
+   would make adding a test look like adding a deletion path. */
+t('deliberate deletion passes the intent explicitly, at both real call sites',
+  /function removeClient\([\s\S]{0,400}?persistDB\(\{deleting:true\}\)/.test(term) &&
+  /function deleteProfile\([\s\S]{0,300}?persistDB\(\{deleting:true\}\)/.test(term));
 t('DB.profiles is repaired if the stored blob is malformed', /if\(!DB\.profiles\|\|typeof DB\.profiles!=='object'\)DB\.profiles=\{\}/.test(term));
 
 /* ==================== INPUT VALIDATION ==================== */
@@ -917,6 +921,42 @@ t('the audit compares the threshold against independent observations, not raw ma
   /const against=effN==null\?have:effN/.test(term) && /' marked, about '\+/.test(term));
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
+
+/* ==================== D5. THE SHIPPED SELF-TEST ==================== */
+G('A harness nobody runs is decoration');
+
+t('the harness exists and is reachable without a console', /function renderSelfTestPage/.test(term) &&
+  /\[\?&\]selftest=1/.test(term));
+t('a failing test is a breached promise on the audit page', /id="selfTestRow"/.test(term) &&
+  /of '\+res\.length\+' FAILING/.test(term));
+/* Every assertion D5 names. */
+const d5Wanted = [
+  'a 10-for-1 split is quarantined','a 3-for-2 split is flagged','a genuine 40% fall is NOT flagged',
+  'an oscillating score produces one call, not four',
+  'expectancy and its interval match a hand-computed fixture',
+  'beta recovers a known factor loading','Jensen alpha subtracts the risk it was paid for',
+  'a Saturday anniversary rolls to the Monday close','a market holiday is skipped',
+  'a full store fails loudly instead of silently',
+  'the hash chain verifies','an edited mark breaks the chain',
+  'STORE_KEY is unchanged','a profile count that drops without a delete is refused'
+];
+const d5Missing = d5Wanted.filter(w => !term.includes(w));
+t('every assertion the spec lists is present', d5Missing.length === 0, d5Missing.join(' | ') || d5Wanted.length + ' present');
+
+/* A self-test that damages the data it is reassuring you about is worse than none. The storage
+   guard tests call persistDB directly, and one of them must let a write SUCCEED. */
+t('writes are neutralised for the whole run, not merely avoided',
+  /localStorage\.setItem=function\(\)\{\};/.test(term));
+t('the real setItem is restored whatever happens',
+  /\}finally\{\s*\n\s*localStorage\.setItem=realSet;/.test(term));
+t('the harness verifies its own containment rather than asserting it',
+  /the self-test left stored data untouched/.test(term) && /before===after/.test(term));
+t('D and DB are swapped and restored', /D=realD; DB=realDB; _profileCount=realCount;/.test(term));
+/* Extracted so the chain can be exercised without saveDB. */
+t('sealing is testable without writing', /async function sealInto/.test(term) &&
+  /const n=await sealInto\(pending,D\.chain\)/.test(term));
+t('the audit result is written after the DOM stops being rewritten',
+  term.indexOf('const res=await runSelfTest()') > term.indexOf("el.innerHTML=out+head('Worker')"));
 
 /* ==================== B2. FIRST-RUN EXPORT ==================== */
 G('The first holding is the first thing worth losing');
