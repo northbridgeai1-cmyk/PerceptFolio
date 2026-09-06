@@ -5423,6 +5423,98 @@ function sharpeOf(dailyRets,rfAnnual){
     loAdjusted:as.adjusted, loRatio:as.ratio||1, loRho:as.rho
   };
 }
+/* ============================ M6. PSR, DEFLATED SHARPE, MinTRL ============================
+   A Sharpe ratio with an error bar says how uncertain it is. These three say something the error
+   bar cannot: whether the number is believable at all, given how non-normal the returns are and
+   how many things were tried before this one was reported.
+
+   THE SKEW AND KURTOSIS TERM. A Sharpe ratio is a mean over a standard deviation, and its own
+   sampling distribution depends on the third and fourth moments of the returns. Negative skew and
+   fat tails, which is what equity returns actually look like, make a given Sharpe far less
+   significant than the normal-theory error bar suggests. Every formula below carries the same
+   correction factor:
+
+       V = 1 - g3*S + (g4-1)/4 * S^2
+
+   PROBABILISTIC SHARPE. The probability the true Sharpe exceeds a benchmark S*:
+
+       PSR(S*) = Phi[ (S - S*) * sqrt(n-1) / sqrt(V) ]
+
+   MINIMUM TRACK RECORD LENGTH. How many observations are needed before PSR would clear a chosen
+   confidence. This is the number that converts "come back in ninety days" from an apology into an
+   answer:
+
+       MinTRL = 1 + V * (Z_alpha / (S - S*))^2
+
+   DEFLATED SHARPE, which is the one that matters most here. This file runs four tracks in
+   parallel and the audit page compares them. Reporting the best of several as though it were the
+   only one tried is exactly how a backtest lies, and the correction is to raise the benchmark to
+   the Sharpe you would expect the BEST of N independent trials to show by luck alone:
+
+       E[max of N] ~ (1-gamma)*Phi^-1(1 - 1/N) + gamma*Phi^-1(1 - 1/(N*e))
+
+   with gamma the Euler-Mascheroni constant, scaled by the spread of the trial Sharpes. With one
+   track there is nothing to deflate and the benchmark stays at zero, which is stated rather than
+   silently applied. */
+const EULER_GAMMA=0.5772156649015329;
+
+/* Inverse standard normal, Acklam's rational approximation. Accurate to about 1e-9 across the
+   range that matters here, and needs no library. */
+function normInv(p){
+  if(!(p>0&&p<1))return NaN;
+  const a=[-39.69683028665376,220.9460984245205,-275.9285104469687,138.3577518672690,-30.66479806614716,2.506628277459239];
+  const b=[-54.47609879822406,161.5858368580409,-155.6989798598866,66.80131188771972,-13.28068155288572];
+  const c=[-0.007784894002430293,-0.3223964580411365,-2.400758277161838,-2.549732539343734,4.374664141464968,2.938163982698783];
+  const d=[0.007784695709041462,0.3224671290700398,2.445134137142996,3.754408661907416];
+  const pl=0.02425;
+  let q,r;
+  if(p<pl){q=Math.sqrt(-2*Math.log(p));
+    return(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  if(p>1-pl){q=Math.sqrt(-2*Math.log(1-p));
+    return-(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  q=p-0.5; r=q*q;
+  return(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+}
+/* Sample skew and excess-free kurtosis of the returns themselves, measured, never assumed. */
+function skewKurt(rets){
+  const n=rets.length;
+  if(n<4)return null;
+  const m=rets.reduce((a,b)=>a+b,0)/n;
+  let m2=0,m3=0,m4=0;
+  for(const r of rets){const d=r-m;m2+=d*d;m3+=d*d*d;m4+=d*d*d*d;}
+  m2/=n;m3/=n;m4/=n;
+  const sd=Math.sqrt(m2);
+  if(!(sd>0))return null;
+  return{g3:m3/(sd*sd*sd),g4:m4/(m2*m2),n};   // g4 is raw kurtosis, 3 for a normal
+}
+/* The shared correction factor. Guarded: a large negative skew with a high Sharpe can drive it
+   non-positive, and a square root of a negative number is not a confidence statement. */
+function srVariance(S,g3,g4){
+  const V=1-g3*S+((g4-1)/4)*S*S;
+  return V>1e-9?V:null;
+}
+function probabilisticSharpe(S,n,g3,g4,sStar){
+  if(!(n>1))return null;
+  const V=srVariance(S,g3,g4);
+  if(V==null)return null;
+  return normCdf((S-(sStar||0))*Math.sqrt(n-1)/Math.sqrt(V));
+}
+function minTrackRecord(S,g3,g4,sStar,conf){
+  const V=srVariance(S,g3,g4);
+  if(V==null)return null;
+  const edge=S-(sStar||0);
+  if(!(edge>0))return null;                     // below the benchmark, no sample size ever clears it
+  const z=normInv(conf||0.95);
+  return 1+V*Math.pow(z/edge,2);
+}
+/* The Sharpe the best of N independent trials shows by luck alone, in the same period units. */
+function expectedMaxSharpe(nTrials,sdOfTrials){
+  if(!(nTrials>1)||!(sdOfTrials>0))return 0;
+  const a=normInv(1-1/nTrials);
+  const b=normInv(1-1/(nTrials*Math.E));
+  return sdOfTrials*((1-EULER_GAMMA)*a+EULER_GAMMA*b);
+}
+
 function renderSharpe(){
   const el=document.getElementById('sharpeBody');
   if(!el||!D)return;
@@ -5436,6 +5528,27 @@ function renderSharpe(){
   const bench=sharpeOf(rows.filter(r=>r.spy!=null).map(r=>r.spy),rf);
   const straddles=me.lo<0&&me.hi>0;
   const f=x=>(x>=0?'+':'')+x.toFixed(2);
+  /* M6. Everything below is in DAILY units, matching the moments, and converted for display only.
+     Mixing an annualised Sharpe with daily skew would silently inflate every figure. */
+  const dailyRets=rows.map(r=>r.r);
+  const sk=skewKurt(dailyRets);
+  const srDaily=me.sharpe/(me.volAnnual>0?(TRADING_DAYS/annualScale(dailyRets,TRADING_DAYS).scale):Math.sqrt(TRADING_DAYS));
+  const m6=(()=>{
+    if(!sk)return null;
+    /* Deflation. Four tracks run in parallel here and the audit page compares them, so the best of
+       them is not the only one that was tried. The benchmark rises to what the best of N would
+       show by luck. With one live track there is nothing to deflate and it stays at zero. */
+    const trials=(typeof ACTIVE_TRACKS!=='undefined'&&ACTIVE_TRACKS.length)?ACTIVE_TRACKS.length:1;
+    const seDaily=Math.sqrt((1+srDaily*srDaily/2)/me.n);
+    const sStar=expectedMaxSharpe(trials,seDaily);
+    return{
+      sk,trials,sStar,srDaily,
+      psr0:probabilisticSharpe(srDaily,me.n,sk.g3,sk.g4,0),
+      psrDef:probabilisticSharpe(srDaily,me.n,sk.g3,sk.g4,sStar),
+      trl0:minTrackRecord(srDaily,sk.g3,sk.g4,0,0.95),
+      trlDef:minTrackRecord(srDaily,sk.g3,sk.g4,sStar,0.95)
+    };
+  })();
   el.innerHTML=
     '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
       '<div class="stat s-profit"><span class="stat-label">Sharpe (annualised)</span><span class="stat-value '+(me.sharpe>=0?'pos':'neg')+'">'+f(me.sharpe)+'</span></div>'+
@@ -5454,6 +5567,42 @@ function renderSharpe(){
       : '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">The range sits entirely '+(me.lo>0?'above':'below')+' zero across '+me.n+' days. That is a real reading, though '+me.n+' days is still a short window to judge a process by.</p>')+
     (bench?'<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.6">Against the index over the same days: <b>'+f(bench.sharpe)+'</b> versus your <b>'+f(me.sharpe)+'</b>. '+
       (me.sharpe>bench.sharpe?'You are being paid more per unit of risk. On this sample.':'The index is being paid more per unit of risk on this sample, which is the outcome most active books produce.')+'</p>':'')+
+    /* M6 rendered. Deliberately after the interval, because it qualifies the interval. */
+    (m6
+      ? '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">'+
+        '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+          '<div class="stat"><span class="stat-label">Chance the Sharpe is real</span><span class="stat-value '+
+            (m6.psr0!=null&&m6.psr0>=0.95?'pos':'')+'">'+(m6.psr0!=null?(m6.psr0*100).toFixed(0)+'%':'-')+'</span>'+
+            '<span class="muted" style="font-size:11px">above zero</span></div>'+
+          '<div class="stat"><span class="stat-label">After deflating for '+m6.trials+' tracks</span><span class="stat-value '+
+            (m6.psrDef!=null&&m6.psrDef>=0.95?'pos':'neg')+'">'+(m6.psrDef!=null?(m6.psrDef*100).toFixed(0)+'%':'-')+'</span>'+
+            '<span class="muted" style="font-size:11px">the honest one</span></div>'+
+          '<div class="stat"><span class="stat-label">Days needed</span><span class="stat-value" style="font-size:16px">'+
+            (m6.trlDef!=null?Math.ceil(m6.trlDef).toLocaleString():'never at this level')+'</span>'+
+            '<span class="muted" style="font-size:11px">you have '+me.n+'</span></div>'+
+          '<div class="stat"><span class="stat-label">Skew / kurtosis</span><span class="stat-value" style="font-size:15px">'+
+            m6.sk.g3.toFixed(2)+' / '+m6.sk.g4.toFixed(1)+'</span></div>'+
+        '</div>'+
+        '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.68">'+
+        '<b>A Sharpe ratio is a claim, and this is the probability it survives.</b> '+
+        'Your returns have a skew of '+m6.sk.g3.toFixed(2)+' and a kurtosis of '+m6.sk.g4.toFixed(1)+
+        ' against 3 for a normal distribution, and both are measured from your own returns rather than assumed. '+
+        (m6.sk.g3<0?'Negative skew and fat tails make a given Sharpe less significant than the plain interval above suggests, which is why this column is lower than that one. ':'')+
+        'The deflated figure raises the bar to the Sharpe the best of '+m6.trials+' parallel tracks would show by luck alone. '+
+        'Reporting the best of several as if it were the only one tried is the single most common way a track record lies, and this product runs '+m6.trials+' of them.'+
+        '</p>'+
+        '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.68">'+
+        '<b>Too early to read?</b> '+
+        (m6.trlDef==null
+          ? 'Your Sharpe is at or below the deflated benchmark, so no amount of additional data would make it significant at this level. That is the answer, not a delay.'
+          : (me.n>=m6.trlDef
+             ? 'You have passed the '+Math.ceil(m6.trlDef).toLocaleString()+' days this Sharpe needs to clear 95% confidence after deflation.'
+             : 'This Sharpe needs about '+Math.ceil(m6.trlDef).toLocaleString()+' days to clear 95% confidence after deflation, and you have '+me.n+'. '+
+               'That is roughly '+Math.max(1,Math.round((m6.trlDef-me.n)/TRADING_DAYS*10)/10)+' more years at this level. '+
+               'It is a number rather than an apology, and it moves down if the Sharpe rises.'))+
+        ' <b>Falsification:</b> if the skew and kurtosis of your returns converge on 0 and 3, this whole panel collapses to the plain interval above and adds nothing.'+
+        '</p></div>'
+      : '')+
     '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Returns are computed from <b>gain</b>, not portfolio value, so money you deposit is not counted as a return. Cash is in the denominator, so holding a large idle balance correctly drags this down. Sortino uses downside deviation only, since Sharpe penalises upside volatility just as hard, which punishes exactly the outcome you want.</p>';
 }
 

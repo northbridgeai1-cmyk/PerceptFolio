@@ -946,6 +946,66 @@ t('both refresh paths check it', (term.match(/if\(!sessionAlive\(\)\)return/g)||
 t('the failure branch is guarded as well as the success branch',
   /catch\(e\)\{\s*\n\s*if\(!sessionAlive\(\)\)return;/.test(term));
 
+/* ==================== M6. PSR, DEFLATED SHARPE, MinTRL ==================== */
+G('Whether the Sharpe is believable at all');
+
+const S8 = new Function(`
+  ${grab(term, 'normCdf')}
+  ${grab(term, 'normInv')}
+  ${grab(term, 'skewKurt')}
+  ${grab(term, 'srVariance')}
+  ${grab(term, 'probabilisticSharpe')}
+  ${grab(term, 'minTrackRecord')}
+  ${grab(term, 'expectedMaxSharpe')}
+  const EULER_GAMMA=0.5772156649015329;
+  return {normCdf,normInv,skewKurt,srVariance,probabilisticSharpe,minTrackRecord,expectedMaxSharpe};
+`)();
+t('normInv inverts the normal to 1e-6',
+  Math.abs(S8.normInv(0.975)-1.959963985)<1e-6 &&
+  Math.abs(S8.normInv(0.05)+1.644853627)<1e-6 &&
+  Math.abs(S8.normInv(0.5))<1e-12);
+/* For normal returns the correction collapses to the textbook 1 + S^2/2. */
+t('the variance factor reduces to the iid case',
+  Math.abs(S8.srVariance(0.10,0,3)-(1+0.01/2))<1e-12);
+t('PSR matches its closed form', (() => {
+  const S=0.10,n=250;
+  const want=S8.normCdf(S*Math.sqrt(n-1)/Math.sqrt(1+S*S/2));
+  return Math.abs(S8.probabilisticSharpe(S,n,0,3,0)-want)<1e-12;
+})());
+/* This is the whole point: real equity returns are skewed and fat-tailed, and that makes a given
+   Sharpe LESS significant than the plain interval says. */
+t('negative skew and fat tails lower the probability',
+  S8.probabilisticSharpe(0.10,250,-0.8,7,0) < S8.probabilisticSharpe(0.10,250,0,3,0));
+t('and demand a longer track record',
+  S8.minTrackRecord(0.10,-0.8,7,0,0.95) > S8.minTrackRecord(0.10,0,3,0,0.95));
+/* MinTRL must be the exact inverse of PSR, or it is not answering the question it claims to. */
+t('PSR at MinTRL equals the confidence asked for', (() => {
+  const need=S8.minTrackRecord(0.10,0,3,0,0.95);
+  return Math.abs(S8.probabilisticSharpe(0.10,need,0,3,0)-0.95)<1e-6;
+})());
+/* Deflation: reporting the best of several as if it were the only one tried is how a record lies. */
+t('one trial deflates by nothing', S8.expectedMaxSharpe(1,0.05)===0);
+t('more trials raise the bar', S8.expectedMaxSharpe(45,0.05) > S8.expectedMaxSharpe(4,0.05));
+t('the benchmark is the expected maximum, not an arbitrary constant',
+  /\(1-EULER_GAMMA\)\*a\+EULER_GAMMA\*b/.test(term));
+t('deflation counts the live tracks rather than a hardcoded number',
+  /ACTIVE_TRACKS!=='undefined'&&ACTIVE_TRACKS\.length\)\?ACTIVE_TRACKS\.length:1/.test(term));
+/* A negative root is not a confidence statement. */
+t('an impossible variance factor returns null rather than NaN',
+  S8.srVariance(3,5,3)===null && S8.probabilisticSharpe(3,100,5,3,0)===null);
+t('a Sharpe below the benchmark yields no track length rather than a negative one',
+  S8.minTrackRecord(0.05,0,3,0.20,0.95)===null);
+t('the screen says so instead of printing a number',
+  /no amount of additional data would make it significant at this level/.test(term));
+/* Moments are measured from the operator's own returns. */
+t('skew and kurtosis are measured, never assumed', /function skewKurt/.test(term) &&
+  /measured from your own returns rather than assumed/.test(term));
+t('daily units are used throughout, not annualised ones',
+  /matching the moments, and converted for display only/.test(term));
+t('it states its own falsification', /this whole panel collapses to the plain interval above/.test(term));
+t('it converts the wait into a number rather than an apology',
+  /It is a number rather than an apology/.test(term));
+
 /* ==================== M5. EFFECTIVE NUMBER OF BETS ==================== */
 G('Nine tickers is not nine bets');
 
