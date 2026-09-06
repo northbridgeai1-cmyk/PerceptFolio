@@ -926,6 +926,25 @@ t('the audit compares the threshold against independent observations, not raw ma
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
 
+/* ==================== M9. THE CASH ASYMMETRY ==================== */
+G('A smaller size is not a better size');
+
+/* The actual arm is fully invested by construction; a smaller budget leaves the remainder in
+   cash. So over a window that fell, the smaller arm wins by arithmetic. The panel previously told
+   the reader that neither row could win on cash, which is the opposite of what drives the
+   numbers, and would have taught "size smaller" from the direction of the market. */
+t('the actual arm is fully invested', /dollars,cash:0,cashPct:0/.test(term));
+t('the alternative holds what it did not deploy', /const cash=Math\.max\(0,W\.start-asked\*scale\)/.test(term));
+t('the screen does not claim cash is neutralised between rows',
+  !/neither can win by holding a different amount of it/.test(term));
+t('it says the undeployed remainder is doing work in the numbers',
+  /it sits in the alternative row earning nothing/.test(term));
+t('and warns that a falling window flatters the smaller size',
+  /<b>Smaller is not better, it is smaller\.<\/b>/.test(term) &&
+  /wins by arithmetic and tells you nothing/.test(term));
+t('it tells the reader which two columns to read together',
+  /Read the drawdown column against the cash column/.test(term));
+
 /* ==================== M2. IMPLEMENTATION SHORTFALL ==================== */
 G('Gross is not net, and the cost is measured');
 

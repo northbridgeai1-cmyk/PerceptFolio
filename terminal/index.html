@@ -6710,10 +6710,21 @@ function renderCounterfactual(){
     '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.68">'+
       '<b>What varied, and what did not.</b> Only the dollars in each position. The tickers are the ones you hold, the dates are ones this app logged a close for, '+
       'and no entry or exit moved. Sizes are set once at the opening close and never adjusted, because re-sizing along the way would be trading on days you did not trade. '+
-      'Cash outside these positions is in neither row, so neither can win by holding a different amount of it, and both rows are price only: '+
+      'Your cash balance is outside every row, so no row is helped by money you simply had sitting there. '+
+      'What a smaller budget does NOT deploy is a different matter and it is doing real work in these numbers: it sits in the alternative row earning nothing, '+
+      'which is why that row carries a cash weight the actual row does not. Both rows are price only: '+
       'a dividend paid inside the window is in neither, so the actual row is what the positions were worth at the closes rather than everything that reached the account. '+
       'Volatility is measured only from closes logged <b>before</b> '+esc(W.from)+', so the alternative rows could not know which names were about to turn violent.</p>'+
     '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.68">'+
+      /* THE TRAP THIS PANEL SETS, AND MUST DEFUSE. The actual row is fully invested by construction;
+         a smaller budget leaves the remainder in cash. So a smaller size lowers the drawdown and
+         the upside together, and over a window that happened to fall it wins automatically. An
+         operator reading only the ending value would conclude "size smaller" from the direction of
+         the market rather than from anything about their sizing. */
+      '<b>Smaller is not better, it is smaller.</b> A lower budget leaves more in cash, so it reduces the fall and the rise together. '+
+      'Over a window that ended down, a smaller size wins by arithmetic and tells you nothing you did not already know about the market. '+
+      'Read the drawdown column against the cash column: a row that halved the drawdown while staying nearly fully invested has said something about sizing, '+
+      'and a row that halved it by holding '+(alt?alt.cashPct.toFixed(0):'40')+'% cash has only said that cash does not fall. '+
       '<b>Too early to read?</b> A maximum drawdown is the largest of '+W.dates.length+' draws, so it grows with the length of the window by construction. '+
       'These rows are comparable with each other, because every one of them runs over the same '+W.dates.length+' sessions, and with nothing else. '+
       (W.dates.length<60?'At this length one bad week decides the column. ':'')+
