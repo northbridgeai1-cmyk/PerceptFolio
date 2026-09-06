@@ -946,6 +946,58 @@ t('both refresh paths check it', (term.match(/if\(!sessionAlive\(\)\)return/g)||
 t('the failure branch is guarded as well as the success branch',
   /catch\(e\)\{\s*\n\s*if\(!sessionAlive\(\)\)return;/.test(term));
 
+/* ==================== M5. EFFECTIVE NUMBER OF BETS ==================== */
+G('Nine tickers is not nine bets');
+
+const S7 = new Function(`
+  ${grab(term, 'jacobiEigenvalues')}
+  ${grab(term, 'effectiveBets')}
+  return {jacobiEigenvalues, effectiveBets};
+`)();
+const I3=[[1,0,0],[0,1,0],[0,0,1]];
+t('uncorrelated equal weights give exactly the nominal count', (() => {
+  const r=S7.effectiveBets([1/3,1/3,1/3],I3);
+  return Math.abs(r.nConc-3)<1e-9 && Math.abs(r.nCorr-3)<1e-9;
+})());
+/* The case the figure exists for: four tickers, one bet. */
+t('perfectly correlated names collapse to one bet', (() => {
+  const r=S7.effectiveBets([1/3,1/3,1/3],[[1,1,1],[1,1,1],[1,1,1]]);
+  return Math.abs(r.nCorr-1)<1e-6 && Math.abs(r.breadth-1)<1e-6;
+})());
+t('concentration alone is the Herfindahl inverse', (() => {
+  const w=[0.92,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01];
+  const want=1/w.reduce((a,x)=>a+x*x,0);
+  return Math.abs(S7.effectiveBets(w,null).nConc-want)<1e-9;
+})());
+/* Correlation bites harder than sizing and is invisible in the weights. */
+t('a correlated cluster is caught even at equal weight', (() => {
+  const S=[];for(let i=0;i<5;i++){S.push([]);for(let j=0;j<5;j++)S[i].push(i===j?1:((i<4&&j<4)?0.9:0.05));}
+  const r=S7.effectiveBets([0.2,0.2,0.2,0.2,0.2],S);
+  return Math.abs(r.nConc-5)<1e-6 && r.nCorr<2.5;
+})());
+t('breadth takes the more pessimistic of the two', (() => {
+  const S=[];for(let i=0;i<5;i++){S.push([]);for(let j=0;j<5;j++)S[i].push(i===j?1:0.9);}
+  const r=S7.effectiveBets([0.2,0.2,0.2,0.2,0.2],S);
+  return Math.abs(r.breadth-Math.min(r.nConc,r.nCorr))<1e-12;
+})());
+/* No library, per I2. */
+t('eigenvalues come from a symmetric Jacobi rotation, not a dependency',
+  /function jacobiEigenvalues/.test(term) && S7.jacobiEigenvalues(I3).every(x=>Math.abs(x-1)<1e-9));
+t('a single holding and an empty book both return null',
+  S7.effectiveBets([1],[[1]])===null && S7.effectiveBets([],null)===null);
+t('without a covariance matrix it reports concentration only, never a guess',
+  S7.effectiveBets([0.5,0.5],null).nCorr===null);
+t('the screen says correlation could not be measured rather than showing a figure',
+  /this is the concentration figure alone and is the optimistic end/.test(term));
+/* Concentration is fixed by resizing; correlation is not. Different remedies, reported apart. */
+t('the two collapses are reported separately', /Sizing alone accounts for/.test(term) &&
+  /Correlation takes it to/.test(term));
+t('it says resizing cannot fix the correlation half', /resizing does not fix it/.test(term));
+t('breadth feeds Grinold', /square root of breadth/.test(term));
+t('it states its own falsification', /the correlation input is wrong and the number is decoration/.test(term));
+t('it reads the same weights and covariance the risk table uses',
+  /bets:effectiveBets\(w,S\)/.test(term));
+
 /* ==================== M9. THE CASH ASYMMETRY ==================== */
 G('A smaller size is not a better size');
 

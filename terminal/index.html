@@ -6462,8 +6462,95 @@ function riskContributions(){
     return{...r,weight:w[i]*100,rc:(w[i]*mc)/(vol*vol)*100};
   });
   const eqW=rows.map(()=>1/rows.length);
-  return{rows:contrib,vol,eqVol:portVol(eqW,S),avgCorr,measured,n:rows.length};
+  /* M5 reads the same weights and the same covariance the risk table is built from, so the two
+     figures cannot disagree about what the book is. */
+  return{rows:contrib,vol,eqVol:portVol(eqW,S),avgCorr,measured,n:rows.length,
+         bets:effectiveBets(w,S)};
 }
+/* ============================ M5. EFFECTIVE NUMBER OF BETS ============================
+   Nine positions is a count of tickers, not a count of bets. Two things collapse it.
+
+   CONCENTRATION. The Herfindahl inverse asks how many EQUALLY sized positions would give the same
+   concentration as the ones actually held:
+
+       N_conc = 1 / sum(w_i^2)
+
+   A book with one position at 40% and eight at 7.5% is not nine bets by any reading.
+
+   CORRELATION, which bites harder and is invisible in the weights. Four semiconductors moving
+   together are one bet wearing four tickers. The principal components of the correlation matrix
+   answer this directly: if one component explains most of the variance, there is one bet.
+
+       N_corr = exp( -sum( p_i * ln p_i ) )      p_i = eigenvalue_i / sum(eigenvalues)
+
+   This is the exponential of the entropy of the variance spectrum, and it is preferred here to
+   counting components above a threshold because a threshold is an assumed parameter and this is
+   not. It equals the number of assets exactly when they are uncorrelated and equal-weighted, and
+   falls to 1 when they move as one.
+
+   BOTH, because they compose: the correlation figure is computed on the risk-weighted spectrum, so
+   a concentrated book of correlated names is penalised twice, which is correct. */
+function jacobiEigenvalues(Min){
+  /* Symmetric eigenvalues by cyclic Jacobi rotation. A correlation matrix is symmetric and small
+     here (a handful of holdings), so this converges in a few sweeps and needs no library, which
+     invariant I2 requires. */
+  const n=Min.length;
+  const A=Min.map(r=>r.slice());
+  for(let sweep=0;sweep<60;sweep++){
+    let off=0;
+    for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)off+=A[i][j]*A[i][j];
+    if(off<1e-12)break;
+    for(let p1=0;p1<n;p1++)for(let q=p1+1;q<n;q++){
+      if(Math.abs(A[p1][q])<1e-15)continue;
+      const theta=(A[q][q]-A[p1][p1])/(2*A[p1][q]);
+      const t=Math.sign(theta||1)/(Math.abs(theta)+Math.sqrt(theta*theta+1));
+      const c=1/Math.sqrt(t*t+1), sN=t*c;
+      for(let k=0;k<n;k++){
+        const akp=A[k][p1],akq=A[k][q];
+        A[k][p1]=c*akp-sN*akq; A[k][q]=sN*akp+c*akq;
+      }
+      for(let k=0;k<n;k++){
+        const apk=A[p1][k],aqk=A[q][k];
+        A[p1][k]=c*apk-sN*aqk; A[q][k]=sN*apk+c*aqk;
+      }
+    }
+  }
+  return A.map((r,i)=>r[i]).sort((a,b)=>b-a);
+}
+/* w: weights. S: covariance. Returns both counts and the nominal, or null if it cannot be had. */
+function effectiveBets(w,S){
+  if(!Array.isArray(w)||w.length<2)return null;
+  const n=w.length;
+  const sumSq=w.reduce((a,x)=>a+x*x,0);
+  if(!(sumSq>0))return null;
+  const nConc=1/sumSq;
+  let nCorr=null,spectrumOk=false;
+  if(S&&S.length===n){
+    /* Risk-weighted: the correlation of the CONTRIBUTIONS, not of the raw returns, so a tiny
+       position in an uncorrelated name cannot dress up a concentrated book. */
+    const C=[];
+    for(let i=0;i<n;i++){
+      C.push([]);
+      for(let j=0;j<n;j++){
+        const d=Math.sqrt(Math.max(S[i][i],0))*Math.sqrt(Math.max(S[j][j],0));
+        C[i].push(d>0?(w[i]*w[j]*S[i][j])/(w[i]*w[j]*d||1):0);
+      }
+    }
+    const ev=jacobiEigenvalues(C).map(x=>Math.max(x,0));
+    const tot=ev.reduce((a,b)=>a+b,0);
+    if(tot>0){
+      let h=0;
+      ev.forEach(e=>{const pI=e/tot; if(pI>1e-12)h-=pI*Math.log(pI);});
+      nCorr=Math.exp(h);
+      spectrumOk=true;
+    }
+  }
+  return{nominal:n,nConc,nCorr,spectrumOk,
+         /* Grinold: IR is roughly IC times the square root of breadth. Breadth is the number of
+            INDEPENDENT bets, not the number of tickers, which is the entire point of this figure. */
+         breadth:(nCorr!=null?Math.min(nConc,nCorr):nConc)};
+}
+
 function renderRiskContrib(){
   const el=document.getElementById('riskContribBody');
   if(!el||!D)return;
@@ -6481,6 +6568,10 @@ function renderRiskContrib(){
       '<div class="stat s-in"><span class="stat-label">If equally weighted</span><span class="stat-value '+(eqBetter?'neg':'pos')+'">'+(R.eqVol*100).toFixed(1)+'%</span></div>'+
       '<div class="stat s-count"><span class="stat-label">Biggest risk source</span><span class="stat-value" style="font-size:16px">'+esc(worst.sym)+'</span></div>'+
       '<div class="stat"><span class="stat-label">Correlation used</span><span class="stat-value" style="font-size:15px">'+R.avgCorr.toFixed(2)+'</span></div>'+
+      /* M5. The headline of this whole tab: how many bets are actually on. */
+      '<div class="stat"><span class="stat-label">Effective bets</span><span class="stat-value '+
+        (R.bets&&R.bets.breadth<R.bets.nominal*0.5?'neg':'')+'">'+
+        (R.bets?R.bets.breadth.toFixed(1):'-')+'<span class="muted" style="font-size:13px;font-weight:400"> of '+R.n+'</span></span></div>'+
     '</div>'+
     '<div style="overflow-x:auto;margin-top:14px"><table><thead><tr>'+
       '<th>Ticker</th><th>Share of money</th><th>Share of risk</th><th>Ratio</th><th>Volatility</th>'+
@@ -6494,6 +6585,24 @@ function renderRiskContrib(){
     }).join('')+'</tbody></table></div>'+
     '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.65"><b>'+esc(worst.sym)+' holds '+worst.weight.toFixed(1)+'% of the money and '+worst.rc.toFixed(1)+'% of the risk.</b> '+
       'A ratio above 1 means a holding punches above its size; below 1 means it is dampening the book. This is the number a position-size percentage cannot show you.</p>'+
+    /* M5. Two separate collapses, reported separately, because they have different remedies:
+       concentration is fixed by resizing, correlation is fixed only by owning something else. */
+    (R.bets
+      ? '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.68">'+
+        '<b>You hold '+R.n+' positions and are running about '+R.bets.breadth.toFixed(1)+' bets.</b> '+
+        'Sizing alone accounts for '+R.bets.nConc.toFixed(1)+': that is how many equally sized positions would concentrate the money the same way. '+
+        (R.bets.spectrumOk
+          ? 'Correlation takes it to '+R.bets.nCorr.toFixed(1)+', from the spread of the risk across the independent directions your book actually moves in. '+
+            (R.bets.nCorr<R.bets.nConc-0.5
+              ? 'The gap between those two is names that move together, and resizing does not fix it. Only owning something genuinely different does.'
+              : 'Those are close, so what you own is not moving as one thing and the count is honest.')
+          : 'Correlation could not be measured for enough pairs, so this is the concentration figure alone and is the optimistic end.')+
+        '</p>'+
+        '<p class="muted" style="font-size:12px;margin-top:8px;line-height:1.6">'+
+        'Grinold: an information ratio scales roughly with the square root of breadth, so on '+R.bets.breadth.toFixed(1)+' bets your ceiling is arithmetic before stock picking enters into it. '+
+        (R.bets.breadth<4?'Adding skill to a book this narrow moves less than adding a genuinely uncorrelated position. ':'')+
+        '<b>Falsification:</b> if this figure barely moves when you add a position from an unrelated sector, the correlation input is wrong and the number is decoration.</p>'
+      : '')+
     '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65">'+
       (eqBetter
         ? 'Splitting the same holdings equally would run at <b class="neg">'+(R.eqVol*100).toFixed(1)+'%</b> volatility against your <b>'+(R.vol*100).toFixed(1)+'%</b>. Your weighting is carrying more risk than dividing evenly would. That is worth a reason.'
