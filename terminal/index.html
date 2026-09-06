@@ -1924,6 +1924,14 @@ body.touring header,body.touring #sidebar{z-index:201}
       <p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.55">Your invite code can sync this account across your own devices, no operator key needed. Be aware of the trade: your portfolio is stored on the worker under that code and is readable by anyone holding it, and sync stops the moment your access is paused.</p>
       <button class="btn btn-sm" style="margin-top:8px" onclick="enableCodeSync()">Turn on code sync</button>
     </div>
+    <!-- F1. A managed or business profile is told why sync is off, up front. A panel that simply
+         does nothing when pressed reads as broken, and someone would go looking for the bug rather
+         than understand the refusal. -->
+    <div id="syncBlockedNotice" style="display:none;margin-top:12px;border:1px solid var(--border);border-left:3px solid var(--red,#e5534b);border-radius:8px;padding:12px 14px">
+      <b style="font-size:13.5px">Sync is off for this account</b>
+      <p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.55" id="syncBlockedWhy"></p>
+      <button class="btn btn-sm" style="margin-top:8px" onclick="exportData()">Export a backup</button>
+    </div>
     <p class="muted" id="syncStatus" style="margin-top:10px;font-size:13px"></p>
     <!-- Answers "is any of this actually working" without a terminal, a curl command, or a guess.
          Every failure in this area so far has been one of four things — the worker not reachable,
@@ -2811,6 +2819,7 @@ function enterSession(){
   resetTransientState();
   /* Repairs anything already contaminated before a single statistic is computed from it. */
   try{ repairAllSeries(); }catch(e){}
+  try{ renderSyncBlocked(); }catch(e){}
   renderBackupBanner();
   /* Adopt marks the worker stamped while this app was closed, then tell it what is still open.
      Both silent and unawaited: session entry must not wait on a network round-trip. */
@@ -5005,6 +5014,9 @@ async function cronUrl(path){
 
 let _lastRegPush='';
 async function pushCallRegistry(){
+  /* The registry carries symbols, entry prices and dates. That is client position data, and it
+     would sit in the same shared keyspace as everything else. Blocked with the rest. */
+  if(syncBlockedReason())return;
   try{
     const t=await cronUrl('/callreg'); if(!t)return;
     /* Only calls the worker could still act on: an unmarked horizon that is not already past
@@ -11991,7 +12003,52 @@ function syncConfigured(){return !!(syncCfg&&syncCfg.url&&syncCfg.key);}
    (the Finnhub proxy, the request queue, /fred with a bearer) and must stay false in code mode, or
    an invited device would send "Bearer undefined" at routes it was never meant to reach. */
 function codeSyncActive(){return !!(syncCfg&&syncCfg.url&&syncCfg.code&&!syncCfg.key);}
-function syncActive(){return syncConfigured()||codeSyncActive();}
+/* ============================ F1. CLIENT BOOKS DO NOT SYNC ============================
+   The operator's sync is a single shared SYNC_SECRET. Anything holding it can read and overwrite
+   every slot, and the worker's own header says so. That is a decision the operator is entitled to
+   make about their own book.
+
+   It is not a decision they are entitled to make about a client's. A client book contains another
+   person's positions, cost basis and, through feePct, a commercial relationship. Putting it behind
+   one shared bearer token that was never issued to them, and that cannot be revoked for them
+   alone, is the one item in this spec with third-party consequences.
+
+   So until per-user authentication covers these profiles, they do not sync at all. Local storage
+   and manual export only. The route out is /usync, which is already per-code and already carries
+   the pause flag; when a managed profile can hold its own credential this gate can be reconsidered.
+
+   Enforced in the transport, not by hiding a button. A blocked profile has nothing to press, but
+   scheduleSync fires on a timer and would push anyway. */
+function syncBlockedReason(){
+  const p=(DB.profiles||{})[USER];
+  if(!p)return null;
+  if(p.managedBy)return 'client';
+  if(p.accountType==='business')return 'business';
+  return null;
+}
+function syncBlockedMessage(){
+  const r=syncBlockedReason();
+  if(!r)return '';
+  return r==='client'
+    ? 'This is a client book. It stays on this device: cloud sync runs on one shared key that was never issued to them and cannot be revoked for them alone. Use Export to move it.'
+    : 'Business profiles stay on this device. Cloud sync runs on one shared key with no per-account revocation, which is not an acceptable place for a book you hold on behalf of someone else. Use Export to move it.';
+}
+function syncActive(){
+  if(syncBlockedReason())return false;
+  return syncConfigured()||codeSyncActive();
+}
+/* Called on entering a session, so the refusal is visible before anything is pressed. */
+function renderSyncBlocked(){
+  const box=document.getElementById('syncBlockedNotice');
+  if(!box)return;
+  const why=syncBlockedReason();
+  box.style.display=why?'block':'none';
+  if(why){
+    const w=document.getElementById('syncBlockedWhy');
+    if(w)w.textContent=syncBlockedMessage();
+    ['syncUrlInput','syncKeyInput'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
+  }
+}
 function setSyncStatus(msg,cls){
   const el=document.getElementById('syncStatus');
   if(el){el.textContent=msg;el.className=cls?cls:'muted';}
@@ -12235,6 +12292,7 @@ async function verifyChain(){
    here costs the corroboration, not the chain. */
 async function pushChainHead(){
   try{
+    if(syncBlockedReason())return;            // a hash leaks nothing, but the keyspace is still shared
     if(!D.chain||!D.chain.head)return;
     const t=await cronUrl('/chain'); if(!t)return;
     await fetch(t.url,{method:'PUT',
@@ -12320,6 +12378,7 @@ async function syncPush(){
      holding a sync key could overwrite the real portfolio with demo holdings — and last-write-wins
      means that would be silent and unrecoverable. Enforced here rather than by hiding buttons. */
   if(isDemoUser()){setSyncStatus('Test account. Sync is disabled here.','muted');return{skipped:true};}
+  if(syncBlockedReason()){setSyncStatus(syncBlockedMessage(),'muted');return{skipped:true,blocked:true};}
   if(!syncActive()||!D)return;
   const slot=await syncSlotId();
   /* One extra read before every push. Without it this device's copy of the record overwrites
@@ -12341,6 +12400,7 @@ async function syncPush(){
 async function syncPull(force){
   // Pulling would drop the real portfolio into the sandbox, which is a data leak into a public login.
   if(isDemoUser()){setSyncStatus('Test account. Sync is disabled here.','muted');return{skipped:true};}
+  if(syncBlockedReason()){setSyncStatus(syncBlockedMessage(),'muted');return{skipped:true,blocked:true};}
   if(!syncActive()||!D)return{applied:false,empty:true};
   const slot=await syncSlotId();
   const remote=await syncFetch('GET',slot);
@@ -12396,6 +12456,7 @@ async function syncNow(){
    so pushing on every save would burn through it in an afternoon. This waits for a lull instead. */
 function scheduleSync(){
   if(isDemoUser())return;   // nothing queued, so nothing can fire after a tab switch either
+  if(syncBlockedReason())return;              // F1: the timer is the path a hidden button misses
   if(!syncActive())return;
   if(syncTimer)clearTimeout(syncTimer);
   syncTimer=setTimeout(()=>{

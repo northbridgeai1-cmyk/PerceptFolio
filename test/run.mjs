@@ -915,6 +915,30 @@ t('the audit compares the threshold against independent observations, not raw ma
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
 
+/* ==================== F1. CLIENT BOOKS DO NOT SYNC ==================== */
+G('The one item with third-party consequences');
+
+t('a managed or business profile is identified', /function syncBlockedReason/.test(term) &&
+  /if\(p\.managedBy\)return 'client'/.test(term) &&
+  /if\(p\.accountType==='business'\)return 'business'/.test(term));
+/* Enforced in the transport, not by hiding a button: scheduleSync fires on a timer. */
+t('syncActive is false for those profiles', /function syncActive\(\)\{\s*\n\s*if\(syncBlockedReason\(\)\)return false/.test(term));
+t('the debounced timer is stopped too', /if\(syncBlockedReason\(\)\)return;\s*\/\/ F1/.test(term));
+t('push and pull each refuse independently',
+  (term.match(/if\(syncBlockedReason\(\)\)\{setSyncStatus\(syncBlockedMessage\(\)/g)||[]).length === 2);
+/* The registry carries symbols, entry prices and dates: that is position data. */
+t('the cron registry is blocked as well', /function pushCallRegistry\(\)\{[\s\S]{0,260}?if\(syncBlockedReason\(\)\)return;/.test(term));
+t('the chain head is blocked as well', /function pushChainHead\(\)\{[\s\S]{0,200}?if\(syncBlockedReason\(\)\)return;/.test(term));
+/* The demo guard must stay first; a public password overwriting the real book is the worse failure. */
+t('the demo refusal still comes before the F1 refusal',
+  term.indexOf("if(isDemoUser()){setSyncStatus('Test account. Sync is disabled here.','muted');return{skipped:true};}\n  if(syncBlockedReason())") > 0);
+/* A panel that silently does nothing reads as a bug rather than a refusal. */
+t('a blocked profile is told why, before pressing anything', /function renderSyncBlocked/.test(term) &&
+  /syncBlockedNotice/.test(term));
+t('the reason names the actual defect, a key that cannot be revoked per account',
+  /cannot be revoked for them alone/.test(term));
+t('and offers the route that does work', /Export a backup/.test(term));
+
 /* ==================== E2. HASH-CHAINED MARKS ==================== */
 G('Tamper-evidence, claimed no wider than it is');
 
