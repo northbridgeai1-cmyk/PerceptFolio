@@ -4554,6 +4554,9 @@ async function refreshAll(){
     const markPrices=await fetchMarkPrices();
     markCalls(markPrices);
     markSells(markPrices);
+    /* Sealed after stamping, not during: crypto.subtle is async and markCalls must stay
+       synchronous so a mark is never half-written. */
+    sealNewMarks().then(n=>{if(n)pushChainHead();}).catch(()=>{});
     pushCallRegistry();                      // keep the worker's registry current; not awaited
     checkPriceAlerts();
     D.lastRefresh=Date.now();
@@ -5071,10 +5074,14 @@ function markCalls(extraPrices){
         return;
       }
       if(px==null)return;
+      const bi=betaVsSpy(c.sym);
       c.marks[h]={price:px,spy:spyNow,at:now,lag,
                   intended:sch.intended,due:sch.due,actual:today,
                   held:dayNum(today)-dayNum(sch.from),
-                  tradingDays:tradingDaysBetween(sch.from,today)};
+                  tradingDays:tradingDaysBetween(sch.from,today),
+                  /* Sealed into the chain, so it records the estimate available when the mark was
+                     taken rather than one recomputed later against more history. */
+                  beta:(bi&&isFinite(bi.beta))?+bi.beta.toFixed(6):null};
     });
   });
 }
@@ -11664,6 +11671,17 @@ async function renderAudit(){
       q.slice(-12).reverse().map(x=>esc(x.d)+'  '+esc(x.sym)+'  '+fmt$(x.prev)+' to '+fmt$(x.price)+'  '+esc(x.detail)).join('<br>')+
       '</div></details></div>';
   }
+  /* E2. Rendered asynchronously because verification hashes every link; the row shows what is
+     known synchronously and fills in the verdict when it lands. */
+  const sealed=(D.calls||[]).reduce((n,c)=>n+Object.keys(c.marks||{}).filter(h=>c.marks[h].hash).length,0);
+  out+=row(sealed?'ok':'wait','Marks are hash-chained',
+    (sealed
+      ? '<span id="chainVerdict">'+sealed+' sealed, verifying</span>. '
+      : 'nothing sealed yet; a chain starts at the first mark. ')+
+    'This proves no mark has been <b>edited since it was written</b>. It does not prove the prices were true when written, '+
+    'because a chain can be built from scratch in one pass. The worker records the head daily under its own clock, so rewriting history '+
+    'would also mean forging a log this device cannot write to. That is corroboration, not a notary.');
+
   out+=row('ok','Marks use total return',
     'distributions accrued on the holding and on the index, so a dividend payer is not scored as if it paid nothing');
 
@@ -11710,6 +11728,18 @@ async function renderAudit(){
   }catch(e){
     el.innerHTML=out+head('Worker')+row('na','Not reachable from here',
       'could not read /version, the worker may be down, or this device may have no route to it');
+  }
+  /* LAST, deliberately. The worker section above rewrites innerHTML when its fetch settles, which
+     re-parses `out` and would wipe a verdict written before it. Verification hashes every link and
+     resolves in milliseconds, so it reliably won the race and was reliably erased. */
+  if(sealed){
+    try{
+      const v=await verifyChain();
+      const sp=document.getElementById('chainVerdict');
+      if(sp)sp.innerHTML=v.ok
+        ? v.n+' sealed, chain intact'
+        : '<b class="neg">chain broken at mark '+v.brokenAt+' ('+esc(v.sym)+', '+v.horizon+'d)</b>. A mark has been altered since it was written';
+    }catch(e){}
   }
 }
 
@@ -12118,6 +12148,99 @@ function disableSync(){
 function syncPayloadFromD(){
   // Straight copy of the profile. Nothing device-specific lives in D, so nothing needs stripping.
   return JSON.parse(JSON.stringify(D));
+}
+
+/* ============================ E2. HASH-CHAINED MARKS ============================
+   A self-reported record is worth nothing to anyone but its author, because its author can edit it.
+   A hash chain fixes that without a third party, without publishing anything, and without a library.
+
+     mark_n  = { callId, horizon, intendedDate, actualDate, price, spy, beta, prevHash }
+     hash_n  = SHA-256( canonical_json(mark_n) )
+
+   Each link commits to the one before it, so editing any historical mark changes its hash, which
+   breaks the link stored in the next mark, and every mark after that.
+
+   WHAT THIS DOES NOT PROVE, WHICH MATTERS MORE THAN WHAT IT DOES. A chain proves no mark has been
+   altered SINCE IT WAS WRITTEN. It proves nothing about whether the prices were true when written,
+   because a complete chain can be fabricated from scratch in one pass. In a product whose entire
+   claim is an honest record, overstating this would be worse than not having it at all, so the
+   limitation is printed on the audit screen beside the result rather than left in a comment.
+
+   The Worker records the chain head daily in KV under its own server clock. That is not a notary,
+   and is not described as one; it means rewriting history also requires forging a server log that
+   this device cannot write to. */
+function canonicalJson(o){
+  if(o===null||typeof o!=='object')return JSON.stringify(o);
+  if(Array.isArray(o))return '['+o.map(canonicalJson).join(',')+']';
+  return '{'+Object.keys(o).sort().map(k=>JSON.stringify(k)+':'+canonicalJson(o[k])).join(',')+'}';
+}
+/* Exactly the fields the chain commits to. Anything not in here is not protected, which is why
+   price, spy and both dates are all present. */
+function chainRecord(id,h,mk,prevHash){
+  return{callId:id,horizon:+h,
+         intendedDate:mk.intended||null,actualDate:mk.actual||null,
+         price:mk.price==null?null:+mk.price,
+         spy:mk.spy==null?null:+mk.spy,
+         beta:mk.beta==null?null:+mk.beta,
+         prevHash:prevHash||''};
+}
+/* Deterministic order, or two devices sealing the same marks would build different chains. */
+function unsealedMarks(){
+  const out=[];
+  (D.calls||[]).forEach(c=>{
+    const id=callId(c);
+    Object.keys(c.marks||{}).forEach(h=>{
+      const mk=c.marks[h];
+      if(!mk||mk.missed||mk.hash)return;
+      out.push({id,h:+h,mk});
+    });
+  });
+  return out.sort((a,b)=>(a.mk.at||0)-(b.mk.at||0)||(a.id<b.id?-1:a.id>b.id?1:0)||a.h-b.h);
+}
+async function sealNewMarks(){
+  const pending=unsealedMarks();
+  if(!pending.length)return 0;
+  if(!D.chain)D.chain={head:'',n:0};
+  for(const {id,h,mk} of pending){
+    const rec=chainRecord(id,h,mk,D.chain.head);
+    mk.hash=await sha(canonicalJson(rec));
+    mk.seq=D.chain.n;
+    D.chain.head=mk.hash;
+    D.chain.n++;
+  }
+  saveDB();
+  return pending.length;
+}
+/* Recomputes the whole chain and reports the first link that does not match. */
+async function verifyChain(){
+  const sealed=[];
+  (D.calls||[]).forEach(c=>{
+    const id=callId(c);
+    Object.keys(c.marks||{}).forEach(h=>{
+      const mk=c.marks[h];
+      if(mk&&mk.hash&&mk.seq!=null)sealed.push({id,h:+h,mk});
+    });
+  });
+  sealed.sort((a,b)=>a.mk.seq-b.mk.seq);
+  let prev='';
+  for(const {id,h,mk} of sealed){
+    const want=await sha(canonicalJson(chainRecord(id,h,mk,prev)));
+    if(want!==mk.hash)return{ok:false,n:sealed.length,brokenAt:mk.seq,sym:id.split(':')[1]||id,horizon:h};
+    prev=mk.hash;
+  }
+  return{ok:true,n:sealed.length,head:prev};
+}
+
+/* Sends the current head to the worker, which stamps it with its own clock. Best-effort: a failure
+   here costs the corroboration, not the chain. */
+async function pushChainHead(){
+  try{
+    if(!D.chain||!D.chain.head)return;
+    const t=await cronUrl('/chain'); if(!t)return;
+    await fetch(t.url,{method:'PUT',
+      headers:Object.assign({'Content-Type':'application/json'},t.headers),
+      body:JSON.stringify({head:D.chain.head,n:D.chain.n})});
+  }catch(e){}
 }
 
 /* ============================ D4. MARKS ARE APPEND-ONLY ============================

@@ -915,6 +915,50 @@ t('the audit compares the threshold against independent observations, not raw ma
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
 
+/* ==================== E2. HASH-CHAINED MARKS ==================== */
+G('Tamper-evidence, claimed no wider than it is');
+
+const S5 = new Function(`
+  ${grab(term, 'canonicalJson')}
+  ${grab(term, 'chainRecord')}
+  return {canonicalJson, chainRecord};
+`)();
+/* Two devices sealing the same marks must build the same chain, so serialisation cannot depend on
+   the order keys happen to be written in. */
+t('canonical JSON is key-order independent',
+  S5.canonicalJson({b:1,a:2,c:{z:1,y:2}}) === S5.canonicalJson({c:{y:2,z:1},a:2,b:1}));
+t('it is stable for nested arrays too',
+  S5.canonicalJson({a:[{q:1,p:2}]}) === S5.canonicalJson({a:[{p:2,q:1}]}));
+t('the chain commits to exactly the fields the spec names, and no others', (() => {
+  const got = Object.keys(S5.chainRecord('x',30,{intended:'a',actual:'b',price:1,spy:2,beta:3},'h')).sort();
+  const want = ['callId','horizon','intendedDate','actualDate','price','spy','beta','prevHash'].sort();
+  return got.join() === want.join();
+})());
+t('each link carries the previous hash', /prevHash:prevHash\|\|''/.test(term));
+t('sealing is ordered deterministically', /function unsealedMarks/.test(term) &&
+  /a\.mk\.at\|\|0\)-\(b\.mk\.at\|\|0\)/.test(term));
+t('a mark is never sealed twice', /if\(!mk\|\|mk\.missed\|\|mk\.hash\)return/.test(term));
+t('SHA-256 comes from crypto.subtle, no library', /crypto\.subtle\.digest\('SHA-256'/.test(term));
+t('beta is recorded at stamping time, not recomputed later', /beta:\(bi&&isFinite\(bi\.beta\)\)/.test(term));
+/* markCalls must stay synchronous or a mark could be half-written. */
+t('sealing happens after stamping, not during', /sealNewMarks\(\)\.then/.test(term));
+
+/* THE PART THAT MATTERS MOST: the claim is bounded on screen, beside the result. */
+t('the audit says what the chain proves', /edited since it was written/.test(term));
+t('and says plainly what it does not prove',
+  /does not prove the prices were true when written/.test(term) &&
+  /a chain can be built from scratch in one pass/.test(term));
+t('the worker record is called corroboration, not a notary', /That is corroboration, not a notary/.test(term));
+t('the worker file makes the same disclaimer to whoever reads it',
+  /It is NOT a notary and is not described as one anywhere/.test(worker));
+t('the worker stamps the head with its own clock, not the client\'s',
+  /at: Date\.now\(\), head, n/.test(worker) && /const today = new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/.test(worker));
+t('a head must be a real digest before it is stored', /\^\[0-9a-f\]\{64\}\$/.test(worker));
+/* Verification is the only asynchronous part of the audit and the worker section rewrites the DOM
+   when its fetch settles, so ordering here is load-bearing, not cosmetic. */
+t('verification runs after the section that rewrites the DOM',
+  term.indexOf('const v=await verifyChain()') > term.indexOf("el.innerHTML=out+head('Worker')"));
+
 /* ==================== D4. MARKS ARE APPEND-ONLY ==================== */
 G('A mark survives the merge, because it cannot be rebuilt');
 

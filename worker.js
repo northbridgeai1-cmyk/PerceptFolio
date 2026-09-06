@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-05.7';
+const WORKER_VERSION = '2026-09-06.1';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -284,7 +284,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -458,7 +458,7 @@ async function handle(request, env) {
      Dual-auth like /fred: the operator authenticates with the sync key and a slot, an invited user
      with a live invite code. Each identity's registry and marks live under their own KV keys, so
      nobody can read or write anyone else's. */
-  if (url.pathname === '/callreg' || url.pathname === '/marks') {
+  if (url.pathname === '/callreg' || url.pathname === '/marks' || url.pathname === '/chain') {
     const auth1 = request.headers.get('Authorization') || '';
     const tok1 = auth1.startsWith('Bearer ') ? auth1.slice(7) : '';
     let ident = null;
@@ -489,6 +489,43 @@ async function handle(request, env) {
     if (url.pathname === '/marks' && request.method === 'GET') {
       const m = await env.PF_SYNC.get('cmarks:' + ident);
       return json({ marks: m ? JSON.parse(m) : {} }, 200, env);
+    }
+
+    /* ---- /chain — E2. An append-only log of the client's chain head, under THIS server's clock.
+       The client can put whatever head it likes here; what it cannot do is choose the timestamp
+       beside it, or remove a head recorded yesterday. That is the whole and only value: rewriting
+       history now also requires forging a log this device cannot write to.
+
+       It is NOT a notary and is not described as one anywhere. A head accepted here is a string
+       the client sent; the server has no idea whether the marks behind it were true. Anyone
+       reading this file should not oversell it, and neither does the interface. */
+    if (url.pathname === '/chain') {
+      const key = 'chain:' + ident;
+      if (request.method === 'GET') {
+        const raw = await env.PF_SYNC.get(key);
+        return json({ heads: raw ? JSON.parse(raw) : [] }, 200, env);
+      }
+      if (request.method === 'PUT') {
+        const raw = await request.text();
+        if (raw.length > 8 * 1024) return json({ error: 'Body too large.' }, 413, env);
+        let body; try { body = JSON.parse(raw); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+        const head = clean(body.head, 64);
+        const n = Number(body.n) || 0;
+        if (!/^[0-9a-f]{64}$/.test(head)) return json({ error: 'head must be a SHA-256 hex digest.' }, 400, env);
+        const prev = await env.PF_SYNC.get(key);
+        const list = prev ? JSON.parse(prev) : [];
+        const today = new Date().toISOString().slice(0, 10);
+        /* One entry per server day. A client cannot rewrite an earlier day by pushing again, and
+           cannot backdate one, because the date and time both come from here. */
+        if (list.length && list[list.length - 1].day === today) {
+          list[list.length - 1] = { day: today, at: Date.now(), head, n };
+        } else {
+          list.push({ day: today, at: Date.now(), head, n });
+        }
+        while (list.length > 400) list.shift();
+        await env.PF_SYNC.put(key, JSON.stringify(list));
+        return json({ ok: true, days: list.length }, 200, env);
+      }
     }
     return json({ error: 'Method not allowed.' }, 405, env);
   }
