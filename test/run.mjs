@@ -922,6 +922,41 @@ t('the audit compares the threshold against independent observations, not raw ma
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
 
+/* ==================== M1. OPERATOR vs SYSTEM ==================== */
+G('The query the terminal turns on');
+
+/* myTags is a current map with no history, so without a stamp the matrix could only ever apply
+   today's opinion to last year's calls, which grades the operator on hindsight. */
+t("the operator's position is stamped onto the call as it is recorded",
+  /myCall:\(typeof myTag==='function'\?myTag\(sym\):''\)\|\|null/.test(term));
+t('agreement is on direction, not wording', /function directionOf/.test(term) &&
+  /v==='hold'\|\|v==='watch'\|\|v==='watching'/.test(term));
+/* No opinion is not the same as agreement, and counting it as such would inflate the consensus row
+   with every ticker the operator never looked at. */
+t('untagged rows are excluded rather than counted as agreement',
+  /if\(sys==null\|\|op==null\)return null/.test(term));
+t('non-directional system verdicts are excluded', /if\(sys==='flat'\)return null/.test(term));
+t('flickering calls do not enter the matrix', /if\(c\.conviction==='flickering'\)return/.test(term));
+t('all four cells are produced', /'up-agree':\[\], 'up-differ':\[\], 'down-agree':\[\], 'down-differ':\[\]/.test(term));
+t('each cell carries its own interval and effective n',
+  /st:rows\.length\?expectancyStats/.test(term) && /eff:effectiveN\(rows\.map/.test(term));
+/* Every cell reports the CHECKLIST's edge. A low number where the operator differed means the
+   checklist was wrong on the calls they refused, which is evidence FOR the operator. Reading it
+   the other way inverts the finding the table exists to produce. */
+t('the file records which direction is good news', /WHICH DIRECTION IS GOOD NEWS/.test(term));
+t('a low override cell is read as evidence for the operator',
+  /worse on exactly the calls you refused to follow/.test(term));
+t('a high override cell is read as evidence against',
+  /You were overriding its <b>better<\/b> calls/.test(term));
+t('overlapping intervals are reported as no difference, not as a winner',
+  /const overlap=!\(Dd\.st\.hi<A\.st\.lo\|\|A\.st\.hi<Dd\.st\.lo\)/.test(term) &&
+  /no measurable difference<\/b> between following the checklist and overriding it/.test(term));
+t('the screen says whose result the numbers are', /Every cell is the checklist/.test(term));
+t('it refuses to read a cell under ten calls', /m\[k\]\.n>=10/.test(term));
+t('it states its own falsification', /<b>Falsification:<\/b> if the two rows stay inside each other/.test(term));
+/* Fixed horizons only: the open-ended view gives every cell a different holding period. */
+t('the open-ended view is refused', /if\(winRaw==='since'\)return '';/.test(term));
+
 /* ==================== D5. THE SHIPPED SELF-TEST ==================== */
 G('A harness nobody runs is decoration');
 
@@ -1115,8 +1150,10 @@ t('a missed mark still records what it was aiming at', /missed:true,lag,intended
 /* Legacy marks predate these fields and must not be recomputed from data never stored. */
 t('older marks fall back rather than being invented', /function markHeldDays/.test(term) &&
   /if\(mk&&mk\.held!=null\)return mk\.held/.test(term));
-t('both consumers use the stored span',
-  (term.match(/=markHeldDays\(mk,days\)/g)||[]).length === 2);
+/* Every place that turns a mark into a return must use the stored calendar span, not re-derive it.
+   Counted rather than named, so a new consumer that skips it fails here. */
+t('every consumer uses the stored span',
+  (term.match(/=markHeldDays\(mk,days\)/g)||[]).length === 3);
 /* One schedule, or the sell marks drift away from the call marks. */
 t('sell marks run on the same calendar', /const sch=markSchedule\(tx\.ts,h\)/.test(term));
 t('nothing schedules a mark by millisecond age any more',

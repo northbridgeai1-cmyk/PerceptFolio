@@ -4664,7 +4664,12 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
       spy:(_spyPriceCache&&isFinite(_spyPriceCache.price))?_spyPriceCache.price:null,
       q:sc?sc.qScore:null,p:sc?sc.pScore:null,m:sc?sc.mScore:null,
       mOk:!!(sc&&D.rules&&sc.mScore>=(D.rules.mBuy||0)),
-      conviction,refreshes
+      conviction,refreshes,
+      /* M1. The operator's standing position at the moment the system spoke, captured here because
+         myTags is a current map with no history and I11 forbids reconstructing one later. Without
+         this stamp the agreement matrix could only ever be built from today's opinion applied to
+         last year's calls, which would grade the operator on hindsight. */
+      myCall:(typeof myTag==='function'?myTag(sym):'')||null
     });
     if(D.calls.length>2000)D.calls=D.calls.slice(D.calls.length-2000);
   };
@@ -4725,6 +4730,67 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
   delete pend[key];
   write('persistent',CONFIRM_REFRESHES);
 }
+/* ============================ M1. OPERATOR vs SYSTEM ============================
+   Verdict and My Call have sat side by side in the Portfolio table since the beginning, both
+   populated, and nothing has ever read them together. This is the query.
+
+                     system BUY              system SELL
+     operator agrees  value of consensus      value of consensus
+     operator differs IS THE OPERATOR ALPHA?  IS THE SYSTEM ALPHA?
+
+   The off-diagonal is the question the whole terminal turns on. If overriding the checklist
+   consistently beats following it, the checklist is a worse instrument than the person using it.
+   If it consistently loses, the operator's discretion is costing them and the number says by how
+   much. Either answer is worth more than any statistic elsewhere in this file, and neither can be
+   had without recording both opinions at the same instant.
+
+   AGREEMENT IS ON DIRECTION, not on wording. The system says buy/sell/hold/watch; the operator
+   says Buy/Hold/Sell/Watching. Two labels agree when they point the same way; a system BUY against
+   an operator Sell is an override in the strong sense, and a system BUY against an operator Hold
+   is still an override because the operator declined to act. Untagged is not a disagreement, it is
+   an absence of opinion, and those rows are excluded rather than counted as agreement. */
+function directionOf(v){
+  if(v==='buy')return 'up';
+  if(v==='sell')return 'down';
+  if(v==='hold'||v==='watch'||v==='watching')return 'flat';
+  return null;
+}
+function agreementCell(c){
+  const sys=directionOf(c.verdict);
+  const op=directionOf(c.myCall);
+  if(sys==null||op==null)return null;                 // no opinion on one side: not a data point
+  if(sys==='flat')return null;                        // the matrix is about directional claims only
+  return{system:sys,agrees:sys===op};
+}
+/* Returns the four cells at one horizon, each with its own expectancy and interval. */
+function operatorMatrix(days){
+  const cells={
+    'up-agree':[], 'up-differ':[], 'down-agree':[], 'down-differ':[]
+  };
+  (D.calls||[]).forEach(c=>{
+    if((c.track||'checklist')!=='checklist')return;   // one system at a time, or the cells blur
+    if(c.conviction==='flickering')return;
+    const cell=agreementCell(c);
+    if(!cell)return;
+    const mk=(c.marks||{})[days];
+    if(!mk||mk.missed||!(c.price>0)||!(c.spy>0))return;
+    const held=markHeldDays(mk,days);
+    const stockRet=(mk.price-c.price)/c.price*100+accruedYield(yieldPctFor(c.sym),held);
+    const spyRet=(mk.spy-c.spy)/c.spy*100+accruedYield(SPY_YIELD_PCT,held);
+    const bi=betaVsSpy(c.sym);
+    const edge=callEdge(c,jensenAlpha(stockRet,spyRet,bi?bi.beta:null,held));
+    if(edge==null)return;
+    cells[cell.system+'-'+(cell.agrees?'agree':'differ')].push({c,edge});
+  });
+  const out={};
+  Object.keys(cells).forEach(k=>{
+    const rows=cells[k];
+    out[k]={n:rows.length,st:rows.length?expectancyStats(rows.map(r=>r.edge)):null,
+            eff:effectiveN(rows.map(r=>({sym:r.c.sym,ts:r.c.ts,days})))};
+  });
+  return out;
+}
+
 /* ---- Fixed-horizon marks ----
    The original scorecard filtered to calls OLDER than the chosen window and then measured them to
    TODAY. A call from three years ago therefore appeared in the "90 days" bucket carrying a three-year
@@ -12126,6 +12192,79 @@ function trackStats(track,winRaw){
   });
   return expectancyStats(edges);
 }
+/* M1 rendered. Deliberately a plain 2x2 with an interval in every cell: the off-diagonal is the
+   only place in this product where the operator can find out whether the terminal earns its
+   existence, and it should not be able to be skimmed as a single flattering number. */
+function operatorMatrixHTML(winRaw){
+  if(winRaw==='since')return '';                     // fixed horizons only, or the cells are not comparable
+  const days=parseInt(winRaw,10);
+  if(!days)return '';
+  const m=operatorMatrix(days);
+  const total=Object.keys(m).reduce((n,k)=>n+m[k].n,0);
+  if(!total)return '';
+  const pts=x=>(x>=0?'+':'')+x.toFixed(2);
+  const cell=(k,label)=>{
+    const c=m[k];
+    if(!c.n)return '<td class="muted" style="vertical-align:top"><b>'+label+'</b><br><span style="font-size:11.5px">no marked calls</span></td>';
+    const st=c.st;
+    const straddles=st.lo!=null&&st.lo<0&&st.hi>0;
+    return '<td style="vertical-align:top"><b>'+label+'</b><br>'+
+      '<span class="'+(st.expectancy>=0?'pos':'neg')+'" style="font-size:15px">'+pts(st.expectancy)+'pts</span>'+
+      '<br><span class="muted" style="font-size:11.5px">'+c.n+' call'+(c.n===1?'':'s')+
+      (c.eff&&c.eff.ok&&c.eff.neff!=null?', ~'+(c.eff.neff<10?c.eff.neff.toFixed(1):Math.round(c.eff.neff))+' independent':'')+
+      '<br>'+(st.lo!=null?'95% '+pts(st.lo)+' to '+pts(st.hi):'needs 2+')+
+      (straddles?'<br><span class="warn">crosses zero</span>':'')+'</span></td>';
+  };
+  const up=m['up-agree'],ud=m['up-differ'],dn=m['down-agree'],dd=m['down-differ'];
+  /* WHICH DIRECTION IS GOOD NEWS, which is not obvious and which I got backwards first time.
+     Every cell reports THE CHECKLIST'S edge, signed by the checklist's own call. So in the row
+     where the operator differed, a LOW number means the checklist did badly on exactly the calls
+     the operator refused to follow, which is evidence FOR the operator's judgement, not against
+     it. Reading a negative override cell as "your overrides lost money" inverts the finding the
+     table exists to produce. */
+  const readable=k=>m[k].n>=10&&m[k].st&&m[k].st.lo!=null;
+  let verdict='';
+  ['up','down'].forEach(dir=>{
+    if(verdict)return;
+    const A=m[dir+'-agree'],Dd=m[dir+'-differ'];
+    if(!readable(dir+'-agree')||!readable(dir+'-differ'))return;
+    const gap=Dd.st.expectancy-A.st.expectancy;
+    const overlap=!(Dd.st.hi<A.st.lo||A.st.hi<Dd.st.lo);
+    const word=dir==='up'?'BUY':'SELL';
+    if(overlap){
+      verdict='On '+word+' signals, the checklist returned <b>'+pts(Dd.st.expectancy)+'pts</b> where you disagreed and <b>'+
+        pts(A.st.expectancy)+'pts</b> where you agreed, and those two intervals overlap. '+
+        'On this evidence there is <b>no measurable difference</b> between following the checklist and overriding it.';
+    }else if(gap<0){
+      verdict='On '+word+' signals you overrode, the checklist returned <b class="neg">'+pts(Dd.st.expectancy)+'pts</b> against <b class="pos">'+
+        pts(A.st.expectancy)+'pts</b> where you agreed. It did <b>worse on exactly the calls you refused to follow</b>, '+
+        'which is evidence that your judgement is adding something the checklist does not have.';
+    }else{
+      verdict='On '+word+' signals you overrode, the checklist returned <b class="pos">'+pts(Dd.st.expectancy)+'pts</b> against <b>'+
+        pts(A.st.expectancy)+'pts</b> where you agreed. You were overriding its <b>better</b> calls, '+
+        'which is evidence that the discretion is costing you.';
+    }
+  });
+  return '<div style="margin-top:16px;border:1px solid var(--border);border-radius:9px;overflow:hidden">'+
+    '<div style="padding:11px 15px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
+      'You against the checklist'+esc(winRaw==='since'?'':' \u00b7 '+winRaw+'-day marks')+'</div>'+
+    '<div style="overflow-x:auto"><table><thead><tr>'+
+      '<th></th><th>System says BUY</th><th>System says SELL</th></tr></thead><tbody>'+
+      '<tr><th style="text-align:left">You agreed</th>'+cell('up-agree','Consensus')+cell('down-agree','Consensus')+'</tr>'+
+      '<tr><th style="text-align:left">You differed</th>'+cell('up-differ','You overrode it')+cell('down-differ','You overrode it')+'</tr>'+
+    '</tbody></table></div>'+
+    '<div style="padding:11px 15px;border-top:1px solid var(--border)">'+
+      (verdict?'<p class="muted" style="font-size:12.5px;line-height:1.65;margin:0 0 8px">'+verdict+'</p>':'')+
+      '<p class="muted" style="font-size:12px;line-height:1.6;margin:0">'+
+        '<b>Every cell is the checklist\'s own result</b>, signed by the checklist\'s call. So a low number in the lower row is good news for you: '+
+        'it means the checklist did badly on the calls you declined to follow. '+
+        'Rows are classified by the My Call tag you had set <b>at the moment the system spoke</b>, recorded with the call. '+
+        'Untagged rows are excluded: no opinion is not the same as agreement. HOLD and WATCH from the system make no directional claim and are not in this table. '+
+        '<b>Falsification:</b> if the two rows stay inside each other\'s intervals as the sample grows, there is no measurable difference between your judgement and the checklist, '+
+        'and this table should be read as saying so rather than as a scoreboard.</p>'+
+    '</div></div>';
+}
+
 function trackComparison(winRaw){
   const rows=['checklist','herizen','gated'].map(t=>({t,s:trackStats(t,winRaw)}));
   const any=rows.filter(r=>r.s);
@@ -12267,6 +12406,7 @@ function renderScorecard(){
               'Falsification: if this difference stays inside its own confidence interval as the sample grows, the three-refresh rule is filtering the record without informing it and should be reconsidered.')+
           '</p>'
         : '')+
+      operatorMatrixHTML(winRaw)+
       trackComparison(winRaw)+
       ruleChangeWarning()+
       (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+scored.length+' scoreable call'+(scored.length===1?'':'s')+' is not evidence.</b> Under roughly 20, two lucky picks dominate every number above. Treat it as a running tally, not a verdict on the checklist.</p>':'')+
