@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- SECURITY POLICY, as far as a static host allows.
+     GitHub Pages serves these files and permits no header configuration, so this is a meta CSP.
+     Two consequences worth stating rather than leaving for someone to discover:
+       * frame-ancestors and X-Frame-Options are IGNORED in a meta tag, so clickjacking cannot be
+         blocked declaratively here. The script at the end of the body refuses to render inside a
+         frame instead, which is weaker but not nothing.
+       * 'unsafe-inline' is unavoidable. The product is one HTML file with inline script and style
+         by design (invariant I2, no build step), so there is nothing to hash against and no
+         nonce to issue. What the policy still buys is real: connect-src pins outbound requests to
+         this origin, the worker and Finnhub, so an injected script cannot exfiltrate a portfolio
+         to an arbitrary host; object-src and frame-src are closed; base-uri cannot be rewritten
+         to redirect every relative URL. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Terms of Use | PerceptFolio</title>
 <meta name="description" content="Terms of Use for PerceptFolio, a private research terminal. Not investment advice; NorthBridge is not a registered adviser.">

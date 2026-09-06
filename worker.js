@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-06.2';
+const WORKER_VERSION = '2026-09-06.3';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -45,14 +45,35 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 
+/* SECURITY HEADERS on every response this worker makes. It cannot set headers for the static
+   site, which GitHub Pages serves and which allows no header configuration at all, so the pages
+   carry what they can as meta tags and this covers the API surface. */
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Cross-Origin-Resource-Policy': 'same-site',
+  'Permissions-Policy': 'geolocation=(), microphone=(), camera=(), payment=(), usb=()',
+  /* Responses here are JSON, never a document, so nothing needs to execute. */
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+  'Cache-Control': 'no-store'
+};
+
 function corsHeaders(env) {
-  return {
-    'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
+  /* NO WILDCARD FALLBACK. This previously answered '*' whenever ALLOWED_ORIGIN was unset, which
+     is the state a fresh or half-configured deployment is in. Every authenticated route here is
+     bearer-token protected rather than cookie protected, so '*' does not by itself hand an
+     attacker a session, but it does let any page on the internet read this worker's responses
+     using a token it has obtained by other means, and it makes a misconfiguration invisible.
+     An unset origin now denies cross-origin reads rather than permitting all of them. */
+  const allowed = (env.ALLOWED_ORIGIN || '').trim().replace(/\/+$/, '');
+  return Object.assign({}, SECURITY_HEADERS, {
+    'Access-Control-Allow-Origin': allowed || 'null',
     'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
-  };
+  });
 }
 
 function json(body, status, env) {
@@ -355,7 +376,7 @@ async function handle(request, env) {
         FRED_API_KEY: !!env.FRED_API_KEY,
         FINNHUB_API_KEY: !!env.FINNHUB_API_KEY,
         AI_API_KEY: !!env.AI_API_KEY,
-        ALLOWED_ORIGIN: env.ALLOWED_ORIGIN || '(unset — CORS will fall back to *)'
+        ALLOWED_ORIGIN: env.ALLOWED_ORIGIN || '(unset — cross-origin reads are DENIED until this is set)'
       };
     }
     return json(body, 200, env);

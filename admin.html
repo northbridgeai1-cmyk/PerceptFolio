@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- SECURITY POLICY, as far as a static host allows.
+     GitHub Pages serves these files and permits no header configuration, so this is a meta CSP.
+     Two consequences worth stating rather than leaving for someone to discover:
+       * frame-ancestors and X-Frame-Options are IGNORED in a meta tag, so clickjacking cannot be
+         blocked declaratively here. The script at the end of the body refuses to render inside a
+         frame instead, which is weaker but not nothing.
+       * 'unsafe-inline' is unavoidable. The product is one HTML file with inline script and style
+         by design (invariant I2, no build step), so there is nothing to hash against and no
+         nonce to issue. What the policy still buys is real: connect-src pins outbound requests to
+         this origin, the worker and Finnhub, so an injected script cannot exfiltrate a portfolio
+         to an arbitrary host; object-src and frame-src are closed; base-uri cannot be rewritten
+         to redirect every relative URL. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Access queue | PerceptFolio</title>
 <meta name="robots" content="noindex,nofollow">
@@ -98,6 +112,26 @@ a:focus-visible,button:focus-visible,summary:focus-visible,
 [tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
   outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 </style>
+<script>
+/* Clickjacking defence. X-Frame-Options and CSP frame-ancestors are both header-only and this is
+   a static host with no header control, so the check happens here. A framed copy of the terminal
+   would let another page overlay it and harvest clicks on real buttons. */
+(function(){
+  try{
+    if(window.top!==window.self){
+      document.documentElement.innerHTML='<body style="background:#0e0f12;color:#f2f3f5;'+
+        'font:15px/1.6 -apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;padding:40px">'+
+        '<p>PerceptFolio does not run inside a frame.</p>'+
+        '<p><a style="color:#3b82f6" href="https://perceptfolio.com/terminal/" target="_top">Open it directly</a></p></body>';
+      window.top.location=window.self.location;
+    }
+  }catch(e){
+    /* Cross-origin parent: reading window.top threw, which itself means we are framed. */
+    document.documentElement.innerHTML='<body style="background:#0e0f12;color:#f2f3f5;padding:40px">'+
+      '<p>PerceptFolio does not run inside a frame.</p></body>';
+  }
+})();
+</script>
 </head>
 <body>
 
