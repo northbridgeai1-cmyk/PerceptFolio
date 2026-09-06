@@ -483,7 +483,10 @@ G('B1: marks no longer depend on the app being open');
 
 t('the worker exports a scheduled handler', /async scheduled\(event, env, ctx\)/.test(worker));
 t('every run stamps cron:last, even on failure', /put\('cron:last', JSON\.stringify\(note\)\)/.test(worker));
-t('overdue-past-tolerance is never backfilled (I11)', /lag < 0 \|\| lag > cronTolerance\(h\)/.test(worker));
+/* Two guards since D3 split them: not yet due, and too late to be honest about. Both must hold
+   or the cron would fabricate a mark from a price nobody observed on the day. */
+t('nothing is marked before its anniversary reaches a close', /if \(today < sch\.due\) continue;/.test(worker));
+t('overdue-past-tolerance is never backfilled (I11)', /if \(lag > cronTolerance\(h\)\) continue;/.test(worker));
 t('an existing mark is never overwritten', /if \(\(marks\[c\.id\] \|\| \{\}\)\[h\]\) continue/.test(worker));
 t('the registry keeps only validated fields, not the client blob',
   /Only the fields the cron needs are kept/.test(worker));
@@ -915,6 +918,25 @@ t('the audit compares the threshold against independent observations, not raw ma
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
 
+/* ==================== B2. FIRST-RUN EXPORT ==================== */
+G('The first holding is the first thing worth losing');
+
+t('a blocking gate exists', /function showFirstRunExport/.test(term));
+/* Not at an empty account: exporting an empty file teaches nothing. */
+t('it fires on the first holding, not before',
+  /const wasEmpty=\(D\.holdings\|\|\[\]\)\.length===0/.test(term) &&
+  /if\(wasEmpty&&!firstRunExportDone\(\)\)showFirstRunExport\(\)/.test(term));
+t('it fires once and is remembered', /D\.firstRunAck=Date\.now\(\)/.test(term) &&
+  /function firstRunExportDone/.test(term));
+t('an existing export counts as done', /D\.lastExportAt\|\|D\.firstRunAck/.test(term));
+t('it names the real mechanism, not a vague warning',
+  /the record is forward-only, so it cannot be rebuilt/.test(term));
+t('iOS Safari gets the seven-day rule specifically',
+  /iOS deletes this site\\'s storage after seven days/.test(term));
+/* One blocking interruption only; a second teaches clicking through them. */
+t('the file says why this is the only blocking dialogue',
+  /a second one would\s*\n?\s*teach the habit of clicking through them/.test(term));
+
 /* ==================== F1. CLIENT BOOKS DO NOT SYNC ==================== */
 G('The one item with third-party consequences');
 
@@ -1221,6 +1243,35 @@ t('trading days are fewer than calendar days over the same span',
   S2.tradingDaysBetween('2026-04-12','2026-07-11')===62);
 t('a mark on the first available close is on time, not late',
   S2.dayNum('2026-07-13')-S2.dayNum(wk.due)===0);
+
+/* The browser and the Worker both decide when a mark is due. If their calendars drift, the cron
+   stamps marks the browser thinks are early, or the browser waits for marks that never come.
+   Rather than trust that two copies of the rule stay in step, compare them. */
+/* Taken as one contiguous block: these helpers reference each other, so grabbing them
+   individually reorders them and breaks the references. */
+const wkCal = worker.slice(worker.indexOf('const _etFmtW'),
+                           worker.indexOf('async function runCronMarks'));
+const WK = new Function(wkCal + '\nreturn {markScheduleW, holidaysForW, tradingDaysBetweenW};')();
+let drift = null;
+for (let d = 0; d < 400 && !drift; d++) {
+  const ts = Date.parse('2026-01-05T15:00:00Z') + d * 864e5;
+  for (const h of [30, 90, 180, 365]) {
+    const a = S2.markSchedule(ts, h), b = WK.markScheduleW(ts, h);
+    if (a.from !== b.from || a.intended !== b.intended || a.due !== b.due) {
+      drift = `d${d} h${h}: browser ${a.intended}/${a.due} vs worker ${b.intended}/${b.due}`;
+      break;
+    }
+  }
+}
+t('browser and worker resolve every anniversary identically', drift === null, drift || '1600 schedules agree');
+let holDrift = null;
+for (let y = 2024; y <= 2035; y++) {
+  const a = [...S2.holidaysFor(y)].sort().join(), b = [...WK.holidaysForW(y)].sort().join();
+  if (a !== b) { holDrift = y + ': ' + a + ' vs ' + b; break; }
+}
+t('their holiday calendars agree for twelve years', holDrift === null, holDrift || '2024-2035 identical');
+t('their trading-day counts agree',
+  S2.tradingDaysBetween('2026-04-12','2026-07-11') === WK.tradingDaysBetweenW('2026-04-12','2026-07-11'));
 t('every entry carries a real due date', due.every(m => /^\d{4}-\d{2}-\d{2}$/.test(m.due)));
 t('missed marks are reported, not swept up', S2.missedMarks().some(m => m.sym === 'EEE' && m.lag === 44));
 

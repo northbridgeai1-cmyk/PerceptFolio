@@ -3897,6 +3897,7 @@ function addHolding(){
   if(deduct&&spend>(D.cash||0)+1e-9){
     if(!confirm('This costs '+fmt$(spend)+' but you only have '+fmt$(D.cash||0)+' in cash.\n\nOK = buy anyway and let cash go negative.\nCancel = go back (untick "Take this out of my cash" to record a purchase made with outside money).'))return;
   }
+  const wasEmpty=(D.holdings||[]).length===0;
   /* Runs only after a holding is successfully added, so it is the honest place to close the
      dialog — a rejected entry keeps the sheet open with the values still in it. */
   const clearForm=()=>{['hTicker','hAmount','hCost'].forEach(id=>document.getElementById(id).value='');closeAddModal();};
@@ -3930,6 +3931,8 @@ function addHolding(){
   const tail=deduct?' Cash is now '+fmt$(D.cash||0)+'.':'';
   if(type==='Fund')toast(t+' added.'+tail+' Enter its NAV in the Price column. Mutual funds aren\'t quoted by Finnhub.');
   else{toast(t+' added, '+sh+' shares at $'+cost.toFixed(2)+'.'+tail);refreshPrices([t]);}
+  /* B2. The first holding is the moment this browser starts holding something irreplaceable. */
+  if(wasEmpty&&!firstRunExportDone())showFirstRunExport();
 }
 function addToPortfolioFromAnalyzer(sym){
   if(isBizOwnView())return toast('A business account doesn\'t hold its own investments in PerceptFolio. Switch into a client first.');
@@ -8836,6 +8839,48 @@ function iosSafariUninstalled(){
   const installed=window.navigator.standalone===true;
   return ios&&safari&&!installed;
 }
+/* ---- B2. THE BLOCKING FIRST-RUN EXPORT ----
+   The banner only appears once data exists, which is right for a nag and wrong for the first
+   moment of risk. The instant a first holding is recorded, this browser holds something that
+   cannot be rebuilt: Safari evicts localStorage for sites unopened for seven days, and the record
+   is forward-only by design.
+
+   So the first holding is gated once, on purpose, with a dialogue that cannot be dismissed by
+   accident. It is deliberately the only blocking interruption in the product; a second one would
+   teach the habit of clicking through them, which is exactly the habit that loses the data.
+
+   Shown at the first holding rather than at an empty account, because exporting an empty file
+   teaches nothing and there is nothing yet to lose. */
+function firstRunExportDone(){return !!(D&&(D.lastExportAt||D.firstRunAck));}
+function showFirstRunExport(){
+  if(document.getElementById('firstRunGate'))return;
+  const box=document.createElement('div');
+  box.id='firstRunGate';
+  box.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(6,7,9,.82);display:grid;place-items:center;padding:24px';
+  box.innerHTML=
+    '<div style="max-width:520px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px 24px">'+
+      '<h3 style="margin:0 0 10px;font-size:17px">Your first holding is recorded. Export it now.</h3>'+
+      '<p class="muted" style="font-size:13.5px;line-height:1.65;margin:0 0 10px">'+
+        'PerceptFolio has no server. Everything, including every call it will mark for you, lives only in this browser. '+
+        'Clearing site data deletes it, and the record is forward-only, so it cannot be rebuilt afterwards.</p>'+
+      '<p class="muted" style="font-size:13.5px;line-height:1.65;margin:0 0 16px">'+
+        (iosSafariUninstalled()
+          ? '<b>You are on iPhone Safari without the app installed, which is the worst case:</b> iOS deletes this site\'s storage after seven days without a visit. Add it to your home screen from the share menu, and export a backup now.'
+          : 'Export takes one click and produces a single file. Do it now, and again whenever the banner asks.')+
+      '</p>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+        '<button class="btn" onclick="exportData();dismissFirstRunExport()">Export a backup</button>'+
+        '<button class="btn btn-ghost" onclick="dismissFirstRunExport()">I understand the risk</button>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(box);
+}
+function dismissFirstRunExport(){
+  const b=document.getElementById('firstRunGate');
+  if(b)b.remove();
+  if(D){D.firstRunAck=Date.now();saveDB();}
+}
+
 function renderBackupBanner(){
   const el=document.getElementById('backupBanner');
   if(!el)return;

@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-06.1';
+const WORKER_VERSION = '2026-09-06.2';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -122,6 +122,53 @@ export default {
 const CRON_HORIZONS = [30, 90, 180, 365];
 function cronTolerance(h) { return Math.max(7, h * 0.25); }
 
+/* ---- D3, the worker half ----
+   The browser resolves anniversaries on the exchange calendar. If this side still measured age in
+   elapsed milliseconds the two would disagree about whether a mark is due, which is one of the three
+   ambiguities D3 exists to remove — and the disagreement would show up as a mark stamped by the
+   cron that the browser thinks is a day early, or a mark the browser expects that never arrives.
+   Same rule, same arithmetic, both sides. */
+const _etFmtW = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+const etDateW = ts => _etFmtW.format(new Date(ts));
+const dayNumW = ds => { const a = ds.split('-'); return Math.floor(Date.UTC(+a[0], +a[1] - 1, +a[2]) / 864e5); };
+const dayStrW = n => new Date(n * 864e5).toISOString().slice(0, 10);
+const addDaysW = (ds, n) => dayStrW(dayNumW(ds) + n);
+const dowOfW = ds => { const a = ds.split('-'); return new Date(Date.UTC(+a[0], +a[1] - 1, +a[2])).getUTCDay(); };
+const padW = n => String(n).padStart(2, '0');
+function easterSundayW(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4,
+    f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
+    i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  return y + '-' + padW(Math.floor((h + l - 7 * m + 114) / 31)) + '-' + padW(((h + l - 7 * m + 114) % 31) + 1);
+}
+const nthDowW = (y, mo, dow, n) => {
+  const fd = new Date(Date.UTC(y, mo - 1, 1)).getUTCDay();
+  return y + '-' + padW(mo) + '-' + padW(1 + ((dow - fd + 7) % 7) + (n - 1) * 7);
+};
+const lastDowW = (y, mo, dow) => {
+  const last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  const ld = new Date(Date.UTC(y, mo - 1, last)).getUTCDay();
+  return y + '-' + padW(mo) + '-' + padW(last - ((ld - dow + 7) % 7));
+};
+const observedHolidayW = ds => { const w = dowOfW(ds); return w === 6 ? addDaysW(ds, -1) : w === 0 ? addDaysW(ds, 1) : ds; };
+const _holW = {};
+function holidaysForW(y) {
+  if (_holW[y]) return _holW[y];
+  return (_holW[y] = new Set([
+    observedHolidayW(y + '-01-01'), nthDowW(y, 1, 1, 3), nthDowW(y, 2, 1, 3),
+    addDaysW(easterSundayW(y), -2), lastDowW(y, 5, 1), observedHolidayW(y + '-06-19'),
+    observedHolidayW(y + '-07-04'), nthDowW(y, 9, 1, 1), nthDowW(y, 11, 4, 4),
+    observedHolidayW(y + '-12-25')
+  ]));
+}
+const isTradingDayW = ds => { const w = dowOfW(ds); return w !== 0 && w !== 6 && !holidaysForW(+ds.slice(0, 4)).has(ds); };
+function nextTradingDayW(ds) { let d = ds, g = 0; while (!isTradingDayW(d) && g++ < 15) d = addDaysW(d, 1); return d; }
+function tradingDaysBetweenW(a, b) { let n = 0, d = a, g = 0; while (d < b && g++ < 4000) { d = addDaysW(d, 1); if (isTradingDayW(d)) n++; } return n; }
+function markScheduleW(ts, h) {
+  const from = etDateW(ts), intended = addDaysW(from, h);
+  return { from, intended, due: nextTradingDayW(intended) };
+}
+
 async function runCronMarks(env) {
   const startedAt = Date.now();
   const note = { at: startedAt, registries: 0, due: 0, marked: 0, errors: [] };
@@ -147,14 +194,16 @@ async function runCronMarks(env) {
       for (const c of (reg.calls || []).slice(0, 400)) {
         if (!c || !c.id || !/^[A-Z.\-]{1,8}$/.test(String(c.sym || ''))) continue;
         if (!(c.ts > 0) || !(c.price > 0) || !(c.spy > 0)) continue;
-        const age = (startedAt - c.ts) / 86400000;
+        const today = etDateW(startedAt);
         for (const h of CRON_HORIZONS) {
           if ((marks[c.id] || {})[h]) continue;
-          const lag = age - h;
+          const sch = markScheduleW(c.ts, h);
+          if (today < sch.due) continue;              // the anniversary has not reached a close
+          const lag = dayNumW(today) - dayNumW(sch.due);
           /* Overdue past tolerance is left alone: the client closes those as missed, and a mark
              fabricated late is exactly what I11 forbids. Healthy cron means lag is 0 or 1. */
-          if (lag < 0 || lag > cronTolerance(h)) continue;
-          due.push({ c, h, lag });
+          if (lag > cronTolerance(h)) continue;
+          due.push({ c, h, lag, sch, today });
           symbols.add(c.sym);
         }
       }
@@ -175,11 +224,18 @@ async function runCronMarks(env) {
 
       for (const w of work) {
         let changed = false;
-        for (const { c, h, lag } of w.due) {
+        for (const { c, h, lag, sch, today } of w.due) {
           const p = px[c.sym];
           if (!(p > 0)) continue;             // no price today; tomorrow's run may still be in tolerance
           if (!w.marks[c.id]) w.marks[c.id] = {};
-          w.marks[c.id][h] = { price: p, spy: px.SPY, at: startedAt, lag: Math.round(lag), cron: true };
+          /* The same fields the browser stamps, so a reconciled mark is indistinguishable from a
+             locally taken one apart from the cron flag. */
+          w.marks[c.id][h] = {
+            price: p, spy: px.SPY, at: startedAt, lag, cron: true,
+            intended: sch.intended, due: sch.due, actual: today,
+            held: dayNumW(today) - dayNumW(sch.from),
+            tradingDays: tradingDaysBetweenW(sch.from, today)
+          };
           changed = true; note.marked++;
         }
         if (changed) await env.PF_SYNC.put('cmarks:' + w.ident, JSON.stringify(w.marks));
