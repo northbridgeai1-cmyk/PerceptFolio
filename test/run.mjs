@@ -823,6 +823,36 @@ t('repair rescales history rather than deleting the observation',
 t('split tolerance accommodates a day of real price movement', /const SPLIT_TOLERANCE=0\.08/.test(term));
 t('the nearest matching ratio wins, not the first', /err<best\.err/.test(term));
 
+/* The 40% gate cannot reach a 3-for-2, which is a 33.3% fall; that ratio was unreachable as
+   originally specified. Verified against every ratio in the list before adding a second gate. */
+t('ratio matching starts below the unexplained-move gate', /const SPLIT_SCAN=0\.27/.test(term));
+t('the low band is scanned, the high band is repaired',
+  /if\(move<=SPLIT_SCAN\)return true/.test(term) && /if\(move<=MAX_DAILY\)\{/.test(term));
+/* Withholding a 30% loss because it resembles a 3-for-2 would delete a real bad day from the
+   record. A record that discards its worst days is a flattered record. */
+t('a suspected low-band split is accepted into the series, not withheld',
+  /'split-suspected',[\s\S]{0,220}?return true;/.test(term));
+t('the low band is never rescaled', /if\(sp&&mv<=MAX_DAILY\)\{[\s\S]{0,400}?continue;/.test(term));
+t('the audit says which way that error runs', /understates rather than flatters the record/.test(term));
+
+/* A1 also covers what is not a split. */
+t('zero, negative and unusable prices are quarantined, not dropped silently',
+  /'bad-value',\s*\n\s*price===0/.test(term));
+t('bad values already in a series are removed, since no arithmetic recovers them',
+  /removed from the series; never a valid price/.test(term) &&
+  /return out\.filter\(r=>r\.p>0&&isFinite\(r\.p\)\)/.test(term));
+t('a symbol that priced and went silent is recorded', /function noteNoQuote/.test(term));
+t('a single missing day is not called a delisting', /if\(!\(days>=3\)\)return/.test(term));
+t('a symbol that never priced concludes nothing', /if\(!Array\.isArray\(arr\)\|\|!arr\.length\)return/.test(term));
+t('the no-quote path is actually wired to the failure', /noteNoQuote\(sym\)/.test(term) &&
+  /e\.message==='NO_DATA'\)\{try\{noteNoQuote/.test(term));
+/* The vendor moved Dividends from free to premium without notice; the split endpoint could go the
+   same way, so it is not load-bearing. */
+t('the split endpoint check is recorded rather than assumed', /THE SPLIT ENDPOINT WAS CHECKED FIRST/.test(term));
+t('all five quarantine categories reach the audit screen',
+  ['split','split-repaired','split-suspected','no-quote','bad-value']
+    .every(r=>term.includes("==='"+r+"'")));
+
 /* ==================== TOTAL RETURN ==================== */
 G('Marks credit distributions, on both legs');
 

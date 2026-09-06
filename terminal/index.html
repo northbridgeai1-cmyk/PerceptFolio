@@ -4566,7 +4566,7 @@ function handleApiErr(e,sym){
   if(e.message==='NO_KEY')toast('Add a Finnhub key in Settings, or set up sync so the worker supplies one.');
   else if(e.message==='BAD_KEY')toast('API key rejected. Check it in Settings.');
   else if(e.message==='RATE_LIMIT')toast('API rate limit hit. Wait a minute and refresh again.');
-  else if(e.message==='NO_DATA')toast(pfx+'no live quote from Finnhub. If this is a mutual fund, set its type to "Mutual Fund" and enter the NAV manually in the Price column.');
+  else if(e.message==='NO_DATA'){try{noteNoQuote(sym);}catch(_){}toast(pfx+'no live quote from Finnhub. If this is a mutual fund, set its type to "Mutual Fund" and enter the NAV manually in the Price column.');}
   else toast(pfx+'data lookup failed ('+e.message+'). You can enter its price manually in the Price column.');
 }
 
@@ -6185,7 +6185,39 @@ function herizenVerdict(sym){
    this app is built against, so the ratio test is what is available. It is deliberately conservative:
    a genuine 45% single-day move on news is quarantined too, which costs one confirmation click and
    is the right direction to be wrong in. */
+/* THE SPLIT ENDPOINT WAS CHECKED FIRST, AS SPECIFIED. Finnhub does publish /stock/split, but its
+   free-tier availability cannot be confirmed without spending a call against a key this file does
+   not hold, and the vendor has form here: Dividends and Major Developments were both free and were
+   reclassified premium with no notice. Building the only defence against a split on an endpoint
+   that can be withdrawn overnight would put the integrity of the whole return series on a vendor's
+   pricing decision.
+
+   So the heuristic below is the mechanism, not the fallback. It needs no extra data, no extra
+   quota and no network. If the endpoint is ever confirmed free it becomes corroboration for a
+   check that already works, which is the right way round. */
 const MAX_DAILY=0.40;                       // beyond this, treat as an event rather than a return
+
+/* A SECOND THRESHOLD, BECAUSE ONE CANNOT WORK.
+   The 3-for-2 in the ratio list below is unreachable behind a 40% gate: that split is a 33.3%
+   fall, so a rule reading "beyond 40% AND matching a split ratio" can never fire on it. Checked
+   against every ratio here — 2:1 is 50%, 3:1 is 66.7%, 10:1 is 90%, all comfortably clear, and
+   3-for-2 is the only one that is not.
+
+   So ratio matching starts at 27%, which covers the whole 3-for-2 band once the 8% tolerance is
+   applied (27.5% to 38.3%). But the ratio test has almost no discriminating power down there. A
+   30% fall on an earnings miss gives a ratio of 1.43, which is 4.8% from a 3-for-2 and therefore
+   a match. Ordinary moves are dense in this band; splits at these ratios are rare.
+
+   WHICH WAY TO BE WRONG. Holding the observation back would remove a real 30% loss from the
+   return series, and a record that quietly discards its worst days is a flattered record. That is
+   the one failure this product exists to prevent, so it is not available as a default. The
+   observation is therefore ACCEPTED into the series and flagged for confirmation. If it was in
+   fact a 3-for-2, the series carries a 33% loss that never happened, which understates the
+   operator's record rather than improving it, and the flag says so on the audit screen.
+
+   Above 40% the reasoning inverts. A clean ratio match there is overwhelmingly a split, ordinary
+   moves that large are rare, and the observation is held back and the history repaired. */
+const SPLIT_SCAN=0.27;                      // start testing ratios here
 const SPLIT_RATIOS=[
   {r:2,   label:'2-for-1'},   {r:3,   label:'3-for-1'},   {r:4,  label:'4-for-1'},
   {r:5,   label:'5-for-1'},   {r:10,  label:'10-for-1'},  {r:20, label:'20-for-1'},
@@ -6220,16 +6252,53 @@ function quarantine(sym,date,price,prev,reason,detail){
 }
 /* Returns true if the observation may enter the log. */
 function acceptPrice(sym,price,prevRow,date){
-  if(!(price>0)||!isFinite(price))return false;
+  /* A vendor error is not an absence of data. Returning false silently would drop the observation
+     with nothing on screen to say a price was rejected, which is the same failure the quarantine
+     exists to prevent — just at the other end of the scale. */
+  if(!(price>0)||!isFinite(price)){
+    quarantine(sym,date,price,prevRow?prevRow.p:null,'bad-value',
+      price===0 ? 'vendor returned zero'
+      : price<0 ? 'vendor returned a negative price'
+                : 'vendor returned no usable number');
+    return false;
+  }
   if(!prevRow||!(prevRow.p>0))return true;                 // nothing to compare against yet
   const move=Math.abs(price-prevRow.p)/prevRow.p;
-  if(move<=MAX_DAILY)return true;
+  if(move<=SPLIT_SCAN)return true;
   const sp=matchSplit(prevRow.p,price);
+  if(move<=MAX_DAILY){
+    if(!sp)return true;                                // an ordinary large move belongs in the series
+    quarantine(sym,date,price,prevRow.p,'split-suspected',
+      'moved '+(move*100).toFixed(0)+'%, which also matches a '+sp.label+' split. Counted as a return; confirm if it was a split.');
+    return true;                                       // accepted: see SPLIT_SCAN on which way to be wrong
+  }
   quarantine(sym,date,price,prevRow.p,
     sp?'split':'unexplained',
     sp?('looks like a '+sp.label+' split')
       :((price<prevRow.p?'fell ':'rose ')+(move*100).toFixed(0)+'% in one session'));
   return false;
+}
+
+/* ---- TICKER CHANGES, SPINOFFS, ACQUISITIONS ----
+   A symbol that has priced for months and now returns nothing is not a transient outage. It is a
+   ticker change, a delisting, an acquisition closing, or a spinoff that took the identifier with
+   it — SNDK being the recent example. Two things then go wrong, and the second is worse:
+
+     the mark cannot be taken at all; or the identifier is reassigned to a different company and
+     the mark is taken against the WRONG instrument, which enters the record as a real return.
+
+   Nothing here can tell those apart from a quote alone, so nothing here guesses. It records that
+   the symbol went quiet, with the date it last priced, and holds it out until a person says which
+   happened. Three days of silence, because one missing day is a bad afternoon at the vendor. */
+function noteNoQuote(sym){
+  if(!D||!D.priceLog)return;
+  const arr=D.priceLog[sym];
+  if(!Array.isArray(arr)||!arr.length)return;          // never priced: nothing to conclude
+  const last=arr[arr.length-1];
+  const days=Math.round((Date.now()-Date.parse(last.d+'T00:00:00Z'))/864e5);
+  if(!(days>=3))return;
+  quarantine(sym,new Date().toISOString().slice(0,10),null,last.p,'no-quote',
+    'priced until '+last.d+', silent '+days+' days. Possible ticker change, delisting or acquisition.');
 }
 
 /* ---- RETROACTIVE REPAIR ----
@@ -6246,9 +6315,17 @@ function scanSeries(sym,rows){
   const out=rows.map(r=>({...r}));
   for(let i=1;i<out.length;i++){
     const prev=out[i-1].p,cur=out[i].p;
-    if(!(prev>0)||!(cur>0))continue;
-    if(Math.abs(cur-prev)/prev<=MAX_DAILY)continue;
+    if(!(prev>0)||!(cur>0))continue;                   // dropped below, after the split pass
+    const mv=Math.abs(cur-prev)/prev;
+    if(mv<=SPLIT_SCAN)continue;
     const sp=matchSplit(prev,cur);
+    if(sp&&mv<=MAX_DAILY){
+      /* Noted, not repaired and not removed. See SPLIT_SCAN above. */
+      quarantine(sym,out[i].d,cur,prev,'split-suspected',
+        'moved '+(mv*100).toFixed(0)+'%, which also matches a '+sp.label+' split. Left in the series as a return; confirm if it was a split.');
+      continue;
+    }
+    if(mv<=MAX_DAILY)continue;
     if(sp){
       /* Everything before the event is divided by the ratio, putting the whole series on the
          post-split basis. Recorded so the operator can see what was changed and why. */
@@ -6256,8 +6333,16 @@ function scanSeries(sym,rows){
       quarantine(sym,out[i].d,cur,prev,'split-repaired','history rescaled for a '+sp.label+' split');
     }else{
       quarantine(sym,out[i].d,cur,prev,'unexplained',
-        (cur<prev?'fell ':'rose ')+(Math.abs(cur-prev)/prev*100).toFixed(0)+'% in one session');
+        (cur<prev?'fell ':'rose ')+(mv*100).toFixed(0)+'% in one session');
     }
+  }
+  /* Values that were never prices are removed outright rather than rescaled. A zero or a negative
+     in the series makes every return computed across it meaningless, and unlike a split there is
+     no arithmetic that recovers the real number. */
+  const bad=out.filter(r=>!(r.p>0)||!isFinite(r.p));
+  if(bad.length){
+    bad.forEach(r=>quarantine(sym,r.d,r.p,null,'bad-value','removed from the series; never a valid price'));
+    return out.filter(r=>r.p>0&&isFinite(r.p));
   }
   return out;
 }
@@ -11262,6 +11347,15 @@ async function renderAudit(){
                 :q.length+' observation'+(q.length===1?'':'s')+' held back from the return series');
   if(splits.length)out+=row('ok','Corporate actions handled',
     splits.length+' split'+(splits.length===1?'':'s')+' detected; history rescaled so no false return survives');
+  const gone=q.filter(x=>x.reason==='no-quote');
+  const badv=q.filter(x=>x.reason==='bad-value');
+  const susp=q.filter(x=>x.reason==='split-suspected');
+  if(susp.length)out+=row('wait','Possible splits awaiting confirmation',
+    susp.length+' move'+(susp.length===1?'':'s')+' between 27% and 40% that also match a split ratio. Counted as losses for now, which understates rather than flatters the record. Confirm any that were splits.');
+  if(gone.length)out+=row('bad','Symbols that stopped pricing',
+    gone.length+' ticker'+(gone.length===1?'':'s')+' priced and then went silent. A ticker change or delisting marks against the wrong company if left unresolved.');
+  if(badv.length)out+=row('wait','Vendor errors rejected',
+    badv.length+' zero, negative or unusable price'+(badv.length===1?'':'s')+' refused entry.');
   if(unex.length)out+=row('wait','Unexplained moves quarantined',
     unex.length+' move'+(unex.length===1?'':'s')+' beyond 40% in a session, not matching a split ratio. Left out of every statistic until identified.');
   if(q.length){
