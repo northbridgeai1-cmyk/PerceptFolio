@@ -291,20 +291,20 @@ main{flex:1;min-width:0;max-width:1180px;padding:28px 26px;
 /* Test-account banner. Deliberately loud: a demo mistaken for the real account is how someone
    concludes their portfolio has been wiped. */
 body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. Nothing here is real.";
-  display:block;background:var(--amber,#d9a441);color:#151515;font:700 11.5px/1 var(--mono);
+  display:block;background:var(--amber,#d9a441);color:#151515;font:700 11px/1 var(--mono);
   letter-spacing:.09em;text-transform:uppercase;text-align:center;padding:7px 10px;position:sticky;top:0;z-index:300}
 
 /* ---- thesis probability ---- */
 .prob-box{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px;margin:12px 0 4px}
-.prob-head{font:10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.prob-head{font:11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
 .prob-row{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 .prob-k{font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:7px}
-.prob-v{font:700 26px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.prob-v{font:700 24px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .prob-n{font-size:11px;line-height:1.5;color:var(--muted);margin-top:6px}
 .prob-own{display:flex;align-items:baseline;gap:5px}
 .prob-own input{width:82px;background:var(--panel2);border:1px solid var(--border);color:var(--text);
-  border-radius:8px;padding:5px 9px;font:700 22px/1.15 var(--mono);font-variant-numeric:tabular-nums}
-.prob-own span{font:600 17px/1 var(--mono);color:var(--muted)}
+  border-radius:8px;padding:5px 9px;font:700 20px/1.15 var(--mono);font-variant-numeric:tabular-nums}
+.prob-own span{font:600 18px/1 var(--mono);color:var(--muted)}
 /* The assumption is not a footnote. A probability printed without it is false precision with a
    Nobel Prize stapled to it, so it renders in warning colour directly beneath the number. */
 .prob-warn{font-size:11px;line-height:1.55;color:var(--yellow);margin-top:13px;padding-top:11px;border-top:1px solid var(--border)}
@@ -319,7 +319,7 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
    report 95% right while losing money on every third gap-down. Expectancy cannot be gamed that way,
    because a large loss is still in the average. */
 .rec{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
-.rec-head{font:10.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
+.rec-head{font:11px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
   display:flex;align-items:center;gap:8px;margin-bottom:11px}
 .rec-head:before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent);flex:none}
 .rec-top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
@@ -333,17 +333,17 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .rec-bar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
 .rec-bar i.done{background:var(--green)}
 .rec-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
-  font:11.5px/1.5 var(--mono);color:var(--muted);margin-top:7px}
+  font:11px/1.5 var(--mono);color:var(--muted);margin-top:7px}
 .rec-foot b{color:var(--text);font-weight:600}
 /* ---- marks schedule ---- */
 .md{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
-.md-head{font:10.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+.md-head{font:11px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
 .md-head b{color:var(--text)}
 .md-row{display:flex;align-items:baseline;gap:12px;padding:6px 0;border-top:1px solid var(--border);flex-wrap:wrap}
 .md-row:first-of-type{border-top:none}
-.md-when{font:700 11.5px/1 var(--mono);letter-spacing:.04em;min-width:74px;color:var(--muted)}
-.md-sym{font:700 13.5px/1 var(--mono);letter-spacing:-.01em}
-.md-meta{font:11.5px/1.4 var(--mono);color:var(--faint)}
+.md-when{font:700 11px/1 var(--mono);letter-spacing:.04em;min-width:74px;color:var(--muted)}
+.md-sym{font:700 13px/1 var(--mono);letter-spacing:-.01em}
+.md-meta{font:11px/1.4 var(--mono);color:var(--faint)}
 @media(max-width:600px){.rec-val{font-size:24px}}
 .hero{padding:8px 0 28px}
 .hero-label{font-family:var(--mono);color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
@@ -446,9 +446,9 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .list-row:hover{background:var(--panel2)}
 .list-row-dot{width:9px;height:9px;border-radius:50%;flex:none}
 .list-row-name{font-size:14px;font-weight:600}
-.list-row-tag{font:9.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+.list-row-tag{font:10px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
   border:1px solid var(--border);border-radius:4px;padding:3px 5px}
-.list-row-n{margin-left:auto;font:12.5px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.list-row-n{margin-left:auto;font:12px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
 .crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:14px}
 .crumb a{cursor:pointer;color:var(--muted)}
 .crumb a:hover{color:var(--text)}
@@ -461,9 +461,9 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .list-card:hover{border-color:#3d434f;background:var(--panel2)}
 .list-card-top{display:flex;align-items:center;gap:8px;font-size:14px}
 .list-card-dot{width:9px;height:9px;border-radius:50%;flex:none}
-.list-card-tag{font:9.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+.list-card-tag{font:10px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
   border:1px solid var(--border);border-radius:4px;padding:3px 5px}
-.list-card-n{font:700 26px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.list-card-n{font:700 24px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .list-card-sub{font-size:11px;color:var(--muted);line-height:1.45;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .list-head{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:16px 18px;margin-bottom:16px}
@@ -3817,6 +3817,26 @@ async function scoreStock(sym){
      market history, available the first time a ticker is scored. Missing windows stay null rather
      than being interpolated from the shorter ones, because a five-year return inferred from a
      one-year return is not a measurement. */
+  /* ---- LIQUIDITY, which nothing here measured ----
+     Sizing was constrained by a policy cap, a volatility budget, a stop distance and a momentum
+     gate. All four ask how much you can afford to lose. None asks whether you could get out.
+
+     A position worth several days of a stock's entire daily turnover cannot be exited at anything
+     like the screen price, and the smaller and more interesting the company, the more true that
+     is. It is the risk that only appears on the day it matters.
+
+     UNITS, WHICH DECIDE WHETHER THIS NUMBER MEANS ANYTHING. Finnhub reports these averages in
+     MILLIONS of shares. Getting that wrong misstates the answer by a factor of a million in one
+     direction or the other, so the converted figure is sanity-checked below rather than trusted:
+     an implied average volume under a thousand shares or above five billion is not a real daily
+     turnover for a listed equity, and is treated as uninterpretable rather than displayed. */
+  const advM=pick(m,['10DayAverageTradingVolume','3MonthAverageTradingVolume']);
+  const advShares=(advM!=null&&isFinite(advM))?advM*1e6:null;
+  out.advShares=(advShares!=null&&advShares>=1000&&advShares<=5e9)?advShares:null;
+  out.advSource=out.advShares!=null
+    ? (pick(m,['10DayAverageTradingVolume'])!=null?'10-day average':'3-month average')
+    : null;
+
   out.returns={
     m1:  pick(m,['monthToDatePriceReturnDaily','4WeekPriceReturnDaily','1MonthPriceReturnDaily']),
     m3:  pick(m,['13WeekPriceReturnDaily','3MonthPriceReturnDaily']),
@@ -7753,7 +7773,14 @@ function riskContributions(){
   const contrib=rows.map((r,i)=>{
     let mc=0;
     for(let j=0;j<rows.length;j++)mc+=w[j]*S[i][j];
-    return{...r,weight:w[i]*100,rc:(w[i]*mc)/(vol*vol)*100};
+    /* How many days of this stock's own average turnover the position represents. The question
+       every other figure on this tab skips: not how much it could fall, but whether you could
+       leave. */
+    const sc=(D.analyses||{})[r.sym];
+    const h=(D.holdings||[]).find(x=>x.sym===r.sym);
+    const adv=(sc&&isFinite(sc.advShares)&&sc.advShares>0)?sc.advShares:null;
+    const days=(adv&&h&&h.shares>0)?h.shares/adv:null;
+    return{...r,weight:w[i]*100,rc:(w[i]*mc)/(vol*vol)*100,exitDays:days,advSource:sc?sc.advSource:null};
   });
   const eqW=rows.map(()=>1/rows.length);
   /* M5 reads the same weights and the same covariance the risk table is built from, so the two
@@ -7878,17 +7905,43 @@ function renderRiskContrib(){
         }):'-')+'<span class="muted" style="font-size:13px;font-weight:400"> of '+R.n+'</span></span></div>'+
     '</div>'+
     '<div style="overflow-x:auto;margin-top:14px"><table><thead><tr>'+
-      '<th>Ticker</th><th>Share of money</th><th>Share of risk</th><th>Ratio</th><th>Volatility</th>'+
+      '<th>Ticker</th><th>Share of money</th><th>Share of risk</th><th>Ratio</th><th>Volatility</th><th title="Your position divided by the stock\'s average daily volume">Days to exit</th>'+
     '</tr></thead><tbody>'+sorted.map(r=>{
       const ratio=r.weight>0?r.rc/r.weight:null;
       return '<tr><td><b>'+esc(r.sym)+'</b></td>'+
         '<td class="muted">'+r.weight.toFixed(1)+'%</td>'+
         '<td class="'+(ratio>1.15?'neg':ratio<0.85?'pos':'')+'"><b>'+r.rc.toFixed(1)+'%</b></td>'+
         '<td class="'+(ratio>1.15?'neg':ratio<0.85?'pos':'muted')+'">'+(ratio!=null?ratio.toFixed(2)+'×':'-')+'</td>'+
-        '<td class="muted">'+(r.sigma*100).toFixed(0)+'%'+(r.assumed?' <span style="font-size:11px">assumed</span>':'')+'</td></tr>';
+        '<td class="muted">'+(r.sigma*100).toFixed(0)+'%'+(r.assumed?' <span style="font-size:var(--fs-caption)">assumed</span>':'')+'</td>'+
+        '<td class="'+(r.exitDays==null?'muted':(r.exitDays>1?'neg':r.exitDays>0.25?'warn':'muted'))+'">'+
+          (r.exitDays==null?'-':(r.exitDays<0.01?'<0.01':r.exitDays.toFixed(2)))+'</td></tr>';
     }).join('')+'</tbody></table></div>'+
     '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.65"><b>'+esc(worst.sym)+' holds '+worst.weight.toFixed(1)+'% of the money and '+worst.rc.toFixed(1)+'% of the risk.</b> '+
       'A ratio above 1 means a holding punches above its size; below 1 means it is dampening the book. This is the number a position-size percentage cannot show you.</p>'+
+    /* Liquidity, said plainly. This is the only figure on the tab that is about the exit rather
+       than the holding, and it is the one that is invisible until the day it is not. */
+    (()=>{
+      const withAdv=sorted.filter(r=>r.exitDays!=null);
+      if(!withAdv.length)
+        return '<p class="muted" style="font-size:var(--fs-sm);margin-top:10px;line-height:1.65">'+
+          '<b>Days to exit could not be calculated.</b> It needs an average daily volume from the scoring call, so it fills in after a refresh. '+
+          'Without it, every figure above tells you how much a position could fall and none tells you whether you could leave.</p>';
+      const worstL=withAdv.slice().sort((a,b)=>b.exitDays-a.exitDays)[0];
+      const heavy=withAdv.filter(r=>r.exitDays>1);
+      return '<p class="muted" style="font-size:var(--fs-sm);margin-top:10px;line-height:1.68">'+
+        '<b>Days to exit is your position divided by the stock\'s average daily volume.</b> '+
+        'Everything else on this tab asks how much you could lose; this asks whether you could leave. '+
+        'At <b>'+esc(worstL.sym)+'</b> you hold <b class="'+(worstL.exitDays>1?'neg':'')+'">'+
+          (worstL.exitDays<0.01?'under a hundredth':worstL.exitDays.toFixed(2))+'</b> of a day\'s trading, which is the largest here. '+
+        (heavy.length
+          ? '<b class="neg">'+heavy.length+' position'+(heavy.length===1?'':'s')+' exceed a full day\'s volume.</b> '+
+            'Selling one of those means being a material share of everyone trading it, and the price you get will not be the price on screen. '+
+            'That is also the day a stop is least likely to fill where you set it.'
+          : 'Nothing here is more than a day\'s volume, so an ordinary exit should not move the price much.')+
+        ' Sizing now respects this as a fifth limit, so the Before You Trade panel will refuse a position you could not leave in about a day. '+
+        'One day is a convention rather than a law. <b>Falsification:</b> if your realised exits show no more slippage on the names with a high figure here, the constraint is costing you size for nothing.</p>';
+    })()+
+
     /* M5. Two separate collapses, reported separately, because they have different remedies:
        concentration is fixed by resizing, correlation is fixed only by owning something else. */
     (R.bets
@@ -11536,6 +11589,9 @@ function maxBuyWithinCap(sym,capPct,fromCash){
      3. Stop distance     — if a thesis stop exists, size so hitting it costs exactly the budget.
                             Dollars = risk ÷ (distance to stop, as a fraction). This is the only one
                             of the three that truncates the loss rather than estimating it. */
+/* One day of the stock's own average turnover. A convention rather than a law, which is why it is
+   a named constant and why the panel says so instead of presenting it as a threshold from nature. */
+const LIQUIDITY_DAYS=1;
 function sizingLimits(sym,fromCash){
   const pol=policy();
   const rows=portfolioRows();
@@ -11569,8 +11625,20 @@ function sizingLimits(sym,fromCash){
   const hz=trackIsLive('herizen')?herizen(sym):null;
   if(hz&&isFinite(out.cap)){ out.hz=hz; out.gate=out.cap*(hz.size/100); }
 
+  /* ---- THE FIFTH LIMIT: can you get out ----
+     Expressed as a share count converted to dollars, so it sits alongside the others. The rule is
+     one day of the stock's own average turnover: past that, exiting means being a material
+     fraction of everyone trading it that day, and the price you get is not the price on screen.
+     One day is a convention, not a law, and it is stated as such on screen. */
+  const adv=(sc&&isFinite(sc.advShares)&&sc.advShares>0)?sc.advShares:null;
+  if(adv&&price>0){
+    out.adv=adv; out.advSource=sc.advSource||null;
+    out.liq=adv*price*LIQUIDITY_DAYS;
+  }
+
   const candidates=[['policy cap',out.cap],['volatility budget',out.vol],
-                    ['stop distance',out.stop],['momentum gate',out.gate]]
+                    ['stop distance',out.stop],['momentum gate',out.gate],
+                    ['liquidity',out.liq]]
     .filter(c=>isFinite(c[1])&&c[1]>=0);
   if(candidates.length){
     candidates.sort((a,b)=>a[1]-b[1]);

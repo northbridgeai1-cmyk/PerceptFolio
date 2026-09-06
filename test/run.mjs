@@ -99,6 +99,7 @@ G('Promise audit — the site may not claim what the code does not do');
    same trap that produced two false failures earlier in this suite's life. Only rendered text can
    make a promise, so only rendered text is audited. */
 const admin = read('admin.html');
+const landing = read('index.html');
 const privacy = read('privacy/index.html');
 const terms = read('terms/index.html');
 /* Comment scoping has to respect script boundaries. An earlier version stripped JS block comments
@@ -1048,6 +1049,58 @@ t('daily units are used throughout, not annualised ones',
 t('it states its own falsification', /this whole panel collapses to the plain interval above/.test(term));
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
+
+/* ==================== LIQUIDITY ==================== */
+G('Not how much you could lose, but whether you could leave');
+
+/* Sizing had four constraints and all four asked how much you could afford to lose. */
+t('liquidity is a fifth sizing constraint',
+  /\['liquidity',out\.liq\]/.test(term) && /const LIQUIDITY_DAYS=1/.test(term));
+t('and can bind before the others', /candidates\.sort\(\(a,b\)=>a\[1\]-b\[1\]\)/.test(term));
+/* The volume figure was already in the scoring response and discarded. */
+t('average volume is captured from the existing scoring call',
+  /pick\(m,\['10DayAverageTradingVolume','3MonthAverageTradingVolume'\]\)/.test(term));
+/* Finnhub reports these in millions. Getting that wrong misstates the answer by 1e6 either way,
+   so the converted figure is range-checked rather than trusted. */
+t('the unit conversion is sanity-checked, not assumed',
+  /advShares>=1000&&advShares<=5e9/.test(term));
+t('an uninterpretable volume yields null rather than a number',
+  /out\.advShares=\(advShares!=null&&advShares>=1000&&advShares<=5e9\)\?advShares:null/.test(term));
+t('days to exit is position over average daily volume',
+  /days=\(adv&&h&&h\.shares>0\)\?h\.shares\/adv:null/.test(term));
+t('it appears as its own column on the risk table', /Days to exit/.test(term));
+t('the panel says what it means and warns above a full day',
+  /asks whether you could leave/.test(term) && /exceed a full day/.test(term));
+t('the one-day rule is named a convention rather than a law',
+  /One day is a convention rather than a law/.test(term));
+t('it states its own falsification',
+  /the constraint is costing you size for nothing/.test(term));
+t('a missing volume says so instead of hiding the column',
+  /<b>Days to exit could not be calculated\.<\/b>/.test(term));
+
+/* ==================== ONE SCALE, BOTH PAGES ==================== */
+G('The front door and the instrument are one product');
+
+t('the landing page is on the same radius tiers as the terminal', (() => {
+  const css = landing.slice(landing.indexOf('<style>'), landing.indexOf('</style>'));
+  const radii = [...new Set((css.match(/border-radius:(\d+)px/g)||[]).map(x=>x.replace(/\D/g,'')))];
+  return radii.every(r => ['4','6','8','12','16'].includes(r));
+})());
+t('and on the same type scale', (() => {
+  const css = landing.slice(landing.indexOf('<style>'), landing.indexOf('</style>'));
+  const sizes = [...new Set((css.match(/font-size:([0-9.]+)px/g)||[]).map(x=>x.replace(/[^0-9.]/g,'')))];
+  return sizes.every(v => !v.includes('.'));
+})());
+/* font: shorthand carries a size too, and a pass that only rewrote font-size left it behind. */
+t('font shorthand sizes are on the scale in both files', (() => {
+  const grab2 = f => f.slice(f.indexOf('<style>'), f.indexOf('</style>'));
+  const off = x => (grab2(x).match(/font:[^;}]*?\b([0-9.]+)px/g)||[]).some(m=>m.includes('.'));
+  return !off(landing) && !off(term);
+})());
+t('the landing page carries the same typographic principles',
+  /h1,h2,\.hero h1\{letter-spacing:-0\.02em;font-weight:600\}/.test(landing));
+t('and the same ban on pill-shaped controls',
+  /\.btn,button,input,select,textarea\{border-radius:8px\}/.test(landing));
 
 /* ==================== TRANSACTIONAL MAIL ==================== */
 G('The last manual step in the access flow');
