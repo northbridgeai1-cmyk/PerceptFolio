@@ -1049,6 +1049,83 @@ t('it states its own falsification', /this whole panel collapses to the plain in
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
 
+/* ==================== P4. CRAFT AND MOBILE ==================== */
+G('The daily check happens on a phone');
+
+/* A spinner says something is happening; a skeleton says a four-row table is arriving here. */
+t('loading states are skeletons, not spinners', /function skeleton\(kind,rows\)/.test(term) &&
+  !/class="empty">Loading/.test(term));
+t('the skeleton is hidden from screen readers and the wait is announced instead',
+  /aria-hidden="true"/.test(term) && /el\.setAttribute\('aria-busy','true'\)/.test(term) &&
+  /<span class="sr-only">Loading<\/span>/.test(term));
+t('there is an sr-only class for it to use', /\.sr-only\{position:absolute/.test(term));
+/* No hover on a phone, so a press must acknowledge itself before the work finishes. */
+t('taps give immediate feedback', /\.btn:active,\.btn-add:active,\.ovf-btn:active,\.prov:active\{transform:scale\(\.97\)\}/.test(term));
+t('and that is dropped for reduced-motion', /@media \(prefers-reduced-motion:reduce\)\{[\s\S]{0,200}?transform:none/.test(term));
+t('numbers align down a column', /font-variant-numeric:tabular-nums/.test(term));
+/* Touch targets are gated on pointer, not width: a narrow desktop window still has a mouse. */
+t('touch targets are enlarged for coarse pointers only', /@media \(pointer:coarse\)\{/.test(term));
+t('the touch block is last, because media queries add no specificity',
+  term.lastIndexOf('@media (pointer:coarse)') > term.lastIndexOf('@media (max-width:400px)'));
+/* Row actions behind the 3-dot menu, finishing the treatment. */
+t('Screener, History and Clients row actions are behind overflow menus',
+  /function screenerMenu/.test(term) && /function historyMenu/.test(term) && /function clientMenu/.test(term));
+t('their menus use the expression-string convention the others use',
+  /run:'removeTransaction\('\+\(\+i\)\+'\)'/.test(term));
+t('destructive row actions are marked as such', /run:'removeClient\('\+q\+'\)'\}/.test(term) &&
+  /danger:true,run:'removeTransaction/.test(term));
+/* Offline: the worker already handled it, nothing told the user. */
+/* Built in script rather than markup, so assert on the construction. */
+t('offline is announced', /function renderOfflineState/.test(term) &&
+  /el\.id='offlineBanner'/.test(term) && /setAttribute\('role','status'\)/.test(term));
+t('it says which half still works rather than implying the app is down',
+  /Your record, scorecard, risk panels and audit all still work/.test(term));
+t('buttons that need the network are disabled with the reason, not left spinning',
+  /b\.title='Needs a connection\. You are offline\.'/.test(term) && /b\.textContent='Offline'/.test(term));
+t('and are restored with their original label', /b\.textContent=b\.dataset\.onlineLabel/.test(term));
+/* Empty states on the panels that were blank. */
+t('the analyzer says what it is before anything is analysed', /<b>Nothing analysed yet\.<\/b>/.test(term));
+t('the command tab explains what a review does', /<b>Nothing checked yet today\.<\/b>/.test(term));
+t('the audit shows a skeleton rather than a blank panel while it computes',
+  /id="auditBody"[^>]*aria-busy="true"/.test(term));
+
+/* ==================== P3. THE COMMAND BAR ==================== */
+G('A professional does not reach for the mouse');
+
+const SD = new Function(`
+  ${grab(term, 'parseCommand')}
+  const CMD_VERBS={SCORE:{needsSym:true},THESIS:{needsSym:true},MAP:{needsSym:true},NEWS:{needsSym:true},
+                   RISK:{},EFFBETS:{},AUDIT:{},SCORECARD:{},HELP:{}};
+  const CMD_HORIZONS={'30D':'30','90D':'90','180D':'180','365D':'365'};
+  return {parseCommand};
+`)();
+const PC=x=>SD.parseCommand(x);
+t('a bare ticker means score it', PC('AAPL').ok && PC('AAPL').verb==='SCORE' && PC('AAPL').sym==='AAPL');
+t('the grammar is subject then verb', PC('ASML SCORE').verb==='SCORE' && PC('ASML THESIS').verb==='THESIS');
+t('book-level commands need no subject', PC('BOOK RISK').ok && PC('BOOK EFFBETS').ok && PC('AUDIT').ok);
+t('a horizon can be set from the bar', PC('SCORE 90D').ok && PC('SCORE 90D').horizon==='90');
+t('lowercase is accepted', PC('aapl score').ok && PC('aapl score').sym==='AAPL');
+/* Guessing at the nearest match is how the wrong ticker gets analysed. */
+t('gibberish is refused rather than guessed at', !PC('!!!').ok && /not a ticker or a command/.test(PC('!!!').why));
+t('an unknown verb names itself and lists the real ones',
+  !PC('AAPL FLY').ok && /FLY/.test(PC('AAPL FLY').why) && /SCORE, THESIS, MAP or NEWS/.test(PC('AAPL FLY').why));
+t('a ticker verb applied to the book is refused', !PC('BOOK SCORE').ok);
+t('an incomplete command explains what is missing', !PC('BOOK').ok && /BOOK needs a verb/.test(PC('BOOK').why));
+t('empty input explains rather than doing nothing', !PC('').ok);
+/* The safety property: a typo must not be able to change the record. */
+/* Scoped to the block itself: a loose regex here runs past the closing brace and matches a
+   mutating call elsewhere in a 12,000 line file, which is a false alarm rather than a finding. */
+t('every verb only navigates or looks up, none mutate', (() => {
+  const i=term.indexOf('const CMD_VERBS={');
+  if(i<0)return false;
+  const block=term.slice(i, term.indexOf('\n};', i));
+  return !/saveDB|recordCall|persistDB|\.push\(|delete D\./.test(block);
+})());
+t('parsing is separate from executing so it can be tested without a DOM',
+  /function parseCommand\(raw\)/.test(term) && /function runCommand\(raw\)/.test(term));
+t('it opens on a keystroke and never steals one while typing',
+  /if\(\/INPUT\|TEXTAREA\|SELECT\/\.test\(tag\)\|\|e\.target\.isContentEditable\)return/.test(term));
+
 /* ==================== E1. THE MONTHLY CLOSE ==================== */
 G('The likeliest failure is not being wrong, it is being unused');
 

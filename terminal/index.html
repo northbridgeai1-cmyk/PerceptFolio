@@ -570,6 +570,36 @@ small.src{color:var(--muted)}
    every other target. Each is position:sticky, so each is its own stacking context. */
 body.touring header,body.touring #sidebar{z-index:201}
 .tour-lit{position:relative;box-shadow:0 0 0 2px var(--brand2),0 0 0 7px rgba(31,158,140,.22);border-radius:8px}
+/* ============================ P4. CRAFT ============================
+   SKELETONS, NOT SPINNERS. A spinner says "something is happening"; a skeleton says "a table with
+   four rows is arriving here". The second one lets the eye settle before the data lands, and it
+   stops the layout jumping when it does, which is the actual complaint behind "it feels slow".
+   Deliberately no shimmer animation: this is a terminal, and a pulsing gradient on every panel is
+   decoration masquerading as feedback. A quiet static block is enough. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.sk{background:var(--panel2);border-radius:4px;display:block}
+.sk-row{height:13px;margin:9px 0}
+.sk-w1{width:92%}.sk-w2{width:74%}.sk-w3{width:58%}.sk-w4{width:83%}
+.sk-stat{height:34px;margin:6px 0;width:100%}
+.sk-wrap{padding:4px 0}
+@media (prefers-reduced-motion:no-preference){
+  .sk{animation:skfade 1.6s ease-in-out infinite}
+  @keyframes skfade{0%,100%{opacity:.55}50%{opacity:.85}}
+}
+
+/* TAP FEEDBACK. On a phone there is no hover, so without this a button gives no sign it was
+   pressed until the work finishes, and people press again. The transform is small on purpose. */
+.btn:active,.btn-add:active,.ovf-btn:active,.prov:active{transform:scale(.97)}
+.btn,.btn-add,.ovf-btn{transition:transform .06s ease,background .12s ease,border-color .12s ease;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+@media (prefers-reduced-motion:reduce){
+  .btn,.btn-add,.ovf-btn{transition:none}
+  .btn:active,.btn-add:active,.ovf-btn:active{transform:none}
+}
+
+/* Numbers are read down a column, so they align down a column. */
+.stat-value,table td,table th{font-variant-numeric:tabular-nums}
+
 @media (max-width:768px){
   .cmd-why{white-space:normal;font-size:12.5px}
   .cmd-row{align-items:flex-start;flex-wrap:wrap;padding:12px}
@@ -728,6 +758,19 @@ body.touring header,body.touring #sidebar{z-index:201}
   .hero-value{font-size:29px}
   .fc-grid-2,.fc-grid-3{grid-template-columns:1fr}
   .auth-h1{font-size:26px}
+}
+
+/* P4. TOUCH TARGETS, and this block is deliberately last: media queries add no specificity (I9),
+   so anything after it would win. A 30px control is comfortable with a mouse and a coin toss with
+   a thumb, and the ones that were too small here are exactly the ones a phone user reaches for
+   most, the row overflow menus. Gated on a coarse pointer rather than on width, because a small
+   window on a desktop is still being driven by a mouse and does not need fat controls. */
+@media (pointer:coarse){
+  .btn-sm,.icon-btn,.ovf-btn{min-height:40px;min-width:40px}
+  .ovf-btn{display:inline-flex;align-items:center;justify-content:center}
+  .ovf-item{min-height:44px;display:flex;align-items:center}
+  .mycall{min-height:40px}
+  select,input[type=number],input[type=text],input[type=password]{min-height:40px}
 }
 </style>
 <script>
@@ -998,7 +1041,7 @@ body.touring header,body.touring #sidebar{z-index:201}
     </div>
     <button class="btn" onclick="runDailyReview()" id="cmdRunBtn">Run review</button>
   </div>
-  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"></div>
+  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"><b>Nothing checked yet today.</b> Run review pulls fresh prices, re-scores every holding and watchlist name, records any verdict that changed, and stamps any call that has reached its horizon. It is the one action that keeps the record accumulating, because a mark can only be taken while this app is open.</div>
   <!-- The track record sits above the actions on purpose. Anything that tells you what to do should
        have to state, in the same breath, how often it has been right. -->
   <div id="cmdRecord" class="rec"></div>
@@ -1464,7 +1507,7 @@ body.touring header,body.touring #sidebar{z-index:201}
         <button class="btn btn-ghost btn-sm" onclick="loadMarketData(true)">↻</button>
       </div>
     </div>
-    <div id="todaysMove" style="margin-top:12px"><div class="empty">Loading…</div></div>
+    <div id="todaysMove" style="margin-top:12px" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
     <p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.55">The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b>, it's a ruler, not a forecast.</p>
   </div>
 
@@ -1487,7 +1530,7 @@ body.touring header,body.touring #sidebar{z-index:201}
   <div class="section-title">Market Weather. Long-run valuation</div>
   <div id="weatherVerdict" style="margin-bottom:14px"></div>
   <div class="grid grid-3" id="weatherCards">
-    <div class="card"><div class="empty">Loading…</div></div>
+    <div class="card" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w4"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
   </div>
   <div class="card" style="margin-top:14px">
     <h3>Figures With No Free Feed</h3>
@@ -1570,7 +1613,7 @@ body.touring header,body.touring #sidebar{z-index:201}
     </div>
     <p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">Loaded on demand, not on every page view. Each holding costs one API call and Finnhub's free tier allows sixty a minute. Cached for thirty minutes.</p>
   </div>
-  <div id="newsBody" style="margin-top:16px"></div>
+  <div id="newsBody" style="margin-top:16px"><div class="empty" style="text-align:left;line-height:1.7"><b>No news loaded yet.</b><br><span style="font-size:12.5px">News is fetched on demand so it does not spend your Finnhub quota in the background. Press Refresh, or open a ticker from Portfolio. Headlines are shown as context only: this product never turns a headline into a buy or sell verdict, because a model asked to justify a verdict from headlines will always find a reason.</span></div></div>
 </div>
 
 <!-- SCREENER -->
@@ -1645,7 +1688,7 @@ body.touring header,body.touring #sidebar{z-index:201}
       <span class="muted">ETFs: quality checks apply to companies, not ETFs. Use this for individual stocks.</span>
     </div>
   </div>
-  <div id="analyzerResult"></div>
+  <div id="analyzerResult"><div class="empty" style="text-align:left;line-height:1.7"><b>Nothing analysed yet.</b><br><span style="font-size:12.5px">Enter a US ticker above. The Analyzer runs the 22 checks, shows what each one measured and whether it passed, and records the verdict as a call so it can be graded later. It is deliberately not a recommendation.</span></div></div>
   <div class="card" style="margin-top:16px">
     <h3>Compare Two Stocks</h3>
     <div class="row">
@@ -1684,7 +1727,7 @@ body.touring header,body.touring #sidebar{z-index:201}
   <div class="section-title">Where your risk actually sits</div>
   <div class="card">
     <p class="muted" style="margin-bottom:12px">Every holding's share of the portfolio's <b>variance</b>, against its share of the <b>money</b>. A 6% position in a violent name can own 20% of your risk, and no position-size percentage will ever show you that.</p>
-    <div id="riskContribBody"></div>
+    <div id="riskContribBody"><div class="empty" style="text-align:left;line-height:1.7"><b>Risk needs at least two holdings.</b><br><span style="font-size:12.5px">This panel splits your risk by where it actually sits rather than by position size, which needs at least two positions with enough price history to estimate volatility. Add holdings in Portfolio and refresh once; it fills in on its own.</span></div></div>
   </div>
 
 
@@ -2023,7 +2066,7 @@ body.touring header,body.touring #sidebar{z-index:201}
       <button class="btn btn-ghost btn-sm" onclick="renderAudit()">Re-check</button>
     </div>
     <p class="muted" style="margin-top:6px;font-size:13px">What this install actually is, as opposed to what any screen claims. Anything red is a promise this copy is not currently keeping.</p>
-    <div id="auditBody" style="margin-top:14px"></div>
+    <div id="auditBody" style="margin-top:14px"aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w4"></span><span class="sk sk-row sk-w3"></span></div></div>
   </div>
 </div>
 
@@ -2523,7 +2566,7 @@ function renderHistory(){
       '<td>'+pmask(amount)+'</td>'+
       '<td>'+(tx.realized!=null?'<span class="'+(tx.realized>=0?'pos':'neg')+'">'+pmask(fmt$(tx.realized))+'</span>':'-')+'</td>'+
       '<td class="muted" style="font-size:12px">'+esc(tx.note||'')+'</td>'+
-      '<td><button class="btn-danger btn btn-sm" onclick="removeTransaction('+i+')">✕</button></td></tr>';
+      '<td>'+ovfButton('historyMenu(this,'+i+')','Actions for this transaction')+'</td></tr>';
   }).join('');
 }
 function clearHistoryFilters(){
@@ -2864,7 +2907,7 @@ function resetTransientState(){
   scrubRow=null;currentChartHist=[];
   /* macroCache holds FRED series — market-wide data, identical for everyone, so it is deliberately
      NOT cleared here. The per-account CAPE and margin figures live in D and swap with the profile. */
-  const tm=document.getElementById('todaysMove');if(tm)tm.innerHTML='<div class="empty">Loading…</div>';
+  const tm=document.getElementById('todaysMove');if(tm)loadingInto(tm,'rows',3);
   // The map is per-account data, so it must not carry over when profiles swap.
   mapSym='';mapProfile=null;mapPeers=[];moveDay='today';cmdOpen=null;
   const mc=document.getElementById('mapCanvas');if(mc)mc.innerHTML='<div class="empty">Enter a ticker above to build its map.</div>';
@@ -2931,6 +2974,7 @@ function enterSession(){
   try{ repairAllSeries(); }catch(e){}
   try{ renderSyncBlocked(); }catch(e){}
   try{ renderMonthlyClose(); }catch(e){}
+  try{ renderOfflineState(); }catch(e){}
   renderBackupBanner();
   /* Adopt marks the worker stamped while this app was closed, then tell it what is still open.
      Both silent and unawaited: session entry must not wait on a network round-trip. */
@@ -3207,9 +3251,7 @@ function renderClientsList(){
       '<td class="'+(gain>=0?'pos':'neg')+'">'+fmt$(gain)+'</td>'+
       '<td><input type="number" min="0" max="100" step="0.1" value="'+feePct+'" style="width:64px" onchange="setClientFee(\''+esc(email)+'\',this.value)">%</td>'+
       '<td>'+fmt$(estFee)+'</td>'+
-      '<td class="row"><button class="btn btn-ghost btn-sm" onclick="toggleClientReport(\''+esc(email)+'\')">'+(openClientReport===email?'Hide':'Report')+'</button>'+
-      '<button class="btn btn-ghost btn-sm" onclick="switchToClient(\''+esc(email)+'\')">Switch</button>'+
-      '<button class="btn-danger btn btn-sm" onclick="removeClient(\''+esc(email)+'\')">✕</button></td></tr>';
+      '<td>'+ovfButton('clientMenu(this,\''+esc(email)+'\')','Actions for this client')+'</td></tr>';
     return row+(openClientReport===email?clientReportRowHtml(email,p):'');
   }).join('');
 }
@@ -4233,6 +4275,167 @@ function closeMenu(){
 }
 /* items: [{label, run, danger}] . `run` is a string evaluated on click, so it survives the innerHTML
    rebuilds the tables do on every render. */
+/* ---- P4. OFFLINE, SAID OUT LOUD ----
+   The service worker already makes this work offline. What it did not do is TELL anyone, so the
+   experience of losing signal was a Refresh button that appeared to hang and prices that quietly
+   stopped being current with nothing on screen to say why.
+
+   Almost all of this product still works with no connection: the record, the scorecard, the audit,
+   the risk panels and every statistic are computed from data already on the device. Only fresh
+   quotes need the network. So the banner says which half is affected rather than implying the app
+   is down, and the buttons that genuinely cannot work are disabled with the reason on them instead
+   of spinning against a server that is not there. */
+function isOffline(){return typeof navigator!=='undefined'&&navigator.onLine===false;}
+const NET_BUTTONS=['cmdRunBtn','refreshBtn','newsLoadBtn','screenRunBtn'];
+function renderOfflineState(){
+  const off=isOffline();
+  let el=document.getElementById('offlineBanner');
+  if(off&&!el){
+    el=document.createElement('div');
+    el.id='offlineBanner';
+    el.setAttribute('role','status');
+    el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:590;background:var(--panel2);'+
+      'border-bottom:1px solid var(--border);color:var(--text);padding:9px 16px;font-size:12.5px;line-height:1.5';
+    el.innerHTML='<b>Offline.</b> Your record, scorecard, risk panels and audit all still work, because they are computed from data already on this device. '+
+      'Only fresh prices need a connection, so quotes are as of the last refresh and no new marks can be stamped until you are back.';
+    document.body.appendChild(el);
+  }
+  if(!off&&el)el.remove();
+  NET_BUTTONS.forEach(id=>{
+    const b=document.getElementById(id);
+    if(!b)return;
+    if(off){
+      if(!b.dataset.onlineLabel)b.dataset.onlineLabel=b.textContent;
+      b.disabled=true;
+      b.title='Needs a connection. You are offline.';
+      b.textContent='Offline';
+    }else if(b.dataset.onlineLabel){
+      b.disabled=false;
+      b.title='';
+      b.textContent=b.dataset.onlineLabel;
+      delete b.dataset.onlineLabel;
+    }
+  });
+}
+window.addEventListener('online',renderOfflineState);
+window.addEventListener('offline',renderOfflineState);
+
+/* P4. One skeleton helper rather than a bespoke placeholder per panel, so a new panel gets the
+   right loading state by default instead of a blank div or a spinner. */
+function skeleton(kind,rows){
+  const n=rows||4;
+  if(kind==='stats')
+    return '<div class="sk-wrap" aria-hidden="true">'+Array.from({length:n},()=>'<span class="sk sk-stat"></span>').join('')+'</div>';
+  const w=['sk-w1','sk-w2','sk-w3','sk-w4'];
+  return '<div class="sk-wrap" aria-hidden="true">'+
+    Array.from({length:n},(_,i)=>'<span class="sk sk-row '+w[i%4]+'"></span>').join('')+'</div>';
+}
+/* Announced separately so a screen reader is told the panel is loading, since the skeleton itself
+   is decorative and hidden from the accessibility tree. */
+function loadingInto(el,kind,rows){
+  if(!el)return;
+  el.setAttribute('aria-busy','true');
+  el.innerHTML='<span class="sr-only">Loading</span>'+skeleton(kind,rows);
+}
+function loadedInto(el,html){
+  if(!el)return;
+  el.removeAttribute('aria-busy');
+  el.innerHTML=html;
+}
+
+/* ============================ P3. THE COMMAND BAR ============================
+   A professional does not reach for a mouse to look up a stock. The grammar is deliberately the
+   terminal convention, subject then verb:
+
+       ASML SCORE        ASML THESIS       ASML MAP        ASML VS SPY
+       BOOK RISK         BOOK EFFBETS      SCORE 90D       AUDIT
+
+   Two rules keep it honest. It only ever NAVIGATES or looks something up: no command mutates the
+   record, so a typo cannot log a call, delete a holding or move a horizon. And an unrecognised
+   command says what it does not understand rather than guessing at the nearest match, because
+   guessing in a terminal is how the wrong ticker gets analysed. */
+const CMD_VERBS={
+  SCORE:{tab:'analyzer',needsSym:true,run:sym=>{showTab('analyzer');analyzeStock(sym);}},
+  THESIS:{tab:'portfolio',needsSym:true,run:sym=>{showTab('portfolio');const el=document.getElementById('thesisSym');if(el){el.value=sym;el.focus();}}},
+  MAP:{tab:'map',needsSym:true,run:sym=>{showTab('map');}},
+  NEWS:{tab:'news',needsSym:true,run:sym=>{showTab('news');}},
+  RISK:{tab:'risk',run:()=>showTab('risk')},
+  EFFBETS:{tab:'risk',run:()=>showTab('risk')},
+  AUDIT:{tab:'settings',run:()=>{showTab('settings');const a=document.getElementById('auditBody');if(a)a.scrollIntoView({block:'start'});}},
+  SCORECARD:{tab:'market',run:()=>showTab('market')},
+  HELP:{run:()=>toggleCommandBar(true)}
+};
+const CMD_HORIZONS={'30D':'30','90D':'90','180D':'180','365D':'365'};
+/* Returns {ok, run, why}. Parsing is separated from executing so it can be tested without a DOM. */
+function parseCommand(raw){
+  const parts=String(raw||'').trim().toUpperCase().split(/\s+/).filter(Boolean);
+  if(!parts.length)return{ok:false,why:'Type a command. Try AUDIT, BOOK RISK, or a ticker followed by SCORE.'};
+  const head=parts[0];
+  if(head==='AUDIT'||head==='HELP')return{ok:true,verb:head,sym:null};
+  if(head==='BOOK'){
+    const v=parts[1];
+    if(!v)return{ok:false,why:'BOOK needs a verb. BOOK RISK or BOOK EFFBETS.'};
+    if(!CMD_VERBS[v]||CMD_VERBS[v].needsSym)return{ok:false,why:'BOOK '+v+' is not a command. Try BOOK RISK or BOOK EFFBETS.'};
+    return{ok:true,verb:v,sym:null};
+  }
+  if(head==='SCORE'&&parts[1]&&CMD_HORIZONS[parts[1]])
+    return{ok:true,verb:'SCORECARD',sym:null,horizon:CMD_HORIZONS[parts[1]]};
+  /* Anything else is subject-first, so the head must look like a ticker. */
+  if(!/^[A-Z][A-Z.\-]{0,7}$/.test(head))
+    return{ok:false,why:'"'+head+'" is not a ticker or a command.'};
+  const verb=parts[1];
+  if(!verb)return{ok:true,verb:'SCORE',sym:head};      // a bare ticker means score it
+  if(verb==='VS')return{ok:true,verb:'MAP',sym:head};
+  if(!CMD_VERBS[verb]||!CMD_VERBS[verb].needsSym)
+    return{ok:false,why:'"'+verb+'" is not something you can do to a ticker. Try SCORE, THESIS, MAP or NEWS.'};
+  return{ok:true,verb,sym:head};
+}
+function runCommand(raw){
+  const p=parseCommand(raw);
+  if(!p.ok){toast(p.why);return false;}
+  const v=CMD_VERBS[p.verb];
+  if(!v){toast('Unrecognised command.');return false;}
+  if(p.horizon){
+    const sel=document.getElementById('scoreWindow');
+    if(sel){sel.value=p.horizon;if(typeof renderScorecard==='function')renderScorecard();}
+  }
+  try{ v.run(p.sym); }catch(e){ toast('That command could not run: '+e.message); return false; }
+  toggleCommandBar(false);
+  return true;
+}
+function toggleCommandBar(show){
+  let bar=document.getElementById('cmdBar');
+  if(!show){ if(bar)bar.remove(); return; }
+  if(bar){const i=document.getElementById('cmdBarInput'); if(i)i.focus(); return;}
+  bar=document.createElement('div');
+  bar.id='cmdBar';
+  bar.style.cssText='position:fixed;inset:0;z-index:9995;background:rgba(6,7,9,.6);display:flex;align-items:flex-start;justify-content:center;padding:12vh 20px 20px';
+  bar.addEventListener('click',e=>{if(e.target===bar)toggleCommandBar(false);});
+  bar.innerHTML='<div style="max-width:560px;width:100%;background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+    '<input id="cmdBarInput" autocomplete="off" spellcheck="false" placeholder="AAPL SCORE"'+
+      ' style="width:100%;border:none;background:transparent;color:var(--text);font:15px/1.4 var(--mono);padding:15px 16px;outline:none">'+
+    '<div style="border-top:1px solid var(--border);padding:11px 16px;font:11.5px/1.9 var(--mono);color:var(--muted)">'+
+      'ASML SCORE &nbsp; ASML THESIS &nbsp; ASML MAP &nbsp; ASML NEWS<br>'+
+      'BOOK RISK &nbsp; BOOK EFFBETS &nbsp; SCORE 90D &nbsp; AUDIT'+
+    '</div></div>';
+  document.body.appendChild(bar);
+  const inp=document.getElementById('cmdBarInput');
+  inp.focus();
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();runCommand(inp.value);}
+    if(e.key==='Escape'){e.preventDefault();toggleCommandBar(false);}
+  });
+}
+document.addEventListener('keydown',e=>{
+  /* Not while typing into something else, and never stealing a browser shortcut. */
+  const tag=(e.target&&e.target.tagName)||'';
+  if(/INPUT|TEXTAREA|SELECT/.test(tag)||e.target.isContentEditable)return;
+  if(e.key===':'||(e.key==='k'&&(e.metaKey||e.ctrlKey))){
+    e.preventDefault();
+    toggleCommandBar(true);
+  }
+});
+
 /* ============================ E1. THE MONTHLY CLOSE ============================
    The highest-probability failure of this project is not being wrong. It is being unused. The
    record needs on the order of a hundred and forty marked calls, corrected upward for
@@ -4437,6 +4640,28 @@ document.addEventListener('click',e=>{ if(_menuOpen&&!e.target.closest('.ovf-men
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeMenu(); });
 window.addEventListener('scroll',()=>closeMenu(),true);
 
+/* P4. The three menus that finish the overflow treatment. Destructive items are marked so they
+   render apart from the rest, because a delete sitting flush against a navigation item is how a
+   row gets removed by accident on a phone. */
+function screenerMenu(btn,sym,inWatch){
+  /* run is an expression string, matching every other menu in this file; openMenu inlines it into
+     the item's onclick. Passing a function here would stringify into something that does nothing. */
+  const q=JSON.stringify(String(sym));
+  const items=[{label:'Analyze',run:'analyzeStock('+q+')'}];
+  if(!inWatch)items.push({label:'Add to watchlist',run:'addWatchSym('+q+')'});
+  openMenu(btn,items);
+}
+function historyMenu(btn,i){
+  openMenu(btn,[{label:'Delete this transaction',danger:true,run:'removeTransaction('+(+i)+')'}]);
+}
+function clientMenu(btn,email){
+  const q=JSON.stringify(String(email));
+  openMenu(btn,[
+    {label:(openClientReport===email?'Hide report':'Show report'),run:'toggleClientReport('+q+')'},
+    {label:'Switch into this client',run:'switchToClient('+q+')'},
+    {label:'Remove client and all data',danger:true,run:'removeClient('+q+')'}
+  ]);
+}
 function ovfButton(onclickExpr,title){
   return '<button class="ovf-btn" title="'+esc(title||'More')+'" aria-label="'+esc(title||'More')+'" onclick="event.stopPropagation();'+onclickExpr+'">'+
     '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">'+
@@ -4829,8 +5054,9 @@ function renderScreenerTable(){
     return '<tr><td><b>'+esc(sym)+'</b></td><td>'+fmt$(sc.price)+'</td><td>'+sc.qScore+'/12</td><td>'+sc.pScore+'/6</td><td>'+sc.mScore+'/4</td>'+
       '<td><span class="pill '+v.cls+'">'+v.label+'</span></td>'+
       '<td class="mycall-cell">'+myTagSelect(sym)+'</td>'+
-      '<td class="row"><button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(sym)+'\')">Analyze</button>'+
-      (inWatch?'':'<button class="btn btn-sm" onclick="addWatchSym(\''+esc(sym)+'\')">+ Watch</button>')+'</td></tr>';
+      /* P4. Row actions behind the same 3-dot menu as everywhere else, so a wide table stays a
+         table rather than a wall of buttons. */
+      '<td>'+ovfButton('screenerMenu(this,\''+esc(sym)+'\','+(inWatch?'true':'false')+')','Actions for '+esc(sym))+'</td></tr>';
   }).join('');
 }
 
