@@ -111,8 +111,34 @@ tr:last-child td{border-bottom:none}
 a:focus-visible,button:focus-visible,summary:focus-visible,
 [tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
   outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.copy-btn{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:4px;
+  padding:2px 7px;font-size:11px;cursor:pointer;margin-left:6px;vertical-align:middle}
+.copy-btn:hover{color:var(--text);border-color:var(--muted)}
+.copy-btn.done{color:var(--green,#2ea043);border-color:var(--green,#2ea043)}
 </style>
 <script>
+/* An invite code is read off this screen and typed into an email by hand, which is precisely how
+   a code that "does not work" gets reported. One button removes the transcription step. */
+function copyText(btn,text){
+  const done=()=>{const o=btn.textContent;btn.textContent='Copied';btn.classList.add('done');
+    setTimeout(()=>{btn.textContent=o;btn.classList.remove('done');},1400);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done));
+  else fallbackCopy(text,done);
+}
+function fallbackCopy(text,done){
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=text; ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;left:-9999px';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done();
+  }catch(e){}
+}
+function copyBtn(text,label){
+  return '<button type="button" class="copy-btn" onclick="event.stopPropagation();copyText(this,'+
+    JSON.stringify(String(text)).replace(/"/g,'&quot;')+')">'+(label||'Copy')+'</button>';
+}
+
 /* Clickjacking defence. X-Frame-Options and CSP frame-ancestors are both header-only and this is
    a static host with no header control, so the check happens here. A framed copy of the terminal
    would let another page overlay it and harvest clicks on real buttons. */
@@ -300,7 +326,7 @@ function render(){
           '<thead><tr><th></th><th>Ticker</th><th>Dir</th><th>Target</th><th>Stop</th><th>By</th><th>Check</th></tr></thead>'+
           '<tbody>'+calls+'</tbody></table></div>':'')+
         (r.note?'<p class="dim" style="font-size:12.5px">Note: '+esc(r.note)+'</p>':'')+
-        (r.code?'<div style="margin-top:12px"><label>Invite code issued</label><span class="code">'+esc(r.code)+'</span></div>':'')+
+        (r.code?'<div style="margin-top:12px"><label>Invite code issued</label><span class="code">'+esc(r.code)+'</span>'+copyBtn(r.code)+'</div>':'')+
       '</div>'+
       (st==='pending'
         ? '<div class="decide">'+

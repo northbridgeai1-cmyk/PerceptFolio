@@ -1049,6 +1049,48 @@ t('it states its own falsification', /this whole panel collapses to the plain in
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
 
+/* ==================== CRAFT ADDITIONS ==================== */
+G('The small things, where they earn their place');
+
+t('a skip link exists and targets a real landmark',
+  /class="skip-link" href="#main"/.test(term) && /<main id="main" tabindex="-1">/.test(term));
+t('table headers stay put while a table is scrolled', /table thead th\{position:sticky/.test(term));
+t('password fields get a reveal toggle', /function initPasswordToggles/.test(term));
+/* The login form is on screen before any session exists, and those are the fields people type
+   into most, so this cannot wait for enterSession. */
+t('and it runs before sign-in, not only after',
+  /DOMContentLoaded',\(\)=>\{try\{initPasswordToggles\(\)/.test(term));
+t('copy confirms on the button rather than silently', /btn\.textContent='Copied'/.test(term));
+t('copy falls back when the clipboard API is unavailable', /function fallbackCopy/.test(term));
+t('invite codes in the admin queue are copyable', /copyBtn\(r\.code\)/.test(admin));
+/* A record is worth having on paper. */
+t('there is a real print stylesheet, not a hidden-nav hack',
+  /@media print\{/.test(term) && /--bg:#fff/.test(term) && /thead\{display:table-header-group\}/.test(term));
+t('printing shows the whole record, not just the open tab',
+  /\.tabs-hidden\{display:block !important\}/.test(term));
+t('back to top appears only once it saves something', /window\.scrollY>600/.test(term));
+
+/* ==================== HINDSIGHT ==================== */
+G('A leaderboard is a trap unless it grades the system');
+
+/* I10: the free tier is 60 calls a minute with no historical candles, so ranking the whole market
+   is unavailable rather than slow. */
+t('the file records why the whole market is not scanned',
+  /WHY THE WHOLE MARKET IS NOT AVAILABLE/.test(term));
+t('and the screen says it too, with the arithmetic',
+  /about four thousand quotes per window against a sixty-per-minute limit/.test(term));
+t('the five-year window is called unavailable, not slow',
+  /it is unavailable rather than merely slow/.test(term));
+/* A hindsight ranking teaches only if it is next to what the system said at the time. */
+t('each row carries what the checklist said before the window opened',
+  /function verdictBefore/.test(term) && /etDate\(c\.ts\)<=cutoffDate/.test(term));
+t('it refuses to double-list a name when there are too few tickers',
+  /const split=rows\.length>=6/.test(term));
+t('it reports the span it actually measured, not the one requested',
+  /const short=covered<hindsightWin/.test(term) && /sessions, not a '\+esc\(asked\)/.test(term));
+t('it states its own falsification',
+  /the checklist is not selecting winners and this table is where that shows first/.test(term));
+
 /* ==================== P4. CRAFT AND MOBILE ==================== */
 G('The daily check happens on a phone');
 

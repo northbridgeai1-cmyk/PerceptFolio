@@ -621,6 +621,57 @@ table td,table th{line-height:var(--lh-normal)}
 .card,.ovf-menu{border-radius:var(--r-lg)}
 .ovf-menu{box-shadow:var(--el-4)}
 
+/* Skip link. First focusable thing on the page, invisible until focused. A keyboard user should
+   not have to tab through fifteen navigation items to reach the table they came for. */
+.skip-link{position:absolute;left:-9999px;top:0;z-index:9999;background:var(--btn-bg);color:var(--btn-fg);
+  padding:10px 16px;border-radius:0 0 var(--r-md) 0;font-weight:var(--fw-medium)}
+.skip-link:focus{left:0}
+
+/* Sticky table headers. A quant table is scrolled; a header that scrolls away turns a column of
+   numbers into a column of unlabelled numbers. */
+table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
+
+/* Back to top. Only on genuinely long documents, and only once you are far enough down that it
+   saves something. */
+#toTop{position:fixed;right:18px;bottom:18px;z-index:120;display:none;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);border-radius:var(--r-md);padding:10px 13px;cursor:pointer;
+  box-shadow:var(--el-2);font-size:var(--fs-sm)}
+#toTop.show{display:block}
+
+/* Copy affordance. */
+.copy-btn{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:var(--r-xs);
+  padding:2px 7px;font-size:var(--fs-caption);cursor:pointer;margin-left:6px;vertical-align:middle}
+.copy-btn:hover{color:var(--text);border-color:var(--muted)}
+.copy-btn.done{color:var(--green);border-color:var(--green)}
+
+/* Password reveal sits inside the field rather than beside it. */
+.pw-wrap{position:relative;display:block}
+.pw-wrap input{padding-right:64px !important}
+.pw-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;
+  border:none;color:var(--muted);font-size:var(--fs-caption);cursor:pointer;padding:6px 8px}
+.pw-toggle:hover{color:var(--text)}
+
+/* ---- PRINT ----
+   A record is worth having on paper: an accountant, a compliance file, a year-end review. The
+   screen is a dark instrument and paper is not, so this is a genuine restyle rather than a
+   hidden-navigation hack. Interactive chrome goes, the record stays, and every panel prints in
+   black on white with its borders intact. */
+@media print{
+  :root{--bg:#fff;--panel:#fff;--panel2:#f4f4f5;--border:#c8ccd2;--text:#111;--muted:#555;
+        --btn-bg:#111;--btn-fg:#fff}
+  body{background:#fff;color:#111}
+  #sidebar,#toTop,.btn,.btn-add,.ovf-btn,.copy-btn,.pw-toggle,.skip-link,
+  #cmdBar,#provPanel,#offlineBanner,#saveFailBanner,#backupBanner,.tour-wrap,.calc-panel{display:none !important}
+  #shell{display:block}
+  .tabs-hidden{display:block !important}          /* print the whole record, not the open tab only */
+  .card{break-inside:avoid;page-break-inside:avoid;border:1px solid var(--border);box-shadow:none}
+  table{break-inside:auto} tr{break-inside:avoid;page-break-inside:avoid}
+  thead{display:table-header-group}               /* repeat headers across pages */
+  a[href^="http"]::after{content:" (" attr(href) ")";font-size:10px;color:#555}
+  .prov{border-bottom:none}
+  @page{margin:16mm}
+}
+
 /* ============================ P4. CRAFT ============================
    SKELETONS, NOT SPINNERS. A spinner says "something is happening"; a skeleton says "a table with
    four rows is arriving here". The second one lets the eye settle before the data lands, and it
@@ -1057,6 +1108,7 @@ table td,table th{line-height:var(--lh-normal)}
 
 <!-- SIDEBAR. Thirteen destinations across a top bar squeezed every label; down the side there is
      room for all of them, and collapsed to icons it costs 56px. -->
+<a class="skip-link" href="#main">Skip to content</a>
 <div id="shell">
 <aside id="sidebar">
   <nav>
@@ -1079,7 +1131,7 @@ table td,table th{line-height:var(--lh-normal)}
   </nav>
   <div class="side-foot"><span class="lbl">Press <b>[</b> to collapse</span></div>
 </aside>
-<main>
+<main id="main" tabindex="-1">
 
 <!-- COMMAND — the morning screen -->
 <div id="tab-command" class="tabs-hidden">
@@ -1546,6 +1598,19 @@ table td,table th{line-height:var(--lh-normal)}
 
 <!-- MARKET -->
 <div id="tab-market" class="tabs-hidden">
+
+  <!-- Hindsight. What the best and worst names DID, and why that is not a shopping list. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Hindsight</h3>
+      <div class="row" style="gap:6px">
+        <button class="btn btn-ghost btn-sm" id="hsBtn_21" onclick="setHindsight(21)">1 month</button>
+        <button class="btn btn-ghost btn-sm" id="hsBtn_126" onclick="setHindsight(126)">6 months</button>
+        <button class="btn btn-ghost btn-sm" id="hsBtn_252" onclick="setHindsight(252)">1 year</button>
+      </div>
+    </div>
+    <div id="hindsightBody" style="margin-top:12px"></div>
+  </div>
 
   <!-- 1. Today's move, in context -->
   <div class="card">
@@ -3045,6 +3110,8 @@ function enterSession(){
   try{ renderSyncBlocked(); }catch(e){}
   try{ renderMonthlyClose(); }catch(e){}
   try{ renderOfflineState(); }catch(e){}
+  try{ initToTop(); }catch(e){}
+  try{ initPasswordToggles(); }catch(e){}
   renderBackupBanner();
   /* Adopt marks the worker stamped while this app was closed, then tell it what is still open.
      Both silent and unawaited: session entry must not wait on a network round-trip. */
@@ -3491,7 +3558,7 @@ function showTab(t){
   if(t==='alerts')markAlertsSeen();
   // Macro data is fetched only when the tab is actually opened, so a user who never looks at it
   // never spends a request on it.
-  if(t==='market'){fillMacroInputs();renderScorecard();renderSeasonal();loadMarketData(false);}
+  if(t==='market'){fillMacroInputs();renderScorecard();renderSeasonal();renderHindsight();loadMarketData(false);}
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
@@ -4390,6 +4457,73 @@ function renderOfflineState(){
 window.addEventListener('online',renderOfflineState);
 window.addEventListener('offline',renderOfflineState);
 
+/* Back to top, copy, and password reveal. Three small things, each of which exists because a
+   specific action was previously awkward: reading to the bottom of the terms, getting an invite
+   code out of the admin queue without transcription errors, and typing a password blind. */
+function initToTop(){
+  if(document.getElementById('toTop'))return;
+  const b=document.createElement('button');
+  b.id='toTop'; b.type='button'; b.textContent='Top';
+  b.setAttribute('aria-label','Back to top');
+  b.onclick=()=>window.scrollTo({top:0,behavior:(matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth')});
+  document.body.appendChild(b);
+  const onScroll=()=>b.classList.toggle('show',window.scrollY>600);
+  window.addEventListener('scroll',onScroll,{passive:true});
+  onScroll();
+}
+/* Copies text and says so on the button itself, because a copy that gives no feedback gets
+   pressed twice and the second press is the one people distrust. */
+function copyText(btn,text){
+  const done=()=>{const o=btn.textContent;btn.textContent='Copied';btn.classList.add('done');
+    setTimeout(()=>{btn.textContent=o;btn.classList.remove('done');},1400);};
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done));
+  }else fallbackCopy(text,done);
+}
+function fallbackCopy(text,done){
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=text; ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;left:-9999px';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); done();
+  }catch(e){ toast('Could not copy. Select the text and copy manually.'); }
+}
+function copyBtn(text,label){
+  return '<button type="button" class="copy-btn" title="Copy" onclick="event.stopPropagation();copyText(this,'+
+    JSON.stringify(String(text)).replace(/"/g,'&quot;')+')">'+esc(label||'Copy')+'</button>';
+}
+/* Password reveal. Wraps every password field once, on entry, rather than needing each form to
+   remember to ask for it. */
+function initPasswordToggles(){
+  document.querySelectorAll('input[type="password"]').forEach(inp=>{
+    if(inp.dataset.pwWrapped)return;
+    inp.dataset.pwWrapped='1';
+    const wrap=document.createElement('span');
+    wrap.className='pw-wrap';
+    inp.parentNode.insertBefore(wrap,inp);
+    wrap.appendChild(inp);
+    const b=document.createElement('button');
+    b.type='button'; b.className='pw-toggle'; b.textContent='Show';
+    b.setAttribute('aria-label','Show password');
+    b.onclick=()=>{
+      const showing=inp.type==='text';
+      inp.type=showing?'password':'text';
+      b.textContent=showing?'Show':'Hide';
+      b.setAttribute('aria-label',(showing?'Show':'Hide')+' password');
+      inp.focus();
+    };
+    wrap.appendChild(b);
+  });
+}
+
+/* The login and sign-up fields are on screen before any session exists, so this cannot wait for
+   enterSession. Those are the password fields people actually type into most. */
+if(document.readyState==='loading')
+  document.addEventListener('DOMContentLoaded',()=>{try{initPasswordToggles();initToTop();}catch(e){}});
+else{try{initPasswordToggles();initToTop();}catch(e){}}
+
+
 /* P4. One skeleton helper rather than a bespoke placeholder per panel, so a new panel gets the
    right loading state by default instead of a blank div or a spinner. */
 function skeleton(kind,rows){
@@ -4505,6 +4639,114 @@ document.addEventListener('keydown',e=>{
     toggleCommandBar(true);
   }
 });
+
+/* ============================ HINDSIGHT ============================
+   The request was the best stock in the whole market over one month, one year and five years.
+   Neither half of that is available here, and the second half should not be built even if it were.
+
+   WHY THE WHOLE MARKET IS NOT AVAILABLE. Ranking every US listed equity means quoting roughly four
+   thousand tickers. At the free tier's sixty calls a minute that is about sixty-seven minutes of
+   continuous calling per window, and it would have to run again on every refresh. The five-year
+   window is worse than slow: it needs historical candles, which the free tier does not serve at
+   all, so no amount of patience produces it. That is invariant I10, which says a feature assuming
+   otherwise cannot work at any effort.
+
+   WHY THE FIGURE IS DANGEROUS EVEN WHERE IT IS AVAILABLE. "Best performer last year" is the purest
+   hindsight number in finance. It is selected after the fact, by definition, from the survivors,
+   and reading it is how a book ends up chasing whatever already ran. A terminal built to stop its
+   owner fooling themselves should not open with a leaderboard of things they did not own.
+
+   SO THIS IS THE HONEST VERSION. It ranks the tickers THIS OPERATOR ACTUALLY TRACKS, over windows
+   the logged prices genuinely cover, and it puts the ranking next to the only question worth
+   asking about it: at the time, did the checklist see it? That turns a shopping list into a test
+   of the system, which is the one use for a hindsight ranking that is not a trap. */
+let hindsightWin=21;
+function setHindsight(d){hindsightWin=d;renderHindsight();}
+function hindsightRows(days){
+  const out=[];
+  Object.keys(D.priceLog||{}).forEach(sym=>{
+    const rows=D.priceLog[sym];
+    if(!Array.isArray(rows)||rows.length<Math.min(days,20)+1)return;
+    const slice=rows.slice(-(days+1));
+    const a=slice[0],b=slice[slice.length-1];
+    if(!(a&&b&&a.p>0&&b.p>0))return;
+    out.push({sym,from:a.d,to:b.d,ret:(b.p-a.p)/a.p*100,obs:slice.length-1,
+              held:(D.holdings||[]).some(h=>h.sym===sym)});
+  });
+  return out.sort((x,y)=>y.ret-x.ret);
+}
+/* Did the system say anything about this name before the window opened? That is the only reading
+   of a hindsight ranking that teaches instead of tempts. */
+function verdictBefore(sym,cutoffDate){
+  const cs=(D.calls||[]).filter(c=>c.sym===sym&&(c.track||'checklist')==='checklist'
+                                   &&c.conviction!=='flickering'&&etDate(c.ts)<=cutoffDate);
+  return cs.length?cs[cs.length-1]:null;
+}
+function renderHindsight(){
+  const el=document.getElementById('hindsightBody');
+  if(!el||!D)return;
+  ['21','126','252'].forEach(d=>{
+    const b=document.getElementById('hsBtn_'+d);
+    if(b)b.classList.toggle('on',String(hindsightWin)===d);
+  });
+  const rows=hindsightRows(hindsightWin);
+  /* What was asked for, against what the log can actually support. A log capped at 300 sessions
+     cannot cover a year, let alone five, and calling 59 sessions "the year" would be exactly the
+     overclaim this panel exists to argue against. */
+  const covered=rows.length?Math.max.apply(null,rows.map(r=>r.obs)):0;
+  const short=covered<hindsightWin;
+  const asked=hindsightWin===21?'month':hindsightWin===126?'six months':'year';
+  const label=short?(covered+' sessions'):asked;
+  if(rows.length<2){
+    el.innerHTML='<div class="empty" style="text-align:left;line-height:1.7">'+
+      '<b>Not enough logged history yet for a '+esc(label)+'.</b><br><span style="font-size:var(--fs-sm)">'+
+      'This ranks the tickers you track, from closes this app recorded itself, so it fills in as you use it. '+
+      'It deliberately does not rank the whole market: that needs about four thousand quotes per window against a sixty-per-minute limit, '+
+      'and a five-year window needs historical candles the free tier does not serve at all.</span></div>';
+    return;
+  }
+  /* With few tickers, taking the top three and the bottom three lists the same name in both, which
+     reads as a contradiction. Below six, one ranked list is the honest presentation. */
+  const split=rows.length>=6;
+  const best=split?rows.slice(0,3):rows, worst=split?rows.slice(-3).reverse():[];
+  const cutoff=rows[0].from;
+  const line=r=>{
+    const v=verdictBefore(r.sym,r.from);
+    return '<tr><td><b>'+esc(r.sym)+'</b>'+(r.held?' <span class="muted" style="font-size:var(--fs-caption)">held</span>':'')+'</td>'+
+      '<td class="'+(r.ret>=0?'pos':'neg')+'"><b>'+(r.ret>=0?'+':'')+r.ret.toFixed(1)+'%</b></td>'+
+      '<td class="muted">'+r.obs+' sessions</td>'+
+      '<td class="'+(v?'':'muted')+'">'+(v?esc((v.verdict||'').toUpperCase())+' on '+esc(v.date)
+          :'no call on file')+'</td></tr>';
+  };
+  const called=rows.filter(r=>verdictBefore(r.sym,r.from));
+  const topCalled=best.filter(r=>{const v=verdictBefore(r.sym,r.from);return v&&v.verdict==='buy';}).length;
+  el.innerHTML=
+    '<div style="overflow-x:auto"><table><thead><tr>'+
+      '<th>Ticker</th><th>Return over '+(short?'the last ':'the ')+esc(label)+'</th><th>Measured on</th><th>What the checklist said first</th>'+
+    '</tr></thead><tbody>'+
+      (split?'<tr><th colspan="4" style="text-align:left;font-size:var(--fs-caption);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Best</th></tr>':'')+
+      best.map(line).join('')+
+      (split?'<tr><th colspan="4" style="text-align:left;font-size:var(--fs-caption);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Worst</th></tr>'+
+             worst.map(line).join(''):'')+
+    '</tbody></table></div>'+
+    (short?'<p class="muted" style="font-size:var(--fs-sm);margin-top:10px;line-height:1.65">'+
+      '<b>This is '+covered+' sessions, not a '+esc(asked)+'.</b> Prices are logged forward from the day you started using this and capped at 300 sessions, '+
+      'so a longer window fills in with use and a five-year one never will. The header says what was measured rather than what was asked for.</p>':'')+
+    '<p class="muted" style="font-size:var(--fs-sm);margin-top:12px;line-height:1.68">'+
+    '<b>This is your own list, not the market.</b> Ranking every US equity would take about four thousand quotes per window against a sixty-per-minute limit, '+
+    'and a five-year window needs historical candles the free tier does not serve, so it is unavailable rather than merely slow. '+
+    'These are the '+rows.length+' ticker'+(rows.length===1?'':'s')+' you track, measured from closes this app recorded itself.'+
+    '</p>'+
+    '<p class="muted" style="font-size:var(--fs-sm);margin-top:8px;line-height:1.68">'+
+    '<b>And the column that matters is the last one.</b> A best-performer list is chosen after the fact and always looks like a missed opportunity, which is the most expensive way to read one. '+
+    (called.length
+      ? 'Of these '+rows.length+', '+called.length+' had a call on file before the window opened, and '+topCalled+' of the top '+best.length+' '+(best.length===1?'was':'were')+' a BUY at the time. '+
+        (topCalled===0
+          ? 'None of the winners were called in advance, which is the useful finding: the ranking is not evidence the system missed them unless it was actually looking at them.'
+          : 'That is the only version of this table that says anything about your process rather than about the past.')
+      : 'None of these had a call on file before the window opened, so this table says nothing about your system yet. It is a record of what happened, not a scorecard.')+
+    ' <b>Falsification:</b> if names the checklist rated BUY do not appear near the top more often than chance as the record grows, the checklist is not selecting winners and this table is where that shows first.</p>';
+}
 
 /* ============================ E1. THE MONTHLY CLOSE ============================
    The highest-probability failure of this project is not being wrong. It is being unused. The
@@ -4679,7 +4921,7 @@ function showProv(id){
       '<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="document.getElementById(\'provPanel\').remove()">Close</button>'+
     '</div>'+
     '<table style="font-size:13px;line-height:1.7"><tbody>'+
-      row('Formula','<code style="font-family:var(--mono);font-size:12.5px">'+esc(d.formula)+'</code>')+
+      row('Formula','<code style="font-family:var(--mono);font-size:var(--fs-sm)">'+esc(d.formula)+'</code>'+copyBtn(d.formula))+
       row('Inputs',esc(d.inputs))+
       row('Observations',d.n==null?'<span class="muted">not a sampled quantity</span>':esc(String(d.n)))+
       row('95% range',d.ci==null?'<span class="muted">none computed</span>':esc(d.ci))+
