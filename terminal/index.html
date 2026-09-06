@@ -1599,19 +1599,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 <!-- MARKET -->
 <div id="tab-market" class="tabs-hidden">
 
-  <!-- Hindsight. What the best and worst names DID, and why that is not a shopping list. -->
-  <div class="card">
-    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-      <h3 style="margin:0">Hindsight</h3>
-      <div class="row" style="gap:6px">
-        <button class="btn btn-ghost btn-sm" id="hsBtn_21" onclick="setHindsight(21)">1 month</button>
-        <button class="btn btn-ghost btn-sm" id="hsBtn_126" onclick="setHindsight(126)">6 months</button>
-        <button class="btn btn-ghost btn-sm" id="hsBtn_252" onclick="setHindsight(252)">1 year</button>
-      </div>
-    </div>
-    <div id="hindsightBody" style="margin-top:12px"></div>
-  </div>
-
   <!-- 1. Today's move, in context -->
   <div class="card">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap">
@@ -1638,6 +1625,20 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <span class="pill pill-na" style="font-size:10px">not used in any verdict</span>
     </div>
     <div id="seasonalBody" style="margin-top:12px"></div>
+  </div>
+
+  <!-- Hindsight. What the best and worst names DID, and why that is not a shopping list. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Hindsight</h3>
+      <div class="row" style="gap:6px">
+        <button class="btn btn-ghost btn-sm" id="hsBtn_m1" onclick="setHindsight('m1')">1 month</button>
+        <button class="btn btn-ghost btn-sm" id="hsBtn_m6" onclick="setHindsight('m6')">6 months</button>
+        <button class="btn btn-ghost btn-sm on" id="hsBtn_y1" onclick="setHindsight('y1')">1 year</button>
+        <button class="btn btn-ghost btn-sm" id="hsBtn_y5" onclick="setHindsight('y5')">5 years</button>
+      </div>
+    </div>
+    <div id="hindsightBody" style="margin-top:12px"></div>
   </div>
 
   <!-- 2. Market weather -->
@@ -3806,6 +3807,25 @@ async function scoreStock(sym){
   const m=(mAll&&mAll.metric)||{};
   const seriesA=(mAll&&mAll.series&&mAll.series.annual)||{};
 
+  /* ---- REAL PRICE HISTORY, WITHOUT WAITING FOR THE LOG TO FILL ----
+     Hindsight originally read D.priceLog, which fills forward from first use, so a one-year window
+     meant waiting a year. The data was already arriving and being thrown away: /stock/metric?
+     metric=all is fetched on every score and carries precomputed price returns over exactly these
+     windows. Two of them were already being read for the momentum checks.
+
+     So this costs no extra call and no extra quota. It is Finnhub's own calculation over the real
+     market history, available the first time a ticker is scored. Missing windows stay null rather
+     than being interpolated from the shorter ones, because a five-year return inferred from a
+     one-year return is not a measurement. */
+  out.returns={
+    m1:  pick(m,['monthToDatePriceReturnDaily','4WeekPriceReturnDaily','1MonthPriceReturnDaily']),
+    m3:  pick(m,['13WeekPriceReturnDaily','3MonthPriceReturnDaily']),
+    m6:  pick(m,['26WeekPriceReturnDaily','6MonthPriceReturnDaily']),
+    y1:  pick(m,['52WeekPriceReturnDaily','1YearPriceReturnDaily','yearToDatePriceReturnDaily']),
+    y5:  pick(m,['5YearPriceReturnDaily','60MonthPriceReturnDaily']),
+    at:  Date.now()
+  };
+
   const add=(list,name,target,value,pass,note)=>{list.push({name,target,value,pass,note:note||''});};
 
   /* ---- QUALITY (12) ---- */
@@ -4712,18 +4732,58 @@ document.addEventListener('keydown',e=>{
    the logged prices genuinely cover, and it puts the ranking next to the only question worth
    asking about it: at the time, did the checklist see it? That turns a shopping list into a test
    of the system, which is the one use for a hindsight ranking that is not a trap. */
-let hindsightWin=21;
-function setHindsight(d){hindsightWin=d;renderHindsight();}
-function hindsightRows(days){
+/* Windows the vendor already computes. `days` is used only by the fallback path. */
+const HS_WINDOWS=[
+  {k:'m1',days:21,  label:'month'},
+  {k:'m6',days:126, label:'six months'},
+  {k:'y1',days:252, label:'year'},
+  {k:'y5',days:1260,label:'five years'}
+];
+let hindsightWin='y1';
+function setHindsight(k){hindsightWin=k;renderHindsight();}
+function hsWindow(){return HS_WINDOWS.find(w=>w.k===hindsightWin)||HS_WINDOWS[2];}
+
+/* TWO SOURCES, IN ORDER OF PREFERENCE.
+
+   VENDOR is the price return Finnhub already computed over the real window, captured onto the
+   analysis during scoring at no extra call. It is available the first time a ticker is scored,
+   which is what makes a one-year or five-year view possible today instead of next year. Two of
+   these fields were already being read for the momentum checks; the rest were arriving in the
+   same response and being discarded.
+
+   LOGGED is this app's own closes, used only where the vendor did not supply that window. It is
+   clipped to what was actually recorded and labelled as such, so a short span is never presented
+   as a full one. A missing window stays missing rather than being inferred from a shorter one. */
+function hindsightRows(){
+  const w=hsWindow();
   const out=[];
-  Object.keys(D.priceLog||{}).forEach(sym=>{
-    const rows=D.priceLog[sym];
-    if(!Array.isArray(rows)||rows.length<Math.min(days,20)+1)return;
-    const slice=rows.slice(-(days+1));
+  const syms=new Set([].concat(
+    Object.keys(D.priceLog||{}),
+    (D.holdings||[]).map(h=>h.sym),
+    (D.watchlist||[])
+  ).filter(Boolean));
+  syms.forEach(sym=>{
+    const sc=(D.analyses||{})[sym];
+    const vend=sc&&sc.returns?sc.returns[w.k]:null;
+    const held=(D.holdings||[]).some(h=>h.sym===sym);
+    if(vend!=null&&isFinite(vend)){
+      out.push({sym,ret:vend,source:'vendor',obs:null,from:null,held});
+      return;
+    }
+    /* THE FALLBACK MUST BE ABLE TO COVER THE WINDOW IT IS LABELLED WITH. Accepting any log with
+       twenty sessions in it put a 59-session return under a "five years" heading, which is the
+       overclaim this panel exists to argue against, merely relocated from the vendor path to this
+       one. A logged series is used only when it covers most of the requested window; short of
+       that the ticker is omitted for that window rather than shown under the wrong label. Since
+       the log is capped at 300 sessions, this means the longest windows are vendor-only, which is
+       the truth about what this app can measure on its own. */
+    const rows=(D.priceLog||{})[sym];
+    const need=Math.max(20,Math.floor(w.days*0.8));
+    if(!Array.isArray(rows)||rows.length<need+1)return;
+    const slice=rows.slice(-(w.days+1));
     const a=slice[0],b=slice[slice.length-1];
     if(!(a&&b&&a.p>0&&b.p>0))return;
-    out.push({sym,from:a.d,to:b.d,ret:(b.p-a.p)/a.p*100,obs:slice.length-1,
-              held:(D.holdings||[]).some(h=>h.sym===sym)});
+    out.push({sym,ret:(b.p-a.p)/a.p*100,source:'logged',obs:slice.length-1,from:a.d,held});
   });
   return out.sort((x,y)=>y.ret-x.ret);
 }
@@ -4737,64 +4797,59 @@ function verdictBefore(sym,cutoffDate){
 function renderHindsight(){
   const el=document.getElementById('hindsightBody');
   if(!el||!D)return;
-  ['21','126','252'].forEach(d=>{
-    const b=document.getElementById('hsBtn_'+d);
-    if(b)b.classList.toggle('on',String(hindsightWin)===d);
+  const w=hsWindow();
+  HS_WINDOWS.forEach(x=>{
+    const b=document.getElementById('hsBtn_'+x.k);
+    if(b)b.classList.toggle('on',x.k===hindsightWin);
   });
-  const rows=hindsightRows(hindsightWin);
-  /* What was asked for, against what the log can actually support. A log capped at 300 sessions
-     cannot cover a year, let alone five, and calling 59 sessions "the year" would be exactly the
-     overclaim this panel exists to argue against. */
-  const covered=rows.length?Math.max.apply(null,rows.map(r=>r.obs)):0;
-  const short=covered<hindsightWin;
-  const asked=hindsightWin===21?'month':hindsightWin===126?'six months':'year';
-  const label=short?(covered+' sessions'):asked;
+  const rows=hindsightRows();
   if(rows.length<2){
     el.innerHTML='<div class="empty" style="text-align:left;line-height:1.7">'+
-      '<b>Not enough logged history yet for a '+esc(label)+'.</b><br><span style="font-size:var(--fs-sm)">'+
-      'This ranks the tickers you track, from closes this app recorded itself, so it fills in as you use it. '+
-      'It deliberately does not rank the whole market: that needs about four thousand quotes per window against a sixty-per-minute limit, '+
-      'and a five-year window needs historical candles the free tier does not serve at all.</span></div>';
+      '<b>Nothing to rank over a '+esc(w.label)+' yet.</b><br><span style="font-size:var(--fs-sm)">'+
+      'These figures come from the scoring call, so a ticker appears here once it has been scored at least once. '+
+      (w.days>300?'This app\'s own price log is capped at 300 sessions, so a window this long can only come from the vendor; it is never stitched together from a shorter log. ':'')+
+      'Run a refresh, or analyse a ticker, and it fills in immediately rather than accumulating over time. '+
+      (w.k==='y5'?'A five-year figure also depends on the vendor publishing that window for a given ticker; where it does not, nothing is shown rather than a shorter span dressed up as five years. ':'')+
+      'It deliberately does not rank the whole market: that needs about four thousand quotes per window against a sixty-per-minute limit.</span></div>';
     return;
   }
-  /* With few tickers, taking the top three and the bottom three lists the same name in both, which
-     reads as a contradiction. Below six, one ranked list is the honest presentation. */
+  const vendorN=rows.filter(r=>r.source==='vendor').length;
+  const loggedN=rows.length-vendorN;
   const split=rows.length>=6;
   const best=split?rows.slice(0,3):rows, worst=split?rows.slice(-3).reverse():[];
-  const cutoff=rows[0].from;
   const line=r=>{
-    const v=verdictBefore(r.sym,r.from);
+    /* The date the window opened, for the "did the checklist see it" column. The vendor gives a
+       return, not a start date, so it is derived from the window length. */
+    const cut=r.from||etDate(Date.now()-w.days*864e5);
+    const v=verdictBefore(r.sym,cut);
     return '<tr><td><b>'+esc(r.sym)+'</b>'+(r.held?' <span class="muted" style="font-size:var(--fs-caption)">held</span>':'')+'</td>'+
       '<td class="'+(r.ret>=0?'pos':'neg')+'"><b>'+(r.ret>=0?'+':'')+r.ret.toFixed(1)+'%</b></td>'+
-      '<td class="muted">'+r.obs+' sessions</td>'+
-      '<td class="'+(v?'':'muted')+'">'+(v?esc((v.verdict||'').toUpperCase())+' on '+esc(v.date)
-          :'no call on file')+'</td></tr>';
+      '<td class="muted">'+(r.source==='vendor'?'market history':r.obs+' logged sessions')+'</td>'+
+      '<td class="'+(v?'':'muted')+'">'+(v?esc((v.verdict||'').toUpperCase())+' on '+esc(v.date):'no call on file')+'</td></tr>';
   };
-  const called=rows.filter(r=>verdictBefore(r.sym,r.from));
-  const topCalled=best.filter(r=>{const v=verdictBefore(r.sym,r.from);return v&&v.verdict==='buy';}).length;
+  const called=rows.filter(r=>verdictBefore(r.sym,r.from||etDate(Date.now()-w.days*864e5)));
+  const topCalled=best.filter(r=>{const v=verdictBefore(r.sym,r.from||etDate(Date.now()-w.days*864e5));return v&&v.verdict==='buy';}).length;
+  const hd='style="text-align:left;font-size:var(--fs-caption);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)"';
   el.innerHTML=
     '<div style="overflow-x:auto"><table><thead><tr>'+
-      '<th>Ticker</th><th>Return over '+(short?'the last ':'the ')+esc(label)+'</th><th>Measured on</th><th>What the checklist said first</th>'+
+      '<th>Ticker</th><th>Return over the '+esc(w.label)+'</th><th>Source</th><th>What the checklist said first</th>'+
     '</tr></thead><tbody>'+
-      (split?'<tr><th colspan="4" style="text-align:left;font-size:var(--fs-caption);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Best</th></tr>':'')+
+      (split?'<tr><th colspan="4" '+hd+'>Best</th></tr>':'')+
       best.map(line).join('')+
-      (split?'<tr><th colspan="4" style="text-align:left;font-size:var(--fs-caption);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Worst</th></tr>'+
-             worst.map(line).join(''):'')+
+      (split?'<tr><th colspan="4" '+hd+'>Worst</th></tr>'+worst.map(line).join(''):'')+
     '</tbody></table></div>'+
-    (short?'<p class="muted" style="font-size:var(--fs-sm);margin-top:10px;line-height:1.65">'+
-      '<b>This is '+covered+' sessions, not a '+esc(asked)+'.</b> Prices are logged forward from the day you started using this and capped at 300 sessions, '+
-      'so a longer window fills in with use and a five-year one never will. The header says what was measured rather than what was asked for.</p>':'')+
     '<p class="muted" style="font-size:var(--fs-sm);margin-top:12px;line-height:1.68">'+
-    '<b>This is your own list, not the market.</b> Ranking every US equity would take about four thousand quotes per window against a sixty-per-minute limit, '+
-    'and a five-year window needs historical candles the free tier does not serve, so it is unavailable rather than merely slow. '+
-    'These are the '+rows.length+' ticker'+(rows.length===1?'':'s')+' you track, measured from closes this app recorded itself.'+
+    '<b>This is your own list, not the market.</b> '+
+    (vendorN?vendorN+' of these come from the vendor\'s own calculation over the real window, which arrives with the scoring call and costs no extra quota. ':'')+
+    (loggedN?loggedN+' fall back to closes this app logged itself, which cover a shorter span. ':'')+
+    'Ranking every US equity would need about four thousand quotes per window against a sixty-per-minute limit, so the whole market is out of reach rather than merely slow.'+
     '</p>'+
     '<p class="muted" style="font-size:var(--fs-sm);margin-top:8px;line-height:1.68">'+
     '<b>And the column that matters is the last one.</b> A best-performer list is chosen after the fact and always looks like a missed opportunity, which is the most expensive way to read one. '+
     (called.length
       ? 'Of these '+rows.length+', '+called.length+' had a call on file before the window opened, and '+topCalled+' of the top '+best.length+' '+(best.length===1?'was':'were')+' a BUY at the time. '+
         (topCalled===0
-          ? 'None of the winners were called in advance, which is the useful finding: the ranking is not evidence the system missed them unless it was actually looking at them.'
+          ? 'None of the winners were called in advance, which is the useful finding: this is not evidence the system missed them unless it was actually looking at them.'
           : 'That is the only version of this table that says anything about your process rather than about the past.')
       : 'None of these had a call on file before the window opened, so this table says nothing about your system yet. It is a record of what happened, not a scorecard.')+
     ' <b>Falsification:</b> if names the checklist rated BUY do not appear near the top more often than chance as the record grows, the checklist is not selecting winners and this table is where that shows first.</p>';

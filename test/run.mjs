@@ -1139,15 +1139,35 @@ t('the file records why the whole market is not scanned',
   /WHY THE WHOLE MARKET IS NOT AVAILABLE/.test(term));
 t('and the screen says it too, with the arithmetic',
   /about four thousand quotes per window against a sixty-per-minute limit/.test(term));
-t('the five-year window is called unavailable, not slow',
-  /it is unavailable rather than merely slow/.test(term));
+/* Five years is now reachable: the scoring call already carries the vendor's own price returns,
+   so the panel no longer waits for a log to fill. Where the vendor omits a window it shows nothing
+   rather than a shorter span relabelled. */
+t('a long window is served from the vendor calculation, not from waiting',
+  /y5:  pick\(m,\['5YearPriceReturnDaily'/.test(term) && /source:'vendor'/.test(term));
+t('and says so when a five-year figure is simply not published',
+  /nothing is shown rather than a shorter span dressed up as five years/.test(term));
 /* A hindsight ranking teaches only if it is next to what the system said at the time. */
 t('each row carries what the checklist said before the window opened',
   /function verdictBefore/.test(term) && /etDate\(c\.ts\)<=cutoffDate/.test(term));
 t('it refuses to double-list a name when there are too few tickers',
   /const split=rows\.length>=6/.test(term));
-t('it reports the span it actually measured, not the one requested',
-  /const short=covered<hindsightWin/.test(term) && /sessions, not a '\+esc\(asked\)/.test(term));
+/* The same honesty, in a better place: every row states which source it came from, so a logged
+   fallback covering 59 sessions can never read as a full year. */
+t('every row states the span it actually came from',
+  /r\.source==='vendor'\?'market history':r\.obs\+' logged sessions'/.test(term));
+t('and the summary counts each source separately',
+  /come from the vendor/.test(term) && /fall back to closes this app logged itself/.test(term));
+/* Asserted on behaviour, not on a comment: the suite strips comments, and a comment guarantees
+   nothing. A vendor value is used only when it is a finite number; otherwise the row falls back to
+   logged closes, and failing that the ticker is omitted rather than estimated. */
+t('a missing window falls back or is omitted, never inferred',
+  /if\(vend!=null&&isFinite\(vend\)\)\{/.test(term) &&
+  /if\(!Array\.isArray\(rows\)\|\|rows\.length<need\+1\)return;/.test(term));
+/* A 59-session return under a "five years" heading is the same overclaim, just relocated. */
+t('the logged fallback must cover most of the window it is labelled with',
+  /const need=Math\.max\(20,Math\.floor\(w\.days\*0\.8\)\)/.test(term));
+t('and the longest windows are vendor-only, which the empty state says',
+  /can only come from the vendor; it is never stitched together from a shorter log/.test(term));
 t('it states its own falsification',
   /the checklist is not selecting winners and this table is where that shows first/.test(term));
 
