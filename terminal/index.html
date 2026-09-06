@@ -1072,6 +1072,11 @@ body.touring header,body.touring #sidebar{z-index:201}
       </select>
       <input id="hAmount" type="number" step="any" placeholder="Shares" style="max-width:130px" oninput="updateBuyPreview()">
       <input id="hCost" type="number" step="any" placeholder="Price / share $" style="max-width:150px" oninput="updateBuyPreview()">
+      <!-- M2. The one field that makes implementation cost measurable instead of assumed. Optional
+           on purpose: left blank it contributes nothing, which is the honest treatment of a number
+           nobody recorded. -->
+      <input id="hDecided" type="number" step="any" placeholder="Price when I decided $" style="max-width:180px"
+             title="Optional. The price when you decided to buy, before you actually filled. The gap between this and your fill is what hesitation and spread cost you.">
       <select id="hBroker" style="max-width:140px">
         <option>Fidelity</option><option>Robinhood</option><option>Schwab</option><option>Vanguard</option>
         <option>E*TRADE</option><option>Webull</option><option>Merrill</option><option>Other</option>
@@ -2316,6 +2321,50 @@ function recordHistorySnapshot(spyClose){
    bought/sold, when, and at what price — separate from D.holdings, which only ever stores the CURRENT
    merged position (shares + weighted-average cost). Holdings answer "what do I own now"; transactions
    answer "how did I get here". Deleting a holding does not erase its transaction history. */
+/* ============================ M2. IMPLEMENTATION SHORTFALL ============================
+   Every expectancy figure in this file is gross. The call is scored from the price on the screen
+   when the verdict changed, and the operator filled somewhere else: later, wider, after thinking
+   about it overnight.
+
+   THE SPEC IS RIGHT TO FORBID ASSUMING A SPREAD. A modelled cost is a guessed input dressed as a
+   measurement, and a guessed input is precisely what this product exists to condemn. So there is
+   one new field, filled in by the person who knows the answer, and when it is blank the trade
+   contributes nothing rather than contributing an estimate.
+
+       shortfall = |fill - decision| / decision
+
+   It also answers a question no retail tool asks, because no retail tool records the decision:
+   what does hesitation cost? */
+function shortfallOf(tx){
+  if(!tx||!(tx.price>0)||!(tx.decided>0))return null;
+  return Math.abs(tx.price-tx.decided)/tx.decided*100;
+}
+/* Signed against the operator: positive means the delay cost them, negative means it helped. A
+   buy filled above the decision price is worse; a sell filled below it is worse. */
+function shortfallSigned(tx){
+  if(!tx||!(tx.price>0)||!(tx.decided>0))return null;
+  const raw=(tx.price-tx.decided)/tx.decided*100;
+  return tx.action==='sell'?-raw:raw;
+}
+function shortfallStats(){
+  const rows=(D.transactions||[]).map(t=>({t,s:shortfallSigned(t)})).filter(r=>r.s!=null);
+  if(!rows.length)return{n:0,recorded:0,total:(D.transactions||[]).length};
+  const vals=rows.map(r=>r.s).sort((a,b)=>a-b);
+  const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+  const byTicker={};
+  rows.forEach(({t,s})=>{
+    if(!byTicker[t.sym])byTicker[t.sym]={sym:t.sym,n:0,sum:0};
+    byTicker[t.sym].n++; byTicker[t.sym].sum+=s;
+  });
+  return{
+    n:rows.length,total:(D.transactions||[]).length,
+    mean,median:median(vals),
+    worst:rows.slice().sort((a,b)=>b.s-a.s)[0],
+    perTicker:Object.values(byTicker).map(x=>({sym:x.sym,n:x.n,avg:x.sum/x.n}))
+                                     .sort((a,b)=>b.avg-a.avg)
+  };
+}
+
 function recordTransaction(tx){
   if(!D.transactions)D.transactions=[];
   /* SPY at the moment of the trade is stamped here so a sale can later be measured against the market
@@ -3865,6 +3914,14 @@ function updateAmountLabel(){
   if(amt)amt.placeholder=(unit==='dollars')?'Dollars $':'Shares';
   updateBuyPreview();
 }
+/* Read and cleared with the rest of the buy form. A stale value carried into the next trade would
+   be worse than no value at all. */
+function decidedPrice(){
+  const el=document.getElementById('hDecided');
+  if(!el)return null;
+  const v=parseFloat(el.value);
+  return isFinite(v)&&v>0?v:null;
+}
 function buyInputs(){
   const unit=(document.getElementById('hUnit')||{}).value||'shares';
   const amount=parseFloat((document.getElementById('hAmount')||{}).value);
@@ -3900,7 +3957,7 @@ function addHolding(){
   const wasEmpty=(D.holdings||[]).length===0;
   /* Runs only after a holding is successfully added, so it is the honest place to close the
      dialog — a rejected entry keeps the sheet open with the values still in it. */
-  const clearForm=()=>{['hTicker','hAmount','hCost'].forEach(id=>document.getElementById(id).value='');closeAddModal();};
+  const clearForm=()=>{['hTicker','hAmount','hCost','hDecided'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});closeAddModal();};
   // Buying moves money from cash into a position, the total is unchanged, which is why this must
   // never touch gain. Sells do the reverse via confirmSell.
   const applyCash=()=>{if(deduct)D.cash=+(((D.cash||0)-spend).toFixed(2));};
@@ -3914,7 +3971,7 @@ function addHolding(){
     if(broker)existing.broker=broker;
     existing.price=null;existing.manualPrice=false;existing.autoFailed=false;
     applyCash();
-    recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,
+    recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,decided:decidedPrice(),
       note:'Added to existing position, '+prevShares+' sh @ $'+prevCost.toFixed(2)+' -> '+totalShares+' sh @ $'+existing.cost.toFixed(2)+(deduct?' · paid from cash':'')});
     clearForm();updateBuyPreview();
     recordHistorySnapshot();saveDB();renderAll();
@@ -3925,7 +3982,8 @@ function addHolding(){
   }
   D.holdings.push({sym:t,type,shares:sh,cost,broker,price:null,manualPrice:false,priceDate:null,autoFailed:false});
   applyCash();
-  recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,note:'Opened position'+(deduct?' · paid from cash':'')});
+  recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,decided:decidedPrice(),
+                     note:'Opened position'+(deduct?' · paid from cash':'')});
   clearForm();updateBuyPreview();
   recordHistorySnapshot();saveDB();renderAll();
   const tail=deduct?' Cash is now '+fmt$(D.cash||0)+'.':'';
@@ -3953,6 +4011,8 @@ function confirmSell(i){
   if(!h)return;
   const sh=parseFloat(document.getElementById('sellShares_'+i).value);
   const price=parseFloat(document.getElementById('sellPrice_'+i).value);
+  const decidedRaw=parseFloat(((document.getElementById('sellDecided_'+i)||{}).value)||'');
+  const decided=isFinite(decidedRaw)&&decidedRaw>0?decidedRaw:null;
   const addCash=document.getElementById('sellAddCash_'+i).checked;
   if(!isFinite(sh)||sh<=0)return toast('Enter a valid number of shares to sell.');
   if(sh>h.shares+1e-9)return toast('You only have '+h.shares+' shares of '+h.sym+'.');
@@ -3960,7 +4020,7 @@ function confirmSell(i){
   const proceeds=sh*price;
   const realizedGL=(price-h.cost)*sh;
   const isFullSale=Math.abs(sh-h.shares)<1e-9;
-  recordTransaction({action:'sell',sym:h.sym,type:h.type,shares:sh,price,broker:h.broker,
+  recordTransaction({action:'sell',sym:h.sym,type:h.type,shares:sh,price,broker:h.broker,decided,
     realized:realizedGL,note:isFullSale?'Closed position':'Partial sale, '+(+(h.shares-sh).toFixed(6))+' sh remaining'});
   if(isFullSale)D.holdings.splice(i,1);
   else h.shares=+(h.shares-sh).toFixed(6);
@@ -8094,6 +8154,7 @@ function renderAll(){
       sellTr.innerHTML='<td colspan="11"><div class="row" style="gap:10px;align-items:flex-end;padding:8px 0;flex-wrap:wrap">'+
         '<div class="field"><label>Shares to sell (of '+h.shares+')</label><input type="number" step="any" id="sellShares_'+i+'" value="'+h.shares+'" max="'+h.shares+'" style="max-width:120px"></div>'+
         '<div class="field"><label>Sell price / share</label><input type="number" step="any" id="sellPrice_'+i+'" value="'+(p!=null?p:h.cost)+'" style="max-width:130px"></div>'+
+        '<div class="field"><label>Price when I decided</label><input type="number" step="any" id="sellDecided_'+i+'" placeholder="optional" style="max-width:150px" title="The price when you decided to sell. Blank contributes nothing."></div>'+
         '<label class="row" style="gap:6px;align-items:center;margin-bottom:8px"><input type="checkbox" id="sellAddCash_'+i+'" checked> Add proceeds to cash</label>'+
         '<button class="btn btn-sm" onclick="confirmSell('+i+')">Confirm Sell</button>'+
         '<button class="btn btn-ghost btn-sm" onclick="closeSellRow()">Cancel</button>'+
@@ -12192,6 +12253,33 @@ function trackStats(track,winRaw){
   });
   return expectancyStats(edges);
 }
+/* M2 rendered. Gross and net side by side, with the cost measured from the operator's own ledger
+   rather than modelled. Silent until at least one decision price has been entered, because an
+   implementation cost of zero is a claim, and the wrong one. */
+function shortfallHTML(st){
+  const sf=shortfallStats();
+  if(!sf.n){
+    if(!sf.total)return '';
+    return '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">'+
+      '<b>Every figure above is gross.</b> None of your '+sf.total+' recorded trade'+(sf.total===1?'':'s')+
+      ' has a decision price, so the gap between deciding and filling cannot be measured. '+
+      'Fill in <b>Price when I decided</b> on your next trade and this becomes a number instead of an omission. '+
+      'It is deliberately not estimated: an assumed spread is a guess wearing a decimal point.</p>';
+  }
+  const pts=x=>(x>=0?'+':'')+x.toFixed(2);
+  const net=st?st.expectancy-sf.mean:null;
+  const worstT=sf.perTicker[0];
+  return '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">'+
+    '<b>Gross and net.</b> Expectancy above is <b>'+(st?pts(st.expectancy):'-')+'pts</b> before implementation cost. '+
+    'Across '+sf.n+' of your '+sf.total+' trade'+(sf.total===1?'':'s')+' with a decision price recorded, the gap between deciding and filling cost a mean of '+
+    '<b class="'+(sf.mean>0?'neg':'pos')+'">'+sf.mean.toFixed(2)+'%</b> (median '+sf.median.toFixed(2)+'%), '+
+    'which leaves roughly <b class="'+(net!=null&&net>=0?'pos':'neg')+'">'+(net!=null?pts(net):'-')+'pts</b> net. '+
+    (worstT&&sf.perTicker.length>1
+      ? 'Worst by ticker: <b>'+esc(worstT.sym)+'</b> at '+worstT.avg.toFixed(2)+'% over '+worstT.n+' trade'+(worstT.n===1?'':'s')+'. '
+      : '')+
+    'Positive means waiting cost you. <b>Falsification:</b> if this mean sits inside its own noise as trades accumulate, hesitation is not measurably expensive and the field can be retired.</p>';
+}
+
 /* M1 rendered. Deliberately a plain 2x2 with an interval in every cell: the off-diagonal is the
    only place in this product where the operator can find out whether the terminal earns its
    existence, and it should not be able to be skimmed as a single flattering number. */
@@ -12406,6 +12494,7 @@ function renderScorecard(){
               'Falsification: if this difference stays inside its own confidence interval as the sample grows, the three-refresh rule is filtering the record without informing it and should be reconsidered.')+
           '</p>'
         : '')+
+      shortfallHTML(st)+
       operatorMatrixHTML(winRaw)+
       trackComparison(winRaw)+
       ruleChangeWarning()+

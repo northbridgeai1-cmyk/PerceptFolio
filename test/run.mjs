@@ -650,7 +650,11 @@ t('the tabs carry a + Add button', (term.match(/class="btn-add"/g)||[]).length >
 t('a successful alert closes the dialog', /paPrice'\)\.value='';\s*\n\s*closeAddModal\(\)/.test(term));
 t('a successful list closes the dialog', /if\(el\)el\.value='';\s*\n\s*closeAddModal\(\)/.test(term));
 t('a successful holding closes the dialog via clearForm, which only runs on success',
-  /const clearForm=\(\)=>\{\[.*?\]\.forEach\(id=>document\.getElementById\(id\)\.value=''\);closeAddModal\(\);\}/.test(term));
+  /const clearForm=\(\)=>\{\[[^\]]*\]\.forEach\(id=>\{[^}]*\.value='';\}\);closeAddModal\(\);\}/.test(term));
+/* M2's decision price is part of the buy form and must be cleared with it: a value carried into
+   the next trade would silently attribute one trade's hesitation to another. */
+t('the decision price is cleared with the rest of the form',
+  /const clearForm=\(\)=>\{\[[^\]]*'hDecided'[^\]]*\]/.test(term));
 /* Every rejection path returns before reaching the close, so no explicit test can assert absence —
    what is asserted is that closing is tied to the success statement, not to the click. */
 t('closing is never wired to the button itself', !/onclick="addWatch\(\);closeAddModal/.test(term));
@@ -921,6 +925,44 @@ t('the audit compares the threshold against independent observations, not raw ma
   /const against=effN==null\?have:effN/.test(term) && /' marked, about '\+/.test(term));
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
+
+/* ==================== M2. IMPLEMENTATION SHORTFALL ==================== */
+G('Gross is not net, and the cost is measured');
+
+const S6 = new Function(`
+  ${grab(term, 'shortfallOf')}
+  ${grab(term, 'shortfallSigned')}
+  return {shortfallOf, shortfallSigned};
+`)();
+t('shortfall is the gap between deciding and filling',
+  Math.abs(S6.shortfallOf({price:204,decided:200}) - 2) < 1e-9);
+/* Signed against the operator, or a buy filled high and a sell filled low would cancel out. */
+t('a buy filled above the decision price counts as a cost',
+  S6.shortfallSigned({action:'buy',price:204,decided:200}) > 0);
+t('a sell filled below the decision price also counts as a cost',
+  S6.shortfallSigned({action:'sell',price:96,decided:100}) > 0);
+t('and a fill that went the operator\'s way is credited',
+  S6.shortfallSigned({action:'buy',price:96,decided:100}) < 0 &&
+  S6.shortfallSigned({action:'sell',price:104,decided:100}) < 0);
+/* An assumed spread is a guess wearing a decimal point, which is the thing this product condemns. */
+t('a trade with no decision price contributes nothing',
+  S6.shortfallSigned({action:'buy',price:100}) === null &&
+  S6.shortfallSigned({action:'buy',price:100,decided:0}) === null);
+t('the field exists on both the buy and the sell path',
+  /id="hDecided"/.test(term) && /id="sellDecided_'\+i\+'"/.test(term));
+t('it is optional in the interface', /placeholder="optional"/.test(term));
+t('both paths store it on the transaction',
+  /action:'buy'[\s\S]{0,120}?decided:decidedPrice\(\)/.test(term) &&
+  /action:'sell'[\s\S]{0,120}?decided,/.test(term));
+t('gross and net are reported side by side', /before implementation cost/.test(term) &&
+  /which leaves roughly/.test(term));
+t('shortfall is broken out per ticker', /perTicker:Object\.values/.test(term) &&
+  /Worst by ticker/.test(term));
+/* Silence would read as a cost of zero, which is a claim and the wrong one. */
+t('with nothing recorded it says the figures are gross rather than showing nothing',
+  /<b>Every figure above is gross\.<\/b>/.test(term));
+t('and says why it will not estimate one', /an assumed spread is a guess wearing a decimal point/.test(term));
+t('it states its own falsification', /hesitation is not measurably expensive and the field can be retired/.test(term));
 
 /* ==================== M1. OPERATOR vs SYSTEM ==================== */
 G('The query the terminal turns on');
