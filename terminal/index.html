@@ -4742,13 +4742,105 @@ function freshPriceFor(sym,extra){
   if(sc&&!sc.error&&isFinite(sc.price)&&sc.price>0&&sc.when&&(Date.now()-sc.when)<MARK_FRESH_MS)return sc.price;
   return null;
 }
+/* ============================ D3. ANNIVERSARY RESOLUTION ============================
+   Three ambiguities sat under one word. "Ninety days" could mean ninety calendar days or ninety
+   trading days; the anniversary could land on a day the market never opened; and the browser and
+   the Worker could disagree about what day it is because they sit in different time zones.
+
+   ONE RULE. Horizons are CALENDAR days, because that is what the operator means by ninety days.
+   The mark is taken at the first regular US market close AT OR AFTER the anniversary, in exchange
+   local time. Intended date, actual mark date and trading-day count are stored separately: the
+   first is the promise, the second is what happened, the third feeds annualisation.
+
+   WHY THIS IS NOT COSMETIC. Age was measured as elapsed milliseconds divided by 86,400,000, which
+   is not a calendar day across a daylight-saving boundary, and the anniversary was compared without
+   asking whether the market was open. A call whose ninetieth day fell on a Saturday was recorded
+   as two days late and spent two days of its tolerance budget on a weekend. Enough of those and a
+   mark is dropped for being late to a market that was shut. */
+const ET_TZ='America/New_York';
+const _etFmt=new Intl.DateTimeFormat('en-CA',{timeZone:ET_TZ,year:'numeric',month:'2-digit',day:'2-digit'});
+function etDate(ts){return _etFmt.format(new Date(ts));}          // 'YYYY-MM-DD' at the exchange
+function dayNum(ds){const a=ds.split('-');return Math.floor(Date.UTC(+a[0],+a[1]-1,+a[2])/864e5);}
+function dayStr(n){return new Date(n*864e5).toISOString().slice(0,10);}
+function addDays(ds,n){return dayStr(dayNum(ds)+n);}
+function dowOf(ds){const a=ds.split('-');return new Date(Date.UTC(+a[0],+a[1]-1,+a[2])).getUTCDay();}
+const _pad=n=>String(n).padStart(2,'0');
+
+/* Computed, not tabulated. A hardcoded holiday list is correct until the year it silently is not,
+   and this file has no build step to refresh one. */
+function easterSunday(y){
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,
+        f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,
+        i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  return y+'-'+_pad(Math.floor((h+l-7*m+114)/31))+'-'+_pad(((h+l-7*m+114)%31)+1);
+}
+function nthDow(y,mo,dow,n){
+  const fd=new Date(Date.UTC(y,mo-1,1)).getUTCDay();
+  return y+'-'+_pad(mo)+'-'+_pad(1+((dow-fd+7)%7)+(n-1)*7);
+}
+function lastDow(y,mo,dow){
+  const last=new Date(Date.UTC(y,mo,0)).getUTCDate();
+  const ld=new Date(Date.UTC(y,mo-1,last)).getUTCDay();
+  return y+'-'+_pad(mo)+'-'+_pad(last-((ld-dow+7)%7));
+}
+/* A holiday on a Saturday is observed the Friday before, on a Sunday the Monday after. */
+function observedHoliday(ds){const w=dowOf(ds);return w===6?addDays(ds,-1):w===0?addDays(ds,1):ds;}
+const _holCache={};
+function holidaysFor(y){
+  if(_holCache[y])return _holCache[y];
+  const H=new Set([
+    observedHoliday(y+'-01-01'),          // New Year's Day
+    nthDow(y,1,1,3),                      // Martin Luther King Jr Day
+    nthDow(y,2,1,3),                      // Washington's Birthday
+    addDays(easterSunday(y),-2),          // Good Friday
+    lastDow(y,5,1),                       // Memorial Day
+    observedHoliday(y+'-06-19'),          // Juneteenth
+    observedHoliday(y+'-07-04'),          // Independence Day
+    nthDow(y,9,1,1),                      // Labor Day
+    nthDow(y,11,4,4),                     // Thanksgiving
+    observedHoliday(y+'-12-25')           // Christmas
+  ]);
+  _holCache[y]=H;
+  return H;
+}
+function isTradingDay(ds){
+  const w=dowOf(ds);
+  if(w===0||w===6)return false;
+  return !holidaysFor(+ds.slice(0,4)).has(ds);
+}
+function nextTradingDay(ds){let d=ds,g=0;while(!isTradingDay(d)&&g++<15)d=addDays(d,1);return d;}
+function tradingDaysBetween(a,b){
+  let n=0,d=a,g=0;
+  while(d<b&&g++<4000){d=addDays(d,1);if(isTradingDay(d))n++;}
+  return n;
+}
+/* from   the call's own date at the exchange
+   due    the first regular close at or after the calendar anniversary
+   A mark taken on `due` is on time even when the anniversary itself was a Sunday. */
+function markSchedule(ts,h){
+  const from=etDate(ts);
+  const intended=addDays(from,h);
+  return{from,intended,due:nextTradingDay(intended)};
+}
+/* Calendar days actually held. Legacy marks predate these fields and fall back to the old
+   arithmetic rather than being recomputed from data that was never stored. */
+function markHeldDays(mk,h){
+  if(mk&&mk.held!=null)return mk.held;
+  return h+((mk&&mk.lag)||0);
+}
+
 /* Does this call have a horizon that has come due and is still inside its tolerance window? If so it
    needs a price NOW, whether or not the ticker is still on any of your lists. */
 function callNeedsMark(c,now){
   if(!(c.price>0)||!(c.spy>0))return false;
-  const age=(now-c.ts)/86400000;
   const marks=c.marks||{};
-  return CALL_HORIZONS.some(h=>!marks[h]&&age>=h&&age<=h+markTolerance(h));
+  const today=etDate(now);
+  return CALL_HORIZONS.some(h=>{
+    if(marks[h])return false;
+    const due=markSchedule(c.ts,h).due;
+    if(today<due)return false;
+    return (dayNum(today)-dayNum(due))<=markTolerance(h);
+  });
 }
 /* ================= THE MARKS SCHEDULE =================
 
@@ -4773,13 +4865,14 @@ function upcomingMarks(withinDays){
     if(!(c.price>0)||!(c.spy>0))return;
     if(c.verdict!=='buy'&&c.verdict!=='sell')return;
     const marks=c.marks||{};
-    const age=(now-c.ts)/86400000;
+    const today=etDate(now);
     CALL_HORIZONS.forEach(h=>{
       if(marks[h])return;
-      const left=h-age;
+      const sch=markSchedule(c.ts,h);
+      const left=dayNum(sch.due)-dayNum(today);   // days until the first close that can price it
       if(left<0||left>withinDays)return;
       out.push({sym:c.sym,track:c.track||'checklist',horizon:h,daysLeft:left,
-                due:new Date(c.ts+h*86400000).toISOString().slice(0,10),
+                due:sch.due,intended:sch.intended,
                 verdict:(c.verdict||'').toUpperCase()});
     });
   });
@@ -4851,9 +4944,13 @@ function callsDueSoon(withinDays){
   (D.calls||[]).forEach(c=>{
     if(!(c.price>0)||!(c.spy>0))return;
     if(c.verdict!=='buy'&&c.verdict!=='sell')return;
-    const age=(now-c.ts)/86400000;
+    const today=etDate(now);
     const marks=c.marks||{};
-    CALL_HORIZONS.forEach(h=>{if(!marks[h]&&age<h&&h-age<=withinDays)n++;});
+    CALL_HORIZONS.forEach(h=>{
+      if(marks[h])return;
+      const left=dayNum(markSchedule(c.ts,h).due)-dayNum(today);
+      if(left>0&&left<=withinDays)n++;
+    });
   });
   return n;
 }
@@ -4912,8 +5009,9 @@ async function pushCallRegistry(){
     const now=Date.now();
     const open=(D.calls||[]).filter(c=>{
       if(!(c.price>0)||!(c.spy>0))return false;
-      const age=(now-c.ts)/86400000;
-      return CALL_HORIZONS.some(h=>!(c.marks||{})[h]&&age<=h+markTolerance(h));
+      const today=etDate(now);
+      return CALL_HORIZONS.some(h=>!(c.marks||{})[h]&&
+        (dayNum(today)-dayNum(markSchedule(c.ts,h).due))<=markTolerance(h));
     }).map(c=>({id:callId(c),sym:c.sym,ts:c.ts,price:c.price,spy:c.spy}));
     const body=JSON.stringify({calls:open});
     if(body===_lastRegPush)return;                 // unchanged; save the write
@@ -4955,17 +5053,28 @@ function markCalls(extraPrices){
   D.calls.forEach(c=>{
     if(!(c.price>0)||!(c.spy>0))return;        // call has no usable entry point, nothing to grade
     if(!c.marks)c.marks={};
-    const ageDays=(now-c.ts)/86400000;
+    const today=etDate(now);
     const px=freshPriceFor(c.sym,extraPrices);
     CALL_HORIZONS.forEach(h=>{
-      if(c.marks[h]||ageDays<h)return;
-      const lag=ageDays-h;
+      if(c.marks[h])return;
+      const sch=markSchedule(c.ts,h);
+      if(today<sch.due)return;                 // the anniversary has not reached a market close
+      /* Lag runs from the first available close, not from the calendar anniversary. A mark taken
+         on the Monday after a Saturday anniversary is on time; the market was shut, and spending
+         tolerance on a closed market is how a mark gets dropped for no reason. */
+      const lag=dayNum(today)-dayNum(sch.due);
       /* Past tolerance is closed out as MISSED even when no price is available, so a dead ticker
          stops being retried on every refresh forever. Inside tolerance with no fresh price, it is
          left open — there is still time to catch it on the next run. */
-      if(lag>markTolerance(h)){c.marks[h]={missed:true,lag:Math.round(lag)};return;}
+      if(lag>markTolerance(h)){
+        c.marks[h]={missed:true,lag,intended:sch.intended,due:sch.due};
+        return;
+      }
       if(px==null)return;
-      c.marks[h]={price:px,spy:spyNow,at:now,lag:Math.round(lag)};
+      c.marks[h]={price:px,spy:spyNow,at:now,lag,
+                  intended:sch.intended,due:sch.due,actual:today,
+                  held:dayNum(today)-dayNum(sch.from),
+                  tradingDays:tradingDaysBetween(sch.from,today)};
     });
   });
 }
@@ -9176,22 +9285,32 @@ function markSells(extraPrices){
   (D.transactions||[]).forEach(tx=>{
     if(tx.action!=='sell'||!(tx.price>0))return;
     if(!tx.marks)tx.marks={};
-    const age=(now-tx.ts)/86400000;
+    const today=etDate(now);
     const px=freshPriceFor(tx.sym,extraPrices);
     SELL_HORIZONS.forEach(h=>{
-      if(tx.marks[h]||age<h)return;
-      const lag=age-h;
-      if(lag>markTolerance(h)){tx.marks[h]={missed:true,lag:Math.round(lag)};return;}
+      if(tx.marks[h])return;
+      const sch=markSchedule(tx.ts,h);
+      if(today<sch.due)return;
+      const lag=dayNum(today)-dayNum(sch.due);
+      if(lag>markTolerance(h)){tx.marks[h]={missed:true,lag,intended:sch.intended,due:sch.due};return;}
       if(px==null)return;
-      tx.marks[h]={price:px,spy:spyNow,at:now,lag:Math.round(lag)};
+      tx.marks[h]={price:px,spy:spyNow,at:now,lag,
+                   intended:sch.intended,due:sch.due,actual:today,
+                   held:dayNum(today)-dayNum(sch.from),
+                   tradingDays:tradingDaysBetween(sch.from,today)};
     });
   });
 }
 function sellNeedsMark(tx,now){
   if(tx.action!=='sell'||!(tx.price>0))return false;
-  const age=(now-tx.ts)/86400000;
+  const today=etDate(now);
   const marks=tx.marks||{};
-  return SELL_HORIZONS.some(h=>!marks[h]&&age>=h&&age<=h+markTolerance(h));
+  return SELL_HORIZONS.some(h=>{
+    if(marks[h])return false;
+    const due=markSchedule(tx.ts,h).due;
+    if(today<due)return false;
+    return (dayNum(today)-dayNum(due))<=markTolerance(h);
+  });
 }
 function sellTiming(h){
   const rows=[];
@@ -11202,12 +11321,12 @@ function scorecardRows(){
         const sc=D.analyses[c.sym];
         now=(sc&&!sc.error&&isFinite(sc.price))?sc.price:null;
         bench=spyNow;
-        heldDays=Math.round((Date.now()-c.ts)/86400000);
+        heldDays=dayNum(etDate(Date.now()))-dayNum(etDate(c.ts));
       }else{
         const mk=(c.marks||{})[days];
         if(!mk)pending=true;
         else if(mk.missed)missed=true;
-        else{now=mk.price;bench=mk.spy;heldDays=days+(mk.lag||0);}
+        else{now=mk.price;bench=mk.spy;heldDays=markHeldDays(mk,days);}
       }
       const priceRet=(c.price>0&&now!=null)?((now-c.price)/c.price*100):null;
       const benchPriceRet=(c.spy>0&&bench!=null)?((bench-c.spy)/c.spy*100):null;
@@ -11349,7 +11468,7 @@ function callRecord(days){
     if(c.verdict!=='buy'&&c.verdict!=='sell')return;
     const mk=(c.marks||{})[days];
     if(!mk||mk.missed||!(c.price>0)||!(c.spy>0))return;
-    const held=days+((mk.lag||0));
+    const held=markHeldDays(mk,days);
     const stockRet=(mk.price-c.price)/c.price*100+accruedYield(yieldPctFor(c.sym),held);
     const spyRet=(mk.spy-c.spy)/c.spy*100+accruedYield(SPY_YIELD_PCT,held);
     /* Same rule in the aggregate as on the row: unadjusted excess return is not an edge, so a call
@@ -11791,7 +11910,14 @@ function renderScorecard(){
       '<td><span class="pill '+pill+'">'+esc((c.verdict||'').toUpperCase())+'</span>'+
         (c.conviction==='flickering'?'<span class="muted" style="font-size:11px;display:block;margin-top:2px" title="Appeared and reverted before holding for three refreshes. Graded separately.">flickering</span>':'')+'</td>'+
       '<td class="muted" style="font-size:12px;white-space:nowrap">'+(c.q!=null?c.q+'/12 · '+c.p+'/6 · '+c.m+'/4':'-')+'</td>'+
-      '<td class="muted">'+(heldDays!=null?heldDays+'d':'-')+'</td>'+
+      /* Calendar days held, with the promise and the outcome both available on hover. A mark taken
+         on the first close after a weekend anniversary is on time, and the tooltip says so rather
+         than leaving the extra days looking like a slip. */
+      '<td class="muted"'+(c.marks&&c.marks[winRaw]&&c.marks[winRaw].intended
+        ? ' title="Anniversary '+esc(c.marks[winRaw].intended)+', first close '+esc(c.marks[winRaw].due||'')+
+          ', marked '+esc(c.marks[winRaw].actual||'')+
+          (c.marks[winRaw].tradingDays!=null?', '+c.marks[winRaw].tradingDays+' trading days':'')+'"'
+        : '')+'>'+(heldDays!=null?heldDays+'d':'-')+'</td>'+
       '<td>'+(c.price!=null?fmt$(c.price):'-')+'</td>'+
       '<td>'+(now!=null?fmt$(now):'-')+'</td>'+
       '<td class="'+(stockRet>=0?'pos':'neg')+'">'+(stockRet>=0?'+':'')+stockRet.toFixed(2)+'%</td>'+

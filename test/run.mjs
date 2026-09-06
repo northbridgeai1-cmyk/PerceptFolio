@@ -915,6 +915,40 @@ t('the audit compares the threshold against independent observations, not raw ma
 t('the aggregate excludes flickers before correcting',
   /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
 
+/* ==================== D3. ANNIVERSARY RESOLUTION ==================== */
+G('One rule for what a horizon means');
+
+t('horizons are calendar days, added as dates not milliseconds', /function addDays\(ds,n\)\{return dayStr\(dayNum\(ds\)\+n\)/.test(term));
+/* Elapsed-ms arithmetic is not a calendar day across a daylight-saving boundary. */
+t('age is no longer elapsed milliseconds over 86400000', !/\(now-c\.ts\)\/86400000/.test(term));
+t('the exchange decides what day it is', /const ET_TZ='America\/New_York'/.test(term) &&
+  /timeZone:ET_TZ/.test(term));
+t('the mark is due at the first regular close at or after', /due:nextTradingDay\(intended\)/.test(term));
+/* A hardcoded holiday table is correct until the year it silently is not, and there is no build
+   step here to refresh one. */
+t('holidays are computed, not tabulated', /function holidaysFor\(y\)/.test(term) &&
+  /function easterSunday\(y\)/.test(term));
+t('all ten NYSE holidays are covered', ['New Year','Martin Luther King','Washington','Good Friday',
+  'Memorial Day','Juneteenth','Independence Day','Labor Day','Thanksgiving','Christmas']
+  .every(h=>term.includes(h)));
+t('a Saturday holiday is observed on the Friday, a Sunday on the Monday',
+  /w===6\?addDays\(ds,-1\):w===0\?addDays\(ds,1\)/.test(term));
+/* Spending tolerance on a closed market is how a mark gets dropped for no reason. */
+t('lag runs from the first available close, not the calendar anniversary',
+  /const lag=dayNum\(today\)-dayNum\(sch\.due\)/.test(term));
+t('intended, actual and trading days are stored separately',
+  /intended:sch\.intended,due:sch\.due,actual:today/.test(term) && /tradingDays:tradingDaysBetween/.test(term));
+t('a missed mark still records what it was aiming at', /missed:true,lag,intended:sch\.intended,due:sch\.due/.test(term));
+/* Legacy marks predate these fields and must not be recomputed from data never stored. */
+t('older marks fall back rather than being invented', /function markHeldDays/.test(term) &&
+  /if\(mk&&mk\.held!=null\)return mk\.held/.test(term));
+t('both consumers use the stored span',
+  (term.match(/=markHeldDays\(mk,days\)/g)||[]).length === 2);
+/* One schedule, or the sell marks drift away from the call marks. */
+t('sell marks run on the same calendar', /const sch=markSchedule\(tx\.ts,h\)/.test(term));
+t('nothing schedules a mark by millisecond age any more',
+  !/const age=\(now-c\.ts\)\/86400000/.test(term) && !/const age=\(now-tx\.ts\)\/86400000/.test(term));
+
 /* ==================== TOTAL RETURN ==================== */
 G('Marks credit distributions, on both legs');
 
@@ -994,11 +1028,34 @@ t('a 95% interval is produced', st.lo != null && st.hi != null && st.lo < st.exp
 /* ==================== 5b. MARKS SCHEDULE ==================== */
 G('Marks schedule — the record cannot accrue if marks are missed');
 
+/* The schedule is now calendar-based (D3), so the date helpers come along. Pulled from the shipped
+   file by the same brace matching as everything else: what is tested is what runs. */
 const S2 = new Function(`
   let D; const CALL_HORIZONS=[30,90,180,365];
+  ${grab(term, 'etDate')}
+  ${grab(term, 'dayNum')}
+  ${grab(term, 'dayStr')}
+  ${grab(term, 'addDays')}
+  ${grab(term, 'dowOf')}
+  ${grab(term, 'easterSunday')}
+  ${grab(term, 'nthDow')}
+  ${grab(term, 'lastDow')}
+  ${grab(term, 'observedHoliday')}
+  ${grab(term, 'holidaysFor')}
+  ${grab(term, 'isTradingDay')}
+  ${grab(term, 'nextTradingDay')}
+  ${grab(term, 'tradingDaysBetween')}
+  ${grab(term, 'markSchedule')}
+  ${grab(term, 'markHeldDays')}
+  const ET_TZ='America/New_York';
+  const _etFmt=new Intl.DateTimeFormat('en-CA',{timeZone:ET_TZ,year:'numeric',month:'2-digit',day:'2-digit'});
+  const _pad=n=>String(n).padStart(2,'0');
+  const _holCache={};
   ${grab(term, 'upcomingMarks')}
   ${grab(term, 'missedMarks')}
-  return {setD:d=>{D=d}, upcomingMarks, missedMarks};
+  return {setD:d=>{D=d}, upcomingMarks, missedMarks,
+          holidaysFor, isTradingDay, nextTradingDay, tradingDaysBetween, markSchedule,
+          easterSunday, addDays, dayNum, etDate, observedHoliday};
 `)();
 const DAY = 864e5, NOW = Date.now();
 const mkCall = (sym, age, marks) => ({ sym, verdict: 'buy', ts: NOW - age * DAY, price: 100, spy: 100, marks: marks || {} });
@@ -1014,6 +1071,45 @@ t('excludes horizons already marked', !due.some(m => m.sym === 'DDD' && m.horizo
 t('excludes anything beyond the window', !due.some(m => m.sym === 'CCC'));
 t('excludes non-directional verdicts', !due.some(m => m.sym === 'HOLD'));
 t('sorted soonest first', due.every((m, i) => !i || due[i-1].daysLeft <= m.daysLeft));
+
+/* ---- D3, executed rather than grepped. Checked against the published NYSE calendar. ---- */
+G('The exchange calendar, computed');
+
+const H26=[...S2.holidaysFor(2026)].sort().join(',');
+const H27=[...S2.holidaysFor(2027)].sort().join(',');
+t('2026 NYSE holidays are exactly right',
+  H26==='2026-01-01,2026-01-19,2026-02-16,2026-04-03,2026-05-25,2026-06-19,2026-07-03,2026-09-07,2026-11-26,2026-12-25', H26);
+/* 2027 is the interesting year: Juneteenth falls Saturday, July 4 Sunday, Christmas Saturday. */
+t('2027 observed shifts land correctly',
+  H27==='2027-01-01,2027-01-18,2027-02-15,2027-03-26,2027-05-31,2027-06-18,2027-07-05,2027-09-06,2027-11-25,2027-12-24', H27);
+t('Good Friday tracks Easter', S2.addDays(S2.easterSunday(2026),-2)==='2026-04-03' &&
+                               S2.addDays(S2.easterSunday(2027),-2)==='2027-03-26');
+t('a Saturday holiday is observed on the Friday', S2.observedHoliday('2027-06-19')==='2027-06-18');
+t('a Sunday holiday is observed on the Monday', S2.observedHoliday('2027-07-04')==='2027-07-05');
+t('weekends are not trading days', !S2.isTradingDay('2026-07-11') && !S2.isTradingDay('2026-07-12'));
+t('a holiday is not a trading day', !S2.isTradingDay('2026-11-26'));
+
+/* The acceptance case: an anniversary the market never opened for. */
+const wk=S2.markSchedule(Date.parse('2026-04-12T14:00:00Z'),90);
+t('a Saturday anniversary rolls to the Monday close',
+  wk.intended==='2026-07-11' && wk.due==='2026-07-13', wk.intended+' -> '+wk.due);
+const hol=S2.markSchedule(Date.parse('2026-06-04T14:00:00Z'),30);
+t('an anniversary on a holiday weekend rolls past the observed holiday',
+  hol.intended==='2026-07-04' && hol.due==='2026-07-06', hol.intended+' -> '+hol.due);
+const th=S2.markSchedule(Date.parse('2026-10-27T14:00:00Z'),30);
+t('Thanksgiving rolls to the Friday', th.intended==='2026-11-26' && th.due==='2026-11-27');
+
+/* Elapsed milliseconds are not calendar days across a daylight-saving boundary. */
+const dst=S2.markSchedule(Date.parse('2026-02-01T17:00:00Z'),90);
+t('90 calendar days across the spring DST change is exactly 90',
+  S2.dayNum(dst.intended)-S2.dayNum(dst.from)===90);
+/* The browser and the Worker must agree on the date; UTC and ET do not. */
+t('a call logged at 9:30pm ET is dated that day, not the next',
+  S2.etDate(Date.parse('2026-03-10T01:30:00Z'))==='2026-03-09');
+t('trading days are fewer than calendar days over the same span',
+  S2.tradingDaysBetween('2026-04-12','2026-07-11')===62);
+t('a mark on the first available close is on time, not late',
+  S2.dayNum('2026-07-13')-S2.dayNum(wk.due)===0);
 t('every entry carries a real due date', due.every(m => /^\d{4}-\d{2}-\d{2}$/.test(m.due)));
 t('missed marks are reported, not swept up', S2.missedMarks().some(m => m.sym === 'EEE' && m.lag === 44));
 
