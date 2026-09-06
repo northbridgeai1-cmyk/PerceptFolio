@@ -11262,6 +11262,75 @@ const EDGE_ASSUMPTION={mean:2,sd:12};      // per-call points, used only until a
 const Z95=1.96;
 const RECORD_FLOOR=20;                     // below this, dispersion itself is not estimable
 
+/* ============================ D2 + E3. EFFECTIVE SAMPLE SIZE ============================
+   Every confidence interval in this file assumes its observations are independent. None of them
+   are, and two separate things destroy it.
+
+   TEMPORAL. Repeated calls on one ticker are not repeated evidence. Two BUYs on the same name
+   whose marking windows overlap are scored against literally the same days of price history; the
+   second one carries almost no information the first did not.
+
+   CROSS-SECTIONAL. Three semiconductor calls in one week are one bet on semiconductors. When the
+   sector moves they all move, so they cannot be three independent tests of a stock-picking rule.
+
+                                n
+              n_eff  =  ---------------------
+                         1 + (n - 1) * rho
+
+   RHO IS MEASURED, NEVER ASSUMED. The spec is explicit about this and it is the part that matters:
+   multiplying two plausible-looking correction factors together produces a precise number resting
+   on nothing, which is the exact failure this product exists to expose. So every pair below comes
+   from observed data:
+
+     same symbol      the fraction of the two marking windows that actually overlap. Those calls
+                      share those days, which is a fact about the record, not a model of it.
+     different symbol the correlation of their daily returns over their common price history.
+
+   Pairs with too little history to correlate are excluded from the average and counted, and if too
+   few pairs are measurable the function returns null rather than a number, because a rho averaged
+   over three of forty pairs is not a measurement.
+
+   The average is floored at zero. A negative average would make n_eff exceed n, and claiming more
+   independent observations than you have calls is not a claim this file will make. */
+const NEFF_MIN_PAIRS=0.5;                  // at least half the pairs must be measurable
+
+function pairRho(a,b){
+  if(a.sym===b.sym){
+    /* Overlap of the two marking windows, as a fraction of the shorter one. Same name, same days,
+       same prices: that is shared evidence by construction. */
+    const s1=a.ts,e1=a.ts+(a.days||0)*864e5,s2=b.ts,e2=b.ts+(b.days||0)*864e5;
+    const span=Math.min(e1,e2)-Math.max(s1,s2);
+    const shorter=Math.min(e1-s1,e2-s2);
+    if(!(shorter>0))return 1;              // two calls on one name, no measurable window: treat as one
+    return Math.max(0,Math.min(1,span/shorter));
+  }
+  const al=alignedReturns([a.sym,b.sym]);
+  if(!al||al.rets[0].length<21)return null;
+  const x=al.rets[0],y=al.rets[1],n=x.length;
+  const mx=x.reduce((p,c)=>p+c,0)/n, my=y.reduce((p,c)=>p+c,0)/n;
+  let sxy=0,sxx=0,syy=0;
+  for(let i=0;i<n;i++){const dx=x[i]-mx,dy=y[i]-my;sxy+=dx*dy;sxx+=dx*dx;syy+=dy*dy;}
+  if(!(sxx>0&&syy>0))return null;
+  return sxy/Math.sqrt(sxx*syy);
+}
+
+/* calls: [{sym, ts, days}] — the marked observations actually being averaged. */
+function effectiveN(calls){
+  const n=calls.length;
+  if(n<2)return{n,neff:n,rho:0,pairs:0,measurable:0,ok:true};
+  let sum=0,measurable=0,pairs=0;
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
+    pairs++;
+    const r=pairRho(calls[i],calls[j]);
+    if(r==null)continue;
+    measurable++; sum+=r;
+  }
+  if(!pairs||measurable/pairs<NEFF_MIN_PAIRS)
+    return{n,neff:null,rho:null,pairs,measurable,ok:false};
+  const rho=Math.max(0,sum/measurable);
+  return{n,neff:n/(1+(n-1)*rho),rho,pairs,measurable,ok:true};
+}
+
 function requiredSample(st){
   const usingOwn=!!(st&&st.n>=RECORD_FLOOR&&st.sd>0&&isFinite(st.expectancy)&&Math.abs(st.expectancy)>1e-9);
   const mean=usingOwn?Math.abs(st.expectancy):EDGE_ASSUMPTION.mean;
@@ -11292,8 +11361,12 @@ function callRecord(days){
   });
   if(!marked.length)return null;
   const st=expectancyStats(marked.map(r=>r.edge));
+  /* Flickers are excluded from the aggregate for the same reason they are graded apart on the
+     scorecard, and the independence correction is computed on what remains. */
+  const firm=marked.filter(r=>r.c.conviction!=='flickering');
+  const eff=effectiveN(firm.map(r=>({sym:r.c.sym,ts:r.c.ts,days})));
   return{n:marked.length,right:marked.filter(r=>r.edge>0).length,
-         medEdge:median(marked.map(r=>r.edge)),st};
+         medEdge:median(marked.map(r=>r.edge)),st,eff};
 }
 
 /* How many logged calls are still waiting on a 90-day anniversary. Distinguishing "waiting" from
@@ -11420,8 +11493,16 @@ async function renderAudit(){
   const rec=callRecord(90);
   const need=requiredSample(rec&&rec.st?rec.st:null).n;
   const have=rec?rec.n:0;
-  out+=row(have>=need?'ok':'wait','Enough marks for the record to mean anything',
-    have+' of about '+need+'. Below this the interval straddles zero almost regardless of the estimate');
+  /* The threshold is a count of INDEPENDENT observations, so comparing it against the raw call
+     count would clear the bar years early. Where independence cannot be measured the raw count is
+     used and the row says which one it is reporting. */
+  const effN=(rec&&rec.eff&&rec.eff.ok&&rec.eff.neff!=null)?rec.eff.neff:null;
+  const against=effN==null?have:effN;
+  out+=row(against>=need?'ok':'wait','Enough marks for the record to mean anything',
+    (effN==null
+      ? have+' of about '+need
+      : have+' marked, about '+(effN<10?effN.toFixed(1):Math.round(effN))+' independent, of about '+need)+
+    '. Below this the interval straddles zero almost regardless of the estimate');
 
   /* ---- DATA: what this device can actually reach ---- */
   out+=head('Data');
@@ -11624,6 +11705,7 @@ function renderScorecard(){
 
   const st=expectancyStats(scored.map(r=>r.edge));
   const stFlick=flick.length?expectancyStats(flick.map(r=>r.edge)):null;
+  const eff=effectiveN(scored.map(r=>({sym:r.c.sym,ts:r.c.ts,days:r.heldDays||0})));
   const medHeld=median(graded.filter(r=>r.heldDays!=null).map(r=>r.heldDays));
 
   // Does requiring momentum actually help? Split the same set and compare. On edge, not raw alpha,
@@ -11653,6 +11735,18 @@ function renderScorecard(){
         '<div class="stat"><span class="stat-label">Median holding</span><span class="stat-value">'+(medHeld!=null?Math.round(medHeld)+'d':'-')+'</span></div>'+
         '<div class="stat"><span class="stat-label">95% range</span><span class="stat-value" style="font-size:15px">'+(st&&st.lo!=null?pts(st.lo)+' to '+pts(st.hi):'needs 2+')+'</span></div>'+
       '</div>'+
+      /* D2/E3. The raw count is the flattering number and it is not the one that governs the
+         interval above. Both are shown, with the correction measured rather than assumed. */
+      '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.65">'+
+        (eff.ok&&eff.neff!=null
+          ? '<b>'+scored.length+' scored call'+(scored.length===1?'':'s')+'. An estimated '+
+            (eff.neff<10?eff.neff.toFixed(1):Math.round(eff.neff))+' independent observations.</b> '+
+            'Calls on the same name over overlapping windows are scored against the same days, and calls on names that move together are one bet, not several. '+
+            'Average pairwise correlation across the '+eff.measurable+' measurable pair'+(eff.measurable===1?'':'s')+' is '+eff.rho.toFixed(2)+', taken from your own price history rather than assumed. '+
+            'The interval above is computed on '+scored.length+', so treat it as the optimistic end.'
+          : '<b>'+scored.length+' scored call'+(scored.length===1?'':'s')+'.</b> Not enough overlapping price history to measure how independent they are ('+
+            eff.measurable+' of '+eff.pairs+' pairs), so no effective sample size is claimed. Repeated calls on one name, and calls on names that move together, count for less than the raw number suggests.')+
+      '</p>'+
       '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65"><b>Expectancy is the number that matters, not hit rate.</b> '+
         'A system right 40% of the time whose winners run three times its losers earns more than one right 60% of the time whose losers run twice its winners. '+
         'Hit rate is shown because you asked for it, but it is deliberately not the headline: the easiest way to raise it is to book winners early and hold losers, which is how a good system becomes a losing one.</p>'+

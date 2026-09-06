@@ -887,6 +887,34 @@ t('the conviction split states its own falsification',
 t('it refuses to read the comparison on too small a sample',
   /Math\.min\(st\.n,stFlick\.n\)<10/.test(term));
 
+/* ==================== D2 + E3. EFFECTIVE SAMPLE SIZE ==================== */
+G('Never report a raw n');
+
+t('the correction exists', /function effectiveN\(calls\)/.test(term));
+t('it is the standard formula', /n\/\(1\+\(n-1\)\*rho\)/.test(term));
+/* The whole point: two guessed correction factors multiplied together produce a precise number
+   resting on nothing, which is the failure this product exists to expose. */
+t('rho comes from observed data, never a constant',
+  /RHO IS MEASURED, NEVER ASSUMED/.test(term) &&
+  !/rho=0\.[0-9]/.test(term));
+t('same-name pairs use the actual overlap of their marking windows',
+  /const span=Math\.min\(e1,e2\)-Math\.max\(s1,s2\)/.test(term));
+t('different-name pairs use the correlation of their own returns',
+  /alignedReturns\(\[a\.sym,b\.sym\]\)/.test(term) && /sxy\/Math\.sqrt\(sxx\*syy\)/.test(term));
+/* A rho averaged over three of forty pairs is not a measurement. */
+t('too few measurable pairs returns null rather than a number',
+  /measurable\/pairs<NEFF_MIN_PAIRS/.test(term) && /neff:null/.test(term));
+t('the screen says so instead of claiming a figure', /no effective sample size is claimed/.test(term));
+/* Claiming more independent observations than you have calls is not a claim this file makes. */
+t('a negative average correlation cannot inflate the sample', /Math\.max\(0,sum\/measurable\)/.test(term));
+
+t('the scorecard reports both counts', /An estimated '\+/.test(term) && /independent observations/.test(term));
+t('it says the interval is computed on the flattering one', /so treat it as the optimistic end/.test(term));
+t('the audit compares the threshold against independent observations, not raw marks',
+  /const against=effN==null\?have:effN/.test(term) && /' marked, about '\+/.test(term));
+t('the aggregate excludes flickers before correcting',
+  /marked\.filter\(r=>r\.c\.conviction!=='flickering'\)/.test(term));
+
 /* ==================== TOTAL RETURN ==================== */
 G('Marks credit distributions, on both legs');
 
