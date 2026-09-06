@@ -54,6 +54,41 @@
   /* Semantic accents so different KINDS of number stop looking identical.
      money going out / money coming in / profit / income / your own input. */
   --c-out:#8b5cf6; --c-in:#3b82f6; --c-profit:#2ea043; --c-income:#d9a441; --c-mine:#ec8f5e;
+
+  /* ---- DESIGN SYSTEM: structure taken from DESIGN.md, skin deliberately not ----
+     The source is a marketing system: 80px heroes, 96px section rhythm, pastel feature cards. Its
+     STRUCTURE is what is worth having and its proportions are not, because this is a dense
+     instrument and its own house rule is density over whitespace. So the scale ratios, the 4px
+     base unit, the radius tiers and the elevation tiers are adopted, and re-anchored one to two
+     steps down. None of its colours or brand are used.
+
+     Before this there were 27 distinct font sizes, 14 radii and 23 padding values in the
+     stylesheet, which is not a scale, it is an accumulation. */
+
+  /* Spacing: 4px base, 8px primary increment, exactly as the source specifies. */
+  --sp-xxs:4px; --sp-xs:8px; --sp-sm:12px; --sp-md:16px; --sp-lg:24px;
+  --sp-xl:32px; --sp-2xl:48px; --sp-3xl:64px;
+
+  /* Type scale. The source's ratios, anchored at 13px body rather than 16px, because a terminal
+     is read in columns and not in paragraphs. Negative tracking on display sizes and the
+     600 heading / 500 button / 400 body weights are its principles, kept as-is. */
+  --fs-micro:10px;  --fs-caption:11px; --fs-sm:12px;   --fs-body:13px;
+  --fs-md:14px;     --fs-lg:16px;      --fs-h5:18px;   --fs-h4:20px;
+  --fs-h3:24px;     --fs-h2:30px;      --fs-h1:40px;
+  --lh-tight:1.2;   --lh-normal:1.5;   --lh-body:1.6;
+  --tr-display:-0.02em; --tr-heading:-0.01em;
+  --fw-body:400; --fw-medium:500; --fw-heading:600;
+
+  /* Radius tiers. The source's rule that a full radius is for status badges and NEVER for regular
+     buttons already matches this project's own ban on pill buttons, so it is adopted verbatim. */
+  --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-full:9999px;
+
+  /* Elevation. Four tiers rather than shadows invented per component. Tuned for a dark ground,
+     where the source's light-mode alphas disappear entirely. */
+  --el-1:0 1px 2px rgba(0,0,0,.28);
+  --el-2:0 4px 12px rgba(0,0,0,.34);
+  --el-3:0 16px 40px rgba(0,0,0,.46);
+  --el-4:0 16px 48px -8px rgba(0,0,0,.55);
 }
 /* Light theme. Same variable names, different values. Every rule downstream is already written
    against the variables, so nothing else has to change. */
@@ -70,10 +105,10 @@ body{background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   min-height:100vh;-webkit-font-smoothing:antialiased}
 button{cursor:pointer;font-family:inherit}
-input,select{font-family:inherit;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 13px;font-size:15px;outline:none;width:100%;transition:border-color .1s ease}
+input,select{font-family:inherit;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 13px;font-size:14px;outline:none;width:100%;transition:border-color .1s ease}
 input:focus,select:focus{border-color:var(--text)}
 input::placeholder{color:var(--muted)}
-.btn{background:var(--btn-bg);color:var(--btn-fg);border:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:15px;transition:opacity .1s ease}
+.btn{background:var(--btn-bg);color:var(--btn-fg);border:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:14px;transition:opacity .1s ease}
 .btn:hover{opacity:.85}
 .btn:active{opacity:.7}
 .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);font-family:var(--mono);font-size:13px;letter-spacing:.02em}
@@ -117,7 +152,7 @@ body.side-collapsed #sidebar{width:var(--side-collapsed);padding-left:calc(6px +
    the eye reaches, and it doesn't cost the sidebar a row. */
 #sideToggle{
   background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;
-  width:28px;height:28px;border-radius:7px;flex:none;display:grid;place-items:center;
+  width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center;
   transition:color .14s,background .14s,border-color .14s,transform .22s var(--ease)}
 #sideToggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 #sideToggle:hover{color:var(--text);background:var(--panel2);border-color:var(--border)}
@@ -162,7 +197,7 @@ body.side-collapsed .nav-sep{margin:8px 12px}
 body.side-collapsed #sidebar nav button:after{
   content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%) translateX(-4px);
   background:var(--panel2);color:var(--text);border:1px solid var(--border);
-  padding:6px 10px;border-radius:6px;font-size:10.5px;letter-spacing:.06em;
+  padding:6px 10px;border-radius:6px;font-size:11px;letter-spacing:.06em;
   white-space:nowrap;pointer-events:none;opacity:0;z-index:120;
   box-shadow:0 6px 20px rgba(0,0,0,.45);transition:opacity .13s,transform .13s var(--ease)}
 body.side-collapsed #sidebar nav button:hover:after{opacity:1;transform:translateY(-50%) translateX(0)}
@@ -216,30 +251,30 @@ header>.row{margin-left:auto;flex:none}
   stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;transition:stroke .14s}
 .hd-search:focus-within .hd-search-ico{stroke:var(--brand2)}
 #globalSearch{width:100%;max-width:none;background:var(--panel);border:1px solid var(--border);
-  border-radius:9px;padding:8px 12px 8px 34px;font-size:13px;color:var(--text);
+  border-radius:8px;padding:8px 12px 8px 34px;font-size:13px;color:var(--text);
   transition:border-color .14s,background .14s}
 #globalSearch::placeholder{color:var(--muted);opacity:.75}
 #globalSearch:focus{outline:none;border-color:var(--brand2);background:var(--panel2)}
 .gs-panel{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:80;display:none;
-  background:var(--panel);border:1px solid var(--border);border-radius:11px;overflow:hidden;
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;
   box-shadow:0 16px 44px rgba(0,0,0,.55)}
 .gs-panel.on{display:block;animation:tabIn .13s var(--ease)}
 .gs-head{padding:11px 14px;border-bottom:1px solid var(--border);background:var(--panel2);
   display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.gs-sym{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.03em}
-.gs-meta{font-size:11.5px;color:var(--muted);margin-left:auto;text-align:right;line-height:1.4}
+.gs-sym{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.03em}
+.gs-meta{font-size:11px;color:var(--muted);margin-left:auto;text-align:right;line-height:1.4}
 .gs-act{display:flex;align-items:center;gap:11px;padding:10px 14px;width:100%;cursor:pointer;
   background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);
-  font-size:13.5px;text-align:left;font-family:inherit;transition:background .12s}
+  font-size:13px;text-align:left;font-family:inherit;transition:background .12s}
 .gs-act:last-child{border-bottom:none}
 .gs-act:hover,.gs-act.sel{background:var(--panel2)}
 .gs-act .gi{width:17px;height:17px;flex:none;fill:none;stroke:var(--muted);stroke-width:1.8;
   stroke-linecap:round;stroke-linejoin:round}
 .gs-act:hover .gi,.gs-act.sel .gi{stroke:var(--brand2)}
-.gs-act small{color:var(--muted);font-size:11.5px;margin-left:auto;white-space:nowrap}
+.gs-act small{color:var(--muted);font-size:11px;margin-left:auto;white-space:nowrap}
 .gs-empty{padding:16px 14px;color:var(--muted);font-size:13px;line-height:1.6}
 
-.badge{background:var(--red);color:#fff;border-radius:9px;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;margin-left:auto;flex:none}
+.badge{background:var(--red);color:#fff;border-radius:8px;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;margin-left:auto;flex:none}
 .avatar{width:30px;height:30px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--text);flex-shrink:0}
 main{flex:1;min-width:0;max-width:1180px;padding:28px 26px;
   padding-right:calc(26px + env(safe-area-inset-right));
@@ -250,7 +285,7 @@ main{flex:1;min-width:0;max-width:1180px;padding:28px 26px;
 @media(max-width:820px){.grid-2,.grid-3{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
 .card h3{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}
-.big{font-family:var(--mono);font-size:25px;font-weight:600;letter-spacing:-.2px;font-variant-numeric:tabular-nums}
+.big{font-family:var(--mono);font-size:24px;font-weight:600;letter-spacing:-.2px;font-variant-numeric:tabular-nums}
 .pos{color:var(--green)} .neg{color:var(--red)} .warn{color:var(--yellow)}
 .muted{color:var(--muted);font-size:13px}
 /* Test-account banner. Deliberately loud: a demo mistaken for the real account is how someone
@@ -260,7 +295,7 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
   letter-spacing:.09em;text-transform:uppercase;text-align:center;padding:7px 10px;position:sticky;top:0;z-index:300}
 
 /* ---- thesis probability ---- */
-.prob-box{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px 16px;margin:12px 0 4px}
+.prob-box{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px;margin:12px 0 4px}
 .prob-head{font:10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
 .prob-row{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 .prob-k{font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:7px}
@@ -268,13 +303,13 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .prob-n{font-size:11px;line-height:1.5;color:var(--muted);margin-top:6px}
 .prob-own{display:flex;align-items:baseline;gap:5px}
 .prob-own input{width:82px;background:var(--panel2);border:1px solid var(--border);color:var(--text);
-  border-radius:7px;padding:5px 9px;font:700 22px/1.15 var(--mono);font-variant-numeric:tabular-nums}
+  border-radius:8px;padding:5px 9px;font:700 22px/1.15 var(--mono);font-variant-numeric:tabular-nums}
 .prob-own span{font:600 17px/1 var(--mono);color:var(--muted)}
 /* The assumption is not a footnote. A probability printed without it is false precision with a
    Nobel Prize stapled to it, so it renders in warning colour directly beneath the number. */
-.prob-warn{font-size:11.5px;line-height:1.55;color:var(--yellow);margin-top:13px;padding-top:11px;border-top:1px solid var(--border)}
+.prob-warn{font-size:11px;line-height:1.55;color:var(--yellow);margin-top:13px;padding-top:11px;border-top:1px solid var(--border)}
 .prob-warn b{color:var(--text)}
-@media(max-width:760px){.prob-row{grid-template-columns:1fr;gap:14px}.prob-v{font-size:22px}}
+@media(max-width:760px){.prob-row{grid-template-columns:1fr;gap:14px}.prob-v{font-size:20px}}
 
 /* ---- TRACK RECORD STRIP ----
    The Council's verdict was that the track record is the product and the portfolio value is not,
@@ -283,25 +318,25 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
    statistic in the discipline: sell covered calls, take profit at +0.5%, never stop out, and you can
    report 95% right while losing money on every third gap-down. Expectancy cannot be gamed that way,
    because a large loss is still in the average. */
-.rec{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
+.rec{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
 .rec-head{font:10.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
   display:flex;align-items:center;gap:8px;margin-bottom:11px}
 .rec-head:before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent);flex:none}
 .rec-top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
 .rec-val{font:700 30px/1 var(--mono);letter-spacing:-.035em;font-variant-numeric:tabular-nums}
 .rec-unit{font:400 12px/1 var(--mono);color:var(--muted);margin-left:7px;letter-spacing:0}
-.rec-ci{font-size:12.5px;color:var(--muted);line-height:1.5}
+.rec-ci{font-size:12px;color:var(--muted);line-height:1.5}
 /* The reading is the sentence that matters, so it is not muted into the furniture. */
 .rec-read{font-size:13px;line-height:1.5;margin-top:3px}
 .rec-read.thin{color:var(--yellow)}
-.rec-bar{height:5px;border-radius:3px;background:var(--panel2);overflow:hidden;margin-top:12px;border:1px solid var(--border)}
-.rec-bar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .4s}
+.rec-bar{height:5px;border-radius:4px;background:var(--panel2);overflow:hidden;margin-top:12px;border:1px solid var(--border)}
+.rec-bar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
 .rec-bar i.done{background:var(--green)}
 .rec-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
   font:11.5px/1.5 var(--mono);color:var(--muted);margin-top:7px}
 .rec-foot b{color:var(--text);font-weight:600}
 /* ---- marks schedule ---- */
-.md{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
+.md{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
 .md-head{font:10.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
 .md-head b{color:var(--text)}
 .md-row{display:flex;align-items:baseline;gap:12px;padding:6px 0;border-top:1px solid var(--border);flex-wrap:wrap}
@@ -309,7 +344,7 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .md-when{font:700 11.5px/1 var(--mono);letter-spacing:.04em;min-width:74px;color:var(--muted)}
 .md-sym{font:700 13.5px/1 var(--mono);letter-spacing:-.01em}
 .md-meta{font:11.5px/1.4 var(--mono);color:var(--faint)}
-@media(max-width:600px){.rec-val{font-size:25px}}
+@media(max-width:600px){.rec-val{font-size:24px}}
 .hero{padding:8px 0 28px}
 .hero-label{font-family:var(--mono);color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
 .hero-value{font-family:var(--mono);font-size:48px;font-weight:600;letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1.1}
@@ -320,7 +355,7 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .privacy-btn{background:rgba(255,255,255,.08);border:none;color:var(--muted);cursor:pointer;width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;transition:background .15s,color .15s}
 .privacy-btn:hover{background:rgba(255,255,255,.15);color:var(--text)}
 .privacy-btn svg{width:18px;height:18px;display:block}
-.hero-change{display:inline-flex;align-items:center;gap:4px;margin-top:10px;font-family:var(--mono);font-size:14px;font-weight:600;padding:4px 10px;border-radius:20px}
+.hero-change{display:inline-flex;align-items:center;gap:4px;margin-top:10px;font-family:var(--mono);font-size:14px;font-weight:600;padding:4px 10px;border-radius:16px}
 .hero-change.pos{background:rgba(46,160,67,.15)}
 .hero-change.neg{background:rgba(229,83,75,.15)}
 .hero-change.flat{background:var(--panel2);color:var(--muted)}
@@ -328,7 +363,7 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
    four dollar figures stops reading as four copies of the same thing. */
 .stat-row{display:flex;gap:14px;padding:18px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:24px;flex-wrap:wrap}
 .stat{display:flex;flex-direction:column;gap:5px;padding:10px 14px;border-left:3px solid var(--border);background:var(--panel);flex:1;min-width:150px}
-.stat-label{font-family:var(--mono);color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
+.stat-label{font-family:var(--mono);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 .stat-value{font-family:var(--mono);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
 .stat.s-out{border-left-color:var(--c-out)}
 .stat.s-in{border-left-color:var(--c-in)}
@@ -359,7 +394,7 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .mycall-none{border-color:var(--border);color:var(--muted);opacity:.65;font-weight:400}
 .mycall-none:hover{opacity:1}
 .mycall option{background:var(--panel);color:var(--text);font-weight:400}
-.greeting{font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:2px}
+.greeting{font-size:20px;font-weight:700;letter-spacing:-.3px;margin-bottom:2px}
 .greeting-sub{color:var(--muted);font-size:14px;margin-bottom:24px}
 .welcome-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px}
 .welcome-card h2{font-size:18px;margin-bottom:6px;font-weight:700}
@@ -370,11 +405,11 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
    markup, same element ids, same functions, and are simply hidden until asked for, then shown as
    a centred sheet. Nothing about how an add works changed; only when the form is on screen. */
 .tab-actions{display:flex;justify-content:flex-end;margin-bottom:12px}
-.btn-add{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;
+.btn-add{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;
   font-size:13px;font-weight:600;border:1px solid var(--border);background:var(--panel);
   color:var(--text);cursor:pointer;font-family:inherit}
 .btn-add:hover{border-color:#3d434f;background:var(--panel2)}
-.btn-add .plus{font-size:15px;line-height:1;color:var(--accent)}
+.btn-add .plus{font-size:14px;line-height:1;color:var(--accent)}
 .addwrap{display:none}
 .addwrap.open{display:block;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6);
   padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -383,19 +418,19 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
   color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:4px 8px}
 .addwrap .add-close:hover{color:var(--text)}
 @media(max-width:600px){.addwrap.open>.card{margin:4vh auto 40px}}
-.agree-row{display:flex;gap:9px;align-items:flex-start;margin:14px 0 12px;font-size:12.5px;
+.agree-row{display:flex;gap:9px;align-items:flex-start;margin:14px 0 12px;font-size:12px;
   line-height:1.5;color:var(--muted)}
 .agree-row input{width:auto;margin-top:2px;flex:none}
 .agree-row a{color:var(--accent)}
-.ovf-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:5px;
+.ovf-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:6px;
   display:inline-flex;align-items:center;line-height:1}
 .ovf-btn:hover{color:var(--text);background:var(--panel2)}
 .ovf-btn svg{fill:currentColor}
 .prov{border-bottom:1px dotted var(--muted);cursor:help}
 .prov:hover{border-bottom-style:solid;color:var(--accent)}
-.prov:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+.prov:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 .ovf-menu{position:fixed;z-index:500;min-width:170px;background:var(--panel);border:1px solid var(--line2);
-  border-radius:9px;padding:5px;box-shadow:0 12px 34px rgba(0,0,0,.5)}
+  border-radius:8px;padding:5px;box-shadow:0 12px 34px rgba(0,0,0,.5)}
 .ovf-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);
   font:inherit;font-size:13px;padding:8px 10px;border-radius:6px;cursor:pointer}
 .ovf-item:hover{background:var(--panel2)}
@@ -404,13 +439,13 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .ovf-swatches button{width:15px;height:15px;border-radius:50%;cursor:pointer;padding:0}
 
 /* list rows */
-.list-rows{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel)}
+.list-rows{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel)}
 .list-row{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);
   cursor:pointer;transition:background .12s}
 .list-row:last-child{border-bottom:none}
 .list-row:hover{background:var(--panel2)}
 .list-row-dot{width:9px;height:9px;border-radius:50%;flex:none}
-.list-row-name{font-size:14.5px;font-weight:600}
+.list-row-name{font-size:14px;font-weight:600}
 .list-row-tag{font:9.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
   border:1px solid var(--border);border-radius:4px;padding:3px 5px}
 .list-row-n{margin-left:auto;font:12.5px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
@@ -421,7 +456,7 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .crumb .cur{color:var(--text);font-weight:650}
 .list-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
 .list-card{display:flex;flex-direction:column;gap:6px;text-align:left;cursor:pointer;
-  background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 16px 14px;
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 16px 14px;
   color:var(--text);font-family:inherit;transition:border-color .14s,background .14s}
 .list-card:hover{border-color:#3d434f;background:var(--panel2)}
 .list-card-top{display:flex;align-items:center;gap:8px;font-size:14px}
@@ -429,16 +464,16 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .list-card-tag{font:9.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
   border:1px solid var(--border);border-radius:4px;padding:3px 5px}
 .list-card-n{font:700 26px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-.list-card-sub{font-size:11.5px;color:var(--muted);line-height:1.45;
+.list-card-sub{font-size:11px;color:var(--muted);line-height:1.45;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.list-head{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:16px 18px;margin-bottom:16px}
+.list-head{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:16px 18px;margin-bottom:16px}
 .list-head-main{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
 .list-head-dot{width:12px;height:12px;border-radius:50%;flex:none}
-.list-head-name{font-size:22px;letter-spacing:-.02em;font-weight:700;margin:0}
+.list-head-name{font-size:20px;letter-spacing:-.02em;font-weight:700;margin:0}
 .list-pick{background:var(--panel2);border:1px solid var(--border);color:var(--muted);
-  border-radius:6px;padding:2px 6px;font-size:11.5px;max-width:110px}
+  border-radius:6px;padding:2px 6px;font-size:11px;max-width:110px}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th{font-family:var(--mono);text-align:left;color:var(--muted);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--border)}
+th{font-family:var(--mono);text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--border)}
 th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
 th.sortable:hover{color:var(--text)}
 td{padding:12px 10px;border-bottom:1px solid var(--border)}
@@ -452,8 +487,8 @@ tr:last-child td{border-bottom:none}
 .research-card{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--research);border-radius:var(--radius);padding:16px;margin-bottom:12px}
 .research-badge{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--research);background:rgba(201,130,42,.14);padding:3px 8px;border-radius:6px}
 .research-stat{font-family:var(--mono);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.1px}
-.research-stat-label{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-weight:600}
-.research-tag{background:var(--panel2);color:var(--muted);font-family:var(--mono);font-size:10.5px;padding:3px 8px;border-radius:20px;border:1px solid var(--border)}
+.research-stat-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-weight:600}
+.research-tag{background:var(--panel2);color:var(--muted);font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:16px;border:1px solid var(--border)}
 .check-pass{color:var(--green);font-weight:600}
 .check-fail{color:var(--red);font-weight:600}
 .check-na{color:var(--muted)}
@@ -479,9 +514,9 @@ tr:last-child td{border-bottom:none}
   -webkit-mask-image:radial-gradient(ellipse 75% 65% at 32% 42%,#000,transparent 78%);
   mask-image:radial-gradient(ellipse 75% 65% at 32% 42%,#000,transparent 78%)}
 .auth-brand-inner{position:relative;max-width:470px}
-.auth-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--brand2);margin-bottom:24px}
+.auth-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--brand2);margin-bottom:24px}
 .auth-h1{font-size:40px;line-height:1.12;letter-spacing:-.022em;font-weight:700;margin-bottom:16px}
-.auth-sub{color:var(--muted);font-size:15.5px;line-height:1.65;margin-bottom:34px;max-width:430px}
+.auth-sub{color:var(--muted);font-size:16px;line-height:1.65;margin-bottom:34px;max-width:430px}
 .auth-points{list-style:none;display:flex;flex-direction:column;gap:15px}
 .auth-points li{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:1.5}
 .auth-points b{display:block;margin-bottom:3px;font-weight:600}
@@ -490,25 +525,25 @@ tr:last-child td{border-bottom:none}
 .auth-foot{margin-top:40px;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
 .auth-panel{display:flex;align-items:center;justify-content:center;padding:40px 32px}
 .auth-card{width:100%;max-width:380px}
-.auth-title{font-size:23px;font-weight:700;letter-spacing:-.012em;margin-bottom:7px}
-.auth-note{color:var(--muted);font-size:13.5px;line-height:1.55;margin-bottom:24px}
-.auth-switch{display:flex;gap:3px;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:3px;margin-bottom:22px}
+.auth-title{font-size:24px;font-weight:700;letter-spacing:-.012em;margin-bottom:7px}
+.auth-note{color:var(--muted);font-size:13px;line-height:1.55;margin-bottom:24px}
+.auth-switch{display:flex;gap:3px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:22px}
 .auth-switch button{flex:1;background:transparent;border:none;color:var(--muted);font-family:var(--mono);
-  font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:9px 0;border-radius:6px;transition:background .12s ease,color .12s ease}
+  font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:9px 0;border-radius:6px;transition:background .12s ease,color .12s ease}
 .auth-switch button.on{background:var(--text);color:var(--bg)}
-.auth-legal{margin-top:22px;padding-top:18px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);line-height:1.65}
+.auth-legal{margin-top:22px;padding-top:18px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);line-height:1.65}
 .login-wrap{max-width:380px;margin:9vh auto;padding:20px}
 .login-wrap .card{padding:28px;border-radius:var(--radius)}
 .field{margin-bottom:12px}
 .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500}
 .chart-box{position:relative;height:240px}
-.score-bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:8px}
-.score-bar div{height:100%;border-radius:3px}
+.score-bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:8px}
+.score-bar div{height:100%;border-radius:4px}
 .tooltip{cursor:help;border-bottom:1px dotted var(--muted)}
 .tabs-hidden{display:none}
 .empty{color:var(--muted);text-align:center;padding:34px 16px;font-size:14px;line-height:1.6}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--btn-bg);color:var(--btn-fg);padding:13px 18px;border-radius:10px;z-index:100;max-width:340px;font-size:14px;font-weight:500}
-.verdict-box{padding:16px;border-radius:var(--radius);margin-bottom:16px;font-size:15px;border:1px solid var(--border)}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--btn-bg);color:var(--btn-fg);padding:13px 18px;border-radius:12px;z-index:100;max-width:340px;font-size:14px;font-weight:500}
+.verdict-box{padding:16px;border-radius:var(--radius);margin-bottom:16px;font-size:14px;border:1px solid var(--border)}
 .v-buy{background:rgba(46,160,67,.10);border-left:3px solid var(--green)}
 .v-watch{background:rgba(59,130,246,.10);border-left:3px solid var(--accent)}
 .v-avoid{background:rgba(229,83,75,.10);border-left:3px solid var(--red)}
@@ -526,27 +561,27 @@ small.src{color:var(--muted)}
 .cmd-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .cmd-kind{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.06em;width:56px;flex-shrink:0}
 .cmd-sym{font-weight:700;font-size:14px;width:64px;flex-shrink:0}
-.cmd-why{flex:1;font-size:13.5px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmd-score{font-family:var(--mono);font-size:11.5px;color:var(--muted);flex-shrink:0}
+.cmd-why{flex:1;font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmd-score{font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0}
 .cmd-chev{color:var(--muted);font-size:11px;flex-shrink:0;transition:transform .15s}
 .cmd-row.open .cmd-chev{transform:rotate(90deg)}
-.cmd-detail{padding:0 16px 16px 60px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:13.5px;line-height:1.6}
+.cmd-detail{padding:0 16px 16px 60px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:13px;line-height:1.6}
 .cmd-detail:last-child{border-bottom:none}
 .cmd-empty{padding:26px 16px;text-align:center}
 /* Section lead-ins on the Projections tab, separating ranges from signals. */
 .sec-lead{display:flex;gap:16px;align-items:flex-start;margin:4px 0 20px}
 .sec-lead .sec-no{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--accent);
-  border:1px solid var(--border);border-radius:5px;padding:6px 9px;flex-shrink:0;margin-top:2px}
+  border:1px solid var(--border);border-radius:6px;padding:6px 9px;flex-shrink:0;margin-top:2px}
 
 /* ---------- first-run walkthrough ---------- */
 .tour-wrap{display:none;position:fixed;inset:0;z-index:200;background:rgba(6,7,9,.72);
   backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:20px}
-.tour-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+.tour-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;
   width:100%;max-width:470px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
 .tour-head{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--border);background:var(--panel2)}
-.tour-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand2)}
+.tour-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand2)}
 .tour-count{font-family:var(--mono);font-size:11px;color:var(--muted)}
-.tour-x{background:none;border:none;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;padding:0 2px}
+.tour-x{background:none;border:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:0 2px}
 .tour-x:hover{color:var(--text)}
 .tour-body{padding:24px 22px 20px;min-height:172px}
 .tour-tag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
@@ -556,7 +591,7 @@ small.src{color:var(--muted)}
 .t-violet{background:rgba(139,92,246,.15);color:#a98bf3}
 .t-amber{background:rgba(217,164,65,.16);color:#e0bc72}
 .t-red{background:rgba(229,83,75,.15);color:#ef8b85}
-.tour-q{font-size:19px;line-height:1.28;font-weight:700;letter-spacing:-.015em;margin-bottom:11px}
+.tour-q{font-size:20px;line-height:1.28;font-weight:700;letter-spacing:-.015em;margin-bottom:11px}
 .tour-p{color:var(--muted);font-size:14px;line-height:1.66}
 .tour-foot{display:flex;align-items:center;gap:8px;padding:13px 18px;border-top:1px solid var(--border);background:var(--panel2)}
 .tour-dots{display:flex;gap:5px}
@@ -570,6 +605,22 @@ small.src{color:var(--muted)}
    every other target. Each is position:sticky, so each is its own stacking context. */
 body.touring header,body.touring #sidebar{z-index:201}
 .tour-lit{position:relative;box-shadow:0 0 0 2px var(--brand2),0 0 0 7px rgba(31,158,140,.22);border-radius:8px}
+/* DESIGN.md's typographic principles, applied as rules rather than per-component values.
+   Negative tracking on display sizes stops large text looking gappy; 600 on headings and 500 on
+   button labels is its weight hierarchy; generous body leading is for reading, and is deliberately
+   NOT applied to table cells, which are scanned in columns and want to stay tight. */
+h1,h2,.hero-value,.auth-h1{letter-spacing:var(--tr-display);font-weight:var(--fw-heading)}
+h3,h4,.section-title{letter-spacing:var(--tr-heading);font-weight:var(--fw-heading)}
+.btn,.btn-add,button{font-weight:var(--fw-medium)}
+p,.muted{line-height:var(--lh-body)}
+table td,table th{line-height:var(--lh-normal)}
+/* The source's rule, which happens to match this project's own ban on pill buttons: a full radius
+   is for a status badge and never for a control. */
+.pill,.badge{border-radius:var(--r-full)}
+.btn,.btn-add,input,select,textarea{border-radius:var(--r-md)}
+.card,.ovf-menu{border-radius:var(--r-lg)}
+.ovf-menu{box-shadow:var(--el-4)}
+
 /* ============================ P4. CRAFT ============================
    SKELETONS, NOT SPINNERS. A spinner says "something is happening"; a skeleton says "a table with
    four rows is arriving here". The second one lets the eye settle before the data lands, and it
@@ -601,14 +652,14 @@ body.touring header,body.touring #sidebar{z-index:201}
 .stat-value,table td,table th{font-variant-numeric:tabular-nums}
 
 @media (max-width:768px){
-  .cmd-why{white-space:normal;font-size:12.5px}
+  .cmd-why{white-space:normal;font-size:12px}
   .cmd-row{align-items:flex-start;flex-wrap:wrap;padding:12px}
   .cmd-detail{padding-left:16px}
   .cmd-score{display:none}
 }
 /* ---- Theme slide switch: light on the left, dark on the right ---- */
-.theme-switch{position:relative;width:240px;height:42px;background:var(--panel2);border:1px solid var(--border);border-radius:21px;cursor:pointer;user-select:none;overflow:hidden}
-.theme-knob{position:absolute;top:3px;left:3px;width:117px;height:34px;background:var(--accent);border-radius:17px;transition:transform .22s ease}
+.theme-switch{position:relative;width:240px;height:42px;background:var(--panel2);border:1px solid var(--border);border-radius:16px;cursor:pointer;user-select:none;overflow:hidden}
+.theme-knob{position:absolute;top:3px;left:3px;width:117px;height:34px;background:var(--accent);border-radius:16px;transition:transform .22s ease}
 .theme-switch.is-dark .theme-knob{transform:translateX(117px)}
 .theme-side{position:absolute;top:0;width:120px;height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;pointer-events:none;color:var(--muted);transition:color .22s ease}
 .theme-switch:not(.is-dark) .theme-side:first-of-type{color:#fff}
@@ -633,16 +684,16 @@ body.touring header,body.touring #sidebar{z-index:201}
 .fc-block{padding:16px 0;border-bottom:1px solid var(--border)}
 .fc-block:first-child{padding-top:2px}
 .fc-block:last-of-type{border-bottom:none}
-.fc-title{font-size:13.5px;font-weight:700;margin-bottom:12px;color:var(--text)}
+.fc-title{font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)}
 .fc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .fc-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .fc-f{display:flex;flex-direction:column;gap:5px}
 .fc-f>span{font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.01em}
 .fc-f>input{padding:9px 10px;font-size:14px;width:100%}
-.fc-go{width:100%;margin-top:11px;padding:10px 0;font-size:13.5px;border-radius:0}
+.fc-go{width:100%;margin-top:11px;padding:10px 0;font-size:13px;border-radius:0}
 /* Result breakdown rows inside .calc-out */
-.fc-head{font-size:19px;font-weight:700;margin-bottom:9px;font-family:var(--mono)}
-.fc-line{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:3px 0}
+.fc-head{font-size:20px;font-weight:700;margin-bottom:9px;font-family:var(--mono)}
+.fc-line{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3px 0}
 .fc-line span:first-child{color:var(--muted)}
 .fc-line span:last-child{font-family:var(--mono);font-weight:600}
 .fc-note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;display:block}
@@ -679,7 +730,7 @@ body.touring header,body.touring #sidebar{z-index:201}
     padding-left:calc(4px + env(safe-area-inset-left))}
   #sidebar .lbl{display:none}
   #sidebar nav button{justify-content:center;padding:11px 0}
-  #sidebar nav button .ico{font-size:17px}
+  #sidebar nav button .ico{font-size:18px}
   #sideToggle{display:none}
   .nav-sep{margin:6px 8px}
   .badge{position:absolute;top:5px;right:5px;margin-left:0}
@@ -689,9 +740,9 @@ body.touring header,body.touring #sidebar{z-index:201}
     padding-right:calc(12px + env(safe-area-inset-right));
     padding-bottom:calc(24px + env(safe-area-inset-bottom))}
 
-  .greeting{font-size:19px}
+  .greeting{font-size:20px}
   .hero{padding:4px 0 20px}
-  .hero-value{font-size:34px;letter-spacing:-.5px}
+  .hero-value{font-size:30px;letter-spacing:-.5px}
   .section-title{margin:24px 0 12px}
 
   /* Two stat cards per row rather than four squeezed flat. */
@@ -700,8 +751,8 @@ body.touring header,body.touring #sidebar{z-index:201}
 
   /* Wide tables scroll sideways inside their card instead of stretching the page. */
   .card{padding:13px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  table{font-size:12.5px}
-  th{padding:7px 7px;font-size:9.5px}
+  table{font-size:12px}
+  th{padding:7px 7px;font-size:10px}
   td{padding:9px 7px}
 
   /* Form rows stack. Inputs carry inline max-widths sized for desktop, which is why
@@ -716,7 +767,7 @@ body.touring header,body.touring #sidebar{z-index:201}
   input,select,textarea{font-size:16px}
   .fc-f>input{font-size:16px}
   .mycall{font-size:16px}
-  .calc-display{font-size:26px}
+  .calc-display{font-size:24px}
 
   /* Calculator fills the screen width rather than overflowing it. The left offset is
      set inline by JS, hence !important. */
@@ -744,8 +795,8 @@ body.touring header,body.touring #sidebar{z-index:201}
 @media (max-width:900px){
   .auth{grid-template-columns:1fr;min-height:0}
   .auth-brand{padding:38px 24px 30px;border-right:none;border-bottom:1px solid var(--border);justify-content:flex-start}
-  .auth-h1{font-size:29px}
-  .auth-sub{font-size:14.5px;margin-bottom:0}
+  .auth-h1{font-size:30px}
+  .auth-sub{font-size:14px;margin-bottom:0}
   .auth-points{display:none}
   .auth-foot{display:none}
   .auth-panel{padding:26px 24px calc(44px + env(safe-area-inset-bottom))}
@@ -755,9 +806,9 @@ body.touring header,body.touring #sidebar{z-index:201}
 /* Very narrow phones (SE, mini): one stat per row rather than two cramped ones. */
 @media (max-width:400px){
   .stat{min-width:100%}
-  .hero-value{font-size:29px}
+  .hero-value{font-size:30px}
   .fc-grid-2,.fc-grid-3{grid-template-columns:1fr}
-  .auth-h1{font-size:26px}
+  .auth-h1{font-size:24px}
 }
 
 /* P4. TOUCH TARGETS, and this block is deliberately last: media queries add no specificity (I9),
@@ -2702,6 +2753,25 @@ function demoData(){
       rows.push({d:new Date(Date.now()-i*86400000).toISOString().slice(0,10),p:+px.toFixed(2)}); }
     rows[rows.length-1].p=base;
     d.priceLog[sym]=rows;
+  });
+  /* The demo exists so every screen renders with no API key and no worker, which is what makes it
+     useful for "did the deploy land". Seeding prices alone did not achieve that: Risk, the
+     effective-bets figure and the shrinkage line all read from D.analyses[sym].riskSigma, so those
+     panels sat empty on the one account whose job is to prove they are not empty. Volatility is
+     computed from the seeded closes rather than invented, so the demo shows real arithmetic on
+     fake prices rather than a fake number. */
+  d.analyses={};
+  Object.keys(d.priceLog).forEach(sym=>{
+    const rows=d.priceLog[sym];
+    const rets=[];
+    for(let i=1;i<rows.length;i++)if(rows[i-1].p>0)rets.push((rows[i].p-rows[i-1].p)/rows[i-1].p);
+    const m=rets.reduce((a,b)=>a+b,0)/(rets.length||1);
+    const v=rets.reduce((a,r)=>a+(r-m)*(r-m),0)/Math.max(1,rets.length-1);
+    const h=d.holdings.find(x=>x.sym===sym);
+    d.analyses[sym]={sym,when:Date.now(),price:rows[rows.length-1].p,
+      riskSigma:+(Math.sqrt(v)*Math.sqrt(252)).toFixed(4),
+      qScore:h?9:7,qTotal:12,pScore:4,pTotal:6,mScore:3,mTotal:4,
+      quality:[],priceChecks:[],momentum:[],wallStreet:[],error:null};
   });
   d.tourSeen=true;                 // the walkthrough is not what is being tested
   return d;
