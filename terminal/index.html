@@ -6749,6 +6749,97 @@ function renderBenchmarks(){
    What survives is the half that needs no expected returns: how much of the portfolio's variance
    each holding is actually responsible for, versus how much of the money it holds. That is
    measurement. It cannot be wrong about the future because it makes no claim about it. */
+/* ============================ M7. LEDOIT-WOLF SHRINKAGE ============================
+   A sample covariance matrix estimated from a few hundred daily observations across a handful of
+   holdings is badly conditioned, and its errors are not random noise that averages out. The
+   extreme eigenvalues are biased outward: the largest sample variances are too large and the
+   smallest too small, so anything that consumes the matrix inherits a systematic error rather
+   than an unbiased one.
+
+   Ledoit and Wolf shrink the sample estimate toward a structured target that has far fewer
+   parameters and therefore far less estimation error, at the cost of some bias:
+
+       Sigma = delta * F + (1 - delta) * S
+
+   F here is the constant-correlation target: every pair gets the average sample correlation, and
+   the diagonal keeps the sample variances. It is the right target for a book of equities, which
+   genuinely do share a common correlation level, and it is what Ledoit and Wolf recommend for
+   this case.
+
+   DELTA IS DERIVED, NOT PICKED. The optimal intensity minimises expected squared error and comes
+   out of the data: it rises when the sample estimate is noisy (short history, many assets) and
+   falls when it is reliable. A hardcoded shrinkage of "about 0.3" would be an assumed parameter,
+   which this file does not get to use where it could measure one instead. */
+function ledoitWolf(retsByAsset){
+  const N=retsByAsset.length;
+  if(N<2)return null;
+  const T=retsByAsset[0].length;
+  if(!(T>=20)||retsByAsset.some(r=>r.length!==T))return null;
+  const mean=retsByAsset.map(r=>r.reduce((a,b)=>a+b,0)/T);
+  const x=retsByAsset.map((r,i)=>r.map(v=>v-mean[i]));
+  /* Sample covariance, divided by T to match the Ledoit-Wolf derivation. */
+  const S=[];
+  for(let i=0;i<N;i++){
+    S.push([]);
+    for(let j=0;j<N;j++){
+      let sum=0; for(let t=0;t<T;t++)sum+=x[i][t]*x[j][t];
+      S[i].push(sum/T);
+    }
+  }
+  const sd=S.map((row,i)=>Math.sqrt(Math.max(row[i],0)));
+  if(sd.some(v=>!(v>0)))return null;
+  let rSum=0,pairs=0;
+  for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){rSum+=S[i][j]/(sd[i]*sd[j]);pairs++;}
+  const rBar=pairs?rSum/pairs:0;
+  // F: constant correlation target.
+  const F=[];
+  for(let i=0;i<N;i++){
+    F.push([]);
+    for(let j=0;j<N;j++)F[i].push(i===j?S[i][i]:rBar*sd[i]*sd[j]);
+  }
+  // pi: sum of asymptotic variances of the sample covariance entries.
+  let pi=0; const piMat=[];
+  for(let i=0;i<N;i++){
+    piMat.push([]);
+    for(let j=0;j<N;j++){
+      let sum=0;
+      for(let t=0;t<T;t++){const d=x[i][t]*x[j][t]-S[i][j];sum+=d*d;}
+      const v=sum/T; piMat[i].push(v); pi+=v;
+    }
+  }
+  // rho: the part of pi the target shares with the sample estimate.
+  let rho=0;
+  for(let i=0;i<N;i++)rho+=piMat[i][i];
+  const theta=(i,j,k)=>{                 // asymptotic covariance of s_ii with s_ij
+    let sum=0;
+    for(let t=0;t<T;t++)sum+=(x[i][t]*x[i][t]-S[i][i])*(x[j][t]*x[k][t]-S[j][k]);
+    return sum/T;
+  };
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++){
+    if(i===j)continue;
+    rho+=(rBar/2)*((sd[j]/sd[i])*theta(i,i,j)+(sd[i]/sd[j])*theta(j,i,j));
+  }
+  // gamma: how far the target sits from the sample estimate.
+  let gamma=0;
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++){const d=F[i][j]-S[i][j];gamma+=d*d;}
+  if(!(gamma>0))return null;
+  const delta=Math.max(0,Math.min(1,((pi-rho)/gamma)/T));
+  const out=[];
+  for(let i=0;i<N;i++){
+    out.push([]);
+    /* Rescaled back to the (T-1) convention the rest of the file uses for a sample variance. */
+    for(let j=0;j<N;j++)out[i].push((delta*F[i][j]+(1-delta)*S[i][j])*(T/(T-1)));
+  }
+  return{S:out,delta,rBar,N,T};
+}
+/* Aligned daily returns for a set of symbols, if every one of them has enough shared history. */
+function shrunkCovFor(syms){
+  if(!Array.isArray(syms)||syms.length<2)return null;
+  const al=alignedReturns(syms);
+  if(!al||!al.rets||al.rets[0].length<20)return null;
+  return ledoitWolf(al.rets);
+}
+
 function covMatrix(rows,avgCorr){
   const n=rows.length,S=[];
   for(let i=0;i<n;i++){
@@ -6790,7 +6881,17 @@ function riskContributions(){
   const avgCorr=(lastRiskCorrPairs&&lastRiskCorrPairs.length)
     ? lastRiskCorrPairs.reduce((s,p)=>s+p.c,0)/lastRiskCorrPairs.length : 0.5;
   const measured=!!(lastRiskCorrPairs&&lastRiskCorrPairs.length);
-  const S=covMatrix(rows,avgCorr);
+  /* M7. Shrinkage where it can be computed, the pairwise build where it cannot. The daily
+     covariance is annualised to match the sigma convention the rest of this function uses. */
+  const lw=shrunkCovFor(rows.map(r=>r.sym));
+  let S,shrunk=null;
+  if(lw){
+    const k=TRADING_DAYS;
+    S=lw.S.map(row=>row.map(v=>v*k));
+    shrunk={delta:lw.delta,rBar:lw.rBar,T:lw.T};
+  }else{
+    S=covMatrix(rows,avgCorr);
+  }
   const vol=portVol(w,S);
   if(!(vol>0))return null;
   // Marginal contribution to risk, then the share each holding owns of total variance.
@@ -6803,7 +6904,7 @@ function riskContributions(){
   /* M5 reads the same weights and the same covariance the risk table is built from, so the two
      figures cannot disagree about what the book is. */
   return{rows:contrib,vol,eqVol:portVol(eqW,S),avgCorr,measured,n:rows.length,
-         bets:effectiveBets(w,S)};
+         bets:effectiveBets(w,S),shrunk};
 }
 /* ============================ M5. EFFECTIVE NUMBER OF BETS ============================
    Nine positions is a count of tickers, not a count of bets. Two things collapse it.
@@ -6905,7 +7006,8 @@ function renderRiskContrib(){
       '<div class="stat s-profit"><span class="stat-label">Portfolio volatility</span><span class="stat-value">'+(R.vol*100).toFixed(1)+'%</span></div>'+
       '<div class="stat s-in"><span class="stat-label">If equally weighted</span><span class="stat-value '+(eqBetter?'neg':'pos')+'">'+(R.eqVol*100).toFixed(1)+'%</span></div>'+
       '<div class="stat s-count"><span class="stat-label">Biggest risk source</span><span class="stat-value" style="font-size:16px">'+esc(worst.sym)+'</span></div>'+
-      '<div class="stat"><span class="stat-label">Correlation used</span><span class="stat-value" style="font-size:15px">'+R.avgCorr.toFixed(2)+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Correlation used</span><span class="stat-value" style="font-size:15px">'+
+        (R.shrunk?R.shrunk.rBar.toFixed(2):R.avgCorr.toFixed(2))+'</span></div>'+
       /* M5. The headline of this whole tab: how many bets are actually on. */
       '<div class="stat"><span class="stat-label">Effective bets</span><span class="stat-value '+
         (R.bets&&R.bets.breadth<R.bets.nominal*0.5?'neg':'')+'">'+
@@ -6945,6 +7047,19 @@ function renderRiskContrib(){
       (eqBetter
         ? 'Splitting the same holdings equally would run at <b class="neg">'+(R.eqVol*100).toFixed(1)+'%</b> volatility against your <b>'+(R.vol*100).toFixed(1)+'%</b>. Your weighting is carrying more risk than dividing evenly would. That is worth a reason.'
         : 'Splitting the same holdings equally would run at <b>'+(R.eqVol*100).toFixed(1)+'%</b> against your <b class="pos">'+(R.vol*100).toFixed(1)+'%</b>, so your weighting is genuinely reducing risk versus naive diversification.')+'</p>'+
+    /* M7. A shrinkage intensity is a parameter and this file does not hide parameters. */
+    (R.shrunk
+      ? '<p class="muted" style="font-size:12px;margin-top:10px;line-height:1.6">'+
+        '<b>Covariance is shrunk, by '+(R.shrunk.delta*100).toFixed(0)+'%.</b> '+
+        'A covariance matrix estimated from '+R.shrunk.T+' days across '+R.n+' holdings has systematically biased extreme values: the largest variances come out too large and the smallest too small, and that error does not average away. '+
+        'Ledoit-Wolf pulls the estimate toward a constant-correlation model, here at an average of '+R.shrunk.rBar.toFixed(2)+'. '+
+        'The intensity is derived from the data rather than chosen, and it falls as history accumulates, so a longer record moves this number toward zero on its own. '+
+        (R.shrunk.delta>0.5
+          ? 'At this level the estimate is leaning heavily on structure rather than on your data, which is what a short history deserves.'
+          : 'At this level your own data is carrying most of the estimate.')+
+        '</p>'
+      : '<p class="muted" style="font-size:12px;margin-top:10px;line-height:1.6">'+
+        '<b>Covariance is not shrunk here.</b> There is not enough overlapping daily history across these holdings to estimate a full matrix, so pairwise correlations are used with an average filling the gaps. That is the weaker estimate and it is the reason this line exists.</p>')+
     '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6"><b>There is no efficient frontier here, on purpose.</b> Optimising a frontier needs expected returns, and mean-variance is notoriously unstable in them, it overweights whatever holding has estimation error in its favour, and equal weighting has beaten it out of sample in published tests. So this shows where your risk actually sits and compares against equal weight, and stops there. '+
       (R.measured?'Correlations are measured from your holdings.':'Correlations are a '+R.avgCorr.toFixed(2)+' assumption. Run <b>Calculate risk</b> on the Risk tab to measure them.')+'</p>';
 }

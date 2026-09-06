@@ -1049,6 +1049,55 @@ t('it states its own falsification', /this whole panel collapses to the plain in
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
 
+/* ==================== M7. LEDOIT-WOLF SHRINKAGE ==================== */
+G('The covariance estimate is biased, and by how much is measurable');
+
+const SB = new Function(`${grab(term, 'ledoitWolf')}\nreturn {ledoitWolf};`)();
+function lwXs(seed){let x=seed>>>0;return()=>{x^=x<<13;x>>>=0;x^=x>>17;x^=x<<5;x>>>=0;return x/4294967296;};}
+function lwBlocks(N,T,seed){
+  const rnd=lwXs(seed);
+  const gs=()=>{let u=0,v=0;while(!u)u=rnd();while(!v)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+  const out=Array.from({length:N},()=>[]);
+  for(let t=0;t<T;t++){const fA=gs(),fB=gs();
+    for(let i=0;i<N;i++)out[i].push(Math.sqrt(0.8)*((i<N/2)?fA:fB)+Math.sqrt(0.2)*gs());}
+  return out;
+}
+/* The defining property: shrinkage is heavy when data is thin and falls as it accumulates. */
+t('shrinkage falls monotonically as history grows', (() => {
+  const d=[40,120,400,1200].map(T=>SB.ledoitWolf(lwBlocks(8,T,77)).delta);
+  return d.every((v,i)=>i===0||v<d[i-1]);
+})());
+t('and stays a proper fraction', (() => {
+  const d=[40,120,400,1200].map(T=>SB.ledoitWolf(lwBlocks(8,T,77)).delta);
+  return d.every(v=>v>=0&&v<=1);
+})());
+/* When the target IS the truth, shrinking all the way to it is correct, not a bug. */
+t('a correctly specified target attracts full shrinkage', (() => {
+  const rnd=lwXs(11);
+  const gs=()=>{let u=0,v=0;while(!u)u=rnd();while(!v)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+  const out=Array.from({length:8},()=>[]);
+  for(let tt=0;tt<600;tt++){const c=gs();for(let i=0;i<8;i++)out[i].push(Math.sqrt(0.4)*c+Math.sqrt(0.6)*gs());}
+  return SB.ledoitWolf(out).delta>0.8;
+})());
+t('the result stays symmetric with positive variances', (() => {
+  const r=SB.ledoitWolf(lwBlocks(6,200,5));
+  return r.S.every((row,i)=>row[i]>0 && row.every((v,j)=>Math.abs(v-r.S[j][i])<1e-12));
+})());
+t('the average correlation is recovered', (() => {
+  const r=SB.ledoitWolf(lwBlocks(8,1200,77));
+  return r.rBar>0.2 && r.rBar<0.6;
+})());
+t('too little history returns null rather than a fragile matrix',
+  SB.ledoitWolf(lwBlocks(3,10,5))===null);
+t('a single asset returns null', SB.ledoitWolf(lwBlocks(1,100,5))===null);
+/* A shrinkage intensity is a parameter, and this file does not hide parameters. */
+t('delta is derived, never a constant', /const delta=Math\.max\(0,Math\.min\(1,\(\(pi-rho\)\/gamma\)\/T\)\)/.test(term));
+t('the target is constant-correlation, not identity', /rBar\*sd\[i\]\*sd\[j\]/.test(term));
+t('the risk panel reports the intensity', /<b>Covariance is shrunk, by '\+/.test(term));
+t('and says when it could not shrink at all', /<b>Covariance is not shrunk here\.<\/b>/.test(term));
+t('the shrunk estimate is what the risk figures consume',
+  /const lw=shrunkCovFor\(rows\.map\(r=>r\.sym\)\)/.test(term));
+
 /* ==================== M3 + M4. AUDITING THE CHECKS ==================== */
 G('Twenty-two checks are not twenty-two opinions');
 
