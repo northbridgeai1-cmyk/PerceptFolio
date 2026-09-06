@@ -1648,6 +1648,22 @@ body.touring header,body.touring #sidebar{z-index:201}
     <div id="riskContribBody"></div>
   </div>
 
+
+  <!-- M9. Sizing counterfactual. Filed on RISK rather than PROJECTIONS deliberately: Projections is
+       for distributions of outcomes under assumptions, and for signals. This is neither. It is
+       arithmetic over closes already recorded, and it sits directly under "Where your risk actually
+       sits" because that section shows a 6% position can own 20% of the risk and this one answers
+       the obvious next question, what a different size would have done to the actual path. -->
+  <div class="section-title">Sizing counterfactual. Same trades, different size</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:12px"><b>This is not a backtest, and the difference matters.</b> It does not choose different stocks, trade on different days, or use a single price that was not already recorded here. Every ticker is one you hold, every date is one this app logged a close for, and every entry and exit stays exactly where it happened. The only thing changed is how many dollars sat in each position. A backtest has to invent prices for trades you never made; this invents nothing, which is why it is allowed to exist here and a backtest is not.</p>
+    <div class="row" style="flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;max-width:200px"><label>Alternative A (% risk per position)</label><input id="cfRiskA" type="number" min="0.1" max="25" step="0.1" onkeydown="if(event.key==='Enter')renderCounterfactual()"></div>
+      <div class="field" style="margin:0;max-width:200px"><label>Alternative B (% risk per position)</label><input id="cfRiskB" type="number" min="0.1" max="25" step="0.1" onkeydown="if(event.key==='Enter')renderCounterfactual()"></div>
+      <button class="btn" id="cfRunBtn" onclick="renderCounterfactual()">Recompute</button>
+    </div>
+    <div id="cfBody" style="margin-top:14px"></div>
+  </div>
   <div class="section-title">Check any stock's risk</div>
   <div class="card">
     <p class="muted" style="margin-bottom:12px">Doesn't need to be in your Portfolio or Watchlist. Just check the risk/volatility profile of any ticker before you decide whether to add it.</p>
@@ -2832,6 +2848,9 @@ function resetTransientState(){
   const ht=document.getElementById('hzTicker');if(ht)ht.value='';
   const shb=document.getElementById('sharpeBody');if(shb)shb.innerHTML='';
   const rcb=document.getElementById('riskContribBody');if(rcb)rcb.innerHTML='';
+  const cfb=document.getElementById('cfBody');if(cfb)cfb.innerHTML='';
+  const cfa=document.getElementById('cfRiskA');if(cfa)cfa.value='';
+  const cfB=document.getElementById('cfRiskB');if(cfB)cfB.value='';
   const vb=document.getElementById('varBody');if(vb)vb.innerHTML='';
   const sb2=document.getElementById('scenarioBody');if(sb2)sb2.innerHTML='';
   /* News is market data, not user data — but it is fetched per HOLDING, so the cache leaks which
@@ -3317,7 +3336,7 @@ function showTab(t){
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
   if(t==='projections')renderHerizen();
   if(t==='news')renderNews();
-  if(t==='risk'){renderBenchmarks();renderRiskContrib();renderSharpe();renderVaR();}
+  if(t==='risk'){renderBenchmarks();renderRiskContrib();renderCounterfactual();renderSharpe();renderVaR();}
   /* refreshMarketDataCard on every open, not just at login: whether the worker answers changes
      when sync is configured or a custom domain starts resolving, and the card must follow. */
   if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();renderAudit();}
@@ -6416,6 +6435,290 @@ function renderRiskContrib(){
         : 'Splitting the same holdings equally would run at <b>'+(R.eqVol*100).toFixed(1)+'%</b> against your <b class="pos">'+(R.vol*100).toFixed(1)+'%</b>, so your weighting is genuinely reducing risk versus naive diversification.')+'</p>'+
     '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6"><b>There is no efficient frontier here, on purpose.</b> Optimising a frontier needs expected returns, and mean-variance is notoriously unstable in them, it overweights whatever holding has estimation error in its favour, and equal weighting has beaten it out of sample in published tests. So this shows where your risk actually sits and compares against equal weight, and stops there. '+
       (R.measured?'Correlations are measured from your holdings.':'Correlations are a '+R.avgCorr.toFixed(2)+' assumption. Run <b>Calculate risk</b> on the Risk tab to measure them.')+'</p>';
+}
+
+
+/* ============================ M9. COUNTERFACTUAL SIZING ============================
+   THE BOUNDARY, STATED FIRST, BECAUSE IT IS THE WHOLE OF THE ITEM.
+
+   Backtesting is on this project's do-not-build list because it negates I11. A backtest asks what
+   a strategy WOULD HAVE RETURNED, and to answer that it has to supply prices for positions that
+   were never held, on dates nobody was watching, chosen by a rule written after the outcome was
+   known. Every one of those is a price this app never observed, and a record assembled out of
+   prices it never observed is a record it can flatter at will. That is the reason for the ban.
+
+   This is the opposite operation, and the difference is one of kind, not of degree.
+
+     SELECTION IS FIXED.  Only symbols in D.holdings can appear. Nothing is added, substituted or
+                          dropped for having done badly.
+     TIMING IS FIXED.     No entry date, exit date or holding period moves. The window is the
+                          stretch over which the CURRENT positions were held at the CURRENT share
+                          counts: it opens at the most recent dated buy or sell in D.transactions
+                          on any held symbol, and runs to the last logged close.
+     PRICES ARE FIXED.    Every price comes out of D.priceLog, which is this app's own record of
+                          closes it saw. There is no fetch in this module, no interpolation, and no
+                          carrying a stale close across a gap. A date on which any held symbol has
+                          no logged close is dropped from the window rather than filled in.
+     WEIGHTS ARE SET ONCE, at the opening close, and never revisited. A rule that re-sized daily
+                          would be issuing trades that never happened, on dates picked with
+                          hindsight, and that is precisely the door this module keeps shut.
+
+   So the only quantity that varies is DOLLARS PER POSITION. Same names, same days, same closes,
+   different size. That is arithmetic over observed data rather than a simulation of an alternative
+   history, and it is the one counterfactual this product is allowed to run. It is worth running
+   because size decides outcomes more reliably than selection does, and it is the variable the
+   operator can actually change tomorrow.
+
+   THE THREE WAYS IT COULD STILL CHEAT, AND WHAT STOPS EACH.
+
+     1. Volatility measured inside the window would let the alternative arm pick sizes already
+        knowing which names turned violent, and violent names are disproportionately the ones that
+        fell. Every sigma here is measured STRICTLY BEFORE the window opens. Where a symbol has too
+        little history before that date the whole panel refuses, rather than substituting a default:
+        an assumed volatility is a guessed input wearing a decimal point, which is the exact failure
+        this product exists to expose.
+     2. Cash could win the comparison on its own. Both arms therefore start with exactly the money
+        that was in positions on the opening date, and cash held outside them is in neither arm.
+     3. A rule can ask for more money than existed. That is reported as unfundable and scaled back
+        pro rata, never quietly levered.
+
+   WHAT THIS MODULE MAY NEVER GROW. No date-range argument, no symbol list, no entry rule, no exit
+   rule, no rebalancing schedule. counterfactualSizing takes one number and an observed window, and
+   that missing surface is the structural reason it cannot become a backtester.
+   ============================================================================ */
+
+/* About a month, the same bar the active-return module uses. Below it the arithmetic still runs but
+   a maximum drawdown drawn from a handful of sessions says nothing at all. */
+const MIN_CF_DAYS=21;
+
+/* Annualised volatility from a plain array of closes, oldest first. Returns null rather than a
+   default, because the caller must refuse rather than assume. */
+function observedSigma(closes){
+  if(!Array.isArray(closes)||closes.length<22)return null;
+  const rets=toReturns(closes);
+  if(rets.length<21)return null;
+  const m=rets.reduce((a,b)=>a+b,0)/rets.length;
+  const v=rets.reduce((a,b)=>a+(b-m)*(b-m),0)/(rets.length-1);
+  const s=Math.sqrt(v)*annualScale(rets,TRADING_DAYS).scale;   // C6
+  return(s>0&&isFinite(s))?{sigma:s,n:rets.length}:null;
+}
+
+/* The observed window. Reads D.holdings, D.transactions and D.priceLog, and nothing else. Every
+   refusal path returns a reason in words, because rendering nothing without saying why is how a
+   panel gets read as "no difference" when the truth is "not measurable". */
+function counterfactualWindow(){
+  const shares={};
+  (D.holdings||[]).forEach(h=>{if(h&&h.sym&&h.shares>0)shares[h.sym]=(shares[h.sym]||0)+h.shares;});
+  const syms=Object.keys(shares).sort();
+  if(syms.length<2)return{ok:false,reason:'Sizing is a statement about the size of one position relative to another, so this needs at least two open positions. There '+(syms.length===1?'is one.':'are none.')};
+
+  /* The window opens at the most recent dated buy OR sell on any symbol still held, so the share
+     count used below was the share count on every day inside it. Sells count as well as buys: a
+     partial sale changes the position, and running today's smaller holding back across the whole
+     window would be sizing a position the operator did not have. */
+  let heldFrom=null;
+  (D.transactions||[]).forEach(tx=>{
+    if(!tx||!tx.date||!shares[tx.sym])return;
+    if(tx.action!=='buy'&&tx.action!=='sell')return;
+    if(!heldFrom||tx.date>heldFrom)heldFrom=tx.date;
+  });
+  if(!heldFrom)return{ok:false,reason:'No dated buy or sell is recorded for any current holding, so there is no date from which these positions are known to have been held at these share counts. Record your trades on the History tab and this becomes computable. It is not assumed.'};
+
+  const px={},noLog=[];
+  syms.forEach(s=>{
+    const m={};
+    ((D.priceLog||{})[s]||[]).forEach(r=>{if(r&&r.d&&r.p>0)m[r.d]=r.p;});
+    if(!Object.keys(m).length)noLog.push(s);
+    px[s]=m;
+  });
+  if(noLog.length)return{ok:false,reason:'No logged closes at all for '+noLog.join(', ')+'. Run Refresh data and the log starts filling from that day.'};
+
+  /* INTERSECTION, NOT UNION. A date on which any held symbol has no close is dropped rather than
+     filled, because filling it is inventing a price. */
+  const dates=Object.keys(px[syms[0]]).filter(d=>d>=heldFrom&&syms.every(s=>px[s][d]>0)).sort();
+  if(dates.length<MIN_CF_DAYS)return{ok:false,reason:'Only '+dates.length+' session'+(dates.length===1?'':'s')+' of logged closes cover every holding since '+heldFrom+', the day your positions were last changed. This needs '+MIN_CF_DAYS+'. The log builds each time you refresh, and the window restarts whenever you open, add to or trim a position.'};
+
+  /* Sigma STRICTLY BEFORE the window opens. See point 1 of the boundary note above. */
+  const sigma={},sigN={},thin=[];
+  syms.forEach(s=>{
+    const pre=Object.keys(px[s]).filter(d=>d<dates[0]).sort().map(d=>px[s][d]);
+    const v=observedSigma(pre);
+    if(!v){thin.push(s+' ('+pre.length+')');return;}
+    sigma[s]=v.sigma;sigN[s]=v.n;
+  });
+  if(thin.length)return{ok:false,reason:'A risk budget becomes a position size by dividing by volatility, and that volatility has to be measured before the window opens. Measuring it inside the window would let the alternative sizing choose sizes already knowing which names turned violent. There are not enough closes logged before '+dates[0]+' for '+thin.join(', ')+', where 22 are needed. Nothing is assumed in their place, so nothing is shown.'};
+
+  const start=syms.reduce((a,s)=>a+shares[s]*px[s][dates[0]],0);
+  if(!(start>0))return{ok:false,reason:'The positions priced at zero on the opening date, which is not a number this can divide by.'};
+  return{ok:true,syms,shares,px,dates,sigma,sigN,start,heldFrom,from:dates[0],to:dates[dates.length-1]};
+}
+
+/* The equity path for ONE fixed dollar allocation. Units are bought at the opening close and never
+   touched again, so this is a re-weighting of observed prices and nothing else.
+   It returns null the moment a price is missing, rather than carrying the previous one forward. */
+function sizedEquityPath(W,dollars,cash){
+  if(!W||!W.ok||!W.dates||!W.dates.length)return null;
+  const d0=W.dates[0],units={};
+  for(const s of W.syms){
+    const p0=W.px[s][d0];
+    if(!(p0>0))return null;
+    units[s]=(dollars[s]||0)/p0;
+  }
+  let peak=null,maxDD=0,end=null;
+  const path=[];
+  for(const d of W.dates){
+    let v=cash;
+    for(const s of W.syms){
+      const p=W.px[s][d];
+      if(!(p>0))return null;                       // refuse; never interpolate
+      v+=units[s]*p;
+    }
+    if(peak===null||v>peak)peak=v;
+    const dd=peak>0?(peak-v)/peak:0;
+    if(dd>maxDD)maxDD=dd;
+    end=v;path.push(v);
+  }
+  return{start:path[0],end,maxDD,n:path.length,path};
+}
+
+/* THE PURE FUNCTION. A risk percentage and an observed window in; ending value, maximum drawdown
+   and the number of observations it could use, out.
+
+   The sizing rule is the app's own, unchanged: dollars = (equity x risk%) / annualised volatility,
+   which is the volatility-budget limb of sizingLimits(). At that size a one standard deviation
+   annual move in the name costs exactly the risk budget. */
+function counterfactualSizing(riskPct,W){
+  if(!W||!W.ok)return{ok:false,reason:(W&&W.reason)||'No observed window.'};
+  if(!(riskPct>0))return{ok:false,reason:'A risk budget has to be above zero.'};
+  const budget=W.start*riskPct/100;
+  const want={};let asked=0;
+  for(const s of W.syms){
+    if(!(W.sigma[s]>0))return{ok:false,reason:'No measured volatility for '+s+'.'};
+    const d=budget/W.sigma[s];want[s]=d;asked+=d;
+  }
+  /* Unfundable rather than levered. Scaling back pro rata is a disclosure, not a fix, and the row
+     is labelled so on screen. */
+  const fundable=asked<=W.start;
+  const scale=fundable?1:W.start/asked;
+  const dollars={};for(const s of W.syms)dollars[s]=want[s]*scale;
+  const cash=Math.max(0,W.start-asked*scale);
+  const p=sizedEquityPath(W,dollars,cash);
+  if(!p)return{ok:false,reason:'A logged close is missing inside the window.'};
+  return{ok:true,riskPct,actual:false,start:W.start,end:p.end,maxDD:p.maxDD,n:p.n,path:p.path,
+         dollars,cash,cashPct:cash/W.start*100,asked,fundable,scale,
+         biggest:W.syms.reduce((a,s)=>dollars[s]>dollars[a]?s:a,W.syms[0]),from:W.from,to:W.to};
+}
+
+/* The arm in which nothing is varied: the dollars that were actually in each position at the
+   opening close, carried through the closes actually logged. No rule, no sigma, no assumption. */
+function actualSizing(W){
+  if(!W||!W.ok)return{ok:false,reason:(W&&W.reason)||'No observed window.'};
+  const dollars={};
+  for(const s of W.syms)dollars[s]=W.shares[s]*W.px[s][W.dates[0]];
+  const p=sizedEquityPath(W,dollars,0);
+  if(!p)return{ok:false,reason:'A logged close is missing inside the window.'};
+  return{ok:true,riskPct:null,actual:true,start:W.start,end:p.end,maxDD:p.maxDD,n:p.n,path:p.path,
+         dollars,cash:0,cashPct:0,asked:W.start,fundable:true,scale:1,
+         biggest:W.syms.reduce((a,s)=>dollars[s]>dollars[a]?s:a,W.syms[0]),from:W.from,to:W.to};
+}
+
+/* The two alternatives the operator is comparing against. Defaults are their own written policy and
+   half of it, so the first thing the panel answers is "what would my own stated rule have done",
+   which is usually not what they actually did. */
+function cfAlternatives(){
+  const pol=policy();
+  const read=(id,dflt)=>{
+    const el=document.getElementById(id);
+    const v=el?parseFloat(el.value):NaN;
+    return isFinite(v)?Math.max(0.1,Math.min(25,v)):dflt;
+  };
+  const a=read('cfRiskA',pol.riskPerTrade);
+  const b=read('cfRiskB',Math.max(0.1,Math.round(pol.riskPerTrade*5)/10));
+  return b===a?[a]:[a,b];
+}
+
+function renderCounterfactual(){
+  const el=document.getElementById('cfBody');
+  if(!el||!D)return;
+  const pol=policy();
+  const seed=(id,v)=>{const n=document.getElementById(id);if(n&&n.value==='')n.value=v;};
+  seed('cfRiskA',pol.riskPerTrade);
+  seed('cfRiskB',Math.max(0.1,Math.round(pol.riskPerTrade*5)/10));
+
+  const W=counterfactualWindow();
+  if(!W.ok){
+    el.innerHTML='<div class="empty" style="text-align:left;line-height:1.65">'+esc(W.reason)+'</div>';
+    return;
+  }
+  const base=actualSizing(W);
+  if(!base.ok){el.innerHTML='<div class="empty" style="text-align:left">'+esc(base.reason)+'</div>';return;}
+  const arms=[base];
+  cfAlternatives().forEach(r=>{const a=counterfactualSizing(r,W);if(a.ok)arms.push(a);});
+  const alt=arms[1]||null;
+
+  const wPct=(a,s)=>a.dollars[s]/a.start*100;
+  const row=a=>{
+    const diff=a.end-base.end;
+    const label=a.actual?'Your actual sizing':a.riskPct.toFixed(1)+'% risk per position';
+    return '<tr'+(a.actual?' style="background:rgba(59,130,246,.07)"':'')+'>'+
+      '<td><b>'+label+'</b>'+
+        (a.actual?' <span class="muted" style="font-size:11.5px">what happened</span>'
+                 :(a.fundable?'':' <span class="warn" style="font-size:11.5px">not fundable</span>'))+'</td>'+
+      '<td>'+pmask(fmt$(a.end))+'</td>'+
+      '<td class="'+(a.actual?'muted':(diff>=0?'pos':'neg'))+'">'+
+        (a.actual?'-':pmask((diff>=0?'+':'')+fmt$(diff)))+'</td>'+
+      '<td class="neg">'+(a.maxDD*100).toFixed(2)+'%</td>'+
+      '<td class="muted">'+esc(a.biggest)+' '+wPct(a,a.biggest).toFixed(1)+'%</td>'+
+      '<td class="muted">'+a.cashPct.toFixed(1)+'%</td>'+
+      '<td class="muted">'+a.n+'</td></tr>';
+  };
+
+  const detail='<div style="overflow-x:auto;margin-top:16px"><table><thead><tr>'+
+    '<th>Ticker</th><th>Shares held</th><th title="Volatility measured only from closes logged before the window opened">Volatility before</th>'+
+    arms.map(a=>'<th>'+(a.actual?'Actual':a.riskPct.toFixed(1)+'%')+'</th>').join('')+
+    '</tr></thead><tbody>'+
+    W.syms.map(s=>'<tr><td><b>'+esc(s)+'</b></td>'+
+      '<td class="muted">'+W.shares[s]+'</td>'+
+      '<td class="muted">'+(W.sigma[s]*100).toFixed(0)+'% <span style="font-size:11px">'+W.sigN[s]+' days</span></td>'+
+      arms.map(a=>'<td>'+wPct(a,s).toFixed(1)+'%</td>').join('')+'</tr>').join('')+
+    '</tbody></table></div>';
+
+  const unfundable=arms.filter(a=>!a.fundable);
+
+  el.innerHTML=
+    '<div class="stat-row" style="margin-bottom:0;border-top:none;padding-top:0">'+
+      '<div class="stat s-count"><span class="stat-label">Window</span><span class="stat-value" style="font-size:14px">'+esc(W.from)+' to '+esc(W.to)+'</span></div>'+
+      '<div class="stat"><span class="stat-label">Observations used</span><span class="stat-value">'+W.dates.length+'</span><span class="muted" style="font-size:11px">logged sessions</span></div>'+
+      '<div class="stat s-in"><span class="stat-label">Money in positions</span><span class="stat-value" style="font-size:16px">'+pmask(fmt$(W.start))+'</span><span class="muted" style="font-size:11px">at the opening close</span></div>'+
+      '<div class="stat"><span class="stat-label">Positions unchanged since</span><span class="stat-value" style="font-size:14px">'+esc(W.heldFrom)+'</span></div>'+
+    '</div>'+
+    '<div style="overflow-x:auto;margin-top:14px"><table><thead><tr>'+
+      '<th>Sizing rule</th><th>Ending value</th><th>vs actual</th><th>Max drawdown</th>'+
+      '<th>Largest position</th><th>Cash left over</th><th>Sessions</th>'+
+    '</tr></thead><tbody>'+arms.map(row).join('')+'</tbody></table></div>'+
+    detail+
+    (alt?'<p style="font-size:13.5px;margin-top:14px;line-height:1.7">'+
+      'At <b>'+alt.riskPct.toFixed(1)+'% risk per position</b> instead of the sizing you actually used, '+
+      'your maximum drawdown across these '+alt.n+' observed sessions would have been '+
+      '<b class="neg">'+(alt.maxDD*100).toFixed(2)+'%</b> against <b class="neg">'+(base.maxDD*100).toFixed(2)+'%</b>, '+
+      'and your ending value <b>'+pmask(fmt$(alt.end))+'</b> against <b>'+pmask(fmt$(base.end))+'</b>.</p>':'')+
+    (unfundable.length?'<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.65">'+
+      '<b class="warn">'+unfundable.map(a=>a.riskPct.toFixed(1)+'%').join(' and ')+' asked for more money than was in the book.</b> '+
+      'At '+unfundable[0].riskPct.toFixed(1)+'% the rule wanted '+pmask(fmt$(unfundable[0].asked))+' against '+pmask(fmt$(W.start))+' available, '+
+      'so every position is scaled back in proportion until it fits. Above that point the rule is fully invested and raising the budget changes nothing, '+
+      'which is itself the answer: the risk setting has stopped binding.</p>':'')+
+    '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.68">'+
+      '<b>What varied, and what did not.</b> Only the dollars in each position. The tickers are the ones you hold, the dates are ones this app logged a close for, '+
+      'and no entry or exit moved. Sizes are set once at the opening close and never adjusted, because re-sizing along the way would be trading on days you did not trade. '+
+      'Cash outside these positions is in neither row, so neither can win by holding a different amount of it, and both rows are price only: '+
+      'a dividend paid inside the window is in neither, so the actual row is what the positions were worth at the closes rather than everything that reached the account. '+
+      'Volatility is measured only from closes logged <b>before</b> '+esc(W.from)+', so the alternative rows could not know which names were about to turn violent.</p>'+
+    '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.68">'+
+      '<b>Too early to read?</b> A maximum drawdown is the largest of '+W.dates.length+' draws, so it grows with the length of the window by construction. '+
+      'These rows are comparable with each other, because every one of them runs over the same '+W.dates.length+' sessions, and with nothing else. '+
+      (W.dates.length<60?'At this length one bad week decides the column. ':'')+
+      '<b>Falsification:</b> if the alternative rows sit within a single day\'s move of the actual row, sizing did not decide this window and the setting is not worth arguing about. '+
+      'And because this is one window over one fixed set of positions, a later window can reverse the ordering. If it does, the gap was noise rather than a finding about your sizing.</p>';
 }
 
 /* ================= WHICH TRACKS RECORD =================
@@ -12081,6 +12384,71 @@ ST('Maths','Jensen alpha subtracts the risk it was paid for',()=>{
   return{ok:Math.abs(a-want)<1e-9&&a<0,detail:'+2 vs SPY becomes '+a.toFixed(2)+' alpha'};
 });
 
+/* ---- M9. Counterfactual sizing ----
+   The window is built by hand here rather than through counterfactualWindow, so the arithmetic
+   under test is the arithmetic and not the data plumbing. Every figure below was computed on
+   paper first:
+
+     shares 10 of X and 10 of Y, closes X 100 -> 120 -> 90 and Y flat at 100.
+     ACTUAL   1000 + 1000 = 2000, path 2000 / 2200 / 1900, so end 1900 and maxDD 300/2200.
+     4% RULE  budget 80; X 80/0.20 = 400, Y 80/0.40 = 200, cash 1400.
+              path 2000 / 2080 / 1960, so end 1960 and maxDD 120/2080. */
+const cfFixture=()=>({ok:true,syms:['X','Y'],shares:{X:10,Y:10},
+  px:{X:{'2026-01-02':100,'2026-01-05':120,'2026-01-06':90},
+      Y:{'2026-01-02':100,'2026-01-05':100,'2026-01-06':100}},
+  dates:['2026-01-02','2026-01-05','2026-01-06'],
+  sigma:{X:0.20,Y:0.40},sigN:{X:30,Y:30},start:2000,
+  heldFrom:'2026-01-02',from:'2026-01-02',to:'2026-01-06'});
+
+ST('Counterfactual sizing','the equity path matches a hand-computed fixture',()=>{
+  const W=cfFixture();
+  const a=actualSizing(W), c=counterfactualSizing(4,W);
+  const okA=Math.abs(a.end-1900)<1e-9&&Math.abs(a.maxDD-300/2200)<1e-12&&a.n===3;
+  const okC=Math.abs(c.end-1960)<1e-9&&Math.abs(c.maxDD-120/2080)<1e-12&&c.n===3&&Math.abs(c.cash-1400)<1e-9;
+  return{ok:okA&&okC,
+         detail:'actual '+a.end.toFixed(2)+' / '+(a.maxDD*100).toFixed(3)+'%, at 4% '+c.end.toFixed(2)+' / '+(c.maxDD*100).toFixed(3)+'%'};
+});
+ST('Counterfactual sizing','a rule that asks for more than the book is scaled back, never levered',()=>{
+  /* At 25% the budget is 500, so X wants 2500 and Y 1250 against 2000 available. Scaled by
+     2000/3750, the book is fully invested: end 1866.67 and maxDD 400/2266.67 = 3/17. */
+  const c=counterfactualSizing(25,cfFixture());
+  return{ok:c.fundable===false&&Math.abs(c.cash)<1e-9&&Math.abs(c.end-5600/3)<1e-9&&Math.abs(c.maxDD-3/17)<1e-12,
+         detail:c.fundable?'WRONGLY MARKED FUNDABLE':'scaled to '+(c.scale*100).toFixed(1)+'%, end '+c.end.toFixed(2)};
+});
+ST('Counterfactual sizing','a missing close refuses the path instead of carrying one forward',()=>{
+  const W=cfFixture();
+  delete W.px.X['2026-01-05'];                    // the gap a backtester would fill
+  const p=sizedEquityPath(W,{X:1000,Y:1000},0);
+  return{ok:p===null,detail:p===null?'refused':'INTERPOLATED to '+p.end.toFixed(2)};
+});
+ST('Counterfactual sizing','it will not size a position it has no record of holding',()=>{
+  D.holdings=[{sym:'X',shares:10,cost:100,type:'Stock'},{sym:'Y',shares:10,cost:100,type:'Stock'}];
+  D.transactions=[];                              // nothing says when these were bought
+  D.priceLog={X:[{d:'2026-01-02',p:100}],Y:[{d:'2026-01-02',p:100}]};
+  const W=counterfactualWindow();
+  return{ok:W.ok===false&&/no date from which these positions are known to have been held/.test(W.reason),
+         detail:W.ok?'RAN ANYWAY':'refused'};
+});
+ST('Counterfactual sizing','volatility comes from before the window, never from inside it',()=>{
+  /* Calm before the window, violent inside it. A sigma measured over the whole series would let the
+     alternative sizing know which name was about to blow up, which is the hindsight this forbids. */
+  const day=k=>new Date(Date.UTC(2026,0,2)+k*864e5).toISOString().slice(0,10);
+  const build=(preMove,inMove)=>{
+    const rows=[];let p=100;
+    for(let k=0;k<45;k++){rows.push({d:day(k),p:+p.toFixed(6)});p*=(k%2?1-preMove:1+preMove);}
+    for(let k=45;k<75;k++){rows.push({d:day(k),p:+p.toFixed(6)});p*=(k%2?1-inMove:1+inMove);}
+    return rows;
+  };
+  D.holdings=[{sym:'X',shares:10,cost:100,type:'Stock'},{sym:'Y',shares:10,cost:100,type:'Stock'}];
+  D.transactions=[{action:'buy',sym:'X',date:day(45),shares:10,price:100,ts:1}];
+  D.priceLog={X:build(0.004,0.05),Y:build(0.004,0.004)};
+  const W=counterfactualWindow();
+  if(!W.ok)return{ok:false,detail:'window refused: '+W.reason};
+  const pre=observedSigma(D.priceLog.X.filter(r=>r.d<W.from).map(r=>r.p));
+  const all=observedSigma(D.priceLog.X.map(r=>r.p));
+  return{ok:Math.abs(W.sigma.X-pre.sigma)<1e-12&&all.sigma>W.sigma.X*2,
+         detail:'used '+(W.sigma.X*100).toFixed(1)+'%, whole series would have said '+(all.sigma*100).toFixed(1)+'%'};
+});
 /* ---- E2. The chain ---- */
 ST('Record integrity','the hash chain verifies',async()=>{
   const T=Date.parse('2026-01-05T15:00:00Z');

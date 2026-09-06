@@ -1222,6 +1222,171 @@ t('a failed save is shown, not swallowed', /function showSaveFailure/.test(term)
 t('a failed save does not schedule a sync of data that never saved',
   /if\(!persistDB\(\)\)return;/.test(term) && /showSaveFailure\(quota,err\);\s*\n\s*return false;/.test(term));
 
+/* ==================== M9. COUNTERFACTUAL SIZING, NOT A BACKTEST ==================== */
+G('Sizing varies. Selection, timing and prices do not');
+
+const CF = new Function(`
+  let D; const TRADING_DAYS=252; const LO_MAXLAG=10, LO_MINOBS=60; const MIN_CF_DAYS=21;
+  ${grab(term, 'toReturns')}
+  ${grab(term, 'autocorr')}
+  ${grab(term, 'annualScale')}
+  ${grab(term, 'observedSigma')}
+  ${grab(term, 'counterfactualWindow')}
+  ${grab(term, 'sizedEquityPath')}
+  ${grab(term, 'counterfactualSizing')}
+  ${grab(term, 'actualSizing')}
+  return {setD:d=>{D=d}, observedSigma, counterfactualWindow, sizedEquityPath,
+          counterfactualSizing, actualSizing};
+`)();
+
+/* THE HAND-COMPUTED CASE, worked on paper before it was coded.
+     10 shares of X and 10 of Y. X closes 100, 120, 90. Y flat at 100. Opening equity 2000.
+     ACTUAL  1000 in each. Path 2000 / 2200 / 1900. End 1900, peak 2200, maxDD 300/2200 = 13.636%.
+     4% RULE budget 2000*0.04 = 80. X gets 80/0.20 = 400, Y gets 80/0.40 = 200, cash 1400.
+             Path 2000 / 2080 / 1960. End 1960, peak 2080, maxDD 120/2080 = 5.769%.               */
+const cfW = () => ({ok:true, syms:['X','Y'], shares:{X:10,Y:10},
+  px:{X:{'2026-01-02':100,'2026-01-05':120,'2026-01-06':90},
+      Y:{'2026-01-02':100,'2026-01-05':100,'2026-01-06':100}},
+  dates:['2026-01-02','2026-01-05','2026-01-06'],
+  sigma:{X:0.20,Y:0.40}, sigN:{X:30,Y:30}, start:2000,
+  heldFrom:'2026-01-02', from:'2026-01-02', to:'2026-01-06'});
+
+{
+  const a = CF.actualSizing(cfW()), c = CF.counterfactualSizing(4, cfW());
+  t('the actual arm reproduces the observed path exactly',
+    Math.abs(a.end - 1900) < 1e-9 && Math.abs(a.maxDD - 300/2200) < 1e-12 && a.n === 3,
+    'end ' + a.end.toFixed(2) + ', maxDD ' + (a.maxDD*100).toFixed(3) + '%');
+  t('a 4% risk budget reproduces the hand-computed counterfactual',
+    Math.abs(c.end - 1960) < 1e-9 && Math.abs(c.maxDD - 120/2080) < 1e-12 &&
+    Math.abs(c.cash - 1400) < 1e-9 && Math.abs(c.dollars.X - 400) < 1e-9 && Math.abs(c.dollars.Y - 200) < 1e-9,
+    'end ' + c.end.toFixed(2) + ', maxDD ' + (c.maxDD*100).toFixed(3) + '%, cash ' + c.cash.toFixed(2));
+  t('it reports how many observations it could use', a.n === 3 && c.n === 3);
+
+  /* PROVING THE CHECK CAN FAIL. The same fixture with a deliberately wrong sigma must NOT produce
+     the hand-computed answer; a test that passes on broken maths is decoration. */
+  const broken = cfW(); broken.sigma.X = 0.10;
+  const b = CF.counterfactualSizing(4, broken);
+  t('a deliberately wrong volatility does not reproduce it (the check can fail)',
+    Math.abs(b.end - 1960) > 1 && Math.abs(b.dollars.X - 800) < 1e-9,
+    'end moves to ' + b.end.toFixed(2) + ' when sigma is halved');
+
+  /* Halving the budget halves every position, so the excess over the cash line halves with it. */
+  const half = CF.counterfactualSizing(2, cfW());
+  t('halving the risk budget halves every position size',
+    Math.abs(half.dollars.X - 200) < 1e-9 && Math.abs(half.dollars.Y - 100) < 1e-9 &&
+    Math.abs(half.end - 1980) < 1e-9, 'end ' + half.end.toFixed(2));
+  t('a smaller budget produces a smaller drawdown on the same prices', half.maxDD < c.maxDD);
+}
+{
+  /* At 25% the rule wants 3750 against 2000. Scaled by 2000/3750 the book is fully invested:
+     X holds 1333.33 and Y 666.67, path 2000 / 2266.67 / 1866.67, maxDD 400/2266.67 = 3/17. */
+  const c = CF.counterfactualSizing(25, cfW());
+  t('a rule that asks for more than the book is flagged unfundable, not levered',
+    c.fundable === false && Math.abs(c.cash) < 1e-9 &&
+    Math.abs(c.end - 5600/3) < 1e-9 && Math.abs(c.maxDD - 3/17) < 1e-12,
+    'scaled to ' + (c.scale*100).toFixed(1) + '%, end ' + c.end.toFixed(2));
+  t('a fundable rule is not scaled', CF.counterfactualSizing(4, cfW()).scale === 1);
+}
+{
+  /* The single most important refusal. A backtester fills the gap; this one stops. */
+  const W = cfW(); delete W.px.X['2026-01-05'];
+  t('a missing close refuses the path rather than carrying the previous one forward',
+    CF.sizedEquityPath(W, {X:1000,Y:1000}, 0) === null);
+  const W2 = cfW(); W2.px.Y['2026-01-06'] = 0;
+  t('a zero price is refused too', CF.sizedEquityPath(W2, {X:1000,Y:1000}, 0) === null);
+}
+{
+  /* Only positions actually held, over dates actually logged, from a date actually recorded. */
+  CF.setD({holdings:[{sym:'X',shares:10}], transactions:[{action:'buy',sym:'X',date:'2026-01-02'}],
+           priceLog:{X:[{d:'2026-01-02',p:100}]}});
+  t('one position is not a sizing comparison', CF.counterfactualWindow().reason.includes('at least two open positions'));
+
+  CF.setD({holdings:[{sym:'X',shares:10},{sym:'Y',shares:10}], transactions:[],
+           priceLog:{X:[{d:'2026-01-02',p:100}],Y:[{d:'2026-01-02',p:100}]}});
+  t('with no dated buy or sell it refuses rather than assuming a start date',
+    CF.counterfactualWindow().reason.includes('no date from which these positions are known to have been held'));
+
+  CF.setD({holdings:[{sym:'X',shares:10},{sym:'Y',shares:10}],
+           transactions:[{action:'buy',sym:'X',date:'2026-01-02'}],
+           priceLog:{X:[{d:'2026-01-02',p:100}],Y:[]}});
+  t('a holding with no logged closes stops the whole panel',
+    CF.counterfactualWindow().reason.includes('No logged closes at all for Y'));
+}
+{
+  /* Calm before the window, violent inside it. Sizing off in-window volatility would let the
+     alternative arm shrink exactly the name that was about to fall, which is hindsight. */
+  const day = k => new Date(Date.UTC(2026,0,2) + k*864e5).toISOString().slice(0,10);
+  const build = (pre, inside) => {
+    const rows = []; let p = 100;
+    for (let k = 0; k < 45; k++) { rows.push({d:day(k), p:+p.toFixed(6)}); p *= (k % 2 ? 1-pre : 1+pre); }
+    for (let k = 45; k < 75; k++) { rows.push({d:day(k), p:+p.toFixed(6)}); p *= (k % 2 ? 1-inside : 1+inside); }
+    return rows;
+  };
+  const log = {X:build(0.004, 0.05), Y:build(0.004, 0.004)};
+  CF.setD({holdings:[{sym:'X',shares:10},{sym:'Y',shares:10}],
+           transactions:[{action:'buy',sym:'X',date:day(45)}], priceLog:log});
+  const W = CF.counterfactualWindow();
+  const pre = CF.observedSigma(log.X.filter(r => r.d < W.from).map(r => r.p));
+  const all = CF.observedSigma(log.X.map(r => r.p));
+  t('the window opens at the last dated change to a held position', W.ok && W.from >= day(45));
+  t('volatility is measured strictly before the window, never inside it',
+    W.ok && Math.abs(W.sigma.X - pre.sigma) < 1e-12 && all.sigma > W.sigma.X * 2,
+    W.ok ? (W.sigma.X*100).toFixed(1) + '% used, ' + (all.sigma*100).toFixed(1) + '% if the window were included' : W.reason);
+
+  /* Nothing is assumed in place of a measurement it does not have. */
+  CF.setD({holdings:[{sym:'X',shares:10},{sym:'Y',shares:10}],
+           transactions:[{action:'buy',sym:'X',date:day(2)}], priceLog:log});
+  const thin = CF.counterfactualWindow();
+  t('too little history before the window refuses instead of assuming a default volatility',
+    thin.ok === false && /not enough closes logged before/i.test(thin.reason), thin.reason ? 'refused' : 'ran anyway');
+}
+{
+  /* A sell shrinks a position, so today's share count cannot be run back across it. */
+  const day = k => new Date(Date.UTC(2026,0,2) + k*864e5).toISOString().slice(0,10);
+  CF.setD({holdings:[{sym:'X',shares:10},{sym:'Y',shares:10}],
+           transactions:[{action:'buy',sym:'X',date:day(1)},{action:'sell',sym:'Y',date:day(30)}],
+           priceLog:{X:[{d:day(1),p:100}],Y:[{d:day(1),p:100}]}});
+  const W = CF.counterfactualWindow();
+  t('a sell restarts the window as well as a buy', W.reason.includes(day(30)), W.reason.slice(0, 60));
+}
+
+/* The boundary, asserted structurally rather than trusted. */
+t('the module states the boundary and why it is not a backtest',
+  /M9\. COUNTERFACTUAL SIZING/.test(term) && /THE BOUNDARY, STATED FIRST/.test(term) &&
+  /SELECTION IS FIXED/.test(term) && /TIMING IS FIXED/.test(term) && /PRICES ARE FIXED/.test(term));
+{
+  const mod = term.slice(term.indexOf('M9. COUNTERFACTUAL SIZING'), term.indexOf('function renderCounterfactual'));
+  t('nothing in the module fetches a price',
+    !/\bfetch\(|getCandles|getQuote|fh\(|await /.test(mod));
+  t('it reads only holdings, the ledger and the app\'s own price log',
+    [...mod.matchAll(/\bD\.([A-Za-z]+)/g)].map(m => m[1])
+      .every(k => ['holdings','transactions','priceLog'].includes(k)));
+  /* The missing surface IS the guarantee: one number and an observed window, no dates, no symbol
+     list, no entry or exit rule. Widening this signature is how it would become a backtester. */
+  t('the pure function takes a risk percentage and nothing else that could move a date',
+    /function counterfactualSizing\(riskPct,W\)\{/.test(mod));
+  t('weights are set once at the opening close, never rebalanced',
+    /WEIGHTS ARE SET ONCE/.test(mod) && /units\[s\]=\(dollars\[s\]\|\|0\)\/p0;/.test(mod));
+  t('the date set is an intersection, so a gap is dropped rather than filled',
+    /INTERSECTION, NOT UNION/.test(mod) &&
+    /dates=Object\.keys\(px\[syms\[0\]\]\)\.filter\(d=>d>=heldFrom&&syms\.every\(s=>px\[s\]\[d\]>0\)\)/.test(mod));
+}
+t('the screen says in plain words that this is not a backtest',
+  /<b>This is not a backtest, and the difference matters\.<\/b>/.test(term) &&
+  /A backtest has to invent prices for trades you never made; this invents nothing/.test(term));
+t('it renders the sentence the spec asks for',
+  /risk per position<\/b> instead of the sizing you actually used/.test(term) &&
+  /your maximum drawdown across these '\+alt\.n\+' observed sessions would have been/.test(term));
+t('it states its own falsification',
+  /<b>Falsification:<\/b> if the alternative rows sit within a single day/.test(term));
+t('it says when the window is too short to read',
+  /A maximum drawdown is the largest of '\+W\.dates\.length\+' draws/.test(term));
+t('it lives on the Risk tab and is rendered when that tab opens',
+  /id="cfBody"/.test(term) &&
+  /if\(t==='risk'\)\{renderBenchmarks\(\);renderRiskContrib\(\);renderCounterfactual\(\);/.test(term));
+t('the panel is cleared when the account is switched',
+  /const cfb=document\.getElementById\('cfBody'\);if\(cfb\)cfb\.innerHTML='';/.test(term));
+
 /* ============================ 5. MATHS ============================ */
 G('Maths — parsed out of terminal/index.html so the shipped code is what runs');
 
