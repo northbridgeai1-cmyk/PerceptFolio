@@ -895,7 +895,8 @@ t('legacy calls without a conviction field are not silently reclassified',
   /Calls recorded before the hysteresis gate existed carry no conviction field/.test(term));
 /* THE STANDING CONTRACT: the module states how it could be shown to be wrong, on screen. */
 t('the conviction split states its own falsification',
-  /Falsification: if this difference stays inside its own confidence interval/.test(term));
+  /If this difference stays inside its own confidence interval/.test(term) &&
+  /aside\('Reading the conviction split'/.test(term));
 t('it refuses to read the comparison on too small a sample',
   /Math\.min\(st\.n,stFlick\.n\)<10/.test(term));
 
@@ -916,11 +917,14 @@ t('different-name pairs use the correlation of their own returns',
 /* A rho averaged over three of forty pairs is not a measurement. */
 t('too few measurable pairs returns null rather than a number',
   /measurable\/pairs<NEFF_MIN_PAIRS/.test(term) && /neff:null/.test(term));
-t('the screen says so instead of claiming a figure', /no effective sample size is claimed/.test(term));
+t('the screen says so instead of claiming a figure',
+  /Independence not measurable/.test(term) && /No effective sample size is claimed here rather than guessed/.test(term));
 /* Claiming more independent observations than you have calls is not a claim this file makes. */
 t('a negative average correlation cannot inflate the sample', /Math\.max\(0,sum\/measurable\)/.test(term));
 
-t('the scorecard reports both counts', /An estimated '\+/.test(term) && /independent observations/.test(term));
+t('the scorecard reports both counts',
+  /' scored call'\+\(scored\.length===1\?'':'s'\)\+\s*\n?\s*', about '\+/.test(term) ||
+  /', about '\+\(eff\.neff<10\?eff\.neff\.toFixed\(1\):Math\.round\(eff\.neff\)\)\+' independent/.test(term));
 t('it says the interval is computed on the flattering one', /so treat it as the optimistic end/.test(term));
 t('the audit compares the threshold against independent observations, not raw marks',
   /const against=effN==null\?have:effN/.test(term) && /' marked, about '\+/.test(term));
@@ -988,7 +992,7 @@ t('gamma is on the face of the panel, including when rejected',
 t('a rejection is written as a result, not a failure',
   /This is the result the model is supposed to be able to return/.test(term));
 t('it states the exact falsification the spec asks for',
-  /if γ is not significantly positive, this is GARCH\(1,1\) with an extra parameter and should be dropped/.test(term));
+  /If gamma is not significantly positive, this is GARCH\(1,1\) with an extra parameter and should be dropped/.test(term));
 
 /* ==================== M6. PSR, DEFLATED SHARPE, MinTRL ==================== */
 G('Whether the Sharpe is believable at all');
@@ -1043,12 +1047,33 @@ t('the screen says so instead of printing a number',
   /no amount of additional data would make it significant at this level/.test(term));
 /* Moments are measured from the operator's own returns. */
 t('skew and kurtosis are measured, never assumed', /function skewKurt/.test(term) &&
-  /measured from your own returns rather than assumed/.test(term));
+  /both measured from your own returns/.test(term));
 t('daily units are used throughout, not annualised ones',
   /matching the moments, and converted for display only/.test(term));
 t('it states its own falsification', /this whole panel collapses to the plain interval above/.test(term));
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
+
+/* ==================== QUIET NOTES ==================== */
+G('State the number, do not lecture');
+
+t('there is one helper for a folded note', /function aside\(summary,body\)/.test(term));
+t('notes are closed by default, being plain details elements',
+  /<details class="aside"><summary>/.test(term) && !/<details class="aside" open/.test(term));
+/* A summary that does not say what is inside is no better than no summary. */
+t('no note is labelled generically', !/<summary>Notes<\/summary>/.test(term));
+/* The reasoning is kept; it is folded, not deleted. */
+t('the falsification sentences still exist, inside notes',
+  /the checklist is not selecting winners/.test(term) &&
+  /the correlation input is wrong/.test(term) &&
+  /hesitation is not measurably expensive/.test(term) &&
+  /If gamma is not significantly positive/.test(term));
+t('and none of them shout from the page any more', !/<b>Falsification:<\/b>/.test(term));
+/* Warnings that change what a reader concludes stay visible; methodology folds. */
+t('the smaller-is-not-better warning stays on the page',
+  /<p class="muted"[^>]*><b>Smaller is not better, it is smaller\.<\/b>/.test(term));
+t('the file records why this was folded rather than deleted',
+  /software apologising for its own output/.test(term));
 
 /* ==================== LIQUIDITY ==================== */
 G('Not how much you could lose, but whether you could leave');
@@ -1072,7 +1097,7 @@ t('it appears as its own column on the risk table', /Days to exit/.test(term));
 t('the panel says what it means and warns above a full day',
   /asks whether you could leave/.test(term) && /exceed a full day/.test(term));
 t('the one-day rule is named a convention rather than a law',
-  /One day is a convention rather than a law/.test(term));
+  /One day is a convention, not a law/.test(term));
 t('it states its own falsification',
   /the constraint is costing you size for nothing/.test(term));
 t('a missing volume says so instead of hiding the column',
@@ -1209,7 +1234,8 @@ t('it refuses to double-list a name when there are too few tickers',
 t('every row states the span it actually came from',
   /r\.source==='vendor'\?'market history':r\.obs\+' logged sessions'/.test(term));
 t('and the summary counts each source separately',
-  /come from the vendor/.test(term) && /fall back to closes this app logged itself/.test(term));
+  /from the vendor calculation over the real window/.test(term) &&
+  /from closes this app logged itself/.test(term));
 /* Asserted on behaviour, not on a comment: the suite strips comments, and a comment guarantees
    nothing. A vendor value is used only when it is a finite number; otherwise the row falls back to
    logged closes, and failing that the ticker is omitted rather than estimated. */
@@ -1221,8 +1247,10 @@ t('the logged fallback must cover most of the window it is labelled with',
   /const need=Math\.max\(20,Math\.floor\(w\.days\*0\.8\)\)/.test(term));
 t('and the longest windows are vendor-only, which the empty state says',
   /can only come from the vendor; it is never stitched together from a shorter log/.test(term));
-t('it states its own falsification',
-  /the checklist is not selecting winners and this table is where that shows first/.test(term));
+/* The reasoning is kept, folded shut rather than shouted. */
+t('it states its own falsification, in a collapsed note',
+  /the checklist is not selecting winners/.test(term) &&
+  /aside\('Why the last column is the one that matters'/.test(term));
 
 /* ==================== P4. CRAFT AND MOBILE ==================== */
 G('The daily check happens on a phone');
@@ -1417,8 +1445,8 @@ t('a single asset returns null', SB.ledoitWolf(lwBlocks(1,100,5))===null);
 /* A shrinkage intensity is a parameter, and this file does not hide parameters. */
 t('delta is derived, never a constant', /const delta=Math\.max\(0,Math\.min\(1,\(\(pi-rho\)\/gamma\)\/T\)\)/.test(term));
 t('the target is constant-correlation, not identity', /rBar\*sd\[i\]\*sd\[j\]/.test(term));
-t('the risk panel reports the intensity', /<b>Covariance is shrunk, by '\+/.test(term));
-t('and says when it could not shrink at all', /<b>Covariance is not shrunk here\.<\/b>/.test(term));
+t('the risk panel reports the intensity', /aside\('Covariance shrunk by '\+\(R\.shrunk\.delta\*100\)/.test(term));
+t('and says when it could not shrink at all', /aside\('Covariance is not shrunk'/.test(term));
 t('the shrunk estimate is what the risk figures consume',
   /const lw=shrunkCovFor\(rows\.map\(r=>r\.sym\)\)/.test(term));
 
@@ -1520,9 +1548,10 @@ t('the screen says correlation could not be measured rather than showing a figur
 /* Concentration is fixed by resizing; correlation is not. Different remedies, reported apart. */
 t('the two collapses are reported separately', /Sizing alone accounts for/.test(term) &&
   /Correlation takes it to/.test(term));
-t('it says resizing cannot fix the correlation half', /resizing does not fix it/.test(term));
+t('it says resizing cannot fix the correlation half', /resizing does not close it/.test(term));
 t('breadth feeds Grinold', /square root of breadth/.test(term));
-t('it states its own falsification', /the correlation input is wrong and the number is decoration/.test(term));
+/* Kept, folded shut rather than shouted under the table. */
+t('it states its own falsification', /If this barely moves when you add an unrelated sector, the correlation input is wrong/.test(term));
 t('it reads the same weights and covariance the risk table uses',
   /bets:effectiveBets\(w,S\)/.test(term));
 
@@ -1539,11 +1568,14 @@ t('the screen does not claim cash is neutralised between rows',
   !/neither can win by holding a different amount of it/.test(term));
 t('it says the undeployed remainder is doing work in the numbers',
   /it sits in the alternative row earning nothing/.test(term));
+/* This warning stays VISIBLE rather than folding, because reading the ending value alone teaches
+   exactly the wrong lesson. The methodology behind it folds; the warning does not. */
+/* The heading became the note's summary when the prose was folded. */
 t('and warns that a falling window flatters the smaller size',
-  /<b>Smaller is not better, it is smaller\.<\/b>/.test(term) &&
-  /wins by arithmetic and tells you nothing/.test(term));
+  /Smaller is not better, it is smaller/.test(term) &&
+  /cuts the fall and the rise together/.test(term));
 t('it tells the reader which two columns to read together',
-  /Read the drawdown column against the cash column/.test(term));
+  /Read drawdown against the cash column/.test(term));
 
 /* ==================== M2. IMPLEMENTATION SHORTFALL ==================== */
 G('Gross is not net, and the cost is measured');
@@ -1573,8 +1605,8 @@ t('it is optional in the interface', /placeholder="optional"/.test(term));
 t('both paths store it on the transaction',
   /action:'buy'[\s\S]{0,120}?decided:decidedPrice\(\)/.test(term) &&
   /action:'sell'[\s\S]{0,120}?decided,/.test(term));
-t('gross and net are reported side by side', /before implementation cost/.test(term) &&
-  /which leaves roughly/.test(term));
+t('gross and net are reported side by side',
+  /pts gross, '\+\(net!=null\?pts\(net\):'-'\)\+'pts net/.test(term));
 t('shortfall is broken out per ticker', /perTicker:Object\.values/.test(term) &&
   /Worst by ticker/.test(term));
 /* Silence would read as a cost of zero, which is a claim and the wrong one. */
@@ -1614,7 +1646,8 @@ t('overlapping intervals are reported as no difference, not as a winner',
   /no measurable difference<\/b> between following the checklist and overriding it/.test(term));
 t('the screen says whose result the numbers are', /Every cell is the checklist/.test(term));
 t('it refuses to read a cell under ten calls', /m\[k\]\.n>=10/.test(term));
-t('it states its own falsification', /<b>Falsification:<\/b> if the two rows stay inside each other/.test(term));
+t('it states its own falsification',
+  /If the two rows stay inside each other/.test(term) && /aside\('How to read this table'/.test(term));
 /* Fixed horizons only: the open-ended view gives every cell a different holding period. */
 t('the open-ended view is refused', /if\(winRaw==='since'\)return '';/.test(term));
 
@@ -1991,13 +2024,15 @@ t('the module states the boundary and why it is not a backtest',
     /dates=Object\.keys\(px\[syms\[0\]\]\)\.filter\(d=>d>=heldFrom&&syms\.every\(s=>px\[s\]\[d\]>0\)\)/.test(mod));
 }
 t('the screen says in plain words that this is not a backtest',
-  /<b>This is not a backtest, and the difference matters\.<\/b>/.test(term) &&
+  /This is not a backtest, and the difference matters/.test(term) &&
   /A backtest has to invent prices for trades you never made; this invents nothing/.test(term));
 t('it renders the sentence the spec asks for',
   /risk per position<\/b> instead of the sizing you actually used/.test(term) &&
   /your maximum drawdown across these '\+alt\.n\+' observed sessions would have been/.test(term));
+/* Folded into a collapsed note; the substance is unchanged. */
 t('it states its own falsification',
-  /<b>Falsification:<\/b> if the alternative rows sit within a single day/.test(term));
+  /alternative rows sit within a single day/.test(term) &&
+  /aside\('Too early to read\?'/.test(term));
 t('it says when the window is too short to read',
   /A maximum drawdown is the largest of '\+W\.dates\.length\+' draws/.test(term));
 t('it lives on the Risk tab and is rendered when that tab opens',

@@ -426,6 +426,23 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
   display:inline-flex;align-items:center;line-height:1}
 .ovf-btn:hover{color:var(--text);background:var(--panel2)}
 .ovf-btn svg{fill:currentColor}
+/* ---- QUIET NOTES ----
+   Every panel had grown a paragraph or three explaining itself. Individually each was defensible;
+   together they read as software apologising for its own output, which is the surest sign of a
+   thing built by a model rather than for a professional. A terminal states the number.
+
+   The content is not deleted, because the reasoning is what makes these figures honest and the
+   caveats are load-bearing. It is folded shut. One quiet line, opened only by someone who wants
+   it, closed by default for someone who already knows. */
+.aside{margin-top:8px}
+.aside>summary{cursor:pointer;list-style:none;color:var(--muted);font-size:var(--fs-caption);
+  letter-spacing:.02em;display:inline-flex;align-items:center;gap:5px;padding:2px 0}
+.aside>summary::-webkit-details-marker{display:none}
+.aside>summary::before{content:'+';font-family:var(--mono);opacity:.7}
+.aside[open]>summary::before{content:'\2212'}
+.aside>summary:hover{color:var(--text)}
+.aside>div{margin-top:7px;font-size:var(--fs-sm);line-height:1.65;color:var(--muted);
+  border-left:1px solid var(--border);padding-left:11px;max-width:78ch}
 .prov{border-bottom:1px dotted var(--muted);cursor:help}
 .prov:hover{border-bottom-style:solid;color:var(--accent)}
 .prov:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
@@ -1362,7 +1379,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <button class="btn" style="align-self:flex-end" onclick="saveThesis()">Save thesis</button>
       <button class="btn-danger btn btn-ghost" style="align-self:flex-end" onclick="deleteThesis()">Delete</button>
     </div>
-    <p class="muted" style="margin-top:10px;font-size:11.5px;line-height:1.55"><b>Four of these the app can act on:</b> the target, the stop, the deadline and the quality threshold. The free text it can store but never read. The stop is what actually limits a loss, it turns "how often am I right" into "how much do I make when I'm right versus lose when I'm wrong", which is the number that decides whether the account grows. The deadline handles the third outcome nobody plans for: the thesis was neither right nor wrong, it just never happened, and the money sat there.</p>
+    <details class="aside"><summary>Four of these the app can act on</summary><div>the target, the stop, the deadline and the quality threshold. The free text it can store but never read. The stop is what actually limits a loss, it turns "how often am I right" into "how much do I make when I'm right versus lose when I'm wrong", which is the number that decides whether the account grows. The deadline handles the third outcome nobody plans for: the thesis was neither right nor wrong, it just never happened, and the money sat there.</div></details>
   </div>
 
   <div class="section-title">Your Holdings</div>
@@ -1421,7 +1438,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <span class="muted" id="driftCount" style="font-size:12px"></span>
     </div>
     <div id="driftBody"></div>
-    <p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.6">Your sell rule fires when a company is <b>already</b> bad. This shows the ones on the way there, a score sliding from 10 to 7 across two quarters is a business deteriorating on your own criteria, often before the price reflects it. The scores were always being calculated; only the latest one used to be kept. This reads the daily log instead, so it starts thin and gets more useful every week you run a refresh.</p>
+    <details class="aside"><summary>What this list is for</summary><div>Your sell rule fires when a company is <b>already</b> bad. This shows the ones on the way there, a score sliding from 10 to 7 across two quarters is a business deteriorating on your own criteria, often before the price reflects it. The scores were always being calculated; only the latest one used to be kept. This reads the daily log instead, so it starts thin and gets more useful every week you run a refresh.</div></details>
   </div>
 </div>
 
@@ -1517,11 +1534,10 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
      rather than only in a paragraph below it. -->
 <div class="stat s-income"><span class="stat-label">Dividends accrued <span class="muted" style="font-weight:400">(projected)</span></span><span class="stat-value" id="histTotalDiv">$0</span><span class="muted" style="font-size:11px">never received, accrued at declared rates</span></div>
   </div>
-  <p class="muted" style="font-size:12px;margin:-12px 0 20px;line-height:1.55">
-    <b>Bought</b> and <b>Sold</b> add up the rows in the ledger below, nothing else. They only count trades you recorded <i>inside PerceptFolio</i>, so a position you typed in before the ledger existed won't appear, and Bought never goes down when you sell. They're a record of activity, not a statement of what you currently have in. For that, use <b>Portfolio value</b> and <b>Unrealized gain / loss</b> on the dashboard.</p>
+  <details class="aside"><summary>Bought</summary><div>and <b>Sold</b> add up the rows in the ledger below, nothing else. They only count trades you recorded <i>inside PerceptFolio</i>, so a position you typed in before the ledger existed won't appear, and Bought never goes down when you sell. They're a record of activity, not a statement of what you currently have in. For that, use <b>Portfolio value</b> and <b>Unrealized gain / loss</b> on the dashboard.</div></details>
   <div class="card">
     <h3>Dividend Income</h3>
-    <p class="muted" style="margin-bottom:10px">Worked out from your holdings automatically, nothing to log. The <b>Dividends accrued</b> figure above is a <b>projection, not income</b>, it accrues day by day from the rates below, so it grows the longer you hold, whether or not a payment ever lands. Finnhub's free tier doesn't expose actual payment dates or amounts, so this is an estimate at each company's current declared rate; it can't see a cut, a raise, or tax withheld.</p>
+    <details class="aside"><summary>How this is worked out</summary><div>Worked out from your holdings automatically, nothing to log. The <b>Dividends accrued</b> figure above is a <b>projection, not income</b>, it accrues day by day from the rates below, so it grows the longer you hold, whether or not a payment ever lands. Finnhub's free tier doesn't expose actual payment dates or amounts, so this is an estimate at each company's current declared rate; it can't see a cut, a raise, or tax withheld.</div></details>
     <div id="divBreakdown"></div>
   </div>
   <div class="section-title">Transaction History</div>
@@ -1546,7 +1562,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <!-- HOW YOU BEHAVE -->
   <div class="section-title">How You Behave, the pattern in your own trading</div>
   <div class="card">
-    <p class="muted" style="margin-bottom:14px">Everything else in PerceptFolio analyses companies. This analyses <b>you</b>. Anyone can get price history; nobody else has yours. These are the four questions the ledger can answer about your habits. How long you actually hold, whether you sell too early, whether you keep to your own cash rule, and whether you trade more when things get loud.</p>
+    <details class="aside"><summary>Why this one analyses you</summary><div>Everything else in PerceptFolio analyses companies. This analyses <b>you</b>. Anyone can get price history; nobody else has yours. These are the four questions the ledger can answer about your habits. How long you actually hold, whether you sell too early, whether you keep to your own cash rule, and whether you trade more when things get loud.</div></details>
     <div id="behaviourBody"></div>
   </div>
 </div>
@@ -1574,7 +1590,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 
   <div class="card" style="margin-top:16px">
     <h3>Add a Relationship</h3>
-    <p class="muted" style="margin-bottom:12px">Supplier and customer links have to be entered by hand. That data is assembled by vendors from filings and transcripts and sold at institutional rates, no free API publishes it. The <b>10-K</b> is where to find it: any customer worth more than 10% of revenue must be disclosed, usually under "Concentration of Credit Risk" or in the risk factors.</p>
+    <details class="aside"><summary>What's automatic and what isn't</summary><div>Supplier and customer links have to be entered by hand. That data is assembled by vendors from filings and transcripts and sold at institutional rates, no free API publishes it. The <b>10-K</b> is where to find it: any customer worth more than 10% of revenue must be disclosed, usually under "Concentration of Credit Risk" or in the risk factors.</div></details>
     <div class="row">
       <select id="relSide" style="max-width:150px">
         <option value="suppliers">They buy from</option>
@@ -1592,8 +1608,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div id="relList" style="margin-top:14px"></div>
   </div>
 
-  <p class="muted" style="margin-top:14px;font-size:12px;line-height:1.6">
-    <b>What's automatic and what isn't.</b> The centre company's profile and the "similar companies" row come from Finnhub and fill in on their own. Suppliers and customers are yours to enter. Institutional holders were deliberately left out: the free source for that is quarterly 13F filings, which are up to four months stale, exclude short positions entirely, and would list Vanguard, BlackRock and State Street at the top of nearly every company you could look up. A list that says the same thing about everything isn't worth the screen space.</p>
+  <details class="aside"><summary>What's automatic and what isn't</summary><div>The centre company's profile and the "similar companies" row come from Finnhub and fill in on their own. Suppliers and customers are yours to enter. Institutional holders were deliberately left out: the free source for that is quarterly 13F filings, which are up to four months stale, exclude short positions entirely, and would list Vanguard, BlackRock and State Street at the top of nearly every company you could look up. A list that says the same thing about everything isn't worth the screen space.</div></details>
 </div>
 
 <!-- MARKET -->
@@ -1611,7 +1626,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </div>
     </div>
     <div id="todaysMove" style="margin-top:12px" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
-    <p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.55">The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b>, it's a ruler, not a forecast.</p>
+    <details class="aside"><summary>How the ruler works</summary><div>The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b>, it's a ruler, not a forecast.</div></details>
   </div>
 
   <!-- 1b. Calendar effects — CONTEXT ONLY, and the panel says so twice.
@@ -1667,10 +1682,9 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </div>
     </div>
     <button class="btn" onclick="saveMacro()">Save figures</button>
-    <p class="muted" style="font-size:11.5px;margin-top:10px">A Buffett figure entered here overrides the one calculated from FRED. Worth doing. FRED's Wilshire series is a price index rather than a dollar market cap, so the calculated version tracks the right direction but isn't the textbook percentage. A number from a source that computes it properly is more trustworthy.</p>
+    <details class="aside"><summary>Entering your own figure</summary><div>A Buffett figure entered here overrides the one calculated from FRED. Worth doing. FRED's Wilshire series is a price index rather than a dollar market cap, so the calculated version tracks the right direction but isn't the textbook percentage. A number from a source that computes it properly is more trustworthy.</div></details>
   </div>
-  <p class="muted" style="margin-top:14px;font-size:12px;line-height:1.6">
-    <b>Read these as long-run expectations, not crash warnings.</b> All three describe what returns over the next ten to fifteen years are likely to look like from today's prices. They have almost no power to time the next twelve months. The Buffett indicator has read "expensive" since roughly 2013 and CAPE has been above 30 since 2017, through years of large gains. Use them to decide how much to put in, not when to get out.</p>
+  <details class="aside"><summary>Read these as long-run expectations, not crash warnings</summary><div>All three describe what returns over the next ten to fifteen years are likely to look like from today's prices. They have almost no power to time the next twelve months. The Buffett indicator has read "expensive" since roughly 2013 and CAPE has been above 30 since 2017, through years of large gains. Use them to decide how much to put in, not when to get out.</div></details>
 
   <!-- 3. Call scorecard -->
   <div class="section-title">Your Call Scorecard. Is the checklist actually working?</div>
@@ -1705,7 +1719,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </table>
     </div>
     <div id="scorecardEmpty" class="empty">No calls recorded yet. PerceptFolio starts logging every time its verdict on a ticker changes, from the next Refresh onward; it can't grade calls it never wrote down. Come back once you have a few weeks of history.</div>
-    <p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.6">Marks are captured live: when a call crosses its 30/90/180/365-day anniversary and the app is open, the price and SPY at that moment are stamped onto the call permanently. Finnhub's free plan has no historical price lookup, so this is the only way to get a true fixed-horizon record, which means the record starts from today and builds forward. If a call's anniversary passes while the app is closed for too long, it is marked unmarkable and dropped rather than graded at the wrong holding period.</p>
+    <details class="aside"><summary>How marks are captured</summary><div>Marks are captured live: when a call crosses its 30/90/180/365-day anniversary and the app is open, the price and SPY at that moment are stamped onto the call permanently. Finnhub's free plan has no historical price lookup, so this is the only way to get a true fixed-horizon record, which means the record starts from today and builds forward. If a call's anniversary passes while the app is closed for too long, it is marked unmarkable and dropped rather than graded at the wrong holding period.</div></details>
   </div>
 </div>
 
@@ -1750,7 +1764,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
         <button class="btn btn-ghost btn-sm" onclick="searchSectorPresets()">Search</button>
       </div>
       <div id="sectorMatches" class="row" style="margin-top:8px"></div>
-      <p class="muted" style="font-size:12px;margin-top:6px">Not a live scan of the entire market. Finnhub's free tier doesn't offer that. These are curated snapshots per sector (10–20 well-known names each), same honest caveat as the Dow 30/Mega-cap Tech presets above. Loading a sector fills the box below; you still hit Run screen to score them. Or just paste your own list below.</p>
+      <details class="aside"><summary>What this screener can and cannot see</summary><div>Not a live scan of the entire market. Finnhub's free tier doesn't offer that. These are curated snapshots per sector (10–20 well-known names each), same honest caveat as the Dow 30/Mega-cap Tech presets above. Loading a sector fills the box below; you still hit Run screen to score them. Or just paste your own list below.</div></details>
     </div>
     <div class="field">
       <label>Or let PerceptFolio search on its own. Stocks you haven't found yet</label>
@@ -1855,7 +1869,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
        the obvious next question, what a different size would have done to the actual path. -->
   <div class="section-title">Sizing counterfactual. Same trades, different size</div>
   <div class="card">
-    <p class="muted" style="margin-bottom:12px"><b>This is not a backtest, and the difference matters.</b> It does not choose different stocks, trade on different days, or use a single price that was not already recorded here. Every ticker is one you hold, every date is one this app logged a close for, and every entry and exit stays exactly where it happened. The only thing changed is how many dollars sat in each position. A backtest has to invent prices for trades you never made; this invents nothing, which is why it is allowed to exist here and a backtest is not.</p>
+    <details class="aside"><summary>This is not a backtest, and the difference matters</summary><div>It does not choose different stocks, trade on different days, or use a single price that was not already recorded here. Every ticker is one you hold, every date is one this app logged a close for, and every entry and exit stays exactly where it happened. The only thing changed is how many dollars sat in each position. A backtest has to invent prices for trades you never made; this invents nothing, which is why it is allowed to exist here and a backtest is not.</div></details>
     <div class="row" style="flex-wrap:wrap;align-items:flex-end">
       <div class="field" style="margin:0;max-width:200px"><label>Alternative A (% risk per position)</label><input id="cfRiskA" type="number" min="0.1" max="25" step="0.1" onkeydown="if(event.key==='Enter')renderCounterfactual()"></div>
       <div class="field" style="margin:0;max-width:200px"><label>Alternative B (% risk per position)</label><input id="cfRiskB" type="number" min="0.1" max="25" step="0.1" onkeydown="if(event.key==='Enter')renderCounterfactual()"></div>
@@ -1880,7 +1894,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 
   <div class="section-title">Risk-adjusted return</div>
   <div class="card">
-    <p class="muted" style="margin-bottom:12px">Return per unit of volatility, from your own daily snapshots. Shown with its confidence interval, because a Sharpe ratio computed on a few months of data carries an error bar usually wider than the number itself, and a point estimate without one is the same false precision as a hit rate without a sample size.</p>
+    <details class="aside"><summary>What Sharpe measures here</summary><div>Return per unit of volatility, from your own daily snapshots. Shown with its confidence interval, because a Sharpe ratio computed on a few months of data carries an error bar usually wider than the number itself, and a point estimate without one is the same false precision as a hit rate without a sample size.</div></details>
     <div id="sharpeBody"></div>
   </div>
 
@@ -1946,18 +1960,16 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <span class="muted" id="hzCount" style="font-size:12px"></span>
     </div>
     <div id="herizenBody"></div>
-    <p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6">
-      <b>Four segments, not four lookbacks.</b> The strategy as described draws lines from one week, two weeks, one month and two months ago to today, but those windows are <i>nested</i>, so the same recent days are counted in all four and a single sharp move pushes every line at once. A +4 built that way is one observation counted four times. This uses <b>non-overlapping</b> segments instead. Two months to one month, one month to two weeks, two weeks to one week, one week to today, so a +4 means four separate stretches each rose, which is a genuinely stronger statement.</p>
+    <details class="aside"><summary>Four segments, not four lookbacks</summary><div>The strategy as described draws lines from one week, two weeks, one month and two months ago to today, but those windows are <i>nested</i>, so the same recent days are counted in all four and a single sharp move pushes every line at once. A +4 built that way is one observation counted four times. This uses <b>non-overlapping</b> segments instead. Two months to one month, one month to two weeks, two weeks to one week, one week to today, so a +4 means four separate stretches each rose, which is a genuinely stronger statement.</div></details>
   </div>
 
   <div class="card" style="margin-top:16px;border-left:3px solid var(--red)">
     <h3 class="neg">Read this before you trust it</h3>
-    <p class="muted" style="font-size:13.5px;line-height:1.68;margin-top:8px">
-      The published evidence on price trends splits sharply by horizon. Momentum, winners keep winning. Is documented at roughly <b>three to twelve months</b>. At <b>one week and one month</b> the documented effect is the opposite: <b>short-term reversal</b>, where recent winners give it back. Three of this rule's four windows sit in that reversal band, which means the honest prior on it is somewhere between "no edge" and "negative edge", before costs.
+    <details class="aside"><summary>What the evidence actually says</summary><div>The published evidence on price trends splits sharply by horizon. Momentum, winners keep winning. Is documented at roughly <b>three to twelve months</b>. At <b>one week and one month</b> the documented effect is the opposite: <b>short-term reversal</b>, where recent winners give it back. Three of this rule's four windows sit in that reversal band, which means the honest prior on it is somewhere between "no edge" and "negative edge", before costs.
       <br><br>
       That is why it is wired in as a <b>position cap and nothing else</b>. It can shrink a position the checklist already cleared. It cannot create a buy, block a sell, or change a verdict. A wrong cap costs you upside; a wrong verdict costs you capital, and this rule has not earned the right to cost you capital.
       <br><br>
-      It is also being <b>graded against two alternatives</b> from today, checklist alone, this alone, and the two combined. On the Market tab. In ninety days that argument settles itself with numbers instead of citations.</p>
+      It is also being <b>graded against two alternatives</b> from today, checklist alone, this alone, and the two combined. On the Market tab. In ninety days that argument settles itself with numbers instead of citations.</div></details>
   </div>
 </div>
 
@@ -1994,7 +2006,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <p class="muted" style="margin-bottom:14px">A business account doesn't hold its own investments in PerceptFolio. Portfolio, Watchlist, and Alerts are hidden here for that reason. Manage client portfolios below, or click <b>Switch</b> on a client to work inside their account.</p>
   <div class="card">
     <h3>Create Client</h3>
-    <p class="muted" style="margin-bottom:10px">This isn't a real brokerage account for your client. Their actual money stays wherever it's actually held (their own broker/custodian). This just gives you, the quant, a separate, walled-off place to track and score that client's holdings by hand, same as any other portfolio in this app. Most people never give the client login access at all. It's for your own recordkeeping. The email below is just an internal ID (it doesn't need to be real, and doesn't need to reach them) unless you specifically want them to log in themselves; if you do, set a password and hand them both. Either way, you can also work in their portfolio anytime via Switch, and export a snapshot for them via Settings → Export if you ever want to hand off a copy.</p>
+    <details class="aside"><summary>What a client account is, and is not</summary><div>This isn't a real brokerage account for your client. Their actual money stays wherever it's actually held (their own broker/custodian). This just gives you, the quant, a separate, walled-off place to track and score that client's holdings by hand, same as any other portfolio in this app. Most people never give the client login access at all. It's for your own recordkeeping. The email below is just an internal ID (it doesn't need to be real, and doesn't need to reach them) unless you specifically want them to log in themselves; if you do, set a password and hand them both. Either way, you can also work in their portfolio anytime via Switch, and export a snapshot for them via Settings → Export if you ever want to hand off a copy.</div></details>
     <div class="row">
       <input id="clientName" placeholder="Client name (e.g. Jane Smith)" style="max-width:200px">
       <input id="clientEmail" placeholder="ID (email format. Doesn't need to be real)" style="max-width:260px">
@@ -2011,9 +2023,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     </table>
     <div id="clientsEmpty" class="empty">No clients yet. Create one above. Their portfolio is completely separate from yours.</div>
   </div>
-  <p class="muted" style="margin-top:12px;font-size:12px;line-height:1.5">
-    <b>This fee % is just a private note, not a billing system.</b> PerceptFolio has no payment processing and never moves money, "Est. fee owed" is a rough math estimate (fee % × unrealized gain, zero on losses), not an invoice. More importantly: taking a cut of a client's investment gains is a <b>performance-based fee</b>, and under SEC Rule 205-3 of the Investment Advisers Act, advisers generally can't charge performance fees except to "qualified clients" who clear specific net-worth/asset thresholds, and that's on top of needing to be a properly registered or exempt adviser in the first place just to manage someone else's investments for pay at all. Recording a number here doesn't make an arrangement compliant. Talk to a securities attorney before you charge anyone a percentage of their gains.
-  </p>
+  <details class="aside"><summary>This fee % is just a private note, not a billing system</summary><div>PerceptFolio has no payment processing and never moves money, "Est. fee owed" is a rough math estimate (fee % × unrealized gain, zero on losses), not an invoice. More importantly: taking a cut of a client's investment gains is a <b>performance-based fee</b>, and under SEC Rule 205-3 of the Investment Advisers Act, advisers generally can't charge performance fees except to "qualified clients" who clear specific net-worth/asset thresholds, and that's on top of needing to be a properly registered or exempt adviser in the first place just to manage someone else's investments for pay at all. Recording a number here doesn't make an arrangement compliant. Talk to a securities attorney before you charge anyone a percentage of their gains.</div></details>
 </div>
 
 <!-- SETTINGS -->
@@ -2098,7 +2108,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <div class="field"><label>Auto-refresh on page load</label><select id="setAutoRefresh"><option value="yes">Yes</option><option value="no">No</option></select></div>
     </div>
     <button class="btn" onclick="saveRules()">Save Rules</button>
-    <p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Changing a buy or sell bar creates a <b>different system</b>. Every call graded before the change was made by one that no longer exists, so you'll be asked what you expect the change to do and what result would prove it wrong. Before you see any data. That's the only defence against searching a small sample until something looks significant.</p>
+    <details class="aside"><summary>Why changing a bar splits the record</summary><div>Changing a buy or sell bar creates a <b>different system</b>. Every call graded before the change was made by one that no longer exists, so you'll be asked what you expect the change to do and what result would prove it wrong. Before you see any data. That's the only defence against searching a small sample until something looks significant.</div></details>
   </div>
 
   <div class="card" style="margin-top:16px">
@@ -2158,7 +2168,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
          an old build pasted, a secret missing, or sync simply not configured on this device — and
          from inside the app all four looked identical. -->
     <div id="connCheck" style="display:none;margin-top:12px"></div>
-    <p class="muted" style="margin-top:10px;font-size:11.5px;line-height:1.55">Once connected it syncs automatically, when you open the app, a few seconds after you make changes, and when you close the tab. <b>This is whole-account last-write-wins, not a merge.</b> If you edit on your phone and your laptop without letting them sync in between, the device that saves last overwrites the other. It warns you before clobbering something newer, but the safe habit is to open the app on a device and let it sync before you start editing there.</p>
+    <details class="aside"><summary>How sync behaves</summary><div>Once connected it syncs automatically, when you open the app, a few seconds after you make changes, and when you close the tab. <b>This is whole-account last-write-wins, not a merge.</b> If you edit on your phone and your laptop without letting them sync in between, the device that saves last overwrites the other. It warns you before clobbering something newer, but the safe habit is to open the app on a device and let it sync before you start editing there.</div></details>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Backup / Restore</h3>
@@ -2947,12 +2957,12 @@ function showAccessBlocked(info){
       (paused?'Access paused':'Access could not be verified')+'</div>'+
     '<h1 style="font-size:26px;letter-spacing:-.02em;margin-bottom:14px">'+
       (paused?'Your access has been paused.':'This device has been offline too long.')+'</h1>'+
-    '<p class="muted" style="margin-bottom:14px">'+
+    '<details class="aside"><summary>Why access is paused</summary><div>'+
       (paused
         ? 'The person who issued your invite has suspended this account. Contact them to have it restored, nothing you entered has been deleted.'
         : 'Access is re-checked when you open the terminal. This device has not reached the server in '+
           (info.days||GRACE_DAYS)+' days, so it cannot confirm the account is still active. Reconnect and reopen.')+
-    '</p>'+
+    '</div></details>'+
     /* Their portfolio is their own work. Locking the app is the point; withholding their data is
        not, and would turn a suspension into something punitive. */
     '<p class="muted" style="font-size:12.5px;margin-bottom:18px">Your data is still on this device and is not affected. You can take a copy with you.</p>'+
@@ -4618,6 +4628,11 @@ function clearErrLog(){
 
 /* P4. One skeleton helper rather than a bespoke placeholder per panel, so a new panel gets the
    right loading state by default instead of a blank div or a spinner. */
+/* One line visible, the rest on request. Used wherever a panel needs to explain a caveat that
+   matters but does not need to be read every time. */
+function aside(summary,body){
+  return '<details class="aside"><summary>'+summary+'</summary><div>'+body+'</div></details>';
+}
 function skeleton(kind,rows){
   const n=rows||4;
   if(kind==='stats')
@@ -4858,21 +4873,19 @@ function renderHindsight(){
       best.map(line).join('')+
       (split?'<tr><th colspan="4" '+hd+'>Worst</th></tr>'+worst.map(line).join(''):'')+
     '</tbody></table></div>'+
-    '<p class="muted" style="font-size:var(--fs-sm);margin-top:12px;line-height:1.68">'+
-    '<b>This is your own list, not the market.</b> '+
-    (vendorN?vendorN+' of these come from the vendor\'s own calculation over the real window, which arrives with the scoring call and costs no extra quota. ':'')+
-    (loggedN?loggedN+' fall back to closes this app logged itself, which cover a shorter span. ':'')+
-    'Ranking every US equity would need about four thousand quotes per window against a sixty-per-minute limit, so the whole market is out of reach rather than merely slow.'+
-    '</p>'+
-    '<p class="muted" style="font-size:var(--fs-sm);margin-top:8px;line-height:1.68">'+
-    '<b>And the column that matters is the last one.</b> A best-performer list is chosen after the fact and always looks like a missed opportunity, which is the most expensive way to read one. '+
-    (called.length
-      ? 'Of these '+rows.length+', '+called.length+' had a call on file before the window opened, and '+topCalled+' of the top '+best.length+' '+(best.length===1?'was':'were')+' a BUY at the time. '+
-        (topCalled===0
-          ? 'None of the winners were called in advance, which is the useful finding: this is not evidence the system missed them unless it was actually looking at them.'
-          : 'That is the only version of this table that says anything about your process rather than about the past.')
-      : 'None of these had a call on file before the window opened, so this table says nothing about your system yet. It is a record of what happened, not a scorecard.')+
-    ' <b>Falsification:</b> if names the checklist rated BUY do not appear near the top more often than chance as the record grows, the checklist is not selecting winners and this table is where that shows first.</p>';
+    aside('How this is measured',
+      (vendorN?vendorN+' from the vendor calculation over the real window, at no extra quota. ':'')+
+      (loggedN?loggedN+' from closes this app logged itself, covering a shorter span. ':'')+
+      'The whole market is out of reach: ranking every US equity needs about four thousand quotes per window against a sixty-per-minute limit.')+
+    aside('Why the last column is the one that matters',
+      'A best-performer list is chosen after the fact and always looks like a missed opportunity. '+
+      (called.length
+        ? called.length+' of these had a call on file before the window opened, and '+topCalled+' of the top '+best.length+' '+(best.length===1?'was':'were')+' a BUY. '+
+          (topCalled===0
+            ? 'None of the winners were called in advance, so this is not evidence the system missed them unless it was looking at them.'
+            : 'That is the part that says something about your process rather than about the past.')
+        : 'None had a call on file before the window opened, so this says nothing about your system yet.')+
+      ' If BUY-rated names do not appear near the top more often than chance as the record grows, the checklist is not selecting winners.');
 }
 
 /* ============================ E1. THE MONTHLY CLOSE ============================
@@ -4962,14 +4975,14 @@ function renderMonthlyClose(){
         '<span class="muted" style="font-size:11px">bad or unexplained prices</span></div>'+
     '</div>'+
     (c.marked.length
-      ? '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.68">'+
+      ? '<details class="aside"><summary>What moved this month</summary><div>'+
         (moved?moved+' ':'')+
         (c.best?'Best was <b>'+esc(c.best.sym)+'</b> at <b class="pos">'+pts(c.best.edge)+'</b> on its '+c.best.horizon+'-day mark. ':'')+
         (c.worst&&c.worst!==c.best?'Worst was <b>'+esc(c.worst.sym)+'</b> at <b class="neg">'+pts(c.worst.edge)+'</b>. ':'')+
         (c.marked.length<10
           ? '<b>This is too few marks to read as a result.</b> It is here so the record says something to you every month rather than only in two years, which is the point at which most records like this quietly stop being kept.'
           : 'Read it against the full scorecard rather than on its own: one month is one draw.')+
-        '</p>'
+        '</div></details>'
       : '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.68">Nothing reached a horizon in '+esc(label)+'. '+
         'That is normal early on, and it is also the failure mode worth watching: marks only happen if the app is open when a call comes due.</p>')+
     (c.quarantined?'<p class="muted" style="font-size:12px;margin-top:8px">'+c.quarantined+' observation'+(c.quarantined===1?' was':'s were')+
@@ -6588,27 +6601,21 @@ function renderSharpe(){
           '<div class="stat"><span class="stat-label">Skew / kurtosis</span><span class="stat-value" style="font-size:15px">'+
             m6.sk.g3.toFixed(2)+' / '+m6.sk.g4.toFixed(1)+'</span></div>'+
         '</div>'+
-        '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.68">'+
-        '<b>A Sharpe ratio is a claim, and this is the probability it survives.</b> '+
-        'Your returns have a skew of '+m6.sk.g3.toFixed(2)+' and a kurtosis of '+m6.sk.g4.toFixed(1)+
-        ' against 3 for a normal distribution, and both are measured from your own returns rather than assumed. '+
-        (m6.sk.g3<0?'Negative skew and fat tails make a given Sharpe less significant than the plain interval above suggests, which is why this column is lower than that one. ':'')+
+        aside('How these probabilities are computed',
+        'Your returns have a skew of '+m6.sk.g3.toFixed(2)+' and a kurtosis of '+m6.sk.g4.toFixed(1)+' against 3 for a normal distribution, both measured from your own returns. '+
+        (m6.sk.g3<0?'Negative skew and fat tails make a given Sharpe less significant than the plain interval above suggests. ':'')+
         'The deflated figure raises the bar to the Sharpe the best of '+m6.trials+' parallel tracks would show by luck alone. '+
-        'Reporting the best of several as if it were the only one tried is the single most common way a track record lies, and this product runs '+m6.trials+' of them.'+
-        '</p>'+
-        '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.68">'+
-        '<b>Too early to read?</b> '+
+        'Reporting the best of several as if it were the only one tried is the most common way a track record lies, and this product runs '+m6.trials+'.')+
+        aside('Too early to read?',
         (m6.trlDef==null
           ? 'Your Sharpe is at or below the deflated benchmark, so no amount of additional data would make it significant at this level. That is the answer, not a delay.'
           : (me.n>=m6.trlDef
              ? 'You have passed the '+Math.ceil(m6.trlDef).toLocaleString()+' days this Sharpe needs to clear 95% confidence after deflation.'
              : 'This Sharpe needs about '+Math.ceil(m6.trlDef).toLocaleString()+' days to clear 95% confidence after deflation, and you have '+me.n+'. '+
-               'That is roughly '+Math.max(1,Math.round((m6.trlDef-me.n)/TRADING_DAYS*10)/10)+' more years at this level. '+
-               'It is a number rather than an apology, and it moves down if the Sharpe rises.'))+
-        ' <b>Falsification:</b> if the skew and kurtosis of your returns converge on 0 and 3, this whole panel collapses to the plain interval above and adds nothing.'+
-        '</p></div>'
+               'That is roughly '+Math.max(1,Math.round((m6.trlDef-me.n)/TRADING_DAYS*10)/10)+' more years at this level. It is a number rather than an apology.'))+
+        ' If the skew and kurtosis of your returns converge on 0 and 3, this whole panel collapses to the plain interval above and adds nothing.')+'</div>'
       : '')+
-    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Returns are computed from <b>gain</b>, not portfolio value, so money you deposit is not counted as a return. Cash is in the denominator, so holding a large idle balance correctly drags this down. Sortino uses downside deviation only, since Sharpe penalises upside volatility just as hard, which punishes exactly the outcome you want.</p>';
+    '<details class="aside"><summary>How returns are computed</summary><div>Returns are computed from <b>gain</b>, not portfolio value, so money you deposit is not counted as a return. Cash is in the denominator, so holding a large idle balance correctly drags this down. Sortino uses downside deviation only, since Sharpe penalises upside volatility just as hard, which punishes exactly the outcome you want.</div></details>';
 }
 
 /* ================= SCENARIO REPLAY & TOLERANCE FINDER =================
@@ -6735,10 +6742,10 @@ function renderScenarios(){
     '<div style="overflow-x:auto;margin-top:16px"><table><thead><tr>'+
       '<th>Episode</th><th>Index fell</th><th>Your book</th><th>Dollars</th><th>To get back</th><th>At 8%/yr</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table></div>'+
-    '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65"><b>Read the right-hand end of each range, not the left.</b> '+
+    '<details class="aside"><summary>Read the right-hand end of each range, not the left</summary><div>'+
       'The lower figure scales each holding by its beta; the higher one assumes correlations go to one, which is what happens in a real panic. People sell what they can, not what they want to, and the diversification beta assumes stops existing exactly when it was supposed to help. '+
       (probe.cash>0?'Your '+pmask(fmt$(probe.cash))+' of cash does not fall, which is why the percentage is milder than the index move. ':'')+
-      'These are historical depths, not forecasts. The next one will have its own number.</p>'+
+      'These are historical depths, not forecasts. The next one will have its own number.</div></details>'+
     '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65"><b>The recovery column is the one that hurts.</b> '+
       'A 30% fall needs +43% to break even; a 50% fall needs +100%. The money comes back eventually. The years do not.</p>'+
     (!anyBeta?'<p class="muted" style="font-size:12px;margin-top:8px">No measured betas yet, so 1.00 is assumed for every holding. Run <b>Refresh data</b> and these tighten up.</p>':'')+
@@ -7065,19 +7072,19 @@ function aiSummaryHtml(sym){
        unverifiable provenance claim this whole change set exists to remove — the same fault, moved
        one layer up. The worker stamps verified:true; only then is the guarantee claimed. */
     (a.verified
-      ? '<p class="muted" style="font-size:11px;margin-top:10px;line-height:1.55">'+
+      ? '<details class="aside"><summary>How the summary was checked</summary><div>'+
           'Each sentence cites the numbered headline it came from, and the worker discarded anything '+
           'it could not trace back. <b>How this can still be wrong:</b> it summarises what was '+
           '<b>published</b>, not what is true. Coverage can be uniformly wrong, planted, or simply '+
           'absent, and this card would faithfully report it. It reads headlines only, never the '+
-          'articles, and carries no buy or sell verdict.</p>'
-      : '<p class="muted" style="font-size:11px;margin-top:10px;line-height:1.55">'+
+          'articles, and carries no buy or sell verdict.</div></details>'
+      : '<details class="aside"><summary>Why this summary is unverified</summary><div>'+
           '<span class="warn">Unverified summary.</span> The worker that produced this predates the '+
           'citation check, so these sentences have <b>not</b> been traced back to specific headlines '+
           'and may name things the coverage never said. Re-paste <code>worker.js</code> into '+
           'Cloudflare and redeploy to turn the check on. <b>How this can still be wrong:</b> even '+
           'once verified it summarises what was <b>published</b>, not what is true, and it reads '+
-          'headlines only, never the articles.</p>')+
+          'headlines only, never the articles.</div></details>')+
   '</div>';
 }
 /* One card per ticker: the brief up top, every source folded behind an arrow underneath. The
@@ -7099,13 +7106,13 @@ function symbolNewsCard(sym,items,tag,move){
     '</div>'+
     aiSummaryHtml(sym)+
     newsBrief(sym,items,newsWindow)+
-    (m?'<p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.62">'+
+    (m?'<details class="aside"><summary>What the market did with the news</summary><div>'+
       (quiet
         ? '<b>'+items.length+' stor'+(items.length===1?'y':'ies')+' and the price barely moved.</b> The market read this and shrugged. Whatever is in these headlines is already in the price, which is the usual case by the time anything gets published.'
         : Math.abs(m.pct)>=8
           ? '<b class="'+(m.pct>=0?'pos':'neg')+'">A '+Math.abs(m.pct).toFixed(1)+'% move alongside this coverage.</b> Something here mattered. Worth reading properly and checking against what you wrote in the thesis, not worth trading on the headline, which is already hours old.'
           : 'A '+(m.pct>=0?'+':'')+m.pct.toFixed(1)+'% move over the same window. Neither dramatic nor nothing.')+
-    '</p>':'')+
+    '</div></details>':'')+
     '<details class="nw-src"><summary>Read the '+items.length+' source'+(items.length===1?'':'s')+'</summary>'+
       '<div>'+items.slice(0,20).map(newsItemHtml).join('')+'</div>'+
       (items.length>20?'<p class="muted" style="font-size:12px;margin-top:8px">'+(items.length-20)+' more not shown.</p>':'')+
@@ -7195,7 +7202,7 @@ function renderNews(){
 
     '<div class="card" style="margin-top:16px;border-left:3px solid var(--red)">'+
       '<h3 class="neg">Why there is no buy or sell verdict here</h3>'+
-      '<p class="muted" style="font-size:13.5px;line-height:1.68;margin-top:8px">'+
+      '<details class="aside"><summary>Why this does not reach a decision</summary><div>'+
         'You asked for this tab to feed the buy and sell decision. It deliberately does not, and the reason is the number in the corner of every card above: <b>the price has already moved.</b> '+
         'A headline is published after the event it describes. Professionals with direct feeds, and machines reading the wire in microseconds, have traded it before you finished the first sentence. Acting on public news is one of the most reliably losing habits in retail investing, and it feels like the most informed thing you could possibly do, which is exactly what makes it dangerous.'+
         '<br><br>'+
@@ -7204,7 +7211,7 @@ function renderNews(){
         'That is why the summary carries a Read line and not a verdict. A model asked to justify BUY from news coverage will always find a reason, because finding reasons is what the words in headlines are for. It would be fluent; it would be confident, and it would have no track record. The four tracks on the Scorecard earned their place by being marked at a fixed horizon and graded whether they worked or not. News has not done that yet.'+
         '<br><br>'+
         '<b>What this tab is for:</b> checking whether something has broken the reason you own a company. Not the price, the <i>reason</i>. If a story contradicts what you wrote in your thesis, that is a real signal and it belongs in Command as a review. If it merely moved the price, that is noise you already missed.'+
-      '</p>'+
+      '</div></details>'+
     '</div>';
 }
 
@@ -7385,27 +7392,28 @@ function renderVaR(){
         '<div class="stat"><span class="stat-label">Leverage γ</span><span class="stat-value '+(g.leverage?'neg':'muted')+'" style="font-size:'+(g.leverage?'18px':'15px')+'">'+
           (g.leverage?g.gamma.toFixed(3):'not found')+'</span></div>'+
       '</div>'+
-      '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">'+
+      '<details class="aside"><summary>What the forecast is saying</summary><div>'+
         (g.sigmaNext>g.sigmaLR*1.15
           ? 'The model expects the next day to be <b class="neg">more volatile than usual</b>. Recent moves have been large and volatility clusters. Your position sizes are computed off trailing volatility, so this is the signal to size smaller than that suggests, not larger.'
           : g.sigmaNext<g.sigmaLR*0.85
             ? 'The model expects the next day to be <b class="pos">calmer than usual</b>. Worth knowing that calm periods are when volatility-based sizing is most generous and most likely to be wrong.'
             : 'The forecast sits near the long-run average, so there is no volatility signal either way right now.')+
-        ' Persistence of '+g.persist.toFixed(3)+' means a shock decays'+(g.halfLife?' to half its size in about '+Math.round(g.halfLife)+' trading days':'')+'. Values close to 1 mean volatility shocks last a long time.</p>'+
+        ' Persistence of '+g.persist.toFixed(3)+' means a shock decays'+(g.halfLife?' to half its size in about '+Math.round(g.halfLife)+' trading days':'')+'. Values close to 1 mean volatility shocks last a long time.</div></details>'+
       /* M8, stated in full because the honest outcome here is often "the extra parameter did not
          earn its place", and that has to read as a result rather than a failure. */
-      '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.68">'+
+      (g.leverage
+        ? '<p class="muted" style="font-size:var(--fs-sm);margin-top:10px"><b>Falls hit this book harder than rises.</b> '+
+          'A down day adds '+((g.alpha+g.gamma)/(g.alpha||1e-9)).toFixed(1)+' times as much to tomorrow\'s expected variance as an up day of the same size.</p>'
+        : '<p class="muted" style="font-size:var(--fs-sm);margin-top:10px"><b>No leverage effect found on this sample.</b> '+
+          'The fit above is plain GARCH(1,1) and gamma is pinned at zero.</p>')+
+      aside('How gamma was decided',
         (g.leverage
-          ? '<b>Falls hit this book harder than rises of the same size.</b> A down day adds '+
-            ((g.alpha+g.gamma)/(g.alpha||1e-9)).toFixed(1)+' times as much to tomorrow\'s expected variance as an up day of identical size '+
-            '(γ of '+g.gamma.toFixed(3)+' on top of an α of '+g.alpha.toFixed(3)+'). '+
-            'Plain GARCH squares the shock and throws the sign away, so it cannot see this at all. '+
-            'The extra parameter earned its place on this sample: a likelihood-ratio test returns '+g.lrStat.toFixed(1)+' against a threshold of 3.84.'
-          : '<b>No leverage effect found on this sample.</b> The asymmetric model was fitted and rejected: it bought '+
-            (g.lrStat>0?g.lrStat.toFixed(1):'no')+' likelihood against a threshold of 3.84, so the fit above is plain GARCH(1,1) and γ is pinned at zero. '+
+          ? 'Gamma of '+g.gamma.toFixed(3)+' on top of an alpha of '+g.alpha.toFixed(3)+'. Plain GARCH squares the shock and throws the sign away, so it cannot see this at all. '+
+            'The extra parameter earned its place: a likelihood-ratio test returns '+g.lrStat.toFixed(1)+' against a threshold of 3.84.'
+          : 'The asymmetric model was fitted and rejected: it bought '+(g.lrStat>0?g.lrStat.toFixed(1):'no')+' likelihood against a threshold of 3.84. '+
             'This is the result the model is supposed to be able to return. Keeping an unjustified parameter because it is fashionable is how a fit starts flattering itself.')+
-        ' <b>Falsification:</b> if γ is not significantly positive, this is GARCH(1,1) with an extra parameter and should be dropped, which is exactly what the test above decides each time it runs.</p>'+
-      '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6">Fitted by variance targeting on '+g.n+' days. Omega is pinned so the model\'s long-run variance matches the sample, leaving the dynamics to be fitted rather than the level. That is standard on short samples and stops the fit implying a long-run volatility the data never showed. It is a forecast of <b>how much things move</b>, never of <b>which way</b>.</p>'+
+        ' If gamma is not significantly positive, this is GARCH(1,1) with an extra parameter and should be dropped, which is what the test decides each time it runs.')+
+      '<details class="aside"><summary>How the model was fitted</summary><div>Fitted by variance targeting on '+g.n+' days. Omega is pinned so the model\'s long-run variance matches the sample, leaving the dynamics to be fitted rather than the level. That is standard on short samples and stops the fit implying a long-run volatility the data never showed. It is a forecast of <b>how much things move</b>, never of <b>which way</b>.</div></details>'+
     '</div>':'<p class="muted" style="font-size:12.5px;margin-top:14px">Volatility forecasting needs about 60 days of history. There are '+rets.length+'.</p>')+
     '<p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6"><b>None of this predicts a return.</b> VaR, Expected Shortfall and GARCH measure how bad and how wild, never which direction. Banks build them to survive being wrong, not to be right more often, and reading them as a win-rate tool is the most common mistake made with them.</p>';
 }
@@ -7570,7 +7578,7 @@ function benchRow(title,sub,st,winLabel){
       '<div class="stat"><span class="stat-label">Sample</span><span class="stat-value">'+st.n+'</span>'+
         '<span class="muted" style="font-size:11px">days · '+st.years.toFixed(2)+' yr'+(winLabel?' · '+winLabel:'')+'</span></div>'+
     '</div>'+
-    '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.6">'+
+    '<details class="aside"><summary>Reading the interval</summary><div>'+
       (dk
         ? 'The 95% interval runs '+(st.lo!=null?st.lo.toFixed(2)+' to '+st.hi.toFixed(2):'-')+
           ' and <b>contains zero</b>, so this result is indistinguishable from luck. '+
@@ -7579,7 +7587,7 @@ function benchRow(title,sub,st,winLabel){
             : '')+
           'Read it as <b>don\'t know</b>, not as the number shown.'
         : 'The interval excludes zero on '+st.n+' days of data. That is a real result for this window; it is not a promise about the next one.')+
-    '</p></div>';
+    '</div></details></div>';
 }
 
 function renderBenchmarks(){
@@ -7606,12 +7614,14 @@ function renderBenchmarks(){
       'Your book against simply buying the index. This mixes selection and sizing together, and needs far more history before it can say anything.',
       b.vsSpy,'everything')+
 
-    '<p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6">'+
-      '<b>Why tracking error is not shown on its own.</b> It measures how much you differ from a benchmark, and the only way to improve it is to look more like one. In a book chosen to be deliberately different that gradient points at closet indexing while still carrying single-stock risk. It appears here strictly as the denominator of the ratio, which asks whether you are <em>paid</em> for differing.'+
-    '</p>'+
-    '<p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.6">'+
-      '<b>How this can be wrong.</b> Weights are cost basis, not market value. Market weights would make a winner heavy <em>because</em> it won, and grade hindsight as skill. The comparison still assumes each position was held at constant weight across the window and ignores dividends, cash drag and costs. An Information Ratio needs roughly <b>16 years</b> before an IR of 0.5 separates from luck, so the equal-weight row is the one worth reading this year: it grades a decision you make every week, on a sample you actually have.'+
-    '</p>';
+    aside('Why tracking error is not shown on its own',
+      'It measures how much you differ from a benchmark, and the only way to improve it is to look more like one. '+
+      'In a book chosen to be deliberately different, that gradient points at closet indexing while still carrying single-stock risk. '+
+      'It appears here strictly as the denominator of the ratio, which asks whether you are paid for differing.')+
+    aside('How this can be wrong',
+      'Weights are cost basis, not market value. Market weights would make a winner heavy because it won, and grade hindsight as skill. '+
+      'The comparison assumes each position was held at constant weight across the window, and ignores dividends, cash drag and costs. '+
+      'An information ratio needs roughly 16 years before an IR of 0.5 separates from luck, so the equal-weight row is the one worth reading this year: it grades a decision you make every week, on a sample you actually have.');
 }
 
 /* ================= RISK CONTRIBUTION =================
@@ -7928,57 +7938,47 @@ function renderRiskContrib(){
           'Without it, every figure above tells you how much a position could fall and none tells you whether you could leave.</p>';
       const worstL=withAdv.slice().sort((a,b)=>b.exitDays-a.exitDays)[0];
       const heavy=withAdv.filter(r=>r.exitDays>1);
-      return '<p class="muted" style="font-size:var(--fs-sm);margin-top:10px;line-height:1.68">'+
-        '<b>Days to exit is your position divided by the stock\'s average daily volume.</b> '+
-        'Everything else on this tab asks how much you could lose; this asks whether you could leave. '+
-        'At <b>'+esc(worstL.sym)+'</b> you hold <b class="'+(worstL.exitDays>1?'neg':'')+'">'+
-          (worstL.exitDays<0.01?'under a hundredth':worstL.exitDays.toFixed(2))+'</b> of a day\'s trading, which is the largest here. '+
-        (heavy.length
-          ? '<b class="neg">'+heavy.length+' position'+(heavy.length===1?'':'s')+' exceed a full day\'s volume.</b> '+
-            'Selling one of those means being a material share of everyone trading it, and the price you get will not be the price on screen. '+
-            'That is also the day a stop is least likely to fill where you set it.'
-          : 'Nothing here is more than a day\'s volume, so an ordinary exit should not move the price much.')+
-        ' Sizing now respects this as a fifth limit, so the Before You Trade panel will refuse a position you could not leave in about a day. '+
-        'One day is a convention rather than a law. <b>Falsification:</b> if your realised exits show no more slippage on the names with a high figure here, the constraint is costing you size for nothing.</p>';
+      return (heavy.length
+        ? '<p class="muted" style="font-size:var(--fs-sm);margin-top:10px"><b class="neg">'+heavy.length+
+          ' position'+(heavy.length===1?'':'s')+' exceed a full day\'s volume.</b> Largest is '+esc(worstL.sym)+
+          ' at '+worstL.exitDays.toFixed(2)+' days.</p>'
+        : '')+
+        aside('What days to exit means',
+          'Your position divided by the stock\'s average daily volume. Everything else here asks how much you could lose; this asks whether you could leave. '+
+          'Above a full day, selling means being a material share of everyone trading it, and the price will not be the one on screen. That is also the day a stop is least likely to fill where you set it. '+
+          'Sizing treats this as a fifth limit, so Before You Trade will refuse a position you could not leave in about a day. One day is a convention, not a law. '+
+          'If your realised exits show no more slippage on the high names, the constraint is costing you size for nothing.');
     })()+
 
     /* M5. Two separate collapses, reported separately, because they have different remedies:
        concentration is fixed by resizing, correlation is fixed only by owning something else. */
     (R.bets
-      ? '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.68">'+
-        '<b>You hold '+R.n+' positions and are running about '+R.bets.breadth.toFixed(1)+' bets.</b> '+
-        'Sizing alone accounts for '+R.bets.nConc.toFixed(1)+': that is how many equally sized positions would concentrate the money the same way. '+
-        (R.bets.spectrumOk
-          ? 'Correlation takes it to '+R.bets.nCorr.toFixed(1)+', from the spread of the risk across the independent directions your book actually moves in. '+
-            (R.bets.nCorr<R.bets.nConc-0.5
-              ? 'The gap between those two is names that move together, and resizing does not fix it. Only owning something genuinely different does.'
-              : 'Those are close, so what you own is not moving as one thing and the count is honest.')
-          : 'Correlation could not be measured for enough pairs, so this is the concentration figure alone and is the optimistic end.')+
-        '</p>'+
-        '<p class="muted" style="font-size:12px;margin-top:8px;line-height:1.6">'+
-        'Grinold: an information ratio scales roughly with the square root of breadth, so on '+R.bets.breadth.toFixed(1)+' bets your ceiling is arithmetic before stock picking enters into it. '+
-        (R.bets.breadth<4?'Adding skill to a book this narrow moves less than adding a genuinely uncorrelated position. ':'')+
-        '<b>Falsification:</b> if this figure barely moves when you add a position from an unrelated sector, the correlation input is wrong and the number is decoration.</p>'
+      ? aside(R.n+' positions, about '+R.bets.breadth.toFixed(1)+' bets',
+          'Sizing alone accounts for '+R.bets.nConc.toFixed(1)+', the number of equally sized positions that would concentrate the money the same way. '+
+          (R.bets.spectrumOk
+            ? 'Correlation takes it to '+R.bets.nCorr.toFixed(1)+'. '+
+              (R.bets.nCorr<R.bets.nConc-0.5
+                ? 'The gap is names that move together; resizing does not close it, only owning something different does.'
+                : 'Those are close, so what you own is not moving as one thing.')
+            : 'Correlation could not be measured for enough pairs, so this is the concentration figure alone and is the optimistic end.')+
+          ' Grinold: an information ratio scales with the square root of breadth, so at '+R.bets.breadth.toFixed(1)+' the ceiling is arithmetic before stock picking. '+
+          'If this barely moves when you add an unrelated sector, the correlation input is wrong.')
       : '')+
-    '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65">'+
+    '<details class="aside"><summary>Against equal weighting</summary><div>'+
       (eqBetter
         ? 'Splitting the same holdings equally would run at <b class="neg">'+(R.eqVol*100).toFixed(1)+'%</b> volatility against your <b>'+(R.vol*100).toFixed(1)+'%</b>. Your weighting is carrying more risk than dividing evenly would. That is worth a reason.'
-        : 'Splitting the same holdings equally would run at <b>'+(R.eqVol*100).toFixed(1)+'%</b> against your <b class="pos">'+(R.vol*100).toFixed(1)+'%</b>, so your weighting is genuinely reducing risk versus naive diversification.')+'</p>'+
+        : 'Splitting the same holdings equally would run at <b>'+(R.eqVol*100).toFixed(1)+'%</b> against your <b class="pos">'+(R.vol*100).toFixed(1)+'%</b>, so your weighting is genuinely reducing risk versus naive diversification.')+'</div></details>'+
     /* M7. A shrinkage intensity is a parameter and this file does not hide parameters. */
     (R.shrunk
-      ? '<p class="muted" style="font-size:12px;margin-top:10px;line-height:1.6">'+
-        '<b>Covariance is shrunk, by '+(R.shrunk.delta*100).toFixed(0)+'%.</b> '+
-        'A covariance matrix estimated from '+R.shrunk.T+' days across '+R.n+' holdings has systematically biased extreme values: the largest variances come out too large and the smallest too small, and that error does not average away. '+
-        'Ledoit-Wolf pulls the estimate toward a constant-correlation model, here at an average of '+R.shrunk.rBar.toFixed(2)+'. '+
-        'The intensity is derived from the data rather than chosen, and it falls as history accumulates, so a longer record moves this number toward zero on its own. '+
-        (R.shrunk.delta>0.5
-          ? 'At this level the estimate is leaning heavily on structure rather than on your data, which is what a short history deserves.'
-          : 'At this level your own data is carrying most of the estimate.')+
-        '</p>'
-      : '<p class="muted" style="font-size:12px;margin-top:10px;line-height:1.6">'+
-        '<b>Covariance is not shrunk here.</b> There is not enough overlapping daily history across these holdings to estimate a full matrix, so pairwise correlations are used with an average filling the gaps. That is the weaker estimate and it is the reason this line exists.</p>')+
-    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.6"><b>There is no efficient frontier here, on purpose.</b> Optimising a frontier needs expected returns, and mean-variance is notoriously unstable in them, it overweights whatever holding has estimation error in its favour, and equal weighting has beaten it out of sample in published tests. So this shows where your risk actually sits and compares against equal weight, and stops there. '+
-      (R.measured?'Correlations are measured from your holdings.':'Correlations are a '+R.avgCorr.toFixed(2)+' assumption. Run <b>Calculate risk</b> on the Risk tab to measure them.')+'</p>';
+      ? aside('Covariance shrunk by '+(R.shrunk.delta*100).toFixed(0)+'%',
+          'A matrix estimated from '+R.shrunk.T+' days across '+R.n+' holdings has biased extremes: the largest variances come out too large, the smallest too small, and that error does not average away. '+
+          'Ledoit-Wolf pulls it toward a constant-correlation model at an average of '+R.shrunk.rBar.toFixed(2)+'. The intensity is derived from the data, not chosen, and falls as history accumulates. '+
+          (R.shrunk.delta>0.5?'At this level it leans on structure rather than your data, which is what a short history deserves.'
+                             :'At this level your own data carries most of the estimate.'))
+      : aside('Covariance is not shrunk',
+          'Not enough overlapping daily history to estimate a full matrix, so pairwise correlations are used with an average filling the gaps. That is the weaker estimate.'))+
+    '<details class="aside"><summary>There is no efficient frontier here, on purpose</summary><div>Optimising a frontier needs expected returns, and mean-variance is notoriously unstable in them, it overweights whatever holding has estimation error in its favour, and equal weighting has beaten it out of sample in published tests. So this shows where your risk actually sits and compares against equal weight, and stops there. '+
+      (R.measured?'Correlations are measured from your holdings.':'Correlations are a '+R.avgCorr.toFixed(2)+' assumption. Run <b>Calculate risk</b> on the Risk tab to measure them.')+'</div></details>';
 }
 
 
@@ -8246,34 +8246,33 @@ function renderCounterfactual(){
       'your maximum drawdown across these '+alt.n+' observed sessions would have been '+
       '<b class="neg">'+(alt.maxDD*100).toFixed(2)+'%</b> against <b class="neg">'+(base.maxDD*100).toFixed(2)+'%</b>, '+
       'and your ending value <b>'+pmask(fmt$(alt.end))+'</b> against <b>'+pmask(fmt$(base.end))+'</b>.</p>':'')+
-    (unfundable.length?'<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.65">'+
+    (unfundable.length?'<details class="aside"><summary>Why some rules are unfundable</summary><div>'+
       '<b class="warn">'+unfundable.map(a=>a.riskPct.toFixed(1)+'%').join(' and ')+' asked for more money than was in the book.</b> '+
       'At '+unfundable[0].riskPct.toFixed(1)+'% the rule wanted '+pmask(fmt$(unfundable[0].asked))+' against '+pmask(fmt$(W.start))+' available, '+
       'so every position is scaled back in proportion until it fits. Above that point the rule is fully invested and raising the budget changes nothing, '+
-      'which is itself the answer: the risk setting has stopped binding.</p>':'')+
-    '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.68">'+
-      '<b>What varied, and what did not.</b> Only the dollars in each position. The tickers are the ones you hold, the dates are ones this app logged a close for, '+
-      'and no entry or exit moved. Sizes are set once at the opening close and never adjusted, because re-sizing along the way would be trading on days you did not trade. '+
-      'Your cash balance is outside every row, so no row is helped by money you simply had sitting there. '+
-      'What a smaller budget does NOT deploy is a different matter and it is doing real work in these numbers: it sits in the alternative row earning nothing, '+
-      'which is why that row carries a cash weight the actual row does not. Both rows are price only: '+
-      'a dividend paid inside the window is in neither, so the actual row is what the positions were worth at the closes rather than everything that reached the account. '+
-      'Volatility is measured only from closes logged <b>before</b> '+esc(W.from)+', so the alternative rows could not know which names were about to turn violent.</p>'+
-    '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.68">'+
-      /* THE TRAP THIS PANEL SETS, AND MUST DEFUSE. The actual row is fully invested by construction;
-         a smaller budget leaves the remainder in cash. So a smaller size lowers the drawdown and
-         the upside together, and over a window that happened to fall it wins automatically. An
-         operator reading only the ending value would conclude "size smaller" from the direction of
-         the market rather than from anything about their sizing. */
-      '<b>Smaller is not better, it is smaller.</b> A lower budget leaves more in cash, so it reduces the fall and the rise together. '+
-      'Over a window that ended down, a smaller size wins by arithmetic and tells you nothing you did not already know about the market. '+
-      'Read the drawdown column against the cash column: a row that halved the drawdown while staying nearly fully invested has said something about sizing, '+
-      'and a row that halved it by holding '+(alt?alt.cashPct.toFixed(0):'40')+'% cash has only said that cash does not fall. '+
-      '<b>Too early to read?</b> A maximum drawdown is the largest of '+W.dates.length+' draws, so it grows with the length of the window by construction. '+
-      'These rows are comparable with each other, because every one of them runs over the same '+W.dates.length+' sessions, and with nothing else. '+
+      'which is itself the answer: the risk setting has stopped binding.</div></details>':'')+
+    /* THE TRAP THIS PANEL SETS, AND MUST DEFUSE. The actual row is fully invested by construction;
+       a smaller budget leaves the remainder in cash, so a smaller size lowers the drawdown and the
+       upside together and wins automatically over a window that fell. Reading only the ending value
+       would teach "size smaller" from the direction of the market. That warning stays visible; the
+       methodology folds. */
+    /* Stays VISIBLE. The bulk fold swallowed this once; it must not, because a reader who takes the
+       ending value at face value learns the opposite of the truth. Methodology folds, warnings that
+       change a conclusion do not. */
+    '<p class="muted" style="font-size:var(--fs-sm);margin-top:12px"><b>Smaller is not better, it is smaller.</b> '+
+      'A lower budget holds more cash, so it cuts the fall and the rise together. Read drawdown against the cash column'+
+      (alt?': a row that halved the drawdown while holding '+alt.cashPct.toFixed(0)+'% cash has only said that cash does not fall.':'.')+'</p>'+
+    aside('What varied, and what did not',
+      'Only the dollars in each position. The tickers are the ones you hold, the dates are ones this app logged a close for, and no entry or exit moved. '+
+      'Sizes are set once at the opening close, because re-sizing along the way would be trading on days you did not trade. '+
+      'Your cash balance is outside every row. What a smaller budget does not deploy is a different matter and is doing real work here: it sits in the alternative row earning nothing. '+
+      'Both rows are price only, so a dividend inside the window is in neither. '+
+      'Volatility is measured only from closes logged before '+esc(W.from)+', so the alternative rows could not know which names were about to turn violent.')+
+    aside('Too early to read?',
+      'A maximum drawdown is the largest of '+W.dates.length+' draws, so it grows with the window by construction. These rows are comparable with each other and with nothing else. '+
       (W.dates.length<60?'At this length one bad week decides the column. ':'')+
-      '<b>Falsification:</b> if the alternative rows sit within a single day\'s move of the actual row, sizing did not decide this window and the setting is not worth arguing about. '+
-      'And because this is one window over one fixed set of positions, a later window can reverse the ordering. If it does, the gap was noise rather than a finding about your sizing.</p>';
+      'If the alternative rows sit within a single day\'s move of the actual row, sizing did not decide this window. '+
+      'And because this is one window over one fixed set of positions, a later window can reverse the ordering; if it does, the gap was noise.');
 }
 
 /* ================= WHICH TRACKS RECORD =================
@@ -8707,14 +8706,14 @@ function renderHerizen(){
       '<td class="'+(l.pt>0?'pos':'neg')+'"><b>'+(l.pt>0?'+1':'−1')+'</b></td></tr>').join('')+
     '</tbody></table></div>'+
     '<div class="chart-box" style="height:240px;margin-top:16px"><canvas id="hzChart"></canvas></div>'+
-    '<p class="muted" style="font-size:13px;margin-top:12px;line-height:1.6">'+
+    '<details class="aside"><summary>How the momentum gate sizes</summary><div>'+
       'A score of <b>'+(h.score>0?'+':'')+h.score+'</b> permits at most <b>'+h.size+'%</b> of the size your other limits allow. '+
       (h.size===0
         ? 'At zero it blocks the position entirely, not because the company is bad, but because nothing here is trending.'
         : h.size===100
           ? 'All four segments rose, so this places no restriction beyond your policy cap and volatility budget.'
           : 'It will bind only if it is smaller than your policy cap, volatility budget and stop distance.')+
-    '</p>';
+    '</div></details>';
   // Chart.js needs the canvas in the DOM, so this runs after innerHTML rather than inside it.
   const ok=drawPriceChart('hzChart',sym,{ewma:true});
   if(!ok){
@@ -8896,7 +8895,7 @@ function renderAnalysis(sym,sc){
     (sc.riskRating?
       '<div class="row" style="margin:10px 0"><span class="pill '+sc.riskRating.cls+'">'+esc(sc.riskRating.label)+'</span>'+
       (sc.sharpe!=null?'<span class="muted">Sharpe ratio '+sc.sharpe.toFixed(2)+', expected excess return per unit of volatility. Above 1.0 is strong, 0–0.5 is fair, below 0 means the expected return doesn\'t clear the risk-free rate given how much this stock swings.</span>':'')+'</div>'+
-      '<p class="muted" style="margin-bottom:10px">Assumptions: 4.5% risk-free rate, 8% expected market return, beta '+(sc.riskBeta!=null?sc.riskBeta.toFixed(2):'1.00')+', volatility '+(sc.riskSigma!=null?(sc.riskSigma*100).toFixed(1)+'%':'-')+' ('+esc(sc.riskSigmaSource||'assumed')+'). Same CAPM/GBM method as the Monte Carlo tool in the Risk tab, which lets you customize the rate assumptions.</p>'+
+      '<details class="aside"><summary>Assumptions behind this figure</summary><div>Assumptions: 4.5% risk-free rate, 8% expected market return, beta '+(sc.riskBeta!=null?sc.riskBeta.toFixed(2):'1.00')+', volatility '+(sc.riskSigma!=null?(sc.riskSigma*100).toFixed(1)+'%':'-')+' ('+esc(sc.riskSigmaSource||'assumed')+'). Same CAPM/GBM method as the Monte Carlo tool in the Risk tab, which lets you customize the rate assumptions.</div></details>'+
       (sc.riskRange?
         '<div class="grid grid-3" style="margin-bottom:10px">'+
         '<div class="card"><h3>Worst case (5th pct)</h3><div class="big neg">'+(sc.riskRange.p5>=0?'+':'')+sc.riskRange.p5.toFixed(1)+'%</div></div>'+
@@ -8919,7 +8918,7 @@ function renderAnalysis(sym,sc){
         '<div class="card"><h3>Annual $/share</h3><div class="big">'+(sc.dividend.perShare!=null?'$'+sc.dividend.perShare.toFixed(2):'-')+'</div></div>'+
         '<div class="card"><h3>Payout ratio</h3><div class="big">'+(sc.dividend.payoutRatio!=null?sc.dividend.payoutRatio.toFixed(0)+'%':'-')+'</div></div>'+
       '</div>'+
-      '<p class="muted" style="font-size:13px">Rule of thumb some income investors use: a payout ratio comfortably under roughly 75–80% of earnings suggests more room to sustain or grow the dividend; well above that, a cut becomes more likely if earnings dip. Not a recommendation, and not a discounted-dividend fair-value model. Just the real numbers, for context.</p>'
+      '<details class="aside"><summary>Reading the payout ratio</summary><div>Rule of thumb some income investors use: a payout ratio comfortably under roughly 75–80% of earnings suggests more room to sustain or grow the dividend; well above that, a cut becomes more likely if earnings dip. Not a recommendation, and not a discounted-dividend fair-value model. Just the real numbers, for context.</div></details>'
       :'<p class="empty">'+esc(sym)+' doesn\'t currently pay a dividend (or Finnhub has no dividend data for it on your plan), this section only applies to dividend-paying stocks.</p>')+
     '<h3 style="margin-top:22px">Your judgment calls (saved per stock)</h3>'+
     '<div class="grid grid-2">'+
@@ -9280,7 +9279,7 @@ function betaDriftHtml(stocks,priceSeries,marketSeries){
       ? '<p style="margin-top:10px;font-size:13.5px"><b>'+esc(biggest.sym)+'</b> has moved the most. Beta '+(biggest.drift>0?'rose':'fell')+' from '+biggest.k.start.toFixed(2)+' to '+biggest.k.current.toFixed(2)+'. '+
         (biggest.drift>0?'It now amplifies market moves more than it did when you bought it.':'It has become less sensitive to the market than it was.')+'</p>'
       : '<p class="muted" style="margin-top:10px;font-size:13px">No holding has drifted more than 0.25. Your positions are behaving roughly as they did six months ago.</p>')+
-    '<p class="muted" style="margin-top:8px;font-size:11.5px;line-height:1.55">Tracked with a Kalman filter over six months of daily returns against SPY, updating beta each day rather than averaging the window into one number. The first 20 days are discarded as burn-in, since the filter is seeded at 1.0 and needs data before its output means anything. An estimate from price history, not a published figure.</p>'+
+    '<details class="aside"><summary>How beta is tracked</summary><div>Tracked with a Kalman filter over six months of daily returns against SPY, updating beta each day rather than averaging the window into one number. The first 20 days are discarded as burn-in, since the filter is seeded at 1.0 and needs data before its output means anything. An estimate from price history, not a published figure.</div></details>'+
     '</div>';
 }
 
@@ -9521,8 +9520,8 @@ async function runDrawdown(){
             ? 'The two agree closely here, which is itself worth knowing. At this volatility the normal assumption isn\'t doing much damage.'
             : 'The bell curve understates the typical worst drop by about <b class="neg">'+Math.abs(understate).toFixed(0)+'%</b> relative. That gap is the cost of assuming bad days arrive independently. They don\'t; they arrive in runs, and a run is what turns an ordinary dip into the kind of decline people sell into.')+
         '</p></div>'+
-      '<p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.6">'+
-        '<b>Read the limits.</b> The path shapes are real S&amp;P 500 days, but they are rescaled to your portfolio\'s volatility rather than drawn from your holdings\' own history, so a concentrated book of high-beta names will behave more violently than this suggests, because single-stock blowups are not in the index\'s record. S&amp;P Dow Jones licenses FRED exactly ten years of daily history, so the sample above starts in '+esc(String(spx.from).slice(0,4))+': <b>2008 is not in it</b>, and the deepest real crash available to draw from is COVID in 2020. Block bootstrapping preserves clustering within a '+blockLen+'-day run and breaks it at the seams, so multi-month grinding bear markets are still under-represented. Every one of these caveats points the same way: treat these as a floor on the pain, not a ceiling.</p>';
+      '<details class="aside"><summary>Read the limits</summary><div>'+
+        '<b>Read the limits.</b> The path shapes are real S&amp;P 500 days, but they are rescaled to your portfolio\'s volatility rather than drawn from your holdings\' own history, so a concentrated book of high-beta names will behave more violently than this suggests, because single-stock blowups are not in the index\'s record. S&amp;P Dow Jones licenses FRED exactly ten years of daily history, so the sample above starts in '+esc(String(spx.from).slice(0,4))+': <b>2008 is not in it</b>, and the deepest real crash available to draw from is COVID in 2020. Block bootstrapping preserves clustering within a '+blockLen+'-day run and breaks it at the seams, so multi-month grinding bear markets are still under-represented. Every one of these caveats points the same way: treat these as a floor on the pain, not a ceiling.</div></details>';
   }catch(e){
     el.innerHTML='<div class="empty">Couldn\'t build the drawdown model: '+esc(e.message||String(e))+'</div>';
   }finally{
@@ -9675,7 +9674,7 @@ function renderMonteCarloResults(r){
     '<button class="btn btn-ghost btn-sm" id="mcViewBoxBtn" onclick="setMcView(\'box\')">Box &amp; Whisker</button></div>'+
     '<div class="chart-box" id="mcHistWrap" style="height:260px;margin-top:10px"><canvas id="mcHistCanvas"></canvas></div>'+
     '<div id="mcBoxWrap" style="display:none;height:170px;position:relative;margin-top:10px"><canvas id="mcBoxCanvas"></canvas></div>'+
-    '<p class="muted" style="margin-top:10px">25th–75th percentile: '+(r.yearP25>=0?'+':'')+r.yearP25.toFixed(1)+'% to '+(r.yearP75>=0?'+':'')+r.yearP75.toFixed(1)+'%, that middle band is where the simulation thinks a typical year lands. The box &amp; whisker view shows the same 5th/25th/median/75th/95th spread as a single chart instead of a full bar-by-bar histogram.</p></div>'+
+    '<details class="aside"><summary>The middle half of outcomes</summary><div>25th–75th percentile: '+(r.yearP25>=0?'+':'')+r.yearP25.toFixed(1)+'% to '+(r.yearP75>=0?'+':'')+r.yearP75.toFixed(1)+'%, that middle band is where the simulation thinks a typical year lands. The box &amp; whisker view shows the same 5th/25th/median/75th/95th spread as a single chart instead of a full bar-by-bar histogram.</div></details></div>'+
     '<div class="section-title">Dollar projection over '+r.years+' years</div>'+
     '<div class="grid grid-3">'+
     '<div class="card"><h3>Worst case (5th pct)</h3><div class="big neg">'+pmask(fmt$(r.finalP5))+'</div><div class="muted">5% of simulations ended below this</div></div>'+
@@ -9693,11 +9692,11 @@ function renderMonteCarloResults(r){
     '<tr><td>Probability of ending below what you put in</td><td>'+r.probLoss.toFixed(1)+'%</td></tr>'+
     '<tr><td>Simulations / horizon</td><td>'+r.sims.toLocaleString()+' paths over '+r.years+' years</td></tr>'+
     '</tbody></table>'+
-    '<p class="muted" style="margin-top:10px">This assumes returns are randomly distributed around one average (geometric Brownian motion). Real markets have fatter tails, crashes cluster, and correlations spike in downturns. Treat this as a range of plausible outcomes under simplifying assumptions, not a forecast. The drawdown model below drops that assumption and samples real history instead.</p>'+
+    '<details class="aside"><summary>What this simulation assumes</summary><div>This assumes returns are randomly distributed around one average (geometric Brownian motion). Real markets have fatter tails, crashes cluster, and correlations spike in downturns. Treat this as a range of plausible outcomes under simplifying assumptions, not a forecast. The drawdown model below drops that assumption and samples real history instead.</div></details>'+
     '</div>'+
     '<div class="section-title">The hole on the way there. Worst drawdown</div>'+
     '<div class="card">'+
-      '<p class="muted" style="margin-bottom:12px">Everything above describes where you might <b>end up</b>. None of it describes the worst point you pass through, and that is the number that decides whether you are still holding when the recovery arrives. This one is built from real S&amp;P 500 trading days rather than a bell curve, because bad days cluster and a bell curve cannot represent that.</p>'+
+      '<details class="aside"><summary>What this leaves out</summary><div>Everything above describes where you might <b>end up</b>. None of it describes the worst point you pass through, and that is the number that decides whether you are still holding when the recovery arrives. This one is built from real S&amp;P 500 trading days rather than a bell curve, because bad days cluster and a bell curve cannot represent that.</div></details>'+
       '<button class="btn" id="ddBtn" onclick="runDrawdown()">Model the drawdown</button>'+
       '<div id="mcDrawdown" style="margin-top:14px"></div>'+
     '</div>';
@@ -10731,9 +10730,9 @@ function ruleChangeWarning(){
   const oldest=Math.min(...calls.map(c=>c.ts));
   const since=changes.filter(ch=>ch.ts>oldest).length;
   if(!since)return '';
-  return '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65"><b class="warn">This record spans '+(since+1)+' different rule-sets.</b> '+
+  return '<details class="aside"><summary>Why the record is split</summary><div><b class="warn">This record spans '+(since+1)+' different rule-sets.</b> '+
     'You changed the buy or sell bar '+since+' time'+(since===1?'':'s')+' after the oldest call above was made, so the numbers average together systems that were not the same system. '+
-    'Treat the figures as indicative until enough calls accumulate under the current rules alone.</p>';
+    'Treat the figures as indicative until enough calls accumulate under the current rules alone.</div></details>';
 }
 function saveRules(){
   const before=ruleSnapshot();
@@ -10850,11 +10849,11 @@ function showFirstRunExport(){
       '<p class="muted" style="font-size:13.5px;line-height:1.65;margin:0 0 10px">'+
         'PerceptFolio has no server. Everything, including every call it will mark for you, lives only in this browser. '+
         'Clearing site data deletes it, and the record is forward-only, so it cannot be rebuilt afterwards.</p>'+
-      '<p class="muted" style="font-size:13.5px;line-height:1.65;margin:0 0 16px">'+
+      '<details class="aside"><summary>Why this matters on iPhone</summary><div>'+
         (iosSafariUninstalled()
           ? '<b>You are on iPhone Safari without the app installed, which is the worst case:</b> iOS deletes this site\'s storage after seven days without a visit. Add it to your home screen from the share menu, and export a backup now.'
           : 'Export takes one click and produces a single file. Do it now, and again whenever the banner asks.')+
-      '</p>'+
+      '</div></details>'+
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
         '<button class="btn" onclick="exportData();dismissFirstRunExport()">Export a backup</button>'+
         '<button class="btn btn-ghost" onclick="dismissFirstRunExport()">I understand the risk</button>'+
@@ -10971,7 +10970,7 @@ function renderSeasonal(){
       '<div class="stat"><span class="stat-label">needed for 12 tests</span>'+
         '<span class="stat-value muted">±'+crit.toFixed(2)+'</span></div>'+
     '</div>'+
-    '<p class="muted" style="font-size:13px;line-height:1.65;margin-top:14px">'+
+    '<details class="aside"><summary>Reading this figure</summary><div>'+
       '<b>Reading:</b> '+esc(name)+'’s mean is '+(mean>=0?'+':'')+mean.toFixed(1)+'%, but the standard error on '+
       SEASONAL_N+' observations is '+se.toFixed(2)+'%, so the 95% interval runs '+(lo>=0?'+':'')+lo.toFixed(1)+
       '% to '+(hi>=0?'+':'')+hi.toFixed(1)+'%. '+
@@ -10981,18 +10980,17 @@ function renderSeasonal(){
       ' Twelve months were tested, and one of them had to come out '+(mean<0?'worst':'best')+
       '. Correcting for that, |t| would need to exceed '+crit.toFixed(2)+'; it is '+Math.abs(t).toFixed(2)+', so '+
       (survives?'it clears the bar, which would be worth a second look.':'<b>it does not clear the bar.</b>')+
-    '</p>'+
+    '</div></details>'+
     (isWorst
-      ? '<p class="muted" style="font-size:12.5px;line-height:1.6;margin-top:8px"><span class="warn">You are in the month with the lowest long-run mean.</span> '+
+      ? '<details class="aside"><summary>Reading this month</summary><div><span class="warn">You are in the month with the lowest long-run mean.</span> '+
         'That is the fact behind every article you will read this month. It is also the fact that survives no correction for having tested twelve months, '+
         'and calendar effects are the most decayed class in the literature, “Sell in May” was published in 2002 and substantially faded afterwards. '+
-        'Publishing an edge is how it dies.</p>'
+        'Publishing an edge is how it dies.</div></details>'
       : '')+
-    '<p class="muted" style="font-size:11.5px;line-height:1.55;margin-top:10px">'+
-      '<b>How this can be wrong:</b> the means and standard deviation are long-run published figures entered as constants, '+
-      'not measured by this app, the data tier caps index history at ten years, roughly ten observations per month, which is far too few to estimate a monthly mean. '+
+    aside('How this can be wrong',
+      'The means and standard deviations are long-run published figures entered as constants, not measured by this app. The data tier caps index history at ten years, roughly ten observations per month, far too few to estimate a monthly mean. '+
       'The arithmetic on top of them is done here and can be checked. '+
-      '<b>Nothing on this panel reaches a score, a verdict or a position size</b>, and it never will: an effect this weak would fail the forty-call rule on its first day.</p>';
+      'Nothing on this panel reaches a score, a verdict or a position size, and it never will: an effect this weak would fail the sample rule on its first day.');
 }
 
 /* ================= THESIS PROBABILITY — N(d2) =================
@@ -11166,11 +11164,9 @@ function updateThesisProbability(){
   }
 
   document.getElementById('probAssume').innerHTML=
-    '<b>How this can be wrong:</b> it assumes returns are lognormal and volatility stays at '+
-    (r.sigma*100).toFixed(0)+'% until the deadline. Both are false. Real returns have fat tails, and '+
-    'this app\'s own GARCH panel exists because volatility clusters. Treat it as an order of magnitude, '+
-    'not a figure to two significant figures. It is a check on whether your target is even plausible, '+
-    'not a forecast.';
+    aside('How this can be wrong',
+      'It assumes returns are lognormal and volatility stays at '+(r.sigma*100).toFixed(0)+'% until the deadline. Both are false: real returns have fat tails, and this app\'s own GARCH panel exists because volatility clusters. '+
+      'Treat it as an order of magnitude, not a figure to two significant figures. It checks whether your target is plausible; it is not a forecast.');
 }
 function fillThesisPicker(){
   const sel=document.getElementById('thesisSym');
@@ -11488,7 +11484,7 @@ function renderBehaviour(){
   }
 
   el.innerHTML=blocks.join('')+
-    '<p class="muted" style="font-size:11.5px;margin-top:14px;line-height:1.6"><b>Read the limits.</b> All of this measures only what is in the ledger, which starts when you began recording trades here. Positions carried in from before are invisible to it. Sample sizes will be small for a long time, and a handful of trades cannot distinguish a habit from a coincidence. Nothing here is advice; it is a mirror.</p>';
+    '<details class="aside"><summary>Read the limits</summary><div>All of this measures only what is in the ledger, which starts when you began recording trades here. Positions carried in from before are invisible to it. Sample sizes will be small for a long time, and a handful of trades cannot distinguish a habit from a coincidence. Nothing here is advice; it is a mirror.</div></details>';
 }
 
 /* ================= QUALITY DRIFT ================= */
@@ -11817,7 +11813,7 @@ function renderTradeImpact(){
     '</tbody></table></div>'+
     sizingPanel(sym,fromCash,side==='buy'?size:0)+
     '<ul style="margin-top:14px;padding-left:20px;line-height:1.7;font-size:13.5px">'+flags.join('')+'</ul>'+
-    '<p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.6"><b>What risk weight does and doesn\'t tell you.</b> Size × beta is how much market movement this position contributes relative to its dollar share, a 6% stake in a 2.3-beta name behaves like a 14% stake in the index. It deliberately ignores how your holdings move against <i>each other</i>; a true risk contribution needs a full covariance matrix, which is what the <b>Risk</b> tab\'s correlation tool is for. Two names at 5% each that always move together are one 10% bet, and this number will not tell you that.</p>';
+    '<details class="aside"><summary>What risk weight does and doesn\'t tell you</summary><div>Size × beta is how much market movement this position contributes relative to its dollar share, a 6% stake in a 2.3-beta name behaves like a 14% stake in the index. It deliberately ignores how your holdings move against <i>each other</i>; a true risk contribution needs a full covariance matrix, which is what the <b>Risk</b> tab\'s correlation tool is for. Two names at 5% each that always move together are one 10% bet, and this number will not tell you that.</div></details>';
 }
 
 /* ================= COMMAND — the action queue =================
@@ -12743,14 +12739,11 @@ function renderMoveWithoutVix(el,data,errMsg){
         (rv.daily*2).toFixed(2)+'%</b>. Measured from the last '+rv.n+' sessions ('+rv.annual.toFixed(1)+'% annualised).</div>'+
       '<div class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.55">'+
         '<b>This is a range, not a prediction</b>, and nothing here says up or down.</div>'+
-      '<div class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.55">'+
-        '<b>How this can be wrong:</b> this is what the market <em>has been</em> doing, not what it '+
-        '<em>expects</em>. It cannot see a scheduled event, an earnings date, a Fed meeting, an election, '+
-        'so it will quote a calm range into the day before a known catalyst. That forward-looking half is '+
-        'the VIX, and it needs a free <b>FRED_API_KEY</b> on your <b>Cloudflare worker</b> (not in this '+
-        'app\'s Settings). See SYNC-SETUP.md, step 5b.'+
-        (errMsg?'<br><span style="opacity:.75">Worker said: '+esc(errMsg)+'</span>':'')+
-      '</div>';
+      aside('How this can be wrong',
+        'This is what the market has been doing, not what it expects. It cannot see a scheduled event, an earnings date, a Fed meeting or an election, '+
+        'so it will quote a calm range into the day before a known catalyst. '+
+        'That forward-looking half is the VIX, and it needs a free FRED_API_KEY on your Cloudflare worker, not in this app\'s Settings. See SYNC-SETUP.md, step 5b.'+
+        (errMsg?'<br>Worker said: '+esc(errMsg):''));
     return;
   }
 
@@ -12804,14 +12797,11 @@ function renderMoveWithoutVix(el,data,errMsg){
     /* The falsifiability line, and an honest statement of which ruler is in use. A realised-vol
        ruler is BACKWARD-looking: it cannot know about an event scheduled for tomorrow, which is
        exactly the gap the VIX fills. Saying so is the difference between a fallback and a fake. */
-    '<div class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">'+
-      '<b>Measured, not implied.</b> This uses volatility calculated from '+(rv?rv.n+' ':'')+'logged S&amp;P closes, '+
-      'not the VIX. <b>How this can be wrong:</b> a realised ruler only knows what already happened, it '+
-      'cannot price an event scheduled for tomorrow, so it will call a move ordinary right up until the '+
-      'day it is not. The VIX is the forward-looking half and needs a free <b>FRED_API_KEY</b> added to your '+
-      '<b>Cloudflare worker</b> (not to this app\'s Settings). See SYNC-SETUP.md, step 5b.'+
-      (errMsg?'<br><span style="opacity:.75">Worker said: '+esc(errMsg)+'</span>':'')+
-    '</div>';
+    aside('Measured, not implied',
+      'This uses volatility calculated from '+(rv?rv.n+' ':'')+'logged S&amp;P closes, not the VIX. '+
+      'A realised ruler only knows what already happened: it cannot price an event scheduled for tomorrow, so it will call a move ordinary right up until the day it is not. '+
+      'The VIX is the forward-looking half and needs a free FRED_API_KEY on your Cloudflare worker, not in this app\'s Settings. See SYNC-SETUP.md, step 5b.'+
+      (errMsg?'<br>Worker said: '+esc(errMsg):''));
 }
 
 /* THE DISTINCTION THE DAY TOGGLE TURNS ON.
@@ -14239,10 +14229,10 @@ function checkAuditHTML(winRaw){
   if(!days)return '';
   const E=checkEfficacy(days);
   if(!E.ok){
-    return '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">'+
+    return '<details class="aside"><summary>Why there is no audit yet</summary><div>'+
       '<b>The 22 checks have not been audited yet.</b> That needs marked calls carrying the check results they were made on, which are recorded from now on; there are '+
       E.n+' so far and it takes at least 8 before any per-check correlation means anything. '+
-      'Until then every check is weighted equally because nothing yet says otherwise, not because anything says it should be.</p>';
+      'Until then every check is weighted equally because nothing yet says otherwise, not because anything says it should be.</div></details>';
   }
   const withR=E.per.filter(p=>p.r!=null);
   const real=withR.filter(p=>p.signal===true);
@@ -14264,27 +14254,17 @@ function checkAuditHTML(winRaw){
         (p.signal===true?(p.r>0?'predicts':'predicts, inverted'):p.signal===false?'noise':'no interval')+
       '</td></tr>').join('')+'</tbody></table></div>'+
     '<div style="padding:11px 15px;border-top:1px solid var(--border)">'+
-      '<p class="muted" style="font-size:12.5px;line-height:1.68;margin:0 0 8px">'+
-      /* Three states, all reported. Counting only the first and calling the rest noise would hide a
-         check that separated the outcomes so cleanly that its interval could not be computed,
-         which is the opposite of noise. */
-      '<b>'+real.length+' of '+withR.length+' checks separate winners from losers on this sample'+(real.length===0&&!extreme.length?', none at all':'')+'.</b> '+
-      (extreme.length?extreme.length+' separated them so completely that no interval could be fitted, which on a record this thin usually means the check and the outcome are the same fact twice. ':'')+
-      (noise.length?noise.length+' have an interval spanning zero, which means they are indistinguishable from a coin toss here and are still contributing a full point each to every score. ':'')+
-      'That is the expected result on a thin record and it is not an argument for deleting them yet; it is an argument against believing the total is 22 pieces of evidence.'+
-      '</p>'+
-      (E.redundancy
-        ? '<p class="muted" style="font-size:12.5px;line-height:1.68;margin:0 0 8px">'+
-          '<b>'+E.redundancy.counted+' checks are carrying about '+E.redundancy.independent.toFixed(1)+' independent opinions.</b> '+
-          'Several move together by construction: three of the quality checks are margin variants, and a company with an expanding operating margin usually has a healthy gross margin too. '+
-          'Counting one idea three times and calling it three points is how an equal-weighted score quietly triple-weights whatever is most correlated with itself.'+
-          '</p>'
-        : '')+
-      '<p class="muted" style="font-size:12px;line-height:1.6;margin:0">'+
-      'Correlation is point-biserial between each check passing and the beta-adjusted edge of the call, over '+E.n+' marked calls. '+
-      'A check needs at least three passes and three failures to be measurable at all; the rest are omitted rather than shown at zero. '+
-      '<b>Falsification:</b> if every interval still spans zero once the record is several times this size, the checklist is not selecting stocks and the score is arithmetic on noise.'+
-      '</p></div></div>';
+      '<p class="muted" style="font-size:var(--fs-sm);line-height:1.6;margin:0"><b>'+real.length+' of '+withR.length+
+      ' checks separate winners from losers'+(real.length===0&&!extreme.length?', none at all':'')+'.</b>'+
+      (noise.length?' '+noise.length+' are indistinguishable from a coin toss and still contribute a full point each.':'')+
+      (E.redundancy?' The '+E.redundancy.counted+' carry about '+E.redundancy.independent.toFixed(1)+' independent opinions.':'')+'</p>'+
+      aside('Reading the check audit',
+        (extreme.length?extreme.length+' separated the outcomes so completely that no interval could be fitted, which on a thin record usually means the check and the outcome are the same fact twice. ':'')+
+        'That most are noise is the expected result on a thin record. It is not an argument for deleting them yet, it is an argument against believing the total is 22 pieces of evidence. '+
+        (E.redundancy?'Several move together by construction: three quality checks are margin variants. Counting one idea three times and calling it three points is how an equal-weighted score triple-weights whatever is most correlated with itself. ':'')+
+        'Correlation is point-biserial between each check passing and the beta-adjusted edge, over '+E.n+' marked calls. A check needs three passes and three failures to be measurable; the rest are omitted rather than shown at zero. '+
+        'If every interval still spans zero once the record is several times this size, the checklist is not selecting stocks and the score is arithmetic on noise.')+
+      '</div></div>';
 }
 
 /* M2 rendered. Gross and net side by side, with the cost measured from the operator's own ledger
@@ -14294,24 +14274,22 @@ function shortfallHTML(st){
   const sf=shortfallStats();
   if(!sf.n){
     if(!sf.total)return '';
-    return '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">'+
-      '<b>Every figure above is gross.</b> None of your '+sf.total+' recorded trade'+(sf.total===1?'':'s')+
-      ' has a decision price, so the gap between deciding and filling cannot be measured. '+
-      'Fill in <b>Price when I decided</b> on your next trade and this becomes a number instead of an omission. '+
-      'It is deliberately not estimated: an assumed spread is a guess wearing a decimal point.</p>';
+    return '<p class="muted" style="font-size:var(--fs-sm);margin-top:12px"><b>Every figure above is gross.</b> '+
+      'None of your '+sf.total+' recorded trade'+(sf.total===1?'':'s')+' has a decision price.</p>'+
+      aside('Why there is no net figure',
+        'Fill in Price when I decided on your next trade and this becomes a number instead of an omission. '+
+        'It is deliberately not estimated: an assumed spread is a guess wearing a decimal point.');
   }
   const pts=x=>(x>=0?'+':'')+x.toFixed(2);
   const net=st?st.expectancy-sf.mean:null;
   const worstT=sf.perTicker[0];
-  return '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65">'+
-    '<b>Gross and net.</b> Expectancy above is <b>'+(st?pts(st.expectancy):'-')+'pts</b> before implementation cost. '+
-    'Across '+sf.n+' of your '+sf.total+' trade'+(sf.total===1?'':'s')+' with a decision price recorded, the gap between deciding and filling cost a mean of '+
-    '<b class="'+(sf.mean>0?'neg':'pos')+'">'+sf.mean.toFixed(2)+'%</b> (median '+sf.median.toFixed(2)+'%), '+
-    'which leaves roughly <b class="'+(net!=null&&net>=0?'pos':'neg')+'">'+(net!=null?pts(net):'-')+'pts</b> net. '+
-    (worstT&&sf.perTicker.length>1
-      ? 'Worst by ticker: <b>'+esc(worstT.sym)+'</b> at '+worstT.avg.toFixed(2)+'% over '+worstT.n+' trade'+(worstT.n===1?'':'s')+'. '
-      : '')+
-    'Positive means waiting cost you. <b>Falsification:</b> if this mean sits inside its own noise as trades accumulate, hesitation is not measurably expensive and the field can be retired.</p>';
+  return '<p class="muted" style="font-size:var(--fs-sm);margin-top:12px">'+
+    '<b>'+(st?pts(st.expectancy):'-')+'pts gross, '+(net!=null?pts(net):'-')+'pts net</b> of a '+
+    '<b class="'+(sf.mean>0?'neg':'pos')+'">'+sf.mean.toFixed(2)+'%</b> mean implementation cost.</p>'+
+    aside('How the cost was measured',
+      'From '+sf.n+' of your '+sf.total+' trade'+(sf.total===1?'':'s')+' with a decision price recorded. Mean '+sf.mean.toFixed(2)+'%, median '+sf.median.toFixed(2)+'%. Positive means waiting cost you. '+
+      (worstT&&sf.perTicker.length>1?'Worst by ticker is '+esc(worstT.sym)+' at '+worstT.avg.toFixed(2)+'% over '+worstT.n+' trade'+(worstT.n===1?'':'s')+'. ':'')+
+      'If this mean sits inside its own noise as trades accumulate, hesitation is not measurably expensive and the field can be retired.');
 }
 
 /* M1 rendered. Deliberately a plain 2x2 with an interval in every cell: the off-diagonal is the
@@ -14377,13 +14355,11 @@ function operatorMatrixHTML(winRaw){
     '</tbody></table></div>'+
     '<div style="padding:11px 15px;border-top:1px solid var(--border)">'+
       (verdict?'<p class="muted" style="font-size:12.5px;line-height:1.65;margin:0 0 8px">'+verdict+'</p>':'')+
-      '<p class="muted" style="font-size:12px;line-height:1.6;margin:0">'+
-        '<b>Every cell is the checklist\'s own result</b>, signed by the checklist\'s call. So a low number in the lower row is good news for you: '+
-        'it means the checklist did badly on the calls you declined to follow. '+
-        'Rows are classified by the My Call tag you had set <b>at the moment the system spoke</b>, recorded with the call. '+
-        'Untagged rows are excluded: no opinion is not the same as agreement. HOLD and WATCH from the system make no directional claim and are not in this table. '+
-        '<b>Falsification:</b> if the two rows stay inside each other\'s intervals as the sample grows, there is no measurable difference between your judgement and the checklist, '+
-        'and this table should be read as saying so rather than as a scoreboard.</p>'+
+      aside('How to read this table',
+        'Every cell is the checklist\'s own result, signed by its own call, so a low number in the lower row is good news for you: the checklist did badly on the calls you declined to follow. '+
+        'Rows are classified by the My Call tag you had set at the moment the system spoke, recorded with the call. Untagged rows are excluded: no opinion is not the same as agreement. '+
+        'HOLD and WATCH make no directional claim and are not here. '+
+        'If the two rows stay inside each other\'s intervals as the sample grows, there is no measurable difference between your judgement and the checklist, and this should be read as saying so rather than as a scoreboard.')+
     '</div></div>';
 }
 
@@ -14494,27 +14470,28 @@ function renderScorecard(){
       '</div>'+
       /* D2/E3. The raw count is the flattering number and it is not the one that governs the
          interval above. Both are shown, with the correction measured rather than assumed. */
-      '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.65">'+
-        (eff.ok&&eff.neff!=null
-          ? '<b>'+scored.length+' scored call'+(scored.length===1?'':'s')+'. An estimated '+
-            (eff.neff<10?eff.neff.toFixed(1):Math.round(eff.neff))+' independent observations.</b> '+
+      (eff.ok&&eff.neff!=null
+        ? '<p class="muted" style="font-size:var(--fs-sm);margin-top:10px"><b>'+scored.length+' scored call'+(scored.length===1?'':'s')+
+          ', about '+(eff.neff<10?eff.neff.toFixed(1):Math.round(eff.neff))+' independent.</b></p>'+
+          aside('Why fewer than the raw count',
             'Calls on the same name over overlapping windows are scored against the same days, and calls on names that move together are one bet, not several. '+
-            'Average pairwise correlation across the '+eff.measurable+' measurable pair'+(eff.measurable===1?'':'s')+' is '+eff.rho.toFixed(2)+', taken from your own price history rather than assumed. '+
-            'The interval above is computed on '+scored.length+', so treat it as the optimistic end.'
-          : '<b>'+scored.length+' scored call'+(scored.length===1?'':'s')+'.</b> Not enough overlapping price history to measure how independent they are ('+
-            eff.measurable+' of '+eff.pairs+' pairs), so no effective sample size is claimed. Repeated calls on one name, and calls on names that move together, count for less than the raw number suggests.')+
-      '</p>'+
-      '<p class="muted" style="font-size:12.5px;margin-top:12px;line-height:1.65"><b>Expectancy is the number that matters, not hit rate.</b> '+
+            'Average pairwise correlation across the '+eff.measurable+' measurable pair'+(eff.measurable===1?'':'s')+' is '+eff.rho.toFixed(2)+', from your own price history rather than assumed. '+
+            'The interval above is computed on '+scored.length+', so treat it as the optimistic end.')
+        : '<p class="muted" style="font-size:var(--fs-sm);margin-top:10px"><b>'+scored.length+' scored call'+(scored.length===1?'':'s')+'.</b> Independence not measurable ('+
+          eff.measurable+' of '+eff.pairs+' pairs).</p>'+
+          aside('What that means',
+            'Repeated calls on one name, and calls on names that move together, count for less than the raw number suggests. No effective sample size is claimed here rather than guessed.'))+
+      aside('Why expectancy, not hit rate',
         'A system right 40% of the time whose winners run three times its losers earns more than one right 60% of the time whose losers run twice its winners. '+
-        'Hit rate is shown because you asked for it, but it is deliberately not the headline: the easiest way to raise it is to book winners early and hold losers, which is how a good system becomes a losing one.</p>'+
+        'Hit rate is shown because you asked for it, but it is not the headline: the easiest way to raise it is to book winners early and hold losers, which is how a good system becomes a losing one.')+
       (straddles
         ? '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65"><b class="warn">The 95% range crosses zero.</b> On this sample the honest reading is <b>no measurable edge yet</b>, not a small edge. '+
           'Distinguishing a real 55% hit rate from a coin flip takes roughly eight hundred graded calls; an average converges faster than that, but not from '+st.n+'.</p>'
         : (st&&st.lo!=null?'<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65">The 95% range sits entirely '+(st.lo>0?'<b class="pos">above</b>':'<b class="neg">below</b>')+' zero. On this sample that is a real signal, though '+st.n+' observations is still a small number to bet a process on.</p>':''))+
-      '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.6"><b>Edge is signed by the call.</b> A BUY is right when the stock beats SPY; a SELL is right when it lags. '+
+      '<details class="aside"><summary>Edge is signed by the call</summary><div>A BUY is right when the stock beats SPY; a SELL is right when it lags. '+
         (open?'This view measures every call from its date to today, so holding periods differ, the <b>Held</b> column shows each one. Pick a fixed horizon for a like-for-like comparison.'
              :'Every row here was marked on its own '+esc(winRaw)+'-day anniversary, so the holding periods match.')+
-        ' HOLD and WATCH calls make no directional claim and are shown but not scored.</p>'+
+        ' HOLD and WATCH calls make no directional claim and are shown but not scored.</div></details>'+
       (mA!=null&&nA!=null&&withM.length>=5&&withoutM.length>=5
         ? '<p class="muted" style="font-size:13px;margin-top:8px">Calls that cleared your momentum minimum ran <b class="'+(mA>=nA?'pos':'neg')+'">'+(mA-nA>=0?'+':'')+(mA-nA).toFixed(2)+'pts</b> '+(mA>=nA?'better':'worse')+' than those that didn\'t ('+withM.length+' vs '+withoutM.length+' calls).</p>'
         : '')+
@@ -14523,16 +14500,16 @@ function renderScorecard(){
          hysteresis gate is filtering noise from the sample without adding information, which is
          still worth knowing and is stated rather than hidden. */
       (stFlick&&st
-        ? '<p class="muted" style="font-size:12.5px;margin-top:8px;line-height:1.65"><b>Conviction, graded apart.</b> '+
-          'Verdicts that held for three consecutive refreshes returned <b class="'+(st.expectancy>=0?'pos':'neg')+'">'+pts(st.expectancy)+'</b> per call ('+st.n+'). '+
-          'Verdicts that appeared and reverted returned <b class="'+(stFlick.expectancy>=0?'pos':'neg')+'">'+pts(stFlick.expectancy)+'</b> ('+stFlick.n+'). '+
-          (Math.min(st.n,stFlick.n)<10
-            ? 'Too few of one kind to read yet; this line becomes meaningful at roughly ten of each.'
-            : (st.expectancy>stFlick.expectancy
-               ? 'Persistent conviction is ahead, which is the result the gate assumes. '
-               : 'Flickering conviction is ahead, which is evidence against the gate as configured. ')+
-              'Falsification: if this difference stays inside its own confidence interval as the sample grows, the three-refresh rule is filtering the record without informing it and should be reconsidered.')+
-          '</p>'
+        ? '<p class="muted" style="font-size:var(--fs-sm);margin-top:8px"><b>Conviction:</b> '+
+          'held <b class="'+(st.expectancy>=0?'pos':'neg')+'">'+pts(st.expectancy)+'</b> ('+st.n+'), '+
+          'flickered <b class="'+(stFlick.expectancy>=0?'pos':'neg')+'">'+pts(stFlick.expectancy)+'</b> ('+stFlick.n+').</p>'+
+          aside('Reading the conviction split',
+            (Math.min(st.n,stFlick.n)<10
+              ? 'Too few of one kind to read yet; this becomes meaningful at roughly ten of each. '
+              : (st.expectancy>stFlick.expectancy
+                 ? 'Persistent conviction is ahead, which is the result the gate assumes. '
+                 : 'Flickering conviction is ahead, which is evidence against the gate as configured. '))+
+            'If this difference stays inside its own confidence interval as the sample grows, the three-refresh rule is filtering the record without informing it and should be reconsidered.')
         : '')+
       shortfallHTML(st)+
       operatorMatrixHTML(winRaw)+
