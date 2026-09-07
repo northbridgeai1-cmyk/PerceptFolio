@@ -100,6 +100,7 @@ G('Promise audit — the site may not claim what the code does not do');
    make a promise, so only rendered text is audited. */
 const admin = read('admin.html');
 const landing = read('index.html');
+const sitemap = read('sitemap.xml');
 const privacy = read('privacy/index.html');
 const terms = read('terms/index.html');
 /* Comment scoping has to respect script boundaries. An earlier version stripped JS block comments
@@ -1053,6 +1054,52 @@ t('daily units are used throughout, not annualised ones',
 t('it states its own falsification', /this whole panel collapses to the plain interval above/.test(term));
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
+
+/* ==================== SERVICE WORKER: ERROR RESPONSES ==================== */
+G('One transient 404 must not become a permanent one');
+
+/* A 404 is a successful HTTP exchange, so it never reaches catch. The status has to be checked, and
+   the navigation branch was not checking it: any error page returned during a deploy window or a
+   DNS blip was written into the cache under a real URL and served from then on. */
+t('a navigation is cached only when it succeeded',
+  /if \(fresh && fresh\.ok\) \{\s*\n\s*const cache = await caches\.open\(CACHE_VERSION\);/.test(sw));
+t('the offline fallback ignores a cached error', /if \(cached && cached\.ok\) return cached;/.test(sw));
+t('and checks the shell before serving it', /if \(shell && shell\.ok\) return shell;/.test(sw));
+/* Bumping the version drops the old cache, but an error stored under the CURRENT version would
+   survive. Devices already broken have to repair themselves without being told to clear site data. */
+t('activate sweeps any non-OK entry so a broken install self-heals',
+  /if \(!res \|\| !res\.ok\) await cache\.delete\(r\)/.test(sw));
+t('the static branch still guards too', /if \(res && \(res\.ok \|\| res\.type === 'opaque'\)\)/.test(sw));
+
+/* ==================== FINDABLE BY NAME ==================== */
+G('Searching the domain should reach the front door');
+
+t('the landing page is indexable', /<meta name="robots" content="index,follow">/.test(landing));
+t('it declares a canonical URL', /<link rel="canonical" href="https:\/\/perceptfolio\.com\/">/.test(landing));
+t('and presents correctly when shared', /property="og:title"/.test(landing) && /property="og:description"/.test(landing));
+t('the landing page is listed in the sitemap', /<loc>https:\/\/perceptfolio\.com\/<\/loc>/.test(sitemap));
+/* The tool itself stays unlisted: a result pointing at it sends people to a login they cannot pass. */
+t('the terminal stays out of the sitemap', !/<loc>https:\/\/perceptfolio\.com\/terminal\//.test(sitemap));
+t('the terminal is noindex, so a search never lands on the login',
+  /<meta name="robots" content="noindex/.test(read('terminal/index.html')));
+/* Listing a page in the sitemap while telling crawlers not to index it asks for two opposite
+   things. Every listed URL must resolve to a real file that permits indexing. */
+t('every sitemap URL exists and is indexable', (() => {
+  const locs=[...sitemap.matchAll(/<loc>https:\/\/perceptfolio\.com(\/[^<]*)<\/loc>/g)].map(m=>m[1]);
+  if(!locs.length)return false;
+  return locs.every(loc => {
+    const f = loc==='/' ? 'index.html' : loc.replace(/^\/|\/$/g,'')+'/index.html';
+    let html; try{ html=read(f); }catch(e){ return false; }
+    const m=html.match(/<meta name="robots" content="([^"]*)"/);
+    return !m || !/noindex/.test(m[1]);
+  });
+})());
+/* A page nobody should reach by search must say so, or it can outrank the door. */
+t('the private surfaces are all noindex',
+  ['terminal/index.html','admin.html','404.html','thanks.html']
+    .every(f => /<meta name="robots" content="noindex/.test(read(f))));
+/* The custom domain only works while this file exists. */
+t('CNAME is present and correct', read('CNAME').trim() === 'perceptfolio.com');
 
 /* ==================== QUIET NOTES ==================== */
 G('State the number, do not lecture');

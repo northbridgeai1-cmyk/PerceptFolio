@@ -1,7 +1,7 @@
 /* PerceptFolio service worker.
    Bump CACHE_VERSION whenever the terminal changes, otherwise installed copies keep serving the old
    shell until the cache happens to be evicted. */
-const CACHE_VERSION = 'perceptfolio-v97';
+const CACHE_VERSION = 'perceptfolio-v98';
 
 /* THE TERMINAL is what has to work offline — and it lives at /terminal/, not at the root. The
    landing page is the front door: nobody needs to read it on a plane, and listing it as required
@@ -58,6 +58,18 @@ self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)));
+    /* SELF-HEAL. Bumping the version already drops the old cache, but a device that stored an error
+       response under the CURRENT version would keep serving it. Sweep any non-OK entry so an
+       already-broken install repairs itself on the next load rather than waiting for a person to
+       clear site data, which they will not think to do. */
+    try {
+      const cache = await caches.open(CACHE_VERSION);
+      const reqs = await cache.keys();
+      await Promise.all(reqs.map(async r => {
+        const res = await cache.match(r);
+        if (!res || !res.ok) await cache.delete(r);
+      }));
+    } catch (e) {}
     await self.clients.claim();
   })());
 });
@@ -98,12 +110,27 @@ self.addEventListener('fetch', event => {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(CACHE_VERSION);
-        cache.put(req, fresh.clone());
+        /* ONLY CACHE A SUCCESS. This previously stored whatever came back, a 404 included, which
+           turned one transient failure into a permanent one for that device: a deploy window, a DNS
+           blip or a propagation gap would write an error page into the cache under a real URL, and
+           every later offline navigation served that error instead of the app. The static branch
+           below always had this guard; this one did not.
+
+           Note that a 404 is a perfectly successful HTTP exchange, so `catch` never sees it. The
+           status has to be checked explicitly. */
+        if (fresh && fresh.ok) {
+          const cache = await caches.open(CACHE_VERSION);
+          cache.put(req, fresh.clone());
+        }
         return fresh;
       } catch (e) {
+        /* Offline. A cached error is worse than no cache, so anything that is not a success is
+           ignored and we fall through to the terminal, which is the page someone offline wanted. */
         const cached = await caches.match(req, { ignoreSearch: true });
-        return cached || (await caches.match('/terminal/')) || Response.error();
+        if (cached && cached.ok) return cached;
+        const shell = await caches.match('/terminal/');
+        if (shell && shell.ok) return shell;
+        return Response.error();
       }
     })());
     return;

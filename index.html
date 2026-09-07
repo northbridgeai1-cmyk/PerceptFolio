@@ -20,10 +20,20 @@
 <title>PerceptFolio | NorthBridge internal terminal</title>
 <meta name="description" content="Internal investment terminal operated by NorthBridge's financial branch. Access restricted to authorised personnel.">
 <meta name="theme-color" content="#0b0c0f">
-<!-- Out of search results, but CRAWLABLE. "nofollow" would have stopped a crawler ever
-     reaching /refused/, which is the one page here meant to be found — the front door stays
-     unlisted while the essay behind it does not. -->
-<meta name="robots" content="noindex,follow">
+<!-- INDEXABLE, changed deliberately. This page was noindex for a long time on the reasoning that
+     an invite-only tool should not advertise its own front door. The tradeoff of that choice was
+     that searching the domain by name returned nothing, so anyone who half-remembered the address
+     could not find their way back, and a stale or hostile result could outrank the real site.
+     Being findable by name is worth more than being unlisted. The terminal itself stays out of
+     results; only this door is listed. -->
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://perceptfolio.com/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://perceptfolio.com/">
+<meta property="og:site_name" content="PerceptFolio">
+<meta property="og:title" content="PerceptFolio">
+<meta property="og:description" content="An investment terminal that records what it told you, marks it on a fixed horizon, and reports the result whether or not it flatters the system. Access by invitation.">
+<meta name="twitter:card" content="summary">
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <style>
 :root{

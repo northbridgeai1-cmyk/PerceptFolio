@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Only the refusal list. The landing page and the terminal are deliberately unlisted:
-     one is the gate to an invite-only tool, the other is the tool. -->
+<!-- The landing page is listed so the domain is findable by name. The TERMINAL stays unlisted:
+     it is the tool itself, it is invite-only, and a search result pointing straight at it would
+     send people to a login they cannot pass. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://perceptfolio.com/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
   <url>
     <loc>https://perceptfolio.com/refused/</loc>
     <changefreq>monthly</changefreq>
-    <priority>1.0</priority>
+    <priority>0.8</priority>
   </url>
   <url><loc>https://perceptfolio.com/privacy/</loc></url>
   <url><loc>https://perceptfolio.com/terms/</loc></url>

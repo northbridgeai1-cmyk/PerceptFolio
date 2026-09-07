@@ -25,6 +25,11 @@
 <!-- ---- Installable app (PWA) ---- -->
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0e0f12">
+<!-- NOINDEX, and the reason matters. This is the tool, not the door. Left indexable, a search for
+     the product name could surface this login above the landing page, sending someone straight to
+     a gate they cannot pass with no explanation of what the thing is. The landing page is the page
+     that should rank; this one should never appear in a result. -->
+<meta name="robots" content="noindex,nofollow">
 <meta name="description" content="Know what to buy. Know what to sell. A private, offline-first portfolio tracker and stock checklist scorer.">
 <!-- iOS doesn't read manifest.json for these, so they have to be declared separately. -->
 <meta name="apple-mobile-web-app-capable" content="yes">
