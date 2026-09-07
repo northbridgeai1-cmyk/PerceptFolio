@@ -32,6 +32,11 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="description" content="Know what to buy. Know what to sell. A private, offline-first portfolio tracker and stock checklist scorer.">
 <!-- iOS doesn't read manifest.json for these, so they have to be declared separately. -->
+<!-- Both, deliberately. The apple- prefixed tag is deprecated and Chrome warns about it, but older
+     iOS still reads only that one, and this is the tag that lets the terminal run from the home
+     screen without browser chrome. Dropping it to silence a console warning would break install on
+     the devices most likely to need it. -->
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PerceptFolio">
@@ -921,7 +926,11 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 <body>
 
 <!-- ============ LOGIN SCREEN ============ -->
-<div id="loginScreen" class="auth">
+<!-- A landmark on the LOGIN screen too. <main> lives inside #app, which is display:none until
+     someone signs in, so the first thing every visitor sees had no main landmark at all: a screen
+     reader landing here got no way to skip to content, and the skip link pointed at a hidden
+     target. This is the one screen every single person meets. -->
+<main id="loginScreen" class="auth">
   <!-- Left: what this is. Deliberately no performance claims of any kind — PerceptFolio is not a
        registered investment adviser and this page is publicly reachable, so every line here describes
        what the software DOES, never what it earns. -->
@@ -940,7 +949,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </ul>
       <div class="auth-foot">Access by invitation</div>
     </div>
-  </div>
+  </main>
 
   <!-- Right: the form. -->
   <div class="auth-panel">

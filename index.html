@@ -38,8 +38,16 @@
 <style>
 :root{
   --bg:#0b0c0f; --panel:#131519; --panel2:#1a1d23; --line:#24272f; --line2:#2f333c;
-  --text:#eef0f3; --dim:#8d939f; --faint:#757b86;
+  /* --faint was #757b86, which clears 4.5:1 on the page ground but drops to 4.29 on --panel and
+     3.97 on --panel2, where most of it is actually used. Lifted until it passes on the darkest
+     surface it sits on. */
+  --text:#eef0f3; --dim:#8d939f; --faint:#949aa6;
   --accent:#3b82f6; --green:#2ea043; --red:#e5534b; --amber:#d9a441; --violet:#8b5cf6;
+  /* A colour used as a BACKGROUND has different contrast requirements from the same colour used as
+     text, and one token cannot satisfy both. --accent stays bright enough to read as a link on the
+     dark ground; --accent-solid is darkened so white text on top of it clears 4.5:1. The primary
+     call to action was at 3.68:1, which is below the threshold for normal text. */
+  --accent-solid:#2563eb;   /* white on this: 5.17:1 */
   --brand2:#1f9e8c;   /* the teal in the logo. Same value the terminal uses */
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   --bar:30px;
@@ -89,7 +97,7 @@ nav{position:sticky;top:0;z-index:60;background:rgba(11,12,15,.94);backdrop-filt
   font-size:13px;font-weight:600;border:1px solid var(--line2);background:var(--panel);color:var(--text);cursor:pointer;
   transition:.14s;font-family:inherit}
 .btn:hover{border-color:#3d434f;background:var(--panel2)}
-.btn-p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-p{background:var(--accent-solid);border-color:var(--accent-solid);color:#fff}
 .btn-p:hover{background:#2f6fd8;border-color:#2f6fd8}
 .btn-lg{padding:12px 22px;font-size:14px}
 .btn:disabled{opacity:.5;cursor:not-allowed}

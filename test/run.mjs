@@ -740,8 +740,37 @@ G('Craft: focus, contrast, landmarks, touch targets');
      legitimate "input:focus{outline:none;border-color:...}" — which pairs with the :focus-visible
      ring above — from a real problem, and flagged correct code. Presence of :focus-visible is the
      check that means something. */
-  t('the faint text colour clears WCAG AA (4.60:1, was 3.24:1)',
-    !/--faint:#5d636e/.test(read('index.html')) && /--faint:#757b86/.test(read('index.html')));
+  /* Compute the ratio rather than pin a hex. A hardcoded colour goes stale the moment the palette
+     improves, and it never checked the thing it claimed to: the old value cleared 4.5:1 on the page
+     ground but dropped to 3.97 on --panel2, which is where most of that text actually sits. */
+  const _lum = h => {
+    const v = h.replace('#','').match(/../g).map(x => parseInt(x,16)/255)
+      .map(c => c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4));
+    return 0.2126*v[0] + 0.7152*v[1] + 0.0722*v[2];
+  };
+  const _ratio = (a,b) => { const l=[_lum(a),_lum(b)].sort((x,y)=>y-x); return (l[0]+0.05)/(l[1]+0.05); };
+  const _tok = (css,name) => (css.match(new RegExp('--'+name+':\\s*(#[0-9a-fA-F]{6})')) || [])[1];
+  const _land = read('index.html');
+  t('faint text clears WCAG AA on every surface it sits on', (() => {
+    const faint=_tok(_land,'faint');
+    if(!faint) return false;
+    return ['bg','panel','panel2'].every(g => {
+      const ground=_tok(_land,g);
+      return ground && _ratio(faint, ground) >= 4.5;
+    });
+  })(), (() => {
+    const f=_tok(_land,'faint'), g=_tok(_land,'panel2');
+    return f&&g ? _ratio(f,g).toFixed(2)+':1 on the darkest panel' : 'token missing';
+  })());
+  /* A colour used as a button BACKGROUND has different requirements from the same colour as text.
+     The primary call to action was white on #3b82f6, which is 3.68:1. */
+  t('white on the primary button clears WCAG AA', (() => {
+    const solid=_tok(_land,'accent-solid');
+    return !!solid && _ratio('#ffffff', solid) >= 4.5;
+  })(), (() => {
+    const s=_tok(_land,'accent-solid');
+    return s ? _ratio('#ffffff',s).toFixed(2)+':1' : 'no --accent-solid token';
+  })());
   t('public pages have a main landmark',
     /<main>/.test(read('index.html')) && /<main>/.test(read('refused/index.html')));
   /* Vertical padding on an inline element is painted and clickable but does not grow the box, so
@@ -1054,6 +1083,40 @@ t('daily units are used throughout, not annualised ones',
 t('it states its own falsification', /this whole panel collapses to the plain interval above/.test(term));
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
+
+/* ==================== LIGHTHOUSE ==================== */
+G('Audited, not assumed');
+
+/* Every public page carries its own copy of the palette, so a contrast fix in one is not a fix in
+   the others. Checked per file rather than once. */
+const _lm = h => {
+  const v = h.replace('#','').match(/../g).map(x => parseInt(x,16)/255)
+    .map(c => c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4));
+  return 0.2126*v[0] + 0.7152*v[1] + 0.0722*v[2];
+};
+const _rt = (a,b) => { const l=[_lm(a),_lm(b)].sort((x,y)=>y-x); return (l[0]+0.05)/(l[1]+0.05); };
+t('faint text clears AA on every public page', (() => {
+  return ['index.html','refused/index.html','privacy/index.html','terms/index.html'].every(f => {
+    const css = read(f);
+    const faint = (css.match(/--faint:\s*(#[0-9a-fA-F]{6})/)||[])[1];
+    const grounds = [...css.matchAll(/--(?:bg|panel|panel2):\s*(#[0-9a-fA-F]{6})/g)].map(m=>m[1]);
+    return faint && grounds.length && grounds.every(g => _rt(faint,g) >= 4.5);
+  });
+})());
+/* The login screen is the first thing every visitor meets, and <main> lives inside a container that
+   is display:none until sign-in, so it had no landmark at all. */
+t('the login screen has its own main landmark', /<main id="loginScreen"/.test(term));
+t('and the app keeps its own', /<main id="main" tabindex="-1">/.test(term));
+/* Count markup, not prose: a comment on this very page contains the literal text <main>, which an
+   unstripped count reads as an unclosed tag. */
+t('every main is closed', (() => {
+  const markup = term.replace(/<!--[\s\S]*?-->/g, '');
+  return (markup.match(/<main[ >]/g)||[]).length === (markup.match(/<\/main>/g)||[]).length;
+})());
+/* Silencing the deprecation by removing the apple tag would break home-screen install on the
+   devices most likely to need it. */
+t('both PWA capability tags are present',
+  /name="mobile-web-app-capable"/.test(term) && /name="apple-mobile-web-app-capable"/.test(term));
 
 /* ==================== SERVICE WORKER: ERROR RESPONSES ==================== */
 G('One transient 404 must not become a permanent one');
