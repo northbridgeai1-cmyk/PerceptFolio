@@ -926,11 +926,15 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 <body>
 
 <!-- ============ LOGIN SCREEN ============ -->
-<!-- A landmark on the LOGIN screen too. <main> lives inside #app, which is display:none until
-     someone signs in, so the first thing every visitor sees had no main landmark at all: a screen
-     reader landing here got no way to skip to content, and the skip link pointed at a hidden
-     target. This is the one screen every single person meets. -->
-<main id="loginScreen" class="auth">
+<!-- A landmark on the LOGIN screen too. The real <main> lives inside #app, which is display:none
+     until someone signs in, so the first screen every visitor meets had no landmark at all.
+
+     role="main" rather than a <main> ELEMENT, deliberately. Swapping the tag meant moving a closing
+     tag 120 lines away, and my first attempt closed the wrong one: it landed on the div that ends
+     the left-hand brand panel, which pushed the sign-in form outside the container and left a stray
+     close that swallowed the app below. The attribute is semantically identical to assistive
+     technology and changes no structure at all. -->
+<div id="loginScreen" class="auth" role="main">
   <!-- Left: what this is. Deliberately no performance claims of any kind — PerceptFolio is not a
        registered investment adviser and this page is publicly reachable, so every line here describes
        what the software DOES, never what it earns. -->
@@ -949,7 +953,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </ul>
       <div class="auth-foot">Access by invitation</div>
     </div>
-  </main>
+  </div>
 
   <!-- Right: the form. -->
   <div class="auth-panel">

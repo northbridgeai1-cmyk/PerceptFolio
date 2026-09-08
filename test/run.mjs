@@ -1105,7 +1105,23 @@ t('faint text clears AA on every public page', (() => {
 })());
 /* The login screen is the first thing every visitor meets, and <main> lives inside a container that
    is display:none until sign-in, so it had no landmark at all. */
-t('the login screen has its own main landmark', /<main id="loginScreen"/.test(term));
+/* role="main" rather than a <main> element: swapping the tag meant relocating a close 120 lines
+   away, and getting that wrong pushed the sign-in form out of its container. The attribute is
+   identical to assistive technology and moves nothing. */
+t('the login screen has its own main landmark',
+  /<div id="loginScreen" class="auth" role="main">/.test(term));
+/* The regression this caused: the form ended up outside its container and the app below was
+   swallowed by a stray close. Guard the containment directly. */
+t('the sign-in form is inside the login container', (() => {
+  const markup = term.replace(/<!--[\s\S]*?-->/g, '');
+  const start = markup.indexOf('<div id="loginScreen"');
+  const app = markup.indexOf('<div id="app"');
+  if (start < 0 || app < start) return false;
+  const block = markup.slice(start, app);
+  const opens = (block.match(/<div\b/g)||[]).length;
+  const closes = (block.match(/<\/div>/g)||[]).length;
+  return opens === closes && /id="loginPassword"/.test(block);
+})());
 t('and the app keeps its own', /<main id="main" tabindex="-1">/.test(term));
 /* Count markup, not prose: a comment on this very page contains the literal text <main>, which an
    unstripped count reads as an unclosed tag. */
