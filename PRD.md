@@ -246,7 +246,7 @@ On every push and pull request: the existing suite (extended); `site/` lint, typ
 | M | Deliverable | Exit test |
 |---|---|---|
 | M0 | PRD agreed; `.gitignore`; secret rotated; tools installed | `gitleaks` clean; you say go |
-| M1 | Cloudflare Pages project; session gate Function; `/enter`; employee permanent code issues and redeems; `/terminal/` unreachable without session | CI smoke test |
+| M1 | Cloudflare Pages project; session gate Function; `/enter`; employee permanent code issues and redeems; `/terminal/` unreachable without session | **Built 2026-09-13; `test/gate.mjs` 13/13 locally. Deploy needs `wrangler login` (§18).** |
 | M2 | Stripe integration against a local stub: Personal checkout, Business application → acceptance → checkout with seat quantity; webhook handler; portal; lapse flow; contract tests | Stub round-trip; activated at M7 |
 | M3 | `site/` React + shadcn: landing, pricing, how-it-works, enter, thanks, legal; skeleton loaders; banned-words test | Playwright pass; Lighthouse 100/100 |
 | M4 | Guided Finnhub-key onboarding; **Business mode** in the terminal (org rulebook, attribution, seats, export); admin shows subscribers, orgs, applications, employees | Onboarding test; a 3-seat org round-trips |
@@ -266,3 +266,18 @@ On every push and pull request: the existing suite (extended); `site/` lint, typ
 - Every row in §10 has evidence.
 - A Kronos forecast can be recorded and appears in the record with a fixed horizon.
 - The build is reproducible from a clean clone with no secrets present.
+
+## 18. Deploying the gate (operator steps)
+
+The Pages project cannot be created from this machine without your Cloudflare login. Once, from the repo root:
+
+```
+npx wrangler login
+npx wrangler pages project create perceptfolio --production-branch main
+npx wrangler pages secret put SESSION_SECRET --project-name perceptfolio   # paste: openssl rand -hex 32
+npx wrangler pages secret put SYNC_SECRET --project-name perceptfolio      # the same value the worker holds
+# WORKER_URL is not secret: set it under Pages > Settings > Variables as https://crimson-hat-6ad9.northbridgeai1.workers.dev
+npx wrangler pages deploy . --project-name perceptfolio --branch rebuild-v2   # preview URL; production cuts over at M7
+```
+
+Then, in the Cloudflare dashboard: Security > WAF > Rate limiting rules, one rule for `/api/enter` at 10 requests per minute per IP. The custom domain moves at M7, not now; until then `perceptfolio.com` stays on GitHub Pages and the preview URL is where M2–M6 are verified.

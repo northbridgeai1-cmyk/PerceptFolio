@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Enter your code | PerceptFolio</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0b0c0f">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/Archivo.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/enter/enter.css">
+</head>
+<body>
+<main id="main" class="enter">
+  <a class="logo" href="/" aria-label="PerceptFolio home">
+    <svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="#2f333c" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="#eef0f3">P</text><text x="20" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="#1f9e8c">F</text></svg>
+    <span>Percept<span class="c2">Folio</span></span>
+  </a>
+
+  <h1>Enter your access code.</h1>
+  <p class="lede" id="lede">It arrived by email when your access was set up. It works on every device you own.</p>
+
+  <form id="f" class="form" autocomplete="off" novalidate>
+    <label for="code">Access code</label>
+    <input id="code" name="code" inputmode="latin" autocapitalize="characters" spellcheck="false" placeholder="XXXXX-XXXXX" maxlength="11" required aria-describedby="msg">
+    <button class="btn btn-p btn-lg" type="submit" id="go">Open the terminal</button>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  </form>
+
+  <p class="foot">
+    Lost it? <a href="mailto:northbridgeai1@gmail.com?subject=PerceptFolio%20access%20code">Ask for it to be sent again.</a>
+    <span class="sep" aria-hidden="true">·</span>
+    <button type="button" class="link" id="opToggle">Operator</button>
+  </p>
+
+  <form id="op" class="form op" hidden autocomplete="off" novalidate>
+    <label for="secret">Operator key</label>
+    <input id="secret" name="secret" type="password" autocomplete="off" required>
+    <button class="btn btn-lg" type="submit">Open admin</button>
+    <p class="msg" id="opMsg" role="status" aria-live="polite"></p>
+  </form>
+</main>
+<script src="/enter/enter.js" defer></script>
+</body>
+</html>

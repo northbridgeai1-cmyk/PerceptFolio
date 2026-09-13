@@ -79,3 +79,19 @@ strix --target https://<preview>.pages.dev
 ```
 
 Results land in `strix_runs/<run-name>`; findings go into this file with a state.
+
+## M1: the gate (2026-09-13)
+
+`functions/_middleware.js` serves `/terminal/*`, `/admin`, `/app*` only to a request carrying a
+valid `pf_session` cookie (HMAC-SHA256, HttpOnly, Secure, SameSite=Strict). `/api/enter` turns an
+access code into a session by burning it at the worker and then trusting the durable `grant:`
+record; the gate re-confirms that record every five minutes and clears the cookie on pause. Real
+security headers ride every response, with a strict CSP (no inline) on public paths and the
+single-file CSP on the terminal. `test/gate.mjs` proves thirteen properties end to end against
+`wrangler pages dev`; `test/run.mjs` holds twenty static guarantees on the same files.
+
+| Note | State |
+|---|---|
+| Codes redeemed **before** `grant:` records existed cannot open a session: `/status` does not know them and `/invite` reports them already used. | **Operator action, once:** issue those accounts a fresh code from admin. The gate is a paywall and does not fail open for unknown codes, by design. |
+| The operator bootstrap accepts `SYNC_SECRET` at `/api/enter` and issues a permanent operator session. | Rate-limit `/api/enter` in Cloudflare (PRD §10 #8) before launch. The compare is constant-time. |
+| `wrangler pages dev` adds `Access-Control-Allow-Origin: *` locally. | The middleware deletes it; production Pages never adds it. Tested. |

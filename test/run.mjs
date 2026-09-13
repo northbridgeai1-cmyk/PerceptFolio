@@ -1123,6 +1123,55 @@ G('Words that sell nothing, and strings that should never ship');
   t('.mcp.json carries no literal key', !/x-api-key":\s*"[^$]/.test(read('.mcp.json')) && /\$\{API_KEY_21ST\}/.test(read('.mcp.json')));
 }
 
+/* ==================== THE GATE (Pages Functions) ==================== */
+G('The terminal is not served without a session');
+
+{
+  const mw = read('functions/_middleware.js'), enter = read('functions/api/enter.js'), sess = read('functions/_lib/session.js');
+  t('every gated prefix is listed: terminal, admin, app',
+    /GATED = \[.*\/terminal.*\/admin.*\/app/.test(mw.replace(/\n/g,' ')));
+  t('no session sends the visitor to /enter, never serves the file',
+    /if \(!session\) return toEnter\(url\)/.test(mw));
+  t('a missing SESSION_SECRET fails closed with 503',
+    /!env\.SESSION_SECRET[\s\S]{0,200}status: 503/.test(mw));
+  t('admin requires operator or employee tier',
+    /ADMIN\.some[\s\S]{0,120}session\.t !== 'operator' && session\.t !== 'employee'[\s\S]{0,80}404/.test(mw));
+  t('the re-check requires known AND active; an unknown code is not trusted',
+    /live = !!\(j && j\.known && j\.active\)/.test(mw));
+  t('a paused grant clears the cookie and says why',
+    /live === false[\s\S]{0,120}toEnter\(url, 'paused'\)[\s\S]{0,40}clearCookie\(\)/.test(mw));
+  t('an outage is honoured for at most 24 hours, then refused',
+    /STALE_MS = 24 \* 60 \* 60 \* 1000/.test(mw) && /live === null && now - \(session\.chk \|\| 0\) > STALE_MS/.test(mw));
+  t('the cookie is HttpOnly, Secure and SameSite=Strict',
+    /HttpOnly; Secure; SameSite=Strict/.test(sess) && !/SameSite=(Lax|None)/.test(sess));
+  t('the cookie is signed with HMAC-SHA256 and verified before use',
+    /name: 'HMAC', hash: 'SHA-256'/.test(sess) && /crypto\.subtle\.verify/.test(sess) && /Date\.now\(\) > p\.exp\) return null/.test(sess));
+  t('employee and operator sessions are permanent; personal and business are 30 days',
+    /personal: 30 \* DAY, business: 30 \* DAY, employee: 3650 \* DAY, operator: 3650 \* DAY/.test(sess));
+  t('the operator secret is compared in constant time',
+    /safeEqual\(body\.secret, env\.SYNC_SECRET\)/.test(enter) && /d \|= a\.charCodeAt\(i\) \^ b\.charCodeAt\(i\)/.test(sess));
+  t('post-sign-in redirects are same-origin only',
+    /!n\.startsWith\('\/'\) \|\| n\.startsWith\('\/\/'\)/.test(enter));
+  t('the public CSP has no unsafe-inline; the gated CSP keeps it for the single-file terminal', (() => {
+    const pub = (mw.match(/return `default-src 'self'; script-src 'self'; style-src 'self';[^`]*`/)||[''])[0];
+    const gated = (mw.match(/return `default-src 'self'; script-src 'self' 'unsafe-inline';[^`]*`/)||[''])[0];
+    return pub && !/unsafe-inline/.test(pub) && /frame-ancestors 'none'/.test(pub) && gated && /frame-ancestors 'none'/.test(gated);
+  })());
+  t('HSTS, nosniff, DENY framing, no-referrer and a Permissions-Policy are set on every response',
+    /'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'/.test(mw) && /'X-Content-Type-Options': 'nosniff'/.test(mw)
+    && /'X-Frame-Options': 'DENY'/.test(mw) && /'Referrer-Policy': 'no-referrer'/.test(mw) && /'Permissions-Policy'/.test(mw));
+  t('the site strips any CORS allow-origin header', /h\.delete\('Access-Control-Allow-Origin'\)/.test(mw));
+  t('the /enter page is external-script only, so it runs under the strict CSP',
+    !/<script>[^<]/.test(read('enter/index.html')) && /<script src="\/enter\/enter\.js" defer>/.test(read('enter/index.html')) && !/style="/.test(read('enter/index.html')));
+  /* robots.txt deliberately allows everything so crawlers can read each page's noindex; a
+     Disallow would hide the tag and still let a bare URL surface. The gate now 302s crawlers away
+     from /terminal/ and /admin to /enter/, which carries noindex itself. */
+  t('the entry page is noindex and robots keeps its allow-all design',
+    /<meta name="robots" content="noindex,nofollow">/.test(read('enter/index.html')) && /^Allow: \/$/m.test(read('robots.txt')) && !/^Disallow:/m.test(read('robots.txt')));
+  t('the worker accepts the employee tier', /\['personal', 'business', 'employee', 'denied'\]/.test(worker));
+  t('.dev.vars is ignored and documented', /\.dev\.vars/.test(read('.gitignore')) && fs.existsSync('.dev.vars.example'));
+}
+
 /* ==================== LIGHTHOUSE ==================== */
 G('Audited, not assumed');
 
