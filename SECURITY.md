@@ -51,3 +51,31 @@ is an acceptable trade for their own book and is not acceptable for anyone else'
 is why profiles carrying `managedBy` or `accountType: business` are excluded from sync
 entirely (F1). The route out is per-user credentials on `/usync`, which already exist for
 invited users.
+
+## Rebuild v2, M0 findings (2026-09-13)
+
+The product is changing from a private tool to a sold subscription on Cloudflare Pages
+(see PRD.md §8–§10). The twenty items are being re-closed against that architecture; this
+section records what M0 found and did.
+
+| Finding | State |
+|---|---|
+| `ACCESS_SECRET='pf-northbridge-gate-1'` and `SIGNUP_SECRET` exist in **public git history** (the first uploaded `index.html`). | **Dead in HEAD.** Nothing reads them; the worker uses `env.SYNC_SECRET`. **Action for the operator:** if `SYNC_SECRET` in Cloudflare was ever set to that string, change it now (`wrangler secret put SYNC_SECRET`). History is public, so treat the string as known. |
+| No `.gitignore` existed. | **Fixed.** `.gitignore` covers `.env*`, `.dev.vars`, keys, builds, tooling state. A test asserts it. |
+| MCP config could carry keys. | **Prevented.** `.mcp.json` uses `${VAR}` placeholders; a test fails if a literal key appears. `.env.example` documents each variable. |
+| Secret-shaped literals in tracked files. | **Scanned on every run.** Test covers Stripe, Resend, AWS, GitHub, Slack key shapes and private-key blocks across all tracked files. `gitleaks` joins CI at M7. |
+| Marketing vocabulary. | **Banned by test.** 23 words and exclamation marks fail the suite if rendered on a public page. |
+
+### Strix (automated penetration test), when a key exists
+
+Not run yet: it needs Docker and an LLM API key (`STRIX_LLM`, `LLM_API_KEY`), neither of which
+is available. To run it against a preview deployment:
+
+```
+curl -sSL https://strix.ai/install | bash
+export STRIX_LLM="openrouter/z-ai/glm-5.3"
+export LLM_API_KEY="…"
+strix --target https://<preview>.pages.dev
+```
+
+Results land in `strix_runs/<run-name>`; findings go into this file with a state.

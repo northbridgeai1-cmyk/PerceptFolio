@@ -13,12 +13,14 @@
          nonce to issue. What the policy still buys is real: connect-src pins outbound requests to
          this origin, the worker and Finnhub, so an injected script cannot exfiltrate a portfolio
          to an arbitrary host; object-src and frame-src are closed; base-uri cannot be rewritten
-         to redirect every relative URL. -->
+         to redirect every relative URL.
+     font-src is 'self' on purpose. The display face is served from /fonts/ rather than a font CDN,
+     because a page that says nothing leaves this origin should not be pulling type from another. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>PerceptFolio | NorthBridge internal terminal</title>
-<meta name="description" content="Internal investment terminal operated by NorthBridge's financial branch. Access restricted to authorised personnel.">
+<title>PerceptFolio | A research terminal that keeps score on itself</title>
+<meta name="description" content="A private research terminal for the people at NorthBridge who make equity calls and have to stand behind them. Twenty-two checks, one verdict, and a record that cannot be edited afterwards. Access by invitation.">
 <meta name="theme-color" content="#0b0c0f">
 <!-- INDEXABLE, changed deliberately. This page was noindex for a long time on the reasoning that
      an invite-only tool should not advertise its own front door. The tradeoff of that choice was
@@ -32,279 +34,375 @@
 <meta property="og:url" content="https://perceptfolio.com/">
 <meta property="og:site_name" content="PerceptFolio">
 <meta property="og:title" content="PerceptFolio">
-<meta property="og:description" content="An investment terminal that records what it told you, marks it on a fixed horizon, and reports the result whether or not it flatters the system. Access by invitation.">
+<meta property="og:description" content="A research terminal that records what it told you, marks it on a fixed horizon, and reports the result whether or not it flatters the system. Access by invitation.">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="preload" href="./fonts/Archivo.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+/* Archivo, self-hosted. A newspaper-and-annual-report grotesk: at its heaviest weights and tight
+   tracking it reads as set rather than typed, which is the one thing a system stack cannot do for
+   a headline. Used for headings only. Body stays on the system stack so it matches the terminal. */
+@font-face{
+  font-family:"Archivo";
+  src:url("./fonts/Archivo.woff2") format("woff2");
+  font-weight:500 900;
+  font-display:swap;
+}
 :root{
   --bg:#0b0c0f; --panel:#131519; --panel2:#1a1d23; --line:#24272f; --line2:#2f333c;
-  /* --faint was #757b86, which clears 4.5:1 on the page ground but drops to 4.29 on --panel and
-     3.97 on --panel2, where most of it is actually used. Lifted until it passes on the darkest
-     surface it sits on. */
-  --text:#eef0f3; --dim:#8d939f; --faint:#949aa6;
-  --accent:#3b82f6; --green:#2ea043; --red:#e5534b; --amber:#d9a441; --violet:#8b5cf6;
+  /* --faint clears 4.5:1 on the darkest surface it sits on (--panel2), not only on the page ground.
+     The old value passed on the ground and failed on the panels, where most of it was used. */
+  --text:#eef0f3; --dim:#a9aeb8; --faint:#949aa6;
+  --accent:#3b82f6; --green:#2ea043; --red:#e5534b; --amber:#d9a441;
   /* A colour used as a BACKGROUND has different contrast requirements from the same colour used as
-     text, and one token cannot satisfy both. --accent stays bright enough to read as a link on the
-     dark ground; --accent-solid is darkened so white text on top of it clears 4.5:1. The primary
-     call to action was at 3.68:1, which is below the threshold for normal text. */
-  --accent-solid:#2563eb;   /* white on this: 5.17:1 */
-  --brand2:#1f9e8c;   /* the teal in the logo. Same value the terminal uses */
+     text. --accent stays bright enough to read as a link on the dark ground; --accent-solid is
+     darkened so white text on it clears 4.5:1 (5.17:1). */
+  --accent-solid:#2563eb;
+  --brand2:#1f9e8c;
+  --display:"Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  --bar:30px;
+  /* Spacing and radius scale. Sections sit on 64 / 96 / 120 so the page has a rhythm rather than a
+     margin, and every control shares the same two radii. */
+  --s-4:4px;--s-8:8px;--s-12:12px;--s-16:16px;--s-20:20px;--s-24:24px;--s-32:32px;--s-40:40px;
+  --sec:96px;--sec-lg:120px;--sec-sm:64px;
+  --r-md:8px;--r-lg:12px;--r-xl:16px;
+  --wrap:1280px;--gutter:40px;
+  --ease:cubic-bezier(.16,1,.3,1);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 body{
-  background:var(--bg);color:var(--text);padding-bottom:var(--bar);
-  font:14px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+  background:var(--bg);color:var(--text);
+  font:16px/1.6 var(--sans);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  overflow-x:hidden;
 }
-a{color:inherit;text-decoration:none}
-.wrap{max-width:1180px;margin:0 auto;padding:0 26px}
-.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+/* The parts the browser draws still carry the design. */
+::selection{background:rgba(59,130,246,.35);color:var(--text)}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-thumb{background:var(--line2);border:3px solid var(--bg);border-radius:8px}
+::-webkit-scrollbar-track{background:var(--bg)}
+html{scrollbar-color:var(--line2) var(--bg)}
+input,textarea,select,button{font:inherit;color:inherit;caret-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--r-md)}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:.18em;text-decoration-thickness:1px;text-decoration-color:rgba(59,130,246,.45)}
+a:hover{text-decoration-color:currentColor}
+img,svg{display:block;max-width:100%}
+.skip{position:absolute;left:-9999px;top:12px;z-index:100;background:var(--text);color:var(--bg);padding:10px 16px;border-radius:var(--r-md);font-weight:600}
+.skip:focus{left:12px}
 
-/* ---------- tape ---------- */
-.tape{border-bottom:1px solid var(--line);background:#08090b;overflow:hidden;height:30px;display:flex;align-items:center}
-.tape-in{display:flex;white-space:nowrap;animation:slide 70s linear infinite;font:11px/1 var(--mono);color:var(--faint);letter-spacing:.07em}
-.tape-in span{padding:0 20px;display:inline-flex;align-items:center;gap:7px}
-.tape-in b{color:var(--dim);font-weight:500}
-.pip{width:4px;height:4px;border-radius:50%;flex:none}
-@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@media(prefers-reduced-motion:reduce){.tape-in{animation:none}}
+/* ---------- type scale ---------- */
+h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:-.02em;text-wrap:balance;line-height:1.1}
+h1{font-size:clamp(40px,5.2vw,74px);font-weight:900;letter-spacing:-.035em;line-height:.98}
+h2{font-size:clamp(32px,3.4vw,44px);letter-spacing:-.025em;line-height:1.05}
+h3{font-size:22px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+p{max-width:64ch}
+.lede{font-size:19px;line-height:1.55;color:var(--dim);max-width:58ch}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 var(--gutter)}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px 18px;border-radius:var(--r-md);border:1px solid var(--line2);
+  background:transparent;color:var(--text);font-weight:600;font-size:15px;line-height:1.3;
+  text-decoration:none;cursor:pointer;white-space:nowrap;
+  transition:background-color .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);
+}
+.btn:hover{background:var(--panel2);border-color:var(--faint)}
+.btn:active{transform:translateY(1px)}
+.btn-p{background:var(--accent-solid);border-color:var(--accent-solid);color:#fff}
+.btn-p:hover{background:#1d4ed8;border-color:#1d4ed8}
+.btn-lg{padding:13px 22px;font-size:16px}
+.btn[disabled]{opacity:.55;cursor:default;transform:none}
 
 /* ---------- nav ---------- */
-nav{position:sticky;top:0;z-index:60;background:rgba(11,12,15,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.nav-in{display:flex;align-items:center;gap:14px;height:56px}
-/* THE LOGO. Identical construction to the terminal's header mark so the two cannot drift apart:
-   a bordered square, P in the text colour, F in the brand teal, wordmark split the same way.
-   An earlier version drew a blue gradient box with "PF" in it, which was not the logo at all -
-   it was a placeholder that survived into three pages. */
-.logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-  display:inline-flex;align-items:center;gap:7px}
-.logo-mark{flex-shrink:0}
-/* The wordmark is ONE flex child. Without this wrapper the .logo gap pushes the two coloured halves
-   apart and renders "Percept Folio"; it is one word, so they must sit flush. */
-.logo-word{display:inline-flex;letter-spacing:-.01em}
-.logo .c1{color:var(--text)}
+nav{
+  height:60px;display:flex;align-items:center;
+  border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:20;
+  background:rgba(11,12,15,.86);backdrop-filter:saturate(140%) blur(10px);-webkit-backdrop-filter:saturate(140%) blur(10px);
+}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:24px;width:100%}
+.logo{display:inline-flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;font-family:var(--display);font-weight:800;letter-spacing:-.01em;font-size:17px}
 .logo .c2{color:var(--brand2)}
-.chip{font:10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:4px 8px;border-radius:4px;
-  background:rgba(229,83,75,.12);color:#ef8b85;border:1px solid rgba(229,83,75,.3)}
-.nav-links{display:flex;gap:2px;margin-left:auto}
-.nav-links a{font:11px/1 var(--mono);letter-spacing:.08em;color:var(--faint);padding:8px 11px;border-radius:6px;text-transform:uppercase}
-.nav-links a:hover{color:var(--text);background:var(--panel)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;border-radius:6px;
-  font-size:13px;font-weight:600;border:1px solid var(--line2);background:var(--panel);color:var(--text);cursor:pointer;
-  transition:.14s;font-family:inherit}
-.btn:hover{border-color:#3d434f;background:var(--panel2)}
-.btn-p{background:var(--accent-solid);border-color:var(--accent-solid);color:#fff}
-.btn-p:hover{background:#2f6fd8;border-color:#2f6fd8}
-.btn-lg{padding:12px 22px;font-size:14px}
-.btn:disabled{opacity:.5;cursor:not-allowed}
+.logo-mark{width:26px;height:26px;flex:none}
+.nav-links{display:flex;align-items:center;gap:6px}
+.nav-links a:not(.btn){color:var(--dim);text-decoration:none;padding:8px 12px;border-radius:var(--r-md);font-weight:500;font-size:15px}
+.nav-links a:not(.btn):hover{color:var(--text);background:var(--panel)}
+.nav-links .btn{margin-left:8px}
 
 /* ---------- hero ---------- */
-header{padding:74px 0 62px;border-bottom:1px solid var(--line);position:relative;overflow:hidden}
-header:before{content:"";position:absolute;inset:0;
-  background:radial-gradient(760px 320px at 18% -20%,rgba(59,130,246,.1),transparent 68%);pointer-events:none}
-header:after{content:"";position:absolute;inset:0;pointer-events:none;
-  background-image:linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.014) 1px,transparent 1px);
-  background-size:44px 44px;mask-image:linear-gradient(180deg,#000,transparent 78%)}
-.cmdline{font:11px/1 var(--mono);color:var(--faint);margin-bottom:22px;letter-spacing:.04em}
-.cmdline b{color:var(--accent);font-weight:500}
-.cur{display:inline-block;width:7px;height:13px;background:var(--accent);vertical-align:-2px;margin-left:3px;animation:blink 1.15s step-end infinite}
-@keyframes blink{50%{opacity:0}}
-@media(prefers-reduced-motion:reduce){.cur{animation:none}}
-h1{font-size:clamp(30px,4.8vw,50px);line-height:1.06;letter-spacing:-.03em;font-weight:750;max-width:17ch}
-.sub{color:var(--dim);font-size:clamp(15px,1.9vw,17.5px);line-height:1.6;max-width:60ch;margin-top:20px}
-.cta{display:flex;gap:10px;margin-top:30px;flex-wrap:wrap}
+.hero{padding:var(--sec) 0 0;position:relative}
+.hero-copy{max-width:860px}
+.hero h1{margin-bottom:var(--s-24)}
+.hero .lede{font-size:21px;max-width:56ch}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:var(--s-32)}
+.hero-note{margin-top:var(--s-16);font-size:14px;color:var(--faint);max-width:56ch}
 
-.notice{border:1px solid rgba(229,83,75,.26);background:rgba(229,83,75,.045);border-radius:8px;
-  padding:15px 18px;margin-top:32px;max-width:68ch;position:relative}
-.notice b{color:#ef8b85;font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase}
-.notice p{font-size:13px;line-height:1.62;color:var(--dim);margin-top:7px}
+/* The terminal, as the hero. Left edge aligned to the copy, right edge running off the viewport so
+   it reads as a window onto something larger rather than a framed screenshot. Its own tokens are
+   the terminal's tokens, not the page's, so it is the product and not an illustration of it. */
+.stage{margin-top:var(--s-32);position:relative;padding-bottom:var(--sec);overflow:hidden;
+  padding-left:max(var(--gutter),calc((100% - var(--wrap)) / 2 + var(--gutter)))}
+.stage-in{
+  --tbg:#0e0f12;--tpanel:#16181d;--tpanel2:#1e2128;--tline:#2b2f38;--ttext:#f2f3f5;--tmuted:#949aa6;
+  /* wider than the space it has, so the right edge runs off the viewport by design */
+  width:calc(100% + 56px);max-width:1400px;
+  background:var(--tbg);border:1px solid var(--tline);border-radius:var(--r-xl);
+  box-shadow:0 30px 80px -20px rgba(0,0,0,.7),0 10px 24px -12px rgba(0,0,0,.5);
+  overflow:hidden;color:var(--ttext);font-size:14px;line-height:1.45;
+  position:relative;
+}
+.stage-in::after{
+  /* a soft fade on the right where the window runs off, so the cut edge is deliberate */
+  content:"";position:absolute;inset:0 0 0 auto;width:120px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(11,12,15,.55));
+}
+.t-top{display:flex;align-items:center;gap:20px;height:56px;padding:0 84px 0 20px;border-bottom:1px solid var(--tline)}
+.t-brand{display:flex;align-items:center;gap:10px;font:700 13px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.t-brand .c2{color:var(--brand2)}
+.t-brand .sep{width:1px;height:18px;background:var(--tline);margin:0 4px}
+.t-brand .screen{color:var(--tmuted);font-weight:600}
+.t-search{flex:1;max-width:520px;margin:0 auto;height:36px;border:1px solid var(--tline);border-radius:10px;background:var(--tpanel);display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--tmuted);font-size:14px}
+.t-search svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.t-user{width:34px;height:34px;border-radius:50%;border:1px solid var(--tline);display:grid;place-items:center;font:600 13px var(--mono);flex:none}
+.t-top .t-tag{margin-left:auto}
+.t-body{display:grid;grid-template-columns:230px 1fr;min-height:560px}
+.t-side{border-right:1px solid var(--tline);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.t-side a{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:8px;color:var(--tmuted);text-decoration:none;font:600 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;position:relative}
+.t-side a svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.t-side a.on{color:var(--ttext);background:var(--tpanel2)}
+.t-side a.on::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;background:var(--brand2)}
+.t-side .gap{height:1px;background:var(--tline);margin:8px 6px}
+.t-main{padding:20px 84px 20px 22px}
+.t-panel{background:var(--tpanel);border:1px solid var(--tline);border-radius:10px}
+.t-head{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:22px;padding:16px 20px}
+.t-sym{font:800 26px/1 var(--display);letter-spacing:-.02em;display:flex;align-items:baseline;gap:10px}
+.t-sym span{font:500 13px/1 var(--sans);color:var(--tmuted);letter-spacing:0}
+.t-px{font:600 22px/1 var(--mono);font-variant-numeric:tabular-nums}
+.t-px small{font-size:12px;color:var(--green);margin-left:8px;font-weight:600}
+.t-pill{justify-self:start;display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:6px;font:600 13px/1 var(--mono);letter-spacing:.02em;border:1px solid}
+.t-pill.watch{color:var(--amber);border-color:rgba(217,164,65,.45);background:rgba(217,164,65,.08)}
+.t-score{font:700 30px/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.t-score small{font-size:13px;color:var(--tmuted);font-weight:500}
+.t-score em{display:block;font:500 11px/1.3 var(--sans);color:var(--tmuted);margin-top:6px}
+.t-cols{display:grid;grid-template-columns:1.25fr 1fr .9fr;gap:14px;margin-top:14px}
+.t-col{padding:14px 16px 8px}
+.t-col h4{display:flex;justify-content:space-between;align-items:baseline;font:600 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--tmuted);padding-bottom:10px;border-bottom:1px solid var(--tline);margin-bottom:4px}
+.t-col h4 b{color:var(--ttext);font-weight:700}
+.r{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(43,47,56,.6);font-size:13px}
+.r:last-child{border-bottom:0}
+.r .m{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font:700 11px/1 var(--mono)}
+.r.ok .m{background:rgba(46,160,67,.18);color:#4ade80}
+.r.no .m{background:rgba(229,83,75,.18);color:#f87171}
+.r.na .m{background:var(--tpanel2);color:var(--tmuted)}
+.r .n{color:var(--ttext);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r .n small{display:block;color:var(--tmuted);font-size:11px;line-height:1.2;margin-top:1px}
+.r .v{font:500 13px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--tmuted);white-space:nowrap}
+.r.ok .v{color:var(--ttext)}
+.t-stamp{margin-top:14px;padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;font:500 12px/1.4 var(--mono);color:var(--tmuted);border-style:dashed}
+.t-stamp b{color:var(--ttext);font-weight:600}
+.t-stamp .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(46,160,67,.18)}
+.t-tag{font:500 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--tmuted);background:var(--tbg);border:1px solid var(--tline);padding:7px 9px;border-radius:6px;white-space:nowrap}
 
-/* ---------- data band ---------- */
-.band{border-bottom:1px solid var(--line);background:var(--panel)}
-.band-g{display:grid;grid-template-columns:repeat(4,1fr)}
-.cell{padding:20px 22px;border-right:1px solid var(--line)}
-.cell:last-child{border-right:none}
-.cell-n{font:700 24px/1 var(--mono);letter-spacing:-.035em;font-variant-numeric:tabular-nums}
-.cell-l{font-size:11px;color:var(--faint);margin-top:8px;line-height:1.45}
+/* The one authored motion: the checks resolve top to bottom the way the Analyzer runs them, then
+   the score and the verdict land. Everything is visible from the start at reduced opacity, so a
+   visitor who scrolls early or has motion reduced sees the finished screen, never a blank one. */
+.r{--i:0;animation:resolve .6s var(--ease) calc(120ms + var(--i) * 42ms) both}
+.t-pill,.t-score{animation:land .7s var(--ease) 1.15s both}
+@keyframes resolve{from{opacity:.28;transform:translateX(-5px)}to{opacity:1;transform:none}}
+@keyframes land{from{opacity:0;transform:translateY(6px);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
+@media (prefers-reduced-motion:reduce){
+  .r,.t-pill,.t-score{animation:none}
+  html{scroll-behavior:auto}
+}
 
 /* ---------- sections ---------- */
-section{padding:68px 0;border-bottom:1px solid var(--line)}
-.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
-.sec-no{font:11px/1 var(--mono);color:var(--accent);letter-spacing:.14em}
-.sec-k{font:11px/1 var(--mono);color:var(--faint);letter-spacing:.14em;text-transform:uppercase}
-h2{font-size:clamp(23px,3.1vw,32px);line-height:1.15;letter-spacing:-.024em;font-weight:700;max-width:22ch}
-.lede{color:var(--dim);font-size:16px;line-height:1.66;max-width:64ch;margin-top:16px}
-.neg{color:#ef8b85}
-/* ---- marking demo ---- */
-.demo{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-top:34px;overflow:hidden}
-.demo-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel2)}
-.demo-k{font:11px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
-.demo-rec{margin-left:auto;font:11px/1 var(--mono);color:var(--faint)}
-.demo-rec b{color:var(--text)}
-#demoStage{padding:18px}
-.demo-intro{color:var(--dim);font-size:14px;line-height:1.65;max-width:62ch;margin-bottom:16px}
-.demo-canvas{width:100%;height:190px;display:block;border:1px solid var(--line);border-radius:8px;background:#08090b}
-.demo-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:16px}
-.demo-f{display:flex;flex-direction:column;gap:5px}
-.demo-f label{font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-.demo-f input,.demo-f select{background:var(--panel2);border:1px solid var(--line2);color:var(--text);
-  border-radius:8px;padding:8px 10px;font:600 14px/1.2 var(--mono);min-width:104px}
-.demo-note{color:var(--faint);font-size:12px;line-height:1.6;margin-top:12px}
-.demo-out{margin-top:16px;padding:15px 17px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2)}
-.demo-verdict{font:700 20px/1.25 var(--mono);letter-spacing:-.02em}
-.demo-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:14px;margin-top:14px}
-.demo-n{font:700 18px/1 var(--mono);font-variant-numeric:tabular-nums}
-.demo-l{font-size:11px;color:var(--faint);margin-top:5px;line-height:1.45;text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)}
-.demo-say{color:var(--dim);font-size:13px;line-height:1.65;margin-top:14px}
-.demo-say b{color:var(--text)}
-.pos{color:var(--green)} .neg{color:var(--red)}
-.goal-h{font-size:18px;font-weight:650;letter-spacing:-.01em;margin-top:40px}
-.goals{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
-  border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:16px}
-.goal{background:var(--panel);padding:22px 20px}
-.goal-k{font:10px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
-.goal p{color:var(--dim);font-size:13px;line-height:1.62}
-.goal b{color:var(--text);font-weight:600}
-@media(max-width:820px){.goals{grid-template-columns:1fr}}
+section{padding:var(--sec) 0}
+section + section{border-top:1px solid var(--line)}
+.two{display:grid;grid-template-columns:7fr 5fr;gap:clamp(40px,6vw,96px);align-items:center}
+.two.flip{grid-template-columns:5fr 7fr}
+.two h2{margin-bottom:var(--s-20)}
+.two p + p{margin-top:var(--s-16)}
+.copy p{color:var(--dim)}
+.copy p b{color:var(--text);font-weight:600}
+.copy .fact{margin-top:var(--s-24);padding-top:var(--s-20);border-top:1px solid var(--line);font-size:15px;color:var(--faint);max-width:52ch}
 
-.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
-  border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:38px}
-.tile{background:var(--panel);padding:24px 22px;transition:background .14s}
-.tile:hover{background:var(--panel2)}
-.tile-h{display:flex;align-items:center;gap:9px;margin-bottom:9px}
-.tile-h b{font-size:14px;font-weight:650}
-.tag{font:10px/1 var(--mono);letter-spacing:.09em;padding:4px 6px;border-radius:4px;text-transform:uppercase;font-weight:700}
-.t1{background:rgba(59,130,246,.14);color:#79a8f4}
-.t2{background:rgba(46,160,67,.14);color:#5fc275}
-.t3{background:rgba(229,83,75,.14);color:#ef8b85}
-.t4{background:rgba(139,92,246,.14);color:#a98bf3}
-.t5{background:rgba(217,164,65,.15);color:#e0bc72}
-.tile p{color:var(--dim);font-size:13px;line-height:1.6}
+/* the scorecard, up close: one column of the terminal at reading scale */
+.close{
+  --tbg:#0e0f12;--tpanel:#16181d;--tpanel2:#1e2128;--tline:#2b2f38;--ttext:#f2f3f5;--tmuted:#949aa6;
+  background:var(--tpanel);border:1px solid var(--tline);border-radius:var(--r-lg);padding:20px 22px 12px;
+  box-shadow:0 24px 60px -24px rgba(0,0,0,.6);color:var(--ttext);
+}
+.close .r{font-size:15px;padding:11px 0;grid-template-columns:22px 1fr auto;gap:14px;animation:none}
+.close .r .m{width:22px;height:22px;font-size:12px}
+.close .r .v{font-size:14px}
+.close .r .n small{font-size:12px;margin-top:2px}
+.close h4{font:600 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--tmuted);display:flex;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--tline);margin-bottom:6px}
+.close h4 b{color:var(--ttext)}
 
-/* ---------- ledger ---------- */
-.panel{margin-top:36px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
-.panel-h{display:flex;align-items:center;gap:9px;padding:11px 16px;border-bottom:1px solid var(--line);
-  background:var(--panel2);font:11px/1 var(--mono);letter-spacing:.1em;color:var(--faint);text-transform:uppercase}
-.panel table{width:100%;border-collapse:collapse;font:12px/1 var(--mono)}
-.panel td,.panel th{padding:11px 16px;text-align:left;border-bottom:1px solid var(--line)}
-.panel th{font-size:10px;letter-spacing:.09em;color:var(--faint);text-transform:uppercase;font-weight:600}
-.panel tr:last-child td{border-bottom:none}
-.dim{color:var(--faint)}
-.panel-f{padding:12px 16px;font-size:12px;color:var(--faint);border-top:1px solid var(--line);background:#08090b;line-height:1.55}
+/* the record: the real log structure, honestly empty */
+.ledger{
+  --tbg:#0e0f12;--tpanel:#16181d;--tline:#2b2f38;--ttext:#f2f3f5;--tmuted:#949aa6;
+  background:var(--tpanel);border:1px solid var(--tline);border-radius:var(--r-lg);color:var(--ttext);
+  /* wide content scrolls inside its own box; the page never scrolls sideways */
+  overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+  box-shadow:0 24px 60px -24px rgba(0,0,0,.6);
+}
+.ledger table{width:100%;min-width:520px;border-collapse:collapse;font-size:14px}
+.ledger th{font:600 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--tmuted);text-align:left;padding:14px 18px;border-bottom:1px solid var(--tline);background:var(--tbg)}
+.ledger td{padding:14px 18px;border-bottom:1px solid var(--tline);font-variant-numeric:tabular-nums;color:var(--tmuted)}
+.ledger td:first-child{font:600 14px var(--mono);color:var(--ttext)}
+.ledger tr:last-child td{border-bottom:0}
+.ledger .call{font:600 12px/1 var(--mono);padding:4px 8px;border-radius:6px;display:inline-block}
+.ledger .buy{color:#4ade80;background:rgba(46,160,67,.14)}
+.ledger .sell{color:#f87171;background:rgba(229,83,75,.14)}
+.ledger .await{color:var(--tmuted);font-style:italic}
+.ledger tfoot td{background:var(--tbg);color:var(--tmuted);font-size:13px;border-top:1px solid var(--tline)}
+.honest{margin-top:var(--s-24);padding:var(--s-16) var(--s-20);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);display:flex;gap:14px;align-items:flex-start;max-width:58ch}
+.honest .dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--amber);margin-top:8px;box-shadow:0 0 0 4px rgba(217,164,65,.15)}
+.honest p{color:var(--dim);font-size:15px;margin:0}
+.honest b{color:var(--text)}
 
-.quote{border-left:2px solid var(--accent);padding:2px 0 2px 22px;margin-top:34px;max-width:64ch}
-.quote p{font-size:18px;line-height:1.54;font-weight:450}
-.quote cite{display:block;margin-top:12px;font:11px/1 var(--mono);color:var(--faint);font-style:normal;letter-spacing:.08em;text-transform:uppercase}
+/* the marking demo: preserved behaviour, restyled. Sits under the record as the proof. */
+.demo{margin-top:var(--sec-sm);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);overflow:hidden}
+.demo-h{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 24px;border-bottom:1px solid var(--line)}
+.demo-h h3{font-size:18px}
+.demo-rec{font:500 13px/1 var(--mono);color:var(--faint)}
+#demoStage{padding:24px}
+.demo-intro{color:var(--dim);max-width:62ch;margin-bottom:var(--s-20)}
+.demo-canvas{width:100%;height:240px;display:block;border-radius:var(--r-md);background:var(--bg);border:1px solid var(--line)}
+.demo-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:var(--s-16)}
+.demo-f{display:flex;flex-direction:column;gap:6px}
+.demo-f label{font:600 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.demo-f select,.demo-f input{background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-md);padding:9px 12px;min-width:120px;color:var(--text)}
+.demo-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:var(--s-20)}
+.demo-n{padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg)}
+.demo-l{font:600 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+.demo-n b,.demo-n strong{font:700 20px/1 var(--mono);font-variant-numeric:tabular-nums}
+.demo-out{margin-top:var(--s-20)}
+.demo-verdict{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.02em;margin-bottom:8px}
+.demo-say{color:var(--dim);max-width:64ch}
+.demo-note{margin-top:var(--s-12);font-size:14px;color:var(--faint);max-width:64ch}
+.pos{color:#4ade80}.neg{color:#f87171}
 
-/* ---------- form ---------- */
-.form{margin-top:38px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;max-width:820px}
-.form-h{padding:13px 20px;border-bottom:1px solid var(--line);background:var(--panel2);
-  font:11px/1 var(--mono);letter-spacing:.1em;color:var(--faint);text-transform:uppercase;display:flex;gap:9px;align-items:center}
-.form-b{padding:22px 20px}
-.fg{margin-bottom:18px}
-.fg:last-child{margin-bottom:0}
-label{display:block;font:11px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
-label .req{color:var(--accent)}
-input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--line2);color:var(--text);
-  border-radius:6px;padding:10px 12px;font:14px/1.5 inherit;transition:border-color .14s}
-input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
-input::placeholder,textarea::placeholder{color:var(--faint)}
-textarea{resize:vertical;min-height:78px}
-.hint{font-size:11px;color:var(--faint);margin-top:6px;line-height:1.5}
-.calls{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:4px}
-.call-row{display:grid;grid-template-columns:1.1fr .9fr 1fr 1fr 1.2fr;gap:1px;background:var(--line)}
-.call-row.head{background:var(--line)}
-.call-row.head > div{background:var(--panel2);font:10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
-  color:var(--faint);padding:9px 10px}
-.call-row > div{background:var(--bg)}
-.call-row input,.call-row select{border:none;border-radius:0;background:transparent;padding:9px 10px;font-size:13px}
-.call-row input:focus,.call-row select:focus{background:var(--panel);border:none;box-shadow:inset 0 0 0 1px var(--accent)}
-.msg{margin-top:16px;padding:13px 16px;border-radius:8px;font-size:13px;line-height:1.6;display:none}
-.msg.ok{display:block;background:rgba(46,160,67,.09);border:1px solid rgba(46,160,67,.32);color:#7fd28f}
-.msg.err{display:block;background:rgba(229,83,75,.08);border:1px solid rgba(229,83,75,.3);color:#ef8b85}
+/* sizing: five limits, one strip */
+#sizing .wrap{max-width:920px}
+#sizing h2,#sizing .lede{text-align:center;margin-left:auto;margin-right:auto}
+#sizing h2{margin-bottom:var(--s-16)}
+.limits{margin-top:var(--s-40);display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.lim{background:var(--panel);padding:20px 18px 18px}
+.lim h3{font-size:15px;font-weight:700;margin-bottom:12px;letter-spacing:0;font-family:var(--sans)}
+.lim .bar{height:6px;border-radius:4px;background:var(--panel2);position:relative;overflow:visible;margin:10px 0 12px}
+.lim .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--accent)}
+.lim .bar em{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--text)}
+.lim .cap{display:flex;justify-content:space-between;font:500 12px/1.3 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.lim .cap b{color:var(--text);font-weight:600}
+.lim.stop .bar i{background:var(--red)}
+.lim.stop .cap b{color:#f87171}
+.limits-note{margin-top:var(--s-20);text-align:center;color:var(--faint);font-size:14px;max-width:60ch;margin-left:auto;margin-right:auto}
 
-/* ---------- steps ---------- */
-.steps{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:36px}
-.step{border:1px solid var(--line);border-radius:8px;padding:20px;background:var(--panel)}
-.step h3{font-size:14px;font-weight:650;margin-bottom:8px;display:flex;align-items:center;gap:10px}
-.step-n{width:21px;height:21px;border-radius:4px;background:var(--panel2);border:1px solid var(--line2);
-  display:grid;place-items:center;font:700 10px/1 var(--mono);color:var(--accent);flex:none}
-.step p{color:var(--dim);font-size:13px;line-height:1.6}
+/* who: type only, wide */
+#who h2{margin-bottom:var(--s-40);font-size:clamp(36px,4.6vw,60px);max-width:14ch}
+.who{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,80px);align-items:start}
+.who-col h3{margin-bottom:var(--s-12)}
+.who-col p{color:var(--dim);font-size:17px;line-height:1.6}
+.who-not{grid-column:1 / -1;margin-top:var(--s-24);padding-top:var(--s-32);border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,80px);align-items:start}
+.who-not h3{color:var(--faint)}
+.who-not p{color:var(--dim);font-size:17px;line-height:1.6}
 
-/* ---------- faq ---------- */
-details{border-bottom:1px solid var(--line);padding:16px 0}
-summary{cursor:pointer;font-weight:600;font-size:14px;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px}
+/* access: the form, with the terms beside it as a plain list rather than four cards */
+.access{display:grid;grid-template-columns:minmax(0,560px) 1fr;gap:clamp(40px,6vw,96px);align-items:start}
+#access h2{margin-bottom:var(--s-16)}
+#access .lede{margin-bottom:var(--s-32)}
+.form{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);overflow:hidden}
+.form-b{padding:24px}
+.fg{margin-bottom:var(--s-20)}
+.fg label{display:block;font-weight:600;font-size:14px;margin-bottom:8px}
+.fg .req{color:var(--red)}
+.fg .muted{color:var(--faint)}
+.fg input,.fg textarea{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-md);padding:12px 14px;color:var(--text);font-size:15px;transition:border-color .15s}
+.fg textarea{min-height:110px;resize:vertical;line-height:1.5}
+.fg input::placeholder,.fg textarea::placeholder{color:var(--faint)}
+.fg input:focus,.fg textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+.fg input:user-invalid,.fg textarea:user-invalid{border-color:var(--red)}
+.hint{font-size:14px;color:var(--faint);margin-top:8px;line-height:1.5}
+.msg{margin-top:var(--s-16);font-size:14px;line-height:1.5;min-height:1.5em}
+.msg.ok{color:#4ade80}.msg.err{color:#f87171}
+.terms{margin-top:6px}
+.terms dt{font-weight:700;font-size:16px;margin-bottom:6px;font-family:var(--display);letter-spacing:-.01em}
+.terms dd{color:var(--dim);font-size:15px;line-height:1.6;padding-bottom:var(--s-20);margin-bottom:var(--s-20);border-bottom:1px solid var(--line);max-width:48ch}
+.terms dd:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
+
+/* faq */
+#faq .wrap{max-width:900px}
+#faq h2{margin-bottom:var(--s-32)}
+details{border-top:1px solid var(--line);padding:20px 0}
+details:last-of-type{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;font-weight:600;font-size:17px;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px;border-radius:var(--r-md)}
 summary::-webkit-details-marker{display:none}
-summary:after{content:"+";color:var(--faint);font:400 20px/1 var(--mono);flex:none}
-details[open] summary:after{content:"\2212"}
-details p{color:var(--dim);font-size:14px;line-height:1.66;margin-top:11px;max-width:70ch}
+summary svg{flex:none;width:18px;height:18px;stroke:var(--faint);fill:none;stroke-width:2;stroke-linecap:round;transition:transform .25s var(--ease)}
+details[open] summary svg{transform:rotate(45deg)}
+details p{color:var(--dim);font-size:16px;line-height:1.62;margin-top:12px;max-width:66ch}
 
-/* ---------- footer + status bar ---------- */
-footer{padding:44px 0 54px;font-size:12px;color:var(--faint)}
-.foot-t{display:flex;gap:38px;flex-wrap:wrap;justify-content:space-between;margin-bottom:30px}
-.foot-l{display:flex;gap:2px;flex-wrap:wrap}
-.foot-l a{font:11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:7px 10px;border-radius:6px}
-.foot-l a:hover{color:var(--text);background:var(--panel)}
-.legal{border-top:1px solid var(--line);padding-top:22px;line-height:1.7;font-size:11px;max-width:92ch}
+/* footer */
+footer{border-top:1px solid var(--line);padding:var(--s-40) 0 var(--s-32)}
+.foot{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:start}
+.foot-l p{color:var(--faint);font-size:14px;line-height:1.6;max-width:70ch;margin-top:12px}
+.foot-r{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.foot-r a{color:var(--dim);text-decoration:none;padding:6px 10px;border-radius:var(--r-md);font-size:14px}
+.foot-r a:hover{color:var(--text);background:var(--panel)}
+.foot-c{margin-top:var(--s-24);padding-top:var(--s-16);border-top:1px solid var(--line);color:var(--faint);font-size:13px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
-.statusbar{position:fixed;left:0;right:0;bottom:0;height:var(--bar);z-index:70;
-  background:#08090b;border-top:1px solid var(--line);display:flex;align-items:center;gap:0;
-  font:11px/1 var(--mono);color:var(--faint);letter-spacing:.06em}
-.sb{padding:0 14px;height:100%;display:flex;align-items:center;gap:7px;border-right:1px solid var(--line);white-space:nowrap}
-.sb:last-child{border-right:none;margin-left:auto;border-left:1px solid var(--line)}
-.sb b{color:var(--dim);font-weight:500}
-.live{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(46,160,67,.8)}
-@media(max-width:700px){.sb.opt{display:none}}
-
-@media(max-width:900px){
-  .grid3{grid-template-columns:1fr}
-  .band-g{grid-template-columns:repeat(2,1fr)}
-  .cell:nth-child(2){border-right:none}
-  .cell:nth-child(1),.cell:nth-child(2){border-bottom:1px solid var(--line)}
-  .steps{grid-template-columns:1fr}
-  .nav-links{display:none}
-  header{padding:50px 0 44px}
-  section{padding:50px 0}
-  .call-row{grid-template-columns:1fr 1fr}
-  .call-row.head{display:none}
-  .call-row{padding:6px 0;border-bottom:1px solid var(--line)}
+/* Touch targets. On a coarse pointer the small text links in the nav and footer grow to a 44px
+   box. The display change is what enlarges the hit area; padding on an inline element paints but
+   does not grow the box. */
+@media (hover:none),(max-width:760px){
+  .nav-links a:not(.btn){display:inline-block;padding:12px 12px}
+  .foot-r a,.foot-c a{display:inline-block;padding:12px 10px}
 }
-
-/* ---- keyboard focus ----
-   Only inputs had a visible focus state, so anyone tabbing through buttons and links had no idea
-   where they were. :focus-visible rather than :focus, so a mouse click never draws a ring the
-   pointer user did not ask for. */
-a:focus-visible,button:focus-visible,summary:focus-visible,
-[tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
-  outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-
-/* ---- touch targets ----
-   Nav and footer links were 15-25px tall, which is fine for a cursor and awkward for a thumb. The
-   guidance is roughly 44px; padding gets them there without changing how the row looks, because the
-   extra height sits inside the existing line box. */
-@media(hover:none),(max-width:760px){
-  /* display matters here: vertical padding on an inline element is painted and is clickable, but
-     does not grow the box, so the target stays the height of one line. inline-block makes the
-     padding count toward the hit area rather than just the paint. */
-  .nav-links a{display:inline-block;padding:11px 12px;line-height:1.1}
-  /* .foot-l a carries its own padding at a higher specificity, so a bare "footer a" loses to it. */
-  footer a,.foot-l a{display:inline-block;padding:12px 10px}
-  .logo{display:inline-flex;padding:6px 0}
+/* ---------- responsive ---------- */
+@media (max-width:1100px){
+  .t-cols{grid-template-columns:1fr 1fr}
+  .t-cols .t-col:last-child{grid-column:1 / -1}
 }
-
-/* Same typographic principles the terminal uses, so the front door and the instrument behind it
-   read as one product rather than two. Structure shared, skin unchanged. */
-h1,h2,.hero h1{letter-spacing:-0.02em;font-weight:600}
-h3,h4{letter-spacing:-0.01em;font-weight:600}
-button,.btn{font-weight:500}
-p{line-height:1.6}
-/* A full radius is for a status badge and never for a control, which is also this project's own
-   standing ban on pill buttons. */
-.btn,button,input,select,textarea{border-radius:8px}
+@media (max-width:900px){
+  :root{--sec:72px;--sec-lg:88px;--sec-sm:48px;--gutter:28px}
+  .t-body{grid-template-columns:1fr}
+  .t-side{display:none}
+  .t-search{display:none}
+  .stage-in::after{display:none}
+  .stage{padding-right:var(--gutter)}
+  .stage-in{width:100%}
+  .t-top{padding-right:16px}
+  .t-main{padding-right:16px}
+  .two,.two.flip{grid-template-columns:1fr;gap:40px}
+  .two.flip > :first-child{order:2}
+  .two.flip > :last-child{order:1}
+  .limits{grid-template-columns:repeat(2,1fr)}
+  .limits .lim:last-child{grid-column:1 / -1}
+  .who,.who-not{grid-template-columns:1fr;gap:32px}
+  .access{grid-template-columns:1fr;gap:48px}
+  .foot{grid-template-columns:1fr}
+  .foot-r{justify-content:flex-start}
+}
+@media (max-width:600px){
+  :root{--sec:56px;--sec-lg:64px;--gutter:20px}
+  nav{height:56px}
+  .nav-links a:not(.btn){display:none}
+  .hero .lede{font-size:18px}
+  .hero-actions .btn{flex:1 1 100%}
+  .t-head{grid-template-columns:1fr 1fr;gap:12px}
+  .t-score{text-align:left}
+  .t-cols{grid-template-columns:1fr}
+  .t-top .t-tag{display:none}
+  .limits{grid-template-columns:1fr}
+  .ledger th,.ledger td{padding:12px 14px}
+  .demo-canvas{height:180px}
+  h2{font-size:30px}
+}
 </style>
 <script>
 /* Clickjacking defence. X-Frame-Options and CSP frame-ancestors are both header-only and this is
@@ -328,73 +426,185 @@ p{line-height:1.6}
 </script>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
-<div class="tape" aria-hidden="true"><div class="tape-in" id="tape"></div></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></symbol>
+  <symbol id="i-portfolio" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+  <symbol id="i-watch" viewBox="0 0 24 24"><polygon points="12 2.6 15 8.7 21.7 9.7 16.8 14.4 18 21 12 17.9 6 21 7.2 14.4 2.3 9.7 9 8.7 12 2.6"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 6.8 12 12 15.6 14"/></symbol>
+  <symbol id="i-market" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
+  <symbol id="i-news" viewBox="0 0 24 24"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1z"/><path d="M18 8h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2"/><line x1="7" y1="8.5" x2="14" y2="8.5"/><line x1="7" y1="12" x2="14" y2="12"/><line x1="7" y1="15.5" x2="11" y2="15.5"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><line x1="8.5" y1="10.6" x2="15.5" y2="6.4"/><line x1="8.5" y1="13.4" x2="15.5" y2="17.6"/></symbol>
+  <symbol id="i-screener" viewBox="0 0 24 24"><polygon points="21.5 3.5 2.5 3.5 10 12.4 10 19 14 21 14 12.4 21.5 3.5"/></symbol>
+  <symbol id="i-analyzer" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></symbol>
+  <symbol id="i-risk" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9.5" x2="12" y2="13.5"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-projections" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+  <symbol id="i-alerts" viewBox="0 0 24 24"><path d="M18 8.5A6 6 0 0 0 6 8.5c0 7-2.5 8.5-2.5 8.5h17S18 15.5 18 8.5"/><path d="M13.7 20.5a2 2 0 0 1-3.4 0"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+</defs></svg>
 
-<nav>
-  <div class="wrap nav-in">
-    <a href="./" class="logo"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--line2)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></a>
-    <span class="chip">Restricted</span>
+<nav aria-label="Primary">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="PerceptFolio home">
+      <svg class="logo-mark" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="#2f333c" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="#eef0f3">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="#1f9e8c">F</text></svg>
+      <span>Percept<span class="c2">Folio</span></span>
+    </a>
     <div class="nav-links">
       <a href="#record">Record</a>
+      <a href="#who">Who it's for</a>
       <a href="#access">Access</a>
-      <a href="#terminal">Terminal</a>
-      <a href="/refused/">Refused</a>
-      <a href="#faq">FAQ</a>
+      <a class="btn btn-p" href="/terminal/">Sign in</a>
     </div>
-    <a class="btn btn-p" href="/terminal/">Sign in</a>
   </div>
 </nav>
-<main>
 
-<header>
-  <div class="wrap" style="position:relative">
-    <div class="cmdline">northbridge:financial $ <b>perceptfolio --status</b><span class="cur"></span></div>
-    <h1>Internal investment terminal.</h1>
-    <p class="sub">The system NorthBridge's financial branch runs on. Every other tool in this category sells you signals. This one keeps a record of what it told you, marked against the index on a horizon it cannot move afterwards, and reported whether or not the result flatters the system.</p>
-    <div class="cta">
-      <a class="btn btn-p btn-lg" href="/terminal/">Sign in to the terminal</a>
-      <a class="btn btn-lg" href="#access">Request access</a>
+<main id="main">
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <h1>A research terminal that keeps score on itself.</h1>
+      <p class="lede">Built for the person at NorthBridge who makes the buy, sell or hold call and has to stand behind it later. Twenty-two checks, one verdict, and a record that cannot be edited afterwards.</p>
+      <div class="hero-actions">
+        <a class="btn btn-p btn-lg" href="/terminal/">Sign in to the terminal</a>
+        <a class="btn btn-lg" href="#access">Request access</a>
+      </div>
+      <p class="hero-note">Internal software. Not a broker, not investment advice, and it never places a trade.</p>
     </div>
-    <div class="notice">
-      <b>Authorised personnel only</b>
-      <p>Access is granted per person by the financial branch. There is no public version, no trial, and no self-service sign-up. If you have arrived here without credentials, the access request below is the only route in.</p>
+  </div>
+
+  <div class="stage">
+    <div class="stage-in" role="img" aria-label="The PerceptFolio terminal on its Analyzer screen. NVDA scored fifteen of twenty checks: quality nine of ten, value two of six, momentum four of four. Verdict: great business, pricey, watch. Illustrative values, not live data.">
+      <div class="t-top">
+        <div class="t-brand"><svg class="logo-mark" viewBox="0 0 40 40" width="24" height="24" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="#2b2f38" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="#f2f3f5">P</text><text x="20" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="#1f9e8c">F</text></svg><span>Percept<span class="c2">Folio</span></span><span class="sep"></span><span class="screen">Analyzer</span></div>
+        <div class="t-search"><svg aria-hidden="true"><use href="#i-search"/></svg>Search a ticker… <span style="margin-left:auto;opacity:.6">/</span></div>
+        <div class="t-tag">Illustrative · not live</div>
+        <div class="t-user">T</div>
+      </div>
+      <div class="t-body">
+        <aside class="t-side" aria-hidden="true">
+          <a><svg><use href="#i-dash"/></svg>Dashboard</a>
+          <a><svg><use href="#i-command"/></svg>Command</a>
+          <a><svg><use href="#i-portfolio"/></svg>Portfolio</a>
+          <a><svg><use href="#i-watch"/></svg>Lists</a>
+          <a><svg><use href="#i-history"/></svg>History</a>
+          <span class="gap"></span>
+          <a><svg><use href="#i-market"/></svg>Market</a>
+          <a><svg><use href="#i-news"/></svg>News</a>
+          <a><svg><use href="#i-map"/></svg>Map</a>
+          <a><svg><use href="#i-screener"/></svg>Screener</a>
+          <a class="on"><svg><use href="#i-analyzer"/></svg>Analyzer</a>
+          <span class="gap"></span>
+          <a><svg><use href="#i-risk"/></svg>Risk</a>
+          <a><svg><use href="#i-projections"/></svg>Projections</a>
+          <a><svg><use href="#i-alerts"/></svg>Alerts</a>
+        </aside>
+        <div class="t-main" aria-hidden="true">
+          <div class="t-panel t-head">
+            <div class="t-sym">NVDA <span>NVIDIA Corp · Semiconductors</span></div>
+            <div class="t-px num">$184.20<small>+1.4%</small></div>
+            <div class="t-pill watch"><span>●</span> Great biz, pricey. WATCH</div>
+            <div class="t-score num">15<small>/20</small><em>2 checks unanswered</em></div>
+          </div>
+          <div class="t-cols">
+            <div class="t-panel t-col">
+              <h4>Quality <b>9 / 10</b></h4>
+              <div class="r ok" style="--i:0"><span class="m">✓</span><span class="n">Revenue growth (YoY)<small>≥ 10%</small></span><span class="v">94.2%</span></div>
+              <div class="r ok" style="--i:1"><span class="m">✓</span><span class="n">Gross margin<small>≥ 40%</small></span><span class="v">74.6%</span></div>
+              <div class="r ok" style="--i:2"><span class="m">✓</span><span class="n">Operating margin<small>Expanding</small></span><span class="v">62.1% ↑</span></div>
+              <div class="r ok" style="--i:3"><span class="m">✓</span><span class="n">Free cash flow<small>Positive</small></span><span class="v">$60.9B</span></div>
+              <div class="r ok" style="--i:4"><span class="m">✓</span><span class="n">Cash vs debt<small>Cash &gt; debt</small></span><span class="v">D/E 0.13</span></div>
+              <div class="r ok" style="--i:5"><span class="m">✓</span><span class="n">Current ratio<small>≥ 1.5</small></span><span class="v">3.39</span></div>
+              <div class="r ok" style="--i:6"><span class="m">✓</span><span class="n">ROE<small>≥ 15%</small></span><span class="v">91.9%</span></div>
+              <div class="r ok" style="--i:7"><span class="m">✓</span><span class="n">EPS beats<small>4 / 4 last quarters</small></span><span class="v">4 / 4</span></div>
+              <div class="r ok" style="--i:8"><span class="m">✓</span><span class="n">Revenue guidance<small>Raised</small></span><span class="v">Raised</span></div>
+              <div class="r no" style="--i:9"><span class="m">✕</span><span class="n">Insider buying<small>Cluster</small></span><span class="v">Net selling</span></div>
+              <div class="r na" style="--i:10"><span class="m">–</span><span class="n">Clear growth runway<small>Your judgment</small></span><span class="v">unset</span></div>
+              <div class="r na" style="--i:11"><span class="m">–</span><span class="n">Competitive moat<small>Your judgment</small></span><span class="v">unset</span></div>
+            </div>
+            <div class="t-panel t-col">
+              <h4>Value <b>2 / 6</b></h4>
+              <div class="r no" style="--i:12"><span class="m">✕</span><span class="n">P/E vs own history<small>Below average</small></span><span class="v">Above</span></div>
+              <div class="r no" style="--i:13"><span class="m">✕</span><span class="n">Comp analysis<small>Below comparables</small></span><span class="v">Above</span></div>
+              <div class="r no" style="--i:14"><span class="m">✕</span><span class="n">DCF value<small>Undervalued</small></span><span class="v">−18%</span></div>
+              <div class="r no" style="--i:15"><span class="m">✕</span><span class="n">P/E<small>Under 30</small></span><span class="v">52.1</span></div>
+              <div class="r ok" style="--i:16"><span class="m">✓</span><span class="n">Forward P/E<small>Below trailing</small></span><span class="v">38.4</span></div>
+              <div class="r ok" style="--i:17"><span class="m">✓</span><span class="n">PEG ratio<small>≤ 1.5</small></span><span class="v">1.21</span></div>
+            </div>
+            <div class="t-panel t-col">
+              <h4>Momentum <b>4 / 4</b></h4>
+              <div class="r ok" style="--i:18"><span class="m">✓</span><span class="n">6-month return<small>Positive</small></span><span class="v">+28.3%</span></div>
+              <div class="r ok" style="--i:19"><span class="m">✓</span><span class="n">12-month return<small>Positive</small></span><span class="v">+61.0%</span></div>
+              <div class="r ok" style="--i:20"><span class="m">✓</span><span class="n">Near 52-week high<small>Within 20%</small></span><span class="v">−4.1%</span></div>
+              <div class="r ok" style="--i:21"><span class="m">✓</span><span class="n">Beating the market<small>vs S&amp;P, 12mo</small></span><span class="v">+43 pts</span></div>
+            </div>
+          </div>
+          <div class="t-panel t-stamp">
+            <span class="dot"></span>
+            <span>Call recorded <b>2026-09-13 15:42 ET</b></span>
+            <span>at <b>$184.20</b></span>
+            <span>S&amp;P <b>6,482.1</b></span>
+            <span>marks at <b>30 · 90 · 180 d</b></span>
+            <span>checks stamped: <b>15 / 20</b></span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </header>
 
-<div class="band">
-  <div class="wrap">
-    <div class="band-g">
-      <div class="cell"><div class="cell-n">22</div><div class="cell-l">checks per company<br>12 quality · 6 value · 4 momentum</div></div>
-      <div class="cell"><div class="cell-n">4</div><div class="cell-l">fixed horizons every call<br>is marked against</div></div>
-      <div class="cell"><div class="cell-n">14</div><div class="cell-l">screens, each answering<br>exactly one decision</div></div>
-      <div class="cell"><div class="cell-n">0</div><div class="cell-l">positions stored on<br>a NorthBridge server</div></div>
+<section id="scorecard" aria-labelledby="h-score">
+  <div class="wrap two">
+    <div class="close" aria-label="The Quality column of the scorecard at reading size">
+      <h4>Quality <b>9 / 10</b></h4>
+      <div class="r ok"><span class="m">✓</span><span class="n">Revenue growth (YoY)<small>Bar: at least 10% a year</small></span><span class="v num">94.2%</span></div>
+      <div class="r ok"><span class="m">✓</span><span class="n">Gross margin<small>Bar: at least 40%</small></span><span class="v num">74.6%</span></div>
+      <div class="r ok"><span class="m">✓</span><span class="n">Free cash flow<small>Bar: positive</small></span><span class="v num">$60.9B</span></div>
+      <div class="r ok"><span class="m">✓</span><span class="n">ROE<small>Bar: at least 15%</small></span><span class="v num">91.9%</span></div>
+      <div class="r no"><span class="m">✕</span><span class="n">Insider buying<small>Bar: a cluster of buys</small></span><span class="v">Net selling</span></div>
+      <div class="r na"><span class="m">–</span><span class="n">Competitive moat<small>Yours to answer. The terminal will not guess.</small></span><span class="v">unset</span></div>
+    </div>
+    <div class="copy">
+      <h2 id="h-score">Every verdict shows its working.</h2>
+      <p>Twelve checks on the quality of the business, six on the price, four on momentum. Each one names what it measured, the bar it was measured against, and whether it cleared it. <b>A score is only a summary of the rows underneath it.</b> You read the ones that failed.</p>
+      <p>Two of the twenty-two are yours: whether the business has room to grow and whether it has a moat. The terminal leaves them unset rather than pretend to know.</p>
+      <p class="fact">The bars are the operator's, set once in Settings. The same rules are applied to every ticker, every day, without exception, which is the only way a record of them means anything.</p>
     </div>
   </div>
-</div>
+</section>
 
-<section id="record">
+<section id="record" aria-labelledby="h-record">
+  <div class="wrap two flip">
+    <div class="copy">
+      <h2 id="h-record">It writes down what it said. Then it checks.</h2>
+      <p>The moment a verdict changes it is logged with the price and the S&amp;P at that instant and given fixed anniversaries. On each one it is marked against the index. <b>The result is shown whether or not it flatters the system</b>, and nothing in the record can be edited afterwards.</p>
+      <p>You will not find a win rate here. A hit rate is the most manufacturable number in finance; what is reported is expectancy against the market, with an interval wide enough to show when the sample is too thin to mean anything. The calls needed to separate a real edge from luck is <span class="num">(1.96 × dispersion ÷ edge)²</span>: roughly 138 at a two-point edge with twelve-point dispersion.</p>
+      <div class="honest">
+        <span class="dot" aria-hidden="true"></span>
+        <p><b>The record is new.</b> Calls are being logged now. The first marks land in about a quarter, and until then the scorecard is honestly empty.</p>
+      </div>
+    </div>
+    <div class="ledger" aria-label="The call log: ticker, call, held, versus index, result">
+      <table>
+        <thead><tr><th>Ticker</th><th>Call</th><th>Held</th><th>vs index</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>–</td><td><span class="call buy">BUY</span></td><td>90 d</td><td>–</td><td class="await">awaiting mark</td></tr>
+          <tr><td>–</td><td><span class="call sell">SELL</span></td><td>90 d</td><td>–</td><td class="await">awaiting mark</td></tr>
+          <tr><td>–</td><td><span class="call buy">BUY</span></td><td>180 d</td><td>–</td><td class="await">awaiting mark</td></tr>
+          <tr><td>–</td><td><span class="call buy">BUY</span></td><td>30 d</td><td>–</td><td class="await">awaiting mark</td></tr>
+        </tbody>
+        <tfoot><tr><td colspan="5">Empty by design. A fixed-horizon record cannot be reconstructed backwards, so every account's record begins the day it begins.</td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+
   <div class="wrap">
-    <div class="sec-head"><span class="sec-no">01</span><span class="sec-k">The record</span></div>
-    <h2>It writes down what it said, then checks.</h2>
-    <p class="lede">Each verdict is logged the moment it changes, stamped with the price and the index, and marked on an anniversary that cannot be moved afterwards. A tool that flatters itself is worse than no tool, because it launders a guess into a number.</p>
-
-    <!-- ============================================================================
-         MAKE A CALL, THEN WATCH IT MARK.
-         The argument for fixed-horizon grading is on this page in prose, and prose is not how
-         anyone comes to believe it. Thirty seconds of making a falsifiable call and watching it
-         graded against the index does the job that four paragraphs cannot.
-
-         The series is real — three years of actual daily closes, bundled and inspectable at
-         /demo/data.js — and the ticker is hidden until after the mark, so the call is a judgement
-         about a price series rather than a memory of what a famous company did.
-
-         The dataset is 60 KB and loads only when someone presses the button. Nobody pays for it
-         on a page view. -->
     <div class="demo" id="demo">
-      <div class="demo-head">
-        <span class="demo-k">Try it. Make a call on real history</span>
+      <div class="demo-h">
+        <h3>Try it. Make a call on real history.</h3>
         <span class="demo-rec" id="demoRec"></span>
       </div>
       <div id="demoStage">
@@ -402,227 +612,137 @@ p{line-height:1.6}
         <button class="btn btn-p" id="demoStart" type="button">Deal me a series</button>
       </div>
     </div>
-
-    <div class="quote">
-      <p>“You do not get to forecast more until you can prove you forecast well.”</p>
-      <cite>The rule the scorecard enforces</cite>
-    </div>
-
-    <div class="panel">
-      <div class="panel-h"><span class="pip" style="background:var(--green)"></span> call scorecard. Structure</div>
-      <table>
-        <thead><tr><th>Ticker</th><th>Call</th><th>Held</th><th>vs index</th><th>Result</th></tr></thead>
-        <tbody>
-          <tr><td class="dim">-</td><td class="dim">BUY</td><td class="dim">90d</td><td class="dim">-</td><td class="dim">awaiting mark</td></tr>
-          <tr><td class="dim">-</td><td class="dim">SELL</td><td class="dim">90d</td><td class="dim">-</td><td class="dim">awaiting mark</td></tr>
-          <tr><td class="dim">-</td><td class="dim">BUY</td><td class="dim">30d</td><td class="dim">-</td><td class="dim">awaiting mark</td></tr>
-        </tbody>
-      </table>
-      <div class="panel-f">Empty by design. A fixed-horizon record cannot be reconstructed backwards, so every account's record begins the day it begins. Anything presenting a completed history on day one is presenting something it never had to live through.</div>
-    </div>
-
-    <!-- THE TARGET, STATED SO IT CAN BE CHECKED.
-         This block exists because the brief that nearly got built asked for an 80% win rate and a
-         tripled account. Both are stated here in the form that can be falsified, because a goal
-         expressed as a return tells you nothing about whether it is reachable, and a goal expressed
-         as a hit rate can be manufactured in an afternoon. -->
-    <h3 class="goal-h">What this is aiming at, in the only terms that can be checked</h3>
-    <div class="goals">
-      <div class="goal">
-        <div class="goal-k">The target</div>
-        <p><b>Positive expectancy per call, measured against the index, with a 95% interval that clears zero.</b> Not a win rate and not a return. A return target tells you nothing about whether it is reachable, because you picked the answer before you had the inputs.</p>
-      </div>
-      <div class="goal">
-        <div class="goal-k">The constraint</div>
-        <p><b>A stated ruin tolerance that sizing is never allowed to breach.</b> Three limits bind every position, policy cap, volatility budget, distance to stop, and the smallest one wins. Being right about the company and wrong about the size is how accounts end.</p>
-      </div>
-      <div class="goal">
-        <div class="goal-k">The threshold</div>
-        <!-- C3. This said "forty marked calls" in the same voice the rest of the page uses for
-             arithmetic, and nobody derived forty. The number of observations needed to separate a
-             mean edge from zero at 95% confidence is n = (Z·sigma/mean)^2, which at a 2-point edge
-             with 12-point dispersion is 138 — forty was optimistic by about 3.5x, and optimistic in
-             the direction that declares an edge proven while it is still noise. The terminal now
-             computes this live from the observed sample, so the target moves as the record does. -->
-        <p><b>The record counts as evidence when the arithmetic says so, not at a round number.</b> The calls needed to separate a real edge from luck is <span class="mono">(1.96 × dispersion ÷ edge)²</span>. Roughly <b>138</b> at a two-point edge with twelve-point dispersion. The terminal computes it from your own marks as they accumulate and shows the gap. Below it, the interval straddles zero almost regardless of the point estimate, and the honest reading is <em>don't know</em>.</p>
-      </div>
-    </div>
-    <p class="lede" style="margin-top:26px">Why it is put this way: a hit rate is the most manufacturable statistic in finance. Sell covered calls, take profit at +0.5%, never stop out, hold the losers to recovery, and you can report being right nine times in ten while losing money on every third gap-down, 80% of wins at +1% against 20% of losses at −10% is an expectancy of <b class="neg">−1.2% per trade</b>. Right nearly always, and reliably bankrupt. Expectancy cannot be dressed up that way, because the large loss stays in the average.</p>
   </div>
 </section>
 
-<section id="access">
+<section id="sizing" aria-labelledby="h-size">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-no">02</span><span class="sec-k">Access</span></div>
-    <h2>Access is granted per person.</h2>
-    <p class="lede">Tell us who you are and what you would use it for. Requests are read by someone who can act on them, and access is tied to what you will actually be doing with the terminal. If it is not the right tool for your work, you will be told that plainly.</p>
+    <h2 id="h-size">Size, not just selection.</h2>
+    <p class="lede">Before money moves, the position is checked against five limits. Any one of them can say no, and the terminal shows which.</p>
+    <div class="limits" role="list" aria-label="The five sizing limits, illustrative">
+      <div class="lim" role="listitem"><h3>Concentration</h3><div class="bar"><i style="width:58%"></i><em style="left:72%"></em></div><div class="cap"><b>5.8%</b><span>cap 7.2%</span></div></div>
+      <div class="lim" role="listitem"><h3>Cash</h3><div class="bar"><i style="width:44%"></i><em style="left:30%"></em></div><div class="cap"><b>11.0%</b><span>floor 7.5%</span></div></div>
+      <div class="lim" role="listitem"><h3>Market exposure</h3><div class="bar"><i style="width:81%"></i><em style="left:90%"></em></div><div class="cap"><b>0.81 β</b><span>cap 0.90</span></div></div>
+      <div class="lim stop" role="listitem"><h3>Liquidity</h3><div class="bar"><i style="width:100%"></i><em style="left:65%"></em></div><div class="cap"><b>3.1 d</b><span>max 2.0 d to exit</span></div></div>
+      <div class="lim" role="listitem"><h3>Thesis deadline</h3><div class="bar"><i style="width:35%"></i><em style="left:100%"></em></div><div class="cap"><b>2027-03-01</b><span>set</span></div></div>
+    </div>
+    <p class="limits-note">Here, liquidity refuses the size: the position would take three sessions to exit at average volume against a limit of two. The terminal says so before the order, not after.</p>
+  </div>
+</section>
 
-    <form class="form" id="reqForm" autocomplete="off">
-      <div class="form-h"><span class="pip" style="background:var(--accent)"></span> access request</div>
-      <div class="form-b">
-        <div class="fg">
-          <label for="rqEmail">Email <span class="req">*</span></label>
-          <input id="rqEmail" type="email" required placeholder="you@example.com">
+<section id="who" aria-labelledby="h-who">
+  <div class="wrap">
+    <h2 id="h-who">Who this is for, and who it is not.</h2>
+    <div class="who">
+      <div class="who-col">
+        <h3>The person who makes the call.</h3>
+        <p>You hold a small number of positions with conviction. You are expected to explain each one, sometimes months later, and you would rather be shown the arithmetic than told the answer. You want the reason written down before the price moves, not invented after it.</p>
+      </div>
+      <div class="who-col">
+        <h3>The person who reviews it.</h3>
+        <p>You want to see what the terminal said at the time, at what price, and what happened next, with nobody having tidied it up in between. A record that cannot be edited is worth more to you than one that looks good.</p>
+      </div>
+      <div class="who-not">
+        <h3>Who it is not for.</h3>
+        <p>Anyone looking for a tip, a signal, or a number that says how often it wins. It does not place trades, does not connect to a broker, is not sold or licensed, and is not investment advice. Judgement stays with the person at the keyboard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="access" aria-labelledby="h-access">
+  <div class="wrap">
+    <h2 id="h-access">Access is granted per person.</h2>
+    <p class="lede">Tell us who you are and what you would use it for. Requests are read by someone who can act on them. If it is not the right tool for your work, you will be told that plainly.</p>
+    <div class="access">
+      <form class="form" id="reqForm" autocomplete="off">
+        <div class="form-b">
+          <div class="fg">
+            <label for="rqEmail">Email <span class="req" aria-hidden="true">*</span></label>
+            <input id="rqEmail" type="email" required placeholder="you@example.com" autocomplete="email" inputmode="email">
+          </div>
+          <div class="fg">
+            <label for="rqWho">Who you are, and why <span class="req" aria-hidden="true">*</span></label>
+            <textarea id="rqWho" required placeholder="Your role, what you'd use the terminal for, and anything that makes the case."></textarea>
+          </div>
+          <!-- The three-call requirement was removed on request. It is gone from the form, from the
+               worker's validation and from the copy in the same change. The optional box keeps the
+               capability available to anyone who wants to make a checkable claim, without making it
+               a barrier. -->
+          <div class="fg">
+            <label for="rqCalls">A call you would stand behind <span class="muted" style="font-weight:400">(optional)</span></label>
+            <textarea id="rqCalls" rows="2" placeholder="e.g. BUY NVDA, target 260, stop 190, by 2027-03-01, or leave blank"></textarea>
+            <p class="hint">Not required, and not scored. A claim with a target, a stop and a date is simply harder to argue with later than a paragraph is.</p>
+          </div>
+          <button class="btn btn-p btn-lg" type="submit" id="rqBtn">Submit request</button>
+          <div class="msg" id="rqMsg" role="status" aria-live="polite"></div>
         </div>
-        <div class="fg">
-          <label for="rqWho">Who you are, and why <span class="req">*</span></label>
-          <textarea id="rqWho" required placeholder="Your role, what you'd use the terminal for, and anything that makes the case."></textarea>
-        </div>
-        <!-- The three-call requirement was removed on request. It is gone from the form, from the
-             worker's validation and from the copy in the same change, because a page that still
-             asked for something the software no longer wanted would be the same class of fault
-             Phase 1 spent its time closing. The optional box below keeps the capability available
-             to anyone who wants to make a checkable claim, without making it a barrier. -->
-        <div class="fg">
-          <label for="rqCalls">A call you would stand behind <span class="muted" style="font-weight:400">(optional)</span></label>
-          <textarea id="rqCalls" rows="2" placeholder="e.g. BUY NVDA, target 260, stop 190, by 2027-03-01, or leave blank"></textarea>
-          <p class="hint">Not required, and not scored. A claim with a target, a stop and a date is simply harder to argue with later than a paragraph is.</p>
-        </div>
-        <button class="btn btn-p btn-lg" type="submit" id="rqBtn">Submit request</button>
-        <div class="msg" id="rqMsg"></div>
-      </div>
-    </form>
-
-    <div class="steps">
-      <div class="step"><h3><span class="step-n">1</span> Reviewed by a person</h3>
-        <p>Not a queue system and not an autoresponder. Every request is read by someone in the financial branch who can act on it, and you get a straight answer including no.</p></div>
-      <div class="step"><h3><span class="step-n">2</span> Granted per person</h3>
-        <p>Credentials are issued individually, never to a team, so every action in the ledger traces to someone. Approval specifies whether the account is personal or carries client books.</p></div>
-      <div class="step"><h3><span class="step-n">3</span> Bring your own data key</h3>
-        <p>The terminal does not resell market data. You connect a free Finnhub key of your own. Two minutes, no card. Client work additionally requires the shared macro proxy.</p></div>
-      <div class="step"><h3><span class="step-n">4</span> Thesis before position</h3>
-        <p>Any position taken through the terminal carries a written thesis, a stop and a deadline recorded when it is opened. A reason invented after the price moves is not a reason.</p></div>
+      </form>
+      <dl class="terms">
+        <dt>Reviewed by a person</dt>
+        <dd>Not a queue and not an autoresponder. Every request is read by someone in the financial branch who can act on it, and you get a straight answer, including no.</dd>
+        <dt>Granted per person</dt>
+        <dd>Credentials are issued individually, never to a team, so every action in the ledger traces to someone. Approval specifies whether the account is personal or carries client books.</dd>
+        <dt>Bring your own data key</dt>
+        <dd>The terminal does not resell market data. You connect a free Finnhub key of your own. Two minutes, no card.</dd>
+        <dt>Thesis before position</dt>
+        <dd>Any position taken through the terminal carries a written thesis, a stop and a deadline, recorded when it is opened. A reason invented after the price moves is not a reason.</dd>
+      </dl>
     </div>
   </div>
 </section>
 
-<section id="terminal">
+<section id="faq" aria-labelledby="h-faq">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-no">03</span><span class="sec-k">The terminal</span></div>
-    <h2>Fourteen screens: One question each.</h2>
-    <p class="lede">Every screen answers one decision and shows the arithmetic behind it. Nothing is a black box, because a system nobody can audit is a system nobody should act on.</p>
-    <div class="grid3">
-      <div class="tile"><div class="tile-h"><span class="tag t1">Command</span></div>
-        <p>One list each morning: what needs you today. Sell signals, breached limits, stops hit, reviews due, idle cash. Most days it reports that nothing needs you, and that is the correct answer.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t2">Scorecard</span></div>
-        <p>Every verdict the system has issued, marked against the index at 30, 90, 180 and 365 days. Reported with a confidence interval, so a thin sample reads as a thin sample rather than a result.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t3">Sizing</span></div>
-        <p>Three limits before any trade, policy cap, volatility budget, distance to stop, and the smallest one binds. Being right about the company and wrong about the size is how accounts end.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t3">Drawdown</span></div>
-        <p>Not where the book might finish but the hole it passes through. Sampled from real market history rather than a normal curve, because losses arrive in runs and a bell curve cannot represent that.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t4">Supply map</span></div>
-        <p>Who a company depends on, upstream and down. Five holdings that all rely on one supplier are one position, not five, and no other screen will surface it.</p></div>
-      <div class="tile"><div class="tile-h"><span class="tag t5">Behaviour</span></div>
-        <p>How long positions are actually held. Whether what gets sold keeps rising without us. Whether the cash rule survives contact with a bad week. The one dataset that cannot be bought.</p></div>
-    </div>
-  </div>
-</section>
-
-<section id="roadmap">
-  <div class="wrap">
-    <div class="sec-head"><span class="sec-no">04</span><span class="sec-k">Roadmap</span></div>
-    <h2>What we built, what we can't, and what we refused.</h2>
-    <p class="lede">Forty-five modules were considered for this terminal. Eighteen are live. Sixteen are impossible on retail market data at any effort. Eleven were declined on evidence.</p>
-
-    <div class="band-g" style="margin-top:34px;border:1px solid var(--line);border-radius:9px;overflow:hidden">
-      <div class="cell"><div class="cell-n" style="color:var(--green)">18</div><div class="cell-l">live, running in<br>the terminal today</div></div>
-      <div class="cell"><div class="cell-n" style="color:var(--faint)">16</div><div class="cell-l">impossible, the data<br>does not exist at this tier</div></div>
-      <div class="cell"><div class="cell-n" style="color:var(--red)">11</div><div class="cell-l">declined. On evidence,<br>with the reason recorded</div></div>
-      <div class="cell"><div class="cell-n">0</div><div class="cell-l">built to look<br>impressive</div></div>
-    </div>
-
-    <!-- THE FULL LIST LIVES AT /refused/ AND ONLY THERE.
-         It used to sit here inside three collapsed <details>, in fourth position, behind the access
-         form. That is the one document on this site that cannot be faked — writing it required
-         understanding all forty-five, and everyone in the field knows that — so it now has its own
-         URL and can be sent to a person on its own.
-
-         Deliberately NOT duplicated. Two copies of a 4,000-word argument drift, and the moment they
-         disagree the page has contradicted itself, which on this site costs more than it would
-         anywhere else. The counts stay here because they carry the point in one glance; the reasons
-         live in one place. -->
-    <p class="lede" style="margin-top:28px">A record of what an operation <em>refused</em> to build is rarer and more informative than a feature list, and considerably harder to fake. Every module, and the reason behind each refusal, is set out in full on its own page.</p>
-    <div class="cta" style="margin-top:22px">
-      <a class="btn btn-p btn-lg" href="/refused/">Read the refusal list</a>
-    </div>
-
-    <div class="notice" style="margin-top:30px;border-color:rgba(59,130,246,.26);background:rgba(59,130,246,.05)">
-      <b style="color:#79a8f4">The rule that governs this list</b>
-      <p>No further analytics are added until the call scorecard holds enough marks for its own arithmetic to clear zero, a figure the terminal derives from the observed edge and dispersion rather than asserting, and which is nearer 138 than the 40 first guessed here. Evidence arrives at one day per day and no amount of building accelerates it, so every module added before then would change the interface without changing what is known. Most of the list is risk machinery; it exists to make being wrong survivable, not to make being right more frequent, and treating it as the second thing is the most common error made with it.</p>
-    </div>
-  </div>
-</section>
-
-<section id="faq">
-  <div class="wrap">
-    <div class="sec-head"><span class="sec-no">05</span><span class="sec-k">Questions</span></div>
-    <h2>The ones worth answering.</h2>
-    <div style="margin-top:30px;max-width:880px">
-      <details open><summary>Is this available to the public?</summary>
-        <p>No. PerceptFolio is internal infrastructure operated by NorthBridge's financial branch. It is not sold, licensed or offered as a service. This page exists so that people who work here have one place to sign in from.</p></details>
-      <details><summary>Is any of this investment advice?</summary>
-        <p>No. The terminal applies rules its operator configures to public data and shows the arithmetic. When it says BUY, that means the position cleared the bar that operator set. It has no view on anyone's circumstances, makes no recommendation, and takes no custody. Judgement stays with the person at the keyboard.</p></details>
-      <details><summary>Does it promise to beat the market?</summary>
-        <p>It promises nothing about returns, and you will not find a performance figure anywhere in this product. What it does is measure. Every call marked against the index on a fixed horizon, reported with a confidence interval wide enough to show when the sample is too thin to mean anything. A tool that tells you it wins is selling. A tool that tells you how often it was wrong is working.</p></details>
-      <details><summary>Where does my data live?</summary>
-        <p>In your own browser. Holdings, prices, notes and history are stored locally on the device you use. With sync enabled it goes to a private store controlled by NorthBridge, protected by a key held per device. There is no central database holding anyone's book.</p></details>
-      <details><summary>Why is my scorecard empty when I start?</summary>
-        <p>Because a fixed-horizon record cannot be faked backwards. To know what a stock did ninety days after a call, something has to look on the day. The terminal marks each call on its own anniversary going forward, so the first meaningful reading is roughly a quarter out.</p></details>
-      <details><summary>Does it place trades?</summary>
-        <p>No, and it never will. There is no broker connection and none is planned. It reports what the rules flagged and shows the numbers; execution happens in your own brokerage, by you.</p></details>
-    </div>
+    <h2 id="h-faq">Questions worth answering.</h2>
+    <details open><summary>Is this available to the public?<svg aria-hidden="true"><use href="#i-plus"/></svg></summary>
+      <p>No. PerceptFolio is internal infrastructure operated by NorthBridge's financial branch. It is not sold, licensed or offered as a service. This page exists so that people who work here have one place to sign in from.</p></details>
+    <details><summary>Is any of this investment advice?<svg aria-hidden="true"><use href="#i-plus"/></svg></summary>
+      <p>No. The terminal applies rules its operator configures to public data and shows the arithmetic. When it says BUY, that means the position cleared the bar that operator set. It has no view on anyone's circumstances, makes no recommendation, and takes no custody. Judgement stays with the person at the keyboard.</p></details>
+    <details><summary>Does it promise to beat the market?<svg aria-hidden="true"><use href="#i-plus"/></svg></summary>
+      <p>It promises nothing about returns, and you will not find a performance figure anywhere in this product. What it does is measure. Every call is marked against the index on a fixed horizon and reported with a confidence interval wide enough to show when the sample is too thin to mean anything. A tool that tells you it wins is selling. A tool that tells you how often it was wrong is working.</p></details>
+    <details><summary>Where does my data live?<svg aria-hidden="true"><use href="#i-plus"/></svg></summary>
+      <p>In your own browser. Holdings, prices, notes and history are stored locally on the device you use. With sync enabled it goes to a private store controlled by NorthBridge, protected by a key held per device. There is no central database holding anyone's book.</p></details>
+    <details><summary>Why is my scorecard empty when I start?<svg aria-hidden="true"><use href="#i-plus"/></svg></summary>
+      <p>Because a fixed-horizon record cannot be faked backwards. To know what a stock did ninety days after a call, something has to look on the day. The terminal marks each call on its own anniversary going forward, so the first meaningful reading is roughly a quarter out.</p></details>
+    <details><summary>Does it place trades?<svg aria-hidden="true"><use href="#i-plus"/></svg></summary>
+      <p>No, and it never will. There is no broker connection and none is planned. It reports what the rules flagged and shows the numbers; execution happens in your own brokerage, by you.</p></details>
   </div>
 </section>
 
 </main>
+
 <footer>
   <div class="wrap">
-    <div class="foot-t">
-      <div>
-        <div class="logo" style="margin-bottom:9px"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--line2)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
-        <div style="max-width:34ch;line-height:1.6">Know what to buy. Know what to sell. Know whether it worked.</div>
-      </div>
+    <div class="foot">
       <div class="foot-l">
-        <a href="#terminal">Terminal</a><a href="#record">Record</a><a href="#access">Access</a>
-        <a href="#roadmap">Roadmap</a><a href="#faq">FAQ</a><a href="/terminal/">Sign in</a>
+        <a class="logo" href="/" aria-label="PerceptFolio home"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="#2f333c" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="#eef0f3">P</text><text x="20" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="#1f9e8c">F</text></svg><span>Percept<span class="c2">Folio</span></span></a>
+        <p>PerceptFolio is internal software for organising research and applying rules set by its operator. It is not a registered investment adviser, does not take custody of assets, and nothing on this site or in the terminal is a recommendation to buy or sell any security.</p>
+      </div>
+      <div class="foot-r">
+        <a href="#record">Record</a>
+        <a href="#who">Who it's for</a>
+        <a href="#access">Access</a>
+        <a href="#faq">Questions</a>
+        <a href="/terminal/">Sign in</a>
       </div>
     </div>
-    <div class="legal">
-      © <span id="yr">2026</span> NorthBridge. PerceptFolio is internal software for organising research and applying rules set by its operator. It is not offered to the public, is not investment advice, does not take custody of assets and does not execute trades. Nothing here is a recommendation to buy or sell any security. Investing carries risk, including loss of principal. Past performance, including any record shown inside the terminal, does not predict future results.
+    <div class="foot-c">
+      <span>© <span id="yr">2026</span> NorthBridge · Financial</span>
+      <span><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms of use</a></span>
     </div>
   </div>
-  <p style="margin-top:12px;font-size:12.5px"><a href="/privacy/">Privacy</a> &nbsp;·&nbsp; <a href="/terms/">Terms of use</a> &nbsp;·&nbsp; <a href="/refused/">What we refused to build</a></p>
 </footer>
 
-<div class="statusbar">
-  <div class="sb"><span class="live"></span> <b>SYSTEM</b> nominal</div>
-  <!-- Labelled DEPLOYED, not BUILD. document.lastModified is the server's Last-Modified for this
-       file, which is when it was deployed — there is no build pipeline and calling it a build tag
-       implied one. If the header is absent the browser substitutes the current time, so the value is
-       checked for plausibility and the field hides itself rather than showing today's date as if it
-       meant something. -->
-  <div class="sb opt" id="sbBuildWrap"><b>DEPLOYED</b> <span id="sbBuild">-</span></div>
-  <div class="sb opt"><b>ACCESS</b> restricted</div>
-  <div class="sb"><b id="sbClock">--:--:--</b> <span id="sbZone">UTC</span></div>
-</div>
-
 <script>
-/* =====================================================================
-   CONFIG
-
-   worker: your Cloudflare Worker URL. The access form POSTs the request
-   there so it lands in a queue you can review, rather than in an inbox.
-   Leave it blank and the form falls back to opening your mail client,
-   so the page is never a dead end on a fresh deploy.
-   ===================================================================== */
 const PF = {
-  /* The Worker's own hostname. perceptfolio.com is GitHub Pages — a file host that cannot run code —
+  /* The Worker's own hostname. perceptfolio.com is GitHub Pages, a file host that cannot run code –
      so the request queue, the invite codes and the data proxies all live at a separate origin.
 
      This is the workers.dev address rather than a custom domain, which is a deliberate choice with a
      known cost. The name embeds the Cloudflare account subdomain, and it is not yours: rename the
      service, or recreate it after an accident, and the address changes while this page goes on
-     POSTing to the old one. Nothing errors on your side — the form quietly stops delivering, and the
+     POSTing to the old one. Nothing errors on your side, the form quietly stops delivering, and the
      only symptom is that nobody applies any more, which reads exactly like nobody being interested.
      If that ever happens, this line is the first place to look. Pointing api.perceptfolio.com at the
      worker and changing this string removes the failure mode entirely.
@@ -634,42 +754,6 @@ const PF = {
 };
 
 document.getElementById('yr').textContent = new Date().getFullYear();
-(function stamp(){
-  const el=document.getElementById('sbBuild'), wrap=document.getElementById('sbBuildWrap');
-  const t=Date.parse(document.lastModified);
-  /* A missing Last-Modified header makes lastModified read as "now". Showing that as a deploy stamp
-     would be a fabricated number on a page that argues against fabricated numbers, so anything
-     inside the last two minutes is treated as absent and the field is removed. */
-  if(!isFinite(t)||Date.now()-t<120000){ if(wrap)wrap.style.display='none'; return; }
-  el.textContent=new Date(t).toISOString().slice(0,10);
-})();
-
-/* Clock in the status bar. Small thing, but a terminal that doesn't know
-   what time it is doesn't read as a terminal. */
-(function clock(){
-  const el=document.getElementById('sbClock'), z=document.getElementById('sbZone');
-  try{ z.textContent=Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop().replace(/_/g,' '); }catch(e){}
-  const tick=()=>{ el.textContent=new Date().toLocaleTimeString([], {hour12:false}); };
-  tick(); setInterval(tick,1000);
-})();
-
-/* The tape lists real checks the terminal runs. Duplicated once so the
-   translate(-50%) loop is seamless. Never fake prices — a page that
-   invents market data loses the only reader worth having. */
-(function tape(){
-  const items=[
-    ['Gross Margin','g'],['Operating Margin','g'],['Free Cash Flow','g'],['Return on Equity','g'],
-    ['Debt to Equity','y'],['Current Ratio','y'],['Interest Cover','y'],['Revenue Growth','g'],
-    ['Insider Buying','b'],['Earnings Surprise','b'],['Moat','b'],['Guidance','b'],
-    ['P/E vs Own History','a'],['DCF Fair Value','a'],['Price to Book','a'],['FCF Yield','a'],
-    ['6-Month Return','p'],['12-Month Return','p'],['Near 52-Week High','p'],['Beating the Index','p'],
-    ['Position vs Cap','r'],['Volatility Budget','r'],['Stop Distance','r'],['Thesis Deadline','r'],
-    ['Quality Drift','r'],['Expectancy','r']
-  ];
-  const c={g:'var(--green)',y:'var(--amber)',b:'var(--accent)',a:'#c98a3f',p:'var(--violet)',r:'var(--red)'};
-  const html=items.map(([t,k])=>'<span><i class="pip" style="background:'+c[k]+'"></i><b>'+t+'</b></span>').join('');
-  document.getElementById('tape').innerHTML=html+html;
-})();
 
 /* =====================================================================
    THE MARKING DEMO
@@ -720,7 +804,7 @@ let _demoDraw=null;                 // last draw, so a resize can repaint identi
 function demoChart(cv,closes,fwd,target){
   _demoDraw=()=>demoChart(cv,closes,fwd,target);
   const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
-  /* A canvas asked to draw itself at zero width paints nothing and never tries again — the chart
+  /* A canvas asked to draw itself at zero width paints nothing and never tries again, the chart
      is simply blank forever. That happens whenever the element is measured before layout has run,
      inside a collapsed container, or in a tab that was hidden when the section rendered. Rather
      than paint nothing, wait for the element to have a size and draw then. */
@@ -848,7 +932,7 @@ function demoRecord(){
     (mean>=0?'+':'')+mean.toFixed(1)+'pts</b>';
 }
 
-/* The close. n is tiny by construction, and saying so is the point rather than a caveat —
+/* The close. n is tiny by construction, and saying so is the point rather than a caveat –
    it is the same argument the front screen of the terminal makes about its derived sample target. */
 function demoSummary(){
   const n=DEMO.marks.length;
@@ -936,13 +1020,13 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
     });
     const j=await res.json().catch(()=>({}));
-    /* A non-OK response is the worker TALKING to us — a bad ticker, a missing stop, the
+    /* A non-OK response is the worker TALKING to us, a bad ticker, a missing stop, the
        daily rate limit. That is real feedback and the applicant has to see it, so it is
        thrown as a REJECTED error and shown rather than buried in a mailto. */
     if(!res.ok){ const err=new Error(j.error||('HTTP '+res.status)); err.rejected=true; throw err; }
     /* Hand off to thanks.html rather than printing a line under the button.
-       That page explains what actually happens next — who reads it, how access
-       is granted, and that the scorecard starts empty — which is the part people
+       That page explains what actually happens next, who reads it, how access
+       is granted, and that the scorecard starts empty, which is the part people
        write in to ask. A success message the user has to scroll to find was
        leaving thanks.html orphaned and the applicant uninformed. */
     document.getElementById('reqForm').reset();
@@ -951,10 +1035,10 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
   }catch(e){
     /* Two different failures wearing the same coat, and they need opposite treatment.
 
-       REJECTED — the worker answered and said no. Show it. The person can fix a typo'd
+       REJECTED, the worker answered and said no. Show it. The person can fix a typo'd
        ticker or a missing stop and submit again; sending them to email would lose that.
 
-       UNREACHABLE — fetch never completed: the custom domain is not live yet, CORS is
+       UNREACHABLE, fetch never completed: the custom domain is not live yet, CORS is
        misconfigured, the worker is down, an extension ate the request. Nothing the
        applicant can fix and nothing they should have to read about. Hand them the mail
        client with everything they typed already in the body. */
@@ -973,7 +1057,7 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
    query string, and a page that silently navigates elsewhere reads as broken rather than clever.
    The Sign in button sits top right on every screen size. That is enough.
 
-   Signed-in users get a quiet relabel instead — a hint, not a navigation. */
+   Signed-in users get a quiet relabel instead, a hint, not a navigation. */
 (function nudge(){
   try{
     const db=localStorage.getItem('quantfolio_v1');

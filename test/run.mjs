@@ -13,6 +13,7 @@
    THE SHIPPED FILES rather than importing a copy, so the thing under test is the thing that ships.
    ============================================================================ */
 import fs from 'fs';
+import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -771,15 +772,18 @@ G('Craft: focus, contrast, landmarks, touch targets');
     const s=_tok(_land,'accent-solid');
     return s ? _ratio('#ffffff',s).toFixed(2)+':1' : 'no --accent-solid token';
   })());
+  /* <main id="main"> so the skip link has a target; the landmark is the element, not its attributes. */
   t('public pages have a main landmark',
-    /<main>/.test(read('index.html')) && /<main>/.test(read('refused/index.html')));
+    /<main[ >]/.test(read('index.html')) && /<main[ >]/.test(read('refused/index.html')));
   /* Vertical padding on an inline element is painted and clickable but does not grow the box, so
      the display change is what actually enlarges the target rather than just its paint. */
-  t('touch targets are enlarged on coarse pointers',
-    /@media\(hover:none\),\(max-width:760px\)/.test(read('index.html')) &&
-    /\.nav-links a\{display:inline-block;padding:11px 12px/.test(read('index.html')));
+  t('touch targets are enlarged on coarse pointers', (() => {
+    const h = read('index.html');
+    const block = (h.match(/@media \(hover:none\),\(max-width:760px\)\{([\s\S]*?)\n\}/)||[])[1] || '';
+    return /\.nav-links a:not\(\.btn\)\{display:inline-block;padding:12px 12px\}/.test(block);
+  })());
   t('footer links are targeted by their own class, not a losing generic selector',
-    /footer a,\.foot-l a\{display:inline-block;padding:12px 10px\}/.test(read('index.html')));
+    /\.foot-r a,\.foot-c a\{display:inline-block;padding:12px 10px\}/.test(read('index.html')));
 }
 
 /* ==================== OVERFLOW MENUS ==================== */
@@ -1084,6 +1088,41 @@ t('it states its own falsification', /this whole panel collapses to the plain in
 t('it converts the wait into a number rather than an apology',
   /It is a number rather than an apology/.test(term));
 
+/* ==================== COPY AND SECRETS ==================== */
+G('Words that sell nothing, and strings that should never ship');
+
+/* Marketing vocabulary reads as generated and says nothing a buyer can check. Rendered text only:
+   comments and scripts keep whatever they like. */
+{
+  const BANNED = ['powerful','intuitive','streamline','streamlined','seamless','leverage','cutting-edge',
+    'next-generation','revolutionary','unlock','empower','robust','world-class','best-in-class','effortless',
+    'supercharge','game-changing','elevate','harness','synergy','innovative','state-of-the-art','disrupt'];
+  const visible = h => h.replace(/<!--[\s\S]*?-->/g,'').replace(/<script[\s\S]*?<\/script>/gi,'')
+                        .replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').toLowerCase();
+  const pages = { index: read('index.html'), privacy: read('privacy/index.html'), terms: read('terms/index.html'),
+                  refused: read('refused/index.html'), thanks: read('thanks.html'), '404': read('404.html') };
+  const hits = [];
+  for (const [n,h] of Object.entries(pages)) {
+    const t = visible(h);
+    for (const w of BANNED) if (new RegExp('\\b' + w.replace(/[-]/g,'\\-') + '\\b').test(t)) hits.push(n + ':' + w);
+  }
+  t('no marketing vocabulary in rendered public copy', hits.length === 0, hits.length ? hits.join(', ') : 'clean');
+  t('no exclamation marks in rendered public copy',
+    Object.entries(pages).every(([,h]) => !/!/.test(visible(h).replace(/!important/g,''))));
+}
+
+/* Secret-shaped literals must never be in a tracked file. Integrity hashes in skills-lock.json and
+   the vendored libraries are excluded; everything else is scanned. */
+{
+  const tracked = execSync('git ls-files', {encoding:'utf8'}).split('\n').filter(f => f && !/^vendor\/|skills-lock\.json|\.png$|\.woff2?$|\.ico$/.test(f));
+  const PAT = /(sk_live_[A-Za-z0-9]{10,}|sk_test_[A-Za-z0-9]{10,}|whsec_[A-Za-z0-9]{10,}|re_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[bpa]-[A-Za-z0-9-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/;
+  const leaks = [];
+  for (const f of tracked) { let c=''; try { c = fs.readFileSync(f,'utf8'); } catch { continue; } const m = c.match(PAT); if (m) leaks.push(f + ': ' + m[1].slice(0,12) + '…'); }
+  t('no secret-shaped literal in any tracked file', leaks.length === 0, leaks.length ? leaks.join(', ') : tracked.length + ' files scanned');
+  t('a .gitignore exists and covers env files and builds', /^\.env$/m.test(read('.gitignore')) && /node_modules\//.test(read('.gitignore')) && /\.dev\.vars/.test(read('.gitignore')));
+  t('.mcp.json carries no literal key', !/x-api-key":\s*"[^$]/.test(read('.mcp.json')) && /\$\{API_KEY_21ST\}/.test(read('.mcp.json')));
+}
+
 /* ==================== LIGHTHOUSE ==================== */
 G('Audited, not assumed');
 
@@ -1235,7 +1274,8 @@ G('The front door and the instrument are one product');
 t('the landing page is on the same radius tiers as the terminal', (() => {
   const css = landing.slice(landing.indexOf('<style>'), landing.indexOf('</style>'));
   const radii = [...new Set((css.match(/border-radius:(\d+)px/g)||[]).map(x=>x.replace(/\D/g,'')))];
-  return radii.every(r => ['4','6','8','12','16'].includes(r));
+  /* 10 is the terminal's own --radius; the hero reproduces the terminal at its real value. */
+  return radii.every(r => ['4','6','8','10','12','16'].includes(r));
 })());
 t('and on the same type scale', (() => {
   const css = landing.slice(landing.indexOf('<style>'), landing.indexOf('</style>'));
@@ -1248,10 +1288,23 @@ t('font shorthand sizes are on the scale in both files', (() => {
   const off = x => (grab2(x).match(/font:[^;}]*?\b([0-9.]+)px/g)||[]).some(m=>m.includes('.'));
   return !off(landing) && !off(term);
 })());
-t('the landing page carries the same typographic principles',
-  /h1,h2,\.hero h1\{letter-spacing:-0\.02em;font-weight:600\}/.test(landing));
-t('and the same ban on pill-shaped controls',
-  /\.btn,button,input,select,textarea\{border-radius:8px\}/.test(landing));
+/* The landing page has a display face of its own; the principle it shares with the terminal is
+   tight tracking and a real weight step, not a specific weight. The face is self-hosted because
+   the page's CSP is font-src 'self'. */
+t('the landing page carries the same typographic principles', (() => {
+  const css = landing.slice(landing.indexOf('<style>'), landing.indexOf('</style>'));
+  return /@font-face\{\s*font-family:"Archivo";\s*src:url\("\.\/fonts\/Archivo\.woff2"\)/.test(css)
+      && /h1\{font-size:clamp\([^)]+\);font-weight:900;letter-spacing:-\.035em/.test(css)
+      && /h1,h2,h3\{font-family:var\(--display\);font-weight:800;letter-spacing:-\.02em/.test(css);
+})());
+t('the display font ships with the page', fs.existsSync('fonts/Archivo.woff2') && fs.statSync('fonts/Archivo.woff2').size > 20000);
+t('and the same ban on pill-shaped controls', (() => {
+  const css = landing.slice(landing.indexOf('<style>'), landing.indexOf('</style>'));
+  return /--r-md:8px/.test(css)
+      && /\.btn\{[^}]*border-radius:var\(--r-md\)/.test(css)
+      && /\.fg input,\.fg textarea\{[^}]*border-radius:var\(--r-md\)/.test(css)
+      && !/\.btn[^{]*\{[^}]*border-radius:999px/.test(css);
+})());
 
 /* ==================== TRANSACTIONAL MAIL ==================== */
 G('The last manual step in the access flow');
