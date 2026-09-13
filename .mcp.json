@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "shadcn": {
+      "command": "npx",
+      "args": ["-y", "@jpisnice/shadcn-ui-mcp-server", "--framework", "react"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}" }
+    },
+    "21st": {
+      "url": "https://21st.dev/api/mcp",
+      "headers": { "x-api-key": "${API_KEY_21ST}" }
+    }
+  }
+}

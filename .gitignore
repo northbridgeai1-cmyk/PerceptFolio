@@ -1,0 +1,33 @@
+# Secrets and local config. Nothing here is ever committed; Cloudflare, Modal and Stripe hold the real values.
+.env
+.env.*
+!.env.example
+.dev.vars
+*.pem
+*.key
+.wrangler/
+.mcp.local.json
+
+# Dependencies and builds
+node_modules/
+site/dist/
+site/.vite/
+kronos/.venv/
+kronos/__pycache__/
+**/__pycache__/
+*.pyc
+
+# Tooling state
+.impeccable/build/
+.impeccable/review/
+.impeccable/mocks/
+.playwright-mcp/
+playwright-report/
+test-results/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

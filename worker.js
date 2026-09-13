@@ -73,7 +73,7 @@ function escHtml(x) {
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 function decisionEmailBody(rec, decision, code, note) {
-  const tier = decision === 'business' ? 'business' : 'personal';
+  const tier = decision === 'business' ? 'business' : decision === 'employee' ? 'employee' : 'personal';
   if (decision === 'denied') {
     return {
       subject: 'Your PerceptFolio access request',
@@ -1021,7 +1021,8 @@ async function handle(request, env) {
     const id = clean(body.id, 40);
     const decision = clean(body.decision, 12).toLowerCase();
     const note = clean(body.note, 1000);
-    if (!['personal', 'business', 'denied'].includes(decision)) {
+    /* employee: a permanent code for NorthBridge staff, issued by the operator, never sold. */
+    if (!['personal', 'business', 'employee', 'denied'].includes(decision)) {
       return json({ error: 'decision must be personal, business or denied.' }, 400, env);
     }
     const stored = await env.PF_SYNC.get('req:' + id);
@@ -1077,7 +1078,7 @@ async function handle(request, env) {
     const stored = await env.PF_SYNC.get('req:' + id);
     if (!stored) return json({ error: 'No such request.' }, 404, env);
     const rec = JSON.parse(stored);
-    if (rec.status !== 'personal' && rec.status !== 'business') {
+    if (rec.status !== 'personal' && rec.status !== 'business' && rec.status !== 'employee') {
       return json({ error: 'Only a granted request can be paused.' }, 400, env);
     }
 
