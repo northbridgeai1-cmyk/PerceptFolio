@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/* Tokens from DESIGN.md. Dark by use scene, one action colour, teal only in the mark. Archivo is
+   self-hosted because the page's CSP is font-src 'self'. */
+@font-face { font-family: "Archivo"; src: url("/fonts/Archivo.woff2") format("woff2"); font-weight: 500 900; font-display: swap; }
+
+@theme {
+  --color-bg: #0b0c0f;
+  --color-panel: #131519;
+  --color-panel2: #1a1d23;
+  --color-line: #24272f;
+  --color-line2: #2f333c;
+  --color-text: #eef0f3;
+  --color-dim: #a9aeb8;
+  --color-faint: #949aa6;
+  --color-accent: #3b82f6;
+  --color-accent-solid: #2563eb;
+  --color-accent-deep: #1d4ed8;
+  --color-brand2: #1f9e8c;
+  --color-green: #2ea043;
+  --color-red: #e5534b;
+  --color-amber: #d9a441;
+  --color-tbg: #0e0f12;
+  --color-tpanel: #16181d;
+  --color-tpanel2: #1e2128;
+  --color-tline: #2b2f38;
+  --color-tmuted: #949aa6;
+  --font-display: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --spacing-sec: 96px;
+  --spacing-sec-lg: 120px;
+  --spacing-sec-sm: 64px;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    background:
+      radial-gradient(1200px 560px at 12% -6%, rgba(59,130,246,.10), transparent 62%),
+      radial-gradient(800px 420px at 96% 4%, rgba(31,158,140,.06), transparent 60%),
+      var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  ::selection { background: rgba(59,130,246,.35); }
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-line2); border: 3px solid var(--color-bg); border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: var(--color-bg); }
+  html { scrollbar-color: var(--color-line2) var(--color-bg); }
+  input, textarea, select, button { font: inherit; color: inherit; caret-color: var(--color-accent); }
+  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; border-radius: var(--radius-md); }
+  a { color: var(--color-accent); text-decoration: underline; text-underline-offset: .18em; text-decoration-thickness: 1px; text-decoration-color: rgba(59,130,246,.45); }
+  a:hover { text-decoration-color: currentColor; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing: -.02em; text-wrap: balance; line-height: 1.1; }
+  h1 { font-size: clamp(40px, 4.5vw, 64px); font-weight: 900; letter-spacing: -.035em; line-height: 1; }
+  h2 { font-size: clamp(32px, 3.4vw, 44px); letter-spacing: -.025em; line-height: 1.05; }
+  h3 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  p { max-width: 64ch; }
+  @media (max-width: 900px) { :root { --spacing-sec: 72px; --spacing-sec-lg: 88px; --spacing-sec-sm: 48px; } }
+  @media (max-width: 600px) { :root { --spacing-sec: 56px; --spacing-sec-lg: 64px; } h2 { font-size: 30px; } }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+}
+
+@layer utilities {
+  .wrap { max-width: 1280px; margin-inline: auto; padding-inline: 40px; }
+  @media (max-width: 900px) { .wrap { padding-inline: 28px; } }
+  @media (max-width: 600px) { .wrap { padding-inline: 20px; } }
+  .lede { font-size: 19px; line-height: 1.55; color: var(--color-dim); max-width: 58ch; }
+  .num { font-variant-numeric: tabular-nums; }
+  .sec { padding-block: var(--spacing-sec); }
+  .sec + .sec { border-top: 1px solid var(--color-line); }
+  .touch a:not(.btn) { display: inline-block; }
+  @media (hover: none), (max-width: 760px) { .nav-link { display: inline-block; padding: 12px 12px; } .foot-link { display: inline-block; padding: 12px 10px; } }
+  /* The one authored motion: rows and tiles resolve top to bottom from a visible default. */
+  @keyframes resolve { from { opacity: .28; transform: translateX(-5px); } to { opacity: 1; transform: none; } }
+  @keyframes land { from { opacity: 0; transform: translateY(6px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+  @keyframes shimmer { to { transform: translateX(100%); } }
+  .resolve { animation: resolve .6s var(--ease-out) calc(120ms + var(--i, 0) * 60ms) both; }
+  .land { animation: land .7s var(--ease-out) .9s both; }
+  .shimmer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.06), transparent); transform: translateX(-100%); animation: shimmer 1.6s var(--ease-out) infinite; }
+}

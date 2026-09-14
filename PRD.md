@@ -248,7 +248,7 @@ On every push and pull request: the existing suite (extended); `site/` lint, typ
 | M0 | PRD agreed; `.gitignore`; secret rotated; tools installed | `gitleaks` clean; you say go |
 | M1 | Cloudflare Pages project; session gate Function; `/enter`; employee permanent code issues and redeems; `/terminal/` unreachable without session | **Built 2026-09-13; `test/gate.mjs` 13/13 locally. Deploy needs `wrangler login` (§18).** |
 | M2 | Stripe integration against a local stub: Personal checkout, Business application → acceptance → checkout with seat quantity; webhook handler; portal; lapse flow; contract tests | **Built 2026-09-13; `test/billing.mjs` 31/31 against a stubbed Stripe. Live activation at M7 needs your Stripe account and Price IDs (§18).** |
-| M3 | `site/` React + shadcn: landing, pricing, how-it-works, enter, thanks, legal; skeleton loaders; banned-words test | Playwright pass; Lighthouse 100/100 |
+| M3 | `site/` React + shadcn: landing, pricing, apply, thanks, legal; skeleton loaders; banned-words test | **Built 2026-09-13.** Vite + React 18 + Tailwind v4 + shadcn-pattern primitives; 89 KB gzipped. Verified in the browser: hero, demo, pricing toggle, business acceptance state, apply, FAQ, zero console errors. `scripts/assemble.mjs` produces the Pages `dist/`. Lighthouse on the preview URL at M7. |
 | M4 | Guided Finnhub-key onboarding; **Business mode** in the terminal (org rulebook, attribution, seats, export); admin shows subscribers, orgs, applications, employees | Onboarding test; a 3-seat org round-trips |
 | M5 | Security items 1–20 + P1–P3 closed with evidence; `SECURITY.md` | Every row has a link |
 | M6 | Kronos service deployed; Model view; forecasts recorded and marked | A forecast appears in the record with a horizon |

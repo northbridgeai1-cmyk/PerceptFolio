@@ -1145,6 +1145,34 @@ G('The landing page sells the method without giving it away');
   t('no threshold or limit value is printed', !/cap 7\.2%|floor 7\.5%|max 2\.0 d|≥ 10%|≥ 40%|Under 30|≤ 1\.5/.test(v));
 }
 
+/* ==================== THE REACT SITE (site/) ==================== */
+G('M3: the public site, same rules as the page it replaces');
+{
+  const path = await import('path');
+  const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+  const src = walk('site/src').filter(f => /\.(tsx|ts)$/.test(f)).map(f => fs.readFileSync(f, 'utf8')).join('\n');
+  /* Visible copy in JSX lives between tags and in string literals; imports and identifiers do not
+     count. Strip import lines and camelCase identifiers before scanning. */
+  const copy = src.replace(/^import .*$/gm, '').replace(/[A-Za-z]+[A-Z][A-Za-z]*/g, ' ').toLowerCase();
+  const BANNED = ['powerful','intuitive','streamline','seamless','leverage','cutting-edge','next-generation','revolutionary','unlock','empower','robust','world-class','best-in-class','effortless','supercharge','game-changing','elevate','harness','synergy','innovative','state-of-the-art','disrupt'];
+  const hits = BANNED.filter(w => new RegExp('\\b' + w.replace(/-/g, '\\-') + '\\b').test(copy));
+  t('site: no marketing vocabulary in any component', hits.length === 0, hits.join(', ') || 'clean');
+  t('site: no em dash in any component', !src.includes('\u2014'));
+  const NAMES = ['Revenue growth','Gross margin','Operating margin','Free cash flow','Cash vs debt','Current ratio','EPS beats','Revenue guidance','Insider buying','Competitive moat','P/E vs own history','Comp analysis','DCF value','Forward P/E','PEG ratio','6-month return','12-month return','Near 52-week high','Beating the market'];
+  const leaked = NAMES.filter(n => src.toLowerCase().includes(n.toLowerCase()));
+  t('site: no rulebook check is named', leaked.length === 0, leaked.join(', ') || '19 names checked');
+  t('site: no "sign in" in copy', !/sign in/i.test(copy));
+  t('site: one primary in the hero, a text link beside it', /variant="primary" size="lg"><a href="#request">Request a demo<\/a>/.test(src) && /or try it on real history first/.test(src));
+  t('site: the nav carries no primary on /pricing', /\{!onPricing && <Button asChild variant="primary"/.test(src));
+  t('site: pricing demotes Personal when a business link is present', /variant=\{token \? 'secondary' : 'primary'\}/.test(src));
+  t('site: the resume link appears only with a local profile', /\{hasProfile && <a href="\/terminal\/"/.test(src));
+  t('site: skeleton before the demo deals; shimmer stops under reduced motion', /<Skeleton/.test(read('site/src/components/Demo.tsx')) && /prefers-reduced-motion: reduce\) \{ html \{ scroll-behavior: auto; \} \*, \*::before, \*::after \{ animation: none !important/.test(read('site/src/index.css')));
+  t('site: Archivo self-hosted, never a font CDN', /url\("\/fonts\/Archivo\.woff2"\)/.test(read('site/src/index.css')) && !/fonts\.googleapis/.test(src + read('site/index.html')) && fs.existsSync('site/public/fonts/Archivo.woff2'));
+  t('site: legal pages say software, not advice, and fourteen-day refunds', /not a registered investment adviser or broker-dealer/.test(src) && /Fourteen days from any payment/.test(src));
+  t('site: prices come from one config and match the PRD', /personal: \{ monthly: 149, yearly: 1490 \}/.test(read('site/src/lib/config.ts')) && /business: \{ monthly: 119, yearly: 1190, minSeats: 3 \}/.test(read('site/src/lib/config.ts')));
+  t('site: dist and node_modules are ignored', /site\/dist\//.test(read('.gitignore')) && /node_modules\//.test(read('.gitignore')));
+}
+
 /* ==================== BILLING (worker) ==================== */
 G('Stripe does the money; the worker does the access');
 {
