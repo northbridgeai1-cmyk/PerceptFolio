@@ -16,7 +16,7 @@
          to redirect every relative URL.
      font-src is 'self' on purpose. The display face is served from /fonts/ rather than a font CDN,
      because a page that says nothing leaves this origin should not be pulling type from another. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'self'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PerceptFolio | A research terminal that keeps score on itself</title>
@@ -137,6 +137,12 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:24px
 .nav-links a:not(.btn):hover{color:var(--text);background:var(--panel)}
 .nav-links .btn{margin-left:8px}
 
+.lang-toggle{display:inline-flex;border:1px solid var(--line2,#2f333c);border-radius:8px;overflow:hidden;font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em}
+.lang-toggle button{background:transparent;border:0;color:var(--faint,#949aa6);padding:8px 10px;cursor:pointer}
+.lang-toggle button[aria-pressed="true"]{background:var(--panel2,#1a1d23);color:var(--text,#eef0f3)}
+.lang-toggle button:hover{color:var(--text,#eef0f3)}
+.nav-links .lang-toggle{margin-left:6px}
+@media (max-width:600px){.nav-links .lang-toggle{display:inline-flex}}
 /* ---------- hero ---------- */
 .hero{padding:var(--sec) 0 0;position:relative}
 .hero-copy{max-width:920px}
@@ -161,6 +167,10 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:24px
   overflow:hidden;color:var(--ttext);font-size:14px;line-height:1.45;
   position:relative;
 }
+.stage-frame{display:block;width:1440px;height:900px;border:0;background:var(--tbg);pointer-events:none;transform-origin:0 0}
+.stage-tag{position:absolute;right:16px;top:14px;z-index:2}
+.stage-in{height:620px}
+@media (max-width:900px){.stage-in{height:420px}.stage-frame{width:1440px}}
 .stage-in::after{
   /* a soft fade on the right where the window runs off, so the cut edge is deliberate */
   content:"";position:absolute;inset:0 0 0 auto;width:120px;pointer-events:none;
@@ -384,6 +394,11 @@ section + section{border-top:1px solid var(--line)}
 .fg{margin-bottom:var(--s-20)}
 .fg label{display:block;font-weight:600;font-size:14px;margin-bottom:8px}
 .fg .req{color:var(--red)}
+.plan{border:0;padding:0}
+.plan legend{font-weight:600;font-size:14px;margin-bottom:8px}
+.plan .opt{display:inline-flex;align-items:center;gap:8px;margin-right:18px;font-size:15px;cursor:pointer}
+.plan .opt input{accent-color:var(--accent);width:16px;height:16px}
+.plan .seats{margin-top:14px;margin-bottom:0}
 .fg .muted{color:var(--faint)}
 .fg input,.fg textarea{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-md);padding:12px 14px;color:var(--text);font-size:15px;transition:border-color .15s}
 .fg textarea{min-height:110px;resize:vertical;line-height:1.5}
@@ -518,6 +533,7 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 var(--s-32)}
       <a href="#record">Record</a>
       <a href="#who">Who it's for</a>
       <a href="/terminal/" id="navOpen" hidden>Resume session</a>
+      <div class="lang-toggle" role="group" aria-label="Language"><button type="button" data-lang-toggle="en" aria-pressed="true">EN</button><button type="button" data-lang-toggle="es" aria-pressed="false">ES</button></div>
       <a class="btn btn-p" href="#request">Request a demo</a>
     </div>
   </div>
@@ -538,53 +554,12 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 var(--s-32)}
   </div>
 
   <div class="stage">
-    <div class="stage-in" role="img" aria-label="The PerceptFolio terminal on its dashboard. Portfolio value, cash to invest, positions, market exposure and open calls; a track-record card that says the first marks are still to come; and a list of positions, each with its verdict. Illustrative, not live data.">
-      <div class="t-top">
-        <div class="t-brand"><svg class="logo-mark" viewBox="0 0 40 40" width="24" height="24" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="#2b2f38" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="#f2f3f5">P</text><text x="20" y="28" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="700" fill="#1f9e8c">F</text></svg><span>Percept<span class="c2">Folio</span></span><span class="sep"></span><span class="screen">Dashboard</span></div>
-        <div class="t-search"><svg aria-hidden="true"><use href="#i-search"/></svg>Search a ticker… <span style="margin-left:auto;opacity:.6">/</span></div>
-        <div class="t-tag">Illustrative, not live</div>
-        <div class="t-user">T</div>
-      </div>
-      <div class="t-body">
-        <aside class="t-side" aria-hidden="true">
-          <a class="on"><svg><use href="#i-dash"/></svg>Dashboard</a>
-          <a><svg><use href="#i-portfolio"/></svg>Portfolio</a>
-          <a><svg><use href="#i-analyzer"/></svg>Analyzer</a>
-          <a><svg><use href="#i-history"/></svg>History</a>
-          <a class="more"><svg><use href="#i-chev"/></svg>More</a>
-        </aside>
-        <div class="t-main" aria-hidden="true">
-          <div class="d-greet"><h3>Good afternoon.</h3><p>Here's where things stand today.</p></div>
-          <div class="d-grid">
-            <div class="t-panel d-val">
-              <span class="d-l">Portfolio value</span>
-              <b class="num">$248,310.55</b>
-              <span class="d-sub">across 9 positions and cash</span>
-              <div class="d-tiles">
-                <div class="d-tile" style="--i:0;--dot:#3b82f6"><span class="d-l">Cash to invest</span><b class="num">$31,200</b></div>
-                <div class="d-tile" style="--i:1;--dot:#949aa6"><span class="d-l">Positions</span><b class="num">9</b></div>
-                <div class="d-tile" style="--i:2;--dot:#8b5cf6"><span class="d-l">Market exposure</span><b class="num">0.78 β</b></div>
-                <div class="d-tile" style="--i:3;--dot:#d9a441"><span class="d-l">Open calls</span><b class="num">6</b></div>
-              </div>
-            </div>
-            <div class="t-panel d-rec">
-              <span class="d-l"><i class="dot"></i>Track record, 90-day marks</span>
-              <b>Awaiting first marks</b>
-              <p>Six calls are logged. The first is marked on its own anniversary in December. Nothing is estimated from a shorter window to fill the space.</p>
-              <div class="d-bar"><i style="width:4%"></i></div>
-              <span class="d-sub num">0 of ~139 marked calls</span>
-            </div>
-          </div>
-          <div class="t-panel d-hold">
-            <h4>Positions <b>9</b></h4>
-            <div class="d-row" style="--i:4"><span class="d-t">NVDA</span><span class="d-w num">14.2%</span><span class="d-p watch">WATCH</span><span class="d-s">since Jun</span></div>
-            <div class="d-row" style="--i:5"><span class="d-t">MSFT</span><span class="d-w num">11.8%</span><span class="d-p buy">BUY candidate</span><span class="d-s">since Feb</span></div>
-            <div class="d-row" style="--i:6"><span class="d-t">COST</span><span class="d-w num">9.4%</span><span class="d-p hold">HOLD</span><span class="d-s">since 2025</span></div>
-            <div class="d-row" style="--i:7"><span class="d-t">LLY</span><span class="d-w num">8.1%</span><span class="d-p buy">BUY candidate</span><span class="d-s">since Aug</span></div>
-            <div class="d-row" style="--i:8"><span class="d-t">ASML</span><span class="d-w num">7.6%</span><span class="d-p watch">WATCH</span><span class="d-s">since Mar</span></div>
-          </div>
-        </div>
-      </div>
+    <div class="stage-in">
+      <!-- The real dashboard, not a drawing of it: preview/dashboard.html is a static snapshot of the
+           terminal's own markup and styles on the sandbox account, scripts removed. Regenerated when
+           the dashboard changes, so the landing page cannot drift from the product. -->
+      <iframe class="stage-frame" src="/preview/dashboard.html" title="The PerceptFolio dashboard on a sample account. Portfolio value, cash to invest, gain and loss, the track-record card, and the growth chart. Illustrative, not live." loading="eager" tabindex="-1" sandbox="allow-same-origin allow-scripts" scrolling="no"></iframe>
+      <div class="t-tag stage-tag">Illustrative, not live</div>
     </div>
   </div>
 </header>
@@ -705,6 +680,16 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 var(--s-32)}
             <label for="rqEmail">Email <span class="req" aria-hidden="true">*</span></label>
             <input id="rqEmail" type="email" required placeholder="you@example.com" autocomplete="email" inputmode="email">
           </div>
+          <fieldset class="fg plan">
+            <legend>For</legend>
+            <label class="opt"><input type="radio" name="plan" value="personal" checked> Myself</label>
+            <label class="opt"><input type="radio" name="plan" value="business"> A firm</label>
+            <div class="fg seats" id="seatsWrap" hidden>
+              <label for="rqSeats">How many people will use it</label>
+              <input id="rqSeats" type="number" min="1" max="500" value="3" inputmode="numeric">
+              <p class="hint">Three or more. Eight or more members get a lower price per seat; the quote will say so.</p>
+            </div>
+          </fieldset>
           <div class="fg">
             <label for="rqWho">Who you are, and what you run <span class="req" aria-hidden="true">*</span></label>
             <textarea id="rqWho" required placeholder="Your role, the size and style of the book, and what you want the terminal to do for it."></textarea>
@@ -778,6 +763,8 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 var(--s-32)}
   </div>
 </footer>
 
+<script src="/i18n/es.js"></script>
+<script src="/i18n/lang.js"></script>
 <script>
 const PF = {
   /* The Worker's own hostname. perceptfolio.com is GitHub Pages, a file host that cannot run code –
@@ -1046,12 +1033,14 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
   const who=document.getElementById('rqWho').value.trim();
   const call=readCall();
   const btn=document.getElementById('rqBtn');
-  const payload={email,who,call,at:Date.now()};
+  const plan=(document.querySelector('input[name=plan]:checked')||{}).value||'personal';
+  const seats=plan==='business'?parseInt(document.getElementById('rqSeats').value,10)||3:1;
+  const payload={email,who,call,plan,seats,at:Date.now()};
 
   /* The mail client is the floor this form cannot fall through. A visitor who has typed out who
      they are must never lose it to a worker that happens to be unreachable. */
   function mailFallback(note){
-    const body='Email: '+email+'\n\nWho and why:\n'+who+(call?'\n\nA call they would stand behind:\n'+call:'');
+    const body='Email: '+email+'\nFor: '+(plan==='business'?'a firm, '+seats+' seats':'myself')+'\n\nWho and what they run:\n'+who+(call?'\n\nA call they would stand behind:\n'+call:'');
     location.href='mailto:'+PF.contact+'?subject='+encodeURIComponent('PerceptFolio access request')+'&body='+encodeURIComponent(body);
     show('ok',(note||'')+'Opening your mail client. If nothing happened, send the details to <b>'+PF.contact+'</b> directly.');
   }
@@ -1102,6 +1091,18 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
    The primary action sits top right on every screen size. That is enough.
 
    Signed-in users get a quiet relabel instead, a hint, not a navigation. */
+/* Seats only matter for a firm; the field stays hidden until it does (Hick's law). */
+/* The dashboard frame is rendered at 1440px and scaled to fit its container, so it looks exactly as
+   it does on a desktop at every viewport instead of reflowing into something else. */
+(function fitFrame(){
+  const f=document.querySelector('.stage-frame'), box=f&&f.parentElement; if(!f)return;
+  const fit=()=>{ const w=box.clientWidth; const k=Math.min(1,w/1440); f.style.transform='scale('+k+')'; box.style.height=Math.round(Math.min(900,620/Math.max(k,.45))*k)+'px'; };
+  fit(); let t; addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(fit,120);});
+})();
+(function planToggle(){
+  const w=document.getElementById('seatsWrap'); if(!w)return;
+  document.querySelectorAll('input[name=plan]').forEach(r=>r.addEventListener('change',()=>{ w.hidden=r.value!=='business'||!r.checked; if(!w.hidden)document.getElementById('rqSeats').focus(); }));
+})();
 (function nudge(){
   try{
     const db=localStorage.getItem('quantfolio_v1');

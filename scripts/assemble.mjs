@@ -17,7 +17,7 @@ copy('terminal');                              // gated by functions/_middleware
 copy('admin.html');                            // gated, operator only
 copy('enter');                                 // the door
 copy('functions');                             // the gate, /api/enter, /api/leave, /api/portal
-copy('fonts'); copy('demo'); copy('favicon.svg'); copy('manifest.json'); copy('sw.js'); copy('robots.txt'); copy('sitemap.xml');
+copy('fonts'); copy('demo'); copy('preview'); copy('favicon.svg'); copy('manifest.json'); copy('sw.js'); copy('robots.txt'); copy('sitemap.xml');
 for (const f of ['icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.svg', 'icon-maskable-512.png', 'apple-touch-icon.png', 'thanks.html', '404.html']) copy(f);
 
 /* SPA routes: Pages serves index.html for unknown paths only with a _redirects rule. */

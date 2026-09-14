@@ -1136,10 +1136,22 @@ G('The landing page sells the method without giving it away');
   const leaked = NAMES.filter(n => v.includes(n.toLowerCase()));
   t('no check from the rulebook is named on the landing page', leaked.length === 0, leaked.length ? leaked.join(', ') : '21 names checked');
   t('every check row on the page is redacted; none carries a name', (idx.match(/class="r (ok|no|na) red"/g)||[]).length >= 6 && !/class="r (ok|no|na)"[^>]*><span class="m">[^<]*<\/span><span class="n">[A-Za-z]/.test(idx));
-  t('the hero shows the dashboard, not the analyzer', /<span class="screen">Dashboard<\/span>/.test(idx) && /class="d-greet"/.test(idx) && !/class="t-cols"/.test(idx));
+  /* The hero is the terminal's own dashboard: a static snapshot of its markup and styles, framed.
+     Identical by construction; regenerate the snapshot when the dashboard changes. */
+  t('the hero frames the real dashboard snapshot', /<iframe class="stage-frame" src="\/preview\/dashboard\.html"/.test(idx) && fs.existsSync("preview/dashboard.html") && /sandbox="allow-same-origin allow-scripts"/.test(idx));
+  t('the snapshot carries no script, no handlers, no sandbox banner class, and says it is illustrative', (() => { const p = read('preview/dashboard.html'); return (p.match(/<script/g)||[]).length === 2 && /\/i18n\/lang\.js/.test(p) && !/onclick=/.test(p) && !/<body[^>]*class="[^"]*\bdemo\b/.test(p) && /Illustrative values/.test(p); })());
+  t('the snapshot shows the dashboard with the compact sidebar', (() => { const p = read('preview/dashboard.html'); return /Good afternoon\./.test(p) && /pf-compact/.test(p) && /PORTFOLIO VALUE|Portfolio value/i.test(p); })());
+  t('frames are allowed from self only, and the snapshot is frameable by self only', /frame-src 'self'/.test(idx) && /frame-src 'self'/.test(read('functions/_middleware.js')) && /FRAMEABLE = \/\^\\\/preview\\\//.test(read('functions/_middleware.js')) && /frame-ancestors 'self'/.test(read('functions/_middleware.js')));
+  t('the React site frames the same snapshot', /src="\/preview\/dashboard\.html"/.test(read('site/src/components/TerminalDashboard.tsx')) && fs.existsSync('site/public/preview/dashboard.html'));
   /* Hick's law: one primary action in the hero and one in the nav; the alternative is a text link,
      and the terminal link is hidden until this browser has a profile. */
-  t('one primary button in the hero, no peer button beside it', (idx.match(/hero-actions[\s\S]*?<\/div>/)||[''])[0].split('class="btn').length === 2 && /class="hero-alt"/.test(idx));
+  t('one primary button in the hero, no peer button beside it', (idx.match(/<div class="hero-actions">[\s\S]*?<\/div>/)||[''])[0].split('class="btn').length === 2 && /class="hero-alt"/.test(idx));
+  /* Language: one dictionary, one translator, a toggle on every surface, and the choice persists. */
+  t('EN/ES toggle on the landing, the terminal, the door and the React nav', [idx, term, read('enter/index.html'), read('site/src/components/Nav.tsx')].every(h => /data-lang-toggle="es"|data-lang-toggle=\{l\}/.test(h)));
+  t('the translator and dictionary load on every surface and are one shared file', [idx, term, read('enter/index.html'), read('site/index.html')].every(h => /\/i18n\/lang\.js/.test(h) && /\/i18n\/es\.js/.test(h)) && read('i18n/es.js') === read('site/public/i18n/es.js'));
+  t('the dictionary covers the landing headings and the terminal chrome', (() => { const d = read('i18n/es.js'); return ['A research terminal that keeps score on itself.', 'Dashboard', 'Portfolio value', 'Request a demo', 'Enter your access code.', 'Two plans. One rulebook.'].every(k => d.includes("'" + k + "'") || d.includes('"' + k + '"')); })());
+  t('the choice persists and sets the document language', /localStorage\.setItem\(KEY, lang\)/.test(read('i18n/lang.js')) && /document\.documentElement\.lang = lang/.test(read('i18n/lang.js')));
+  t('re-rendered terminal views are re-translated', /new MutationObserver/.test(read('i18n/lang.js')));
   t('the terminal link is hidden until relevant', /id="navOpen" hidden>/.test(idx) && /b\.hidden=false/.test(idx));
   t('the terminal sidebar discloses advanced tabs behind More', /nav\.pf-compact button\.pf-adv\{display:none\}/.test(term) && /pf_nav_compact/.test(term) && /ADV\.indexOf\(t\)>-1/.test(term));
   t('no threshold or limit value is printed', !/cap 7\.2%|floor 7\.5%|max 2\.0 d|≥ 10%|≥ 40%|Under 30|≤ 1\.5/.test(v));
@@ -1164,7 +1176,12 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: no "sign in" in copy', !/sign in/i.test(copy));
   t('site: one primary in the hero, a text link beside it', /variant="primary" size="lg"><a href="#request">Request a demo<\/a>/.test(src) && /or try it on real history first/.test(src));
   t('site: the nav carries no primary on /pricing', /\{!onPricing && <Button asChild variant="primary"/.test(src));
-  t('site: pricing demotes Personal when a business link is present', /variant=\{token \? 'secondary' : 'primary'\}/.test(src));
+  t('site: pricing is quote-first, one primary per card, no self-serve checkout', /<Link to="\/#request">Request access<\/Link>/.test(src) && /Request seats for a firm/.test(src) && !/checkout\(/.test(read('site/src/pages/Pricing.tsx')));
+  t('site: the business discount is one constant, stated on the page and in the form hint', /BUSINESS_DISCOUNT = \{ minSeats: 8, pct: 15 \}/.test(read('site/src/lib/config.ts')) && /Eight or more members get a lower price per seat/.test(src));
+  t('forms ask personal or firm, and seats only for a firm', /name="plan" value="business"/.test(idx) && /id="seatsWrap" hidden/.test(idx) && /plan === 'business' && <div/.test(src));
+  t('the worker tells the operator on every request, with a suggested quote', /Demo request: \$\{plan\}/.test(worker) && /Suggested quote:\\n\$\{q\.text\}/.test(worker) && /BUSINESS_DISCOUNT = \{ minSeats: 8, pct: 15 \}/.test(worker));
+  t('member codes: one per email, operator only, business grants only, re-send instead of re-mint', /url\.pathname === '\/decide\/members'/.test(worker) && /rec\.status !== 'business'/.test(worker) && /rec\.members\.find\(x => x\.email === email\)/.test(worker));
+  t('admin has Send quote and Issue member codes', /function mailQuote/.test(read('admin.html')) && /async function issueMembers/.test(read('admin.html')) && /Issue member codes/.test(read('admin.html')));
   t('site: the resume link appears only with a local profile', /\{hasProfile && <a href="\/terminal\/"/.test(src));
   t('site: skeleton before the demo deals; shimmer stops under reduced motion', /<Skeleton/.test(read('site/src/components/Demo.tsx')) && /prefers-reduced-motion: reduce\) \{ html \{ scroll-behavior: auto; \} \*, \*::before, \*::after \{ animation: none !important/.test(read('site/src/index.css')));
   t('site: Archivo self-hosted, never a font CDN', /url\("\/fonts\/Archivo\.woff2"\)/.test(read('site/src/index.css')) && !/fonts\.googleapis/.test(src + read('site/index.html')) && fs.existsSync('site/public/fonts/Archivo.woff2'));

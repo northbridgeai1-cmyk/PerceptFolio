@@ -35,3 +35,8 @@ input[aria-invalid=true]{border-color:var(--red)}
 .link:hover{color:var(--text)}
 @media (hover:none),(max-width:760px){.foot a,.link{display:inline-block;padding:10px 0}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.lang-toggle{display:inline-flex;border:1px solid var(--line2,#2f333c);border-radius:8px;overflow:hidden;font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em}
+.lang-toggle button{background:transparent;border:0;color:var(--faint,#949aa6);padding:8px 10px;cursor:pointer}
+.lang-toggle button[aria-pressed="true"]{background:var(--panel2,#1a1d23);color:var(--text,#eef0f3)}
+.lang-toggle button:hover{color:var(--text,#eef0f3)}

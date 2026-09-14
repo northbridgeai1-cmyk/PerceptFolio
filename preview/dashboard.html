@@ -1,0 +1,2262 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<!-- SECURITY POLICY, as far as a static host allows.
+     GitHub Pages serves these files and permits no header configuration, so this is a meta CSP.
+     Two consequences worth stating rather than leaving for someone to discover:
+       * frame-ancestors and X-Frame-Options are IGNORED in a meta tag, so clickjacking cannot be
+         blocked declaratively here. The script at the end of the body refuses to render inside a
+         frame instead, which is weaker but not nothing.
+       * 'unsafe-inline' is unavoidable. The product is one HTML file with inline script and style
+         by design (invariant I2, no build step), so there is nothing to hash against and no
+         nonce to issue. What the policy still buys is real: connect-src pins outbound requests to
+         this origin, the worker and Finnhub, so an injected script cannot exfiltrate a portfolio
+         to an arbitrary host; object-src and frame-src are closed; base-uri cannot be rewritten
+         to redirect every relative URL. -->
+
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PerceptFolio dashboard, illustrative</title>
+<!-- Root-absolute, not relative. This file lives at /terminal/index.html so that the URL reads
+     perceptfolio.com/terminal — a relative "favicon.svg" would resolve to /terminal/favicon.svg
+     and 404. -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<!-- ---- Installable app (PWA) ---- -->
+
+<meta name="theme-color" content="#0e0f12">
+<!-- NOINDEX, and the reason matters. This is the tool, not the door. Left indexable, a search for
+     the product name could surface this login above the landing page, sending someone straight to
+     a gate they cannot pass with no explanation of what the thing is. The landing page is the page
+     that should rank; this one should never appear in a result. -->
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Know what to buy. Know what to sell. A private, offline-first portfolio tracker and stock checklist scorer.">
+<!-- iOS doesn't read manifest.json for these, so they have to be declared separately. -->
+<!-- Both, deliberately. The apple- prefixed tag is deprecated and Chrome warns about it, but older
+     iOS still reads only that one, and this is the tag that lets the terminal run from the home
+     screen without browser chrome. Dropping it to silence a console warning would break install on
+     the devices most likely to need it. -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PerceptFolio">
+<!-- MUST be a PNG. iOS silently ignores an SVG apple-touch-icon and falls back to a screenshot of
+     the page, which is what you get if this line ever points at icon.svg again. -->
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<!-- Chart.js, served from this origin rather than cdnjs. An offline-first terminal that
+     silently needs a third-party CDN on first load is not offline-first, and an
+     un-pinned CDN script runs with full access to a page holding positions and an API
+     key. Provenance and upgrade steps are in vendor/README.md. -->
+
+<style>
+:root{
+  /* Warm charcoal rather than pure black. Less eye strain over a long session, and it gives the
+     accent colours something to sit against instead of maximum-contrast voids. */
+  --bg:#0e0f12; --panel:#16181d; --panel2:#1e2128; --border:#2b2f38;
+  --text:#f2f3f5; --muted:#949aa6; --accent:#3b82f6; --green:#2ea043;
+  --red:#e5534b; --yellow:#d9a441; --research:#c98a3f; --brand2:#1f9e8c; --radius:10px;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+  /* Solid-button fill. Kept separate from --text because the primary button paints --text as its
+     BACKGROUND, reusing --text directly would make the button invert into unreadable dark-on-dark
+     the moment the theme flips. */
+  --btn-bg:#f2f3f5; --btn-fg:#0e0f12;
+  --pie-border:#16181d;
+  /* Semantic accents so different KINDS of number stop looking identical.
+     money going out / money coming in / profit / income / your own input. */
+  --c-out:#8b5cf6; --c-in:#3b82f6; --c-profit:#2ea043; --c-income:#d9a441; --c-mine:#ec8f5e;
+
+  /* ---- DESIGN SYSTEM: structure taken from DESIGN.md, skin deliberately not ----
+     The source is a marketing system: 80px heroes, 96px section rhythm, pastel feature cards. Its
+     STRUCTURE is what is worth having and its proportions are not, because this is a dense
+     instrument and its own house rule is density over whitespace. So the scale ratios, the 4px
+     base unit, the radius tiers and the elevation tiers are adopted, and re-anchored one to two
+     steps down. None of its colours or brand are used.
+
+     Before this there were 27 distinct font sizes, 14 radii and 23 padding values in the
+     stylesheet, which is not a scale, it is an accumulation. */
+
+  /* Spacing: 4px base, 8px primary increment, exactly as the source specifies. */
+  --sp-xxs:4px; --sp-xs:8px; --sp-sm:12px; --sp-md:16px; --sp-lg:24px;
+  --sp-xl:32px; --sp-2xl:48px; --sp-3xl:64px;
+
+  /* Type scale. The source's ratios, anchored at 13px body rather than 16px, because a terminal
+     is read in columns and not in paragraphs. Negative tracking on display sizes and the
+     600 heading / 500 button / 400 body weights are its principles, kept as-is. */
+  --fs-micro:10px;  --fs-caption:11px; --fs-sm:12px;   --fs-body:13px;
+  --fs-md:14px;     --fs-lg:16px;      --fs-h5:18px;   --fs-h4:20px;
+  --fs-h3:24px;     --fs-h2:30px;      --fs-h1:40px;
+  --lh-tight:1.2;   --lh-normal:1.5;   --lh-body:1.6;
+  --tr-display:-0.02em; --tr-heading:-0.01em;
+  --fw-body:400; --fw-medium:500; --fw-heading:600;
+
+  /* Radius tiers. The source's rule that a full radius is for status badges and NEVER for regular
+     buttons already matches this project's own ban on pill buttons, so it is adopted verbatim. */
+  --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-full:9999px;
+
+  /* Elevation. Four tiers rather than shadows invented per component. Tuned for a dark ground,
+     where the source's light-mode alphas disappear entirely. */
+  --el-1:0 1px 2px rgba(0,0,0,.28);
+  --el-2:0 4px 12px rgba(0,0,0,.34);
+  --el-3:0 16px 40px rgba(0,0,0,.46);
+  --el-4:0 16px 48px -8px rgba(0,0,0,.55);
+}
+/* Light theme. Same variable names, different values. Every rule downstream is already written
+   against the variables, so nothing else has to change. */
+body.theme-light{
+  --bg:#f6f6f4; --panel:#ffffff; --panel2:#eeeeec; --border:#d8d8d4;
+  --text:#1c1c1e; --muted:#6b6b70; --accent:#2563eb; --green:#1a7f37;
+  --red:#c9372c; --yellow:#9a6700; --research:#8a5a1a; --brand2:#0f5c51;
+  --btn-bg:#1c1c1e; --btn-fg:#ffffff;
+  --pie-border:#ffffff;
+  --c-out:#7c3aed; --c-in:#2563eb; --c-profit:#1a7f37; --c-income:#9a6700; --c-mine:#c2410c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  min-height:100vh;-webkit-font-smoothing:antialiased}
+button{cursor:pointer;font-family:inherit}
+input,select{font-family:inherit;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 13px;font-size:14px;outline:none;width:100%;transition:border-color .1s ease}
+input:focus,select:focus{border-color:var(--text)}
+input::placeholder{color:var(--muted)}
+.btn{background:var(--btn-bg);color:var(--btn-fg);border:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:14px;transition:opacity .1s ease}
+.btn:hover{opacity:.85}
+.btn:active{opacity:.7}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);font-family:var(--mono);font-size:13px;letter-spacing:.02em}
+.btn-ghost:hover{border-color:var(--text)}
+.btn-danger{background:transparent;color:var(--red);border:1px solid var(--border);font-family:var(--mono);font-size:13px}
+.btn-danger:hover{border-color:var(--red)}
+.btn-sm{padding:7px 6px;font-size:12px}
+/* Installed on iOS the status bar is translucent and content runs under the notch, so the header
+   pads itself by whatever the device reports as its safe area. On desktop these insets are 0. */
+header{display:flex;align-items:center;gap:10px;padding:0 16px 0 12px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:50;
+  padding-top:env(safe-area-inset-top);height:calc(56px + env(safe-area-inset-top));
+  padding-left:calc(24px + env(safe-area-inset-left));padding-right:calc(24px + env(safe-area-inset-right))}
+.logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;display:inline-flex;align-items:center;gap:7px}
+.logo-mark{flex-shrink:0}
+/* The wordmark is ONE flex child. Without this wrapper the .logo `gap` would push the two coloured
+   halves apart and render "Percept Folio". It's one word, so they must sit flush. */
+.logo-word{display:inline-flex;letter-spacing:-.01em}
+.logo .c1{color:var(--text)}
+.logo .c2{color:var(--brand2)}
+/* ---------- SIDEBAR ----------
+   Thirteen destinations do not fit across a top bar without shrinking every label to the point of
+   uselessness. Down the side there is room, and collapsed it costs 56px while every icon stays
+   clickable. The width lives in a custom property so main's offset and the sidebar itself can never
+   disagree about how wide it is. */
+:root{--side:222px;--side-collapsed:60px;--ease:cubic-bezier(.32,.72,0,1)}
+/* Header spans the full width, sidebar hangs beneath it, so the sidebar sticks at the header's
+   height, not at 0. Sticking at 0 would make it slide up under the header on the first scroll. */
+#shell{display:flex;align-items:flex-start;min-height:calc(100vh - 56px)}
+#sidebar{
+  width:var(--side);flex:none;position:sticky;
+  top:calc(56px + env(safe-area-inset-top));
+  height:calc(100vh - 56px - env(safe-area-inset-top));
+  border-right:1px solid var(--border);background:var(--panel);
+  display:flex;flex-direction:column;padding:12px 10px 10px;
+  transition:width .22s var(--ease);overflow:hidden;
+  padding-left:calc(10px + env(safe-area-inset-left));
+}
+body.side-collapsed #sidebar{width:var(--side-collapsed);padding-left:calc(6px + env(safe-area-inset-left));padding-right:6px}
+
+/* The collapse control lives in the header beside the wordmark. Top of the screen, first thing
+   the eye reaches, and it doesn't cost the sidebar a row. */
+#sideToggle{
+  background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;
+  width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center;
+  transition:color .14s,background .14s,border-color .14s,transform .22s var(--ease)}
+#sideToggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#sideToggle:hover{color:var(--text);background:var(--panel2);border-color:var(--border)}
+body.side-collapsed #sideToggle{transform:rotate(180deg)}
+.hd-div{width:1px;height:20px;background:var(--border);flex:none;margin:0 2px}
+header>.logo{text-decoration:none;flex:none}
+
+#sidebar nav{display:flex;flex-direction:column;gap:1px;flex:1;overflow-y:auto;overflow-x:hidden;margin:0 -2px;padding:0 2px}
+#sidebar nav button{
+  background:transparent;border:none;color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;gap:12px;width:100%;
+  padding:9px 10px;border-radius:8px;position:relative;
+  font-family:var(--mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+  text-align:left;transition:background .14s,color .14s;white-space:nowrap;
+}
+#sidebar nav button .ico{width:19px;height:19px;flex:none;display:grid;place-items:center}
+#sidebar nav button .ico svg{
+  width:17px;height:17px;fill:none;stroke:currentColor;
+  stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;
+  transition:stroke-width .14s}
+#sidebar nav button:hover{color:var(--text);background:var(--panel2)}
+#sidebar nav button.active{color:var(--text);background:var(--panel2)}
+#sidebar nav button.active .ico{color:var(--brand2)}
+#sidebar nav button.active .ico svg{stroke-width:2}
+/* A left rule rather than a full inversion, a solid block of --text was shouting at this size. */
+#sidebar nav button.active:before{
+  content:"";position:absolute;left:-2px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--brand2)}
+#sidebar nav button:active{transform:translateY(.5px)}
+.nav-sep{height:1px;background:var(--border);margin:8px 8px;flex:none}
+.side-foot{flex:none;padding:10px 10px 2px;font:10px/1.4 var(--mono);color:var(--muted);opacity:.5;letter-spacing:.05em}
+.side-foot b{color:var(--text);font-weight:600}
+
+/* Collapsed: labels, badge and footer hint vanish; icons centre. */
+body.side-collapsed #sidebar .lbl,
+body.side-collapsed #sidebar .badge,
+body.side-collapsed .side-foot{display:none}
+body.side-collapsed #sidebar nav button{justify-content:center;padding-left:0;padding-right:0;gap:0}
+body.side-collapsed .nav-sep{margin:8px 12px}
+
+/* TOOLTIPS. Icons with no labels is guesswork, so the collapsed rail names everything on hover.
+   Pure CSS, no positioning library, and it cannot desync from the button it belongs to. */
+body.side-collapsed #sidebar nav button:after{
+  content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%) translateX(-4px);
+  background:var(--panel2);color:var(--text);border:1px solid var(--border);
+  padding:6px 10px;border-radius:6px;font-size:11px;letter-spacing:.06em;
+  white-space:nowrap;pointer-events:none;opacity:0;z-index:120;
+  box-shadow:0 6px 20px rgba(0,0,0,.45);transition:opacity .13s,transform .13s var(--ease)}
+body.side-collapsed #sidebar nav button:hover:after{opacity:1;transform:translateY(-50%) translateX(0)}
+body.side-collapsed #sidebar{overflow:visible}
+body.side-collapsed #sidebar nav{overflow:visible}
+
+/* ---------- feel ----------
+   Small things, but they are the difference between a page and an instrument. */
+::selection{background:rgba(31,158,140,.3);color:var(--text)}
+*{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;border:3px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#3d434f}
+/* Keyboard focus gets a real ring; mouse clicks do not. :focus-visible is what separates them. */
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--brand2);outline-offset:2px;border-radius:6px}
+button{-webkit-tap-highlight-color:transparent}
+.btn:active{transform:translateY(1px)}
+/* Panels lift very slightly under the cursor. Enough to read as interactive, not enough to bounce. */
+.card{transition:border-color .16s,box-shadow .16s}
+.card:hover{border-color:#343945}
+/* Tab changes fade rather than snap. 140ms is below the threshold where it feels like waiting. */
+main>div:not(.tabs-hidden){animation:tabIn .16s var(--ease)}
+@keyframes tabIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  main>div:not(.tabs-hidden){animation:none}
+  #sidebar,#sideToggle{transition:none}
+}
+/* Where you are, in the header. Cheap orientation once the sidebar labels can be hidden. */
+.nw-win.on{background:var(--panel2);border-color:var(--brand2);color:var(--text)}
+/* Sources fold away behind an arrow. The headlines are the evidence, but nobody wants forty of
+   them stacked on screen at once. */
+.nw-src{margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+.nw-src summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);transition:color .13s}
+.nw-src summary::-webkit-details-marker{display:none}
+.nw-src summary:hover{color:var(--text)}
+.nw-src summary:before{content:"";width:0;height:0;flex:none;
+  border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;
+  transition:transform .16s var(--ease)}
+.nw-src[open] summary:before{transform:rotate(90deg)}
+.hd-where{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header>.row{margin-left:auto;flex:none}
+
+/* ---------- ticker command palette ---------- */
+.hd-search{position:relative;flex:1;max-width:420px;margin:0 auto;display:flex;align-items:center}
+.hd-search-ico{position:absolute;left:11px;width:15px;height:15px;fill:none;stroke:var(--muted);
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;transition:stroke .14s}
+.hd-search:focus-within .hd-search-ico{stroke:var(--brand2)}
+#globalSearch{width:100%;max-width:none;background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px 8px 34px;font-size:13px;color:var(--text);
+  transition:border-color .14s,background .14s}
+#globalSearch::placeholder{color:var(--muted);opacity:.75}
+#globalSearch:focus{outline:none;border-color:var(--brand2);background:var(--panel2)}
+.gs-panel{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:80;display:none;
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;
+  box-shadow:0 16px 44px rgba(0,0,0,.55)}
+.gs-panel.on{display:block;animation:tabIn .13s var(--ease)}
+.gs-head{padding:11px 14px;border-bottom:1px solid var(--border);background:var(--panel2);
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.gs-sym{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.03em}
+.gs-meta{font-size:11px;color:var(--muted);margin-left:auto;text-align:right;line-height:1.4}
+.gs-act{display:flex;align-items:center;gap:11px;padding:10px 14px;width:100%;cursor:pointer;
+  background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);
+  font-size:13px;text-align:left;font-family:inherit;transition:background .12s}
+.gs-act:last-child{border-bottom:none}
+.gs-act:hover,.gs-act.sel{background:var(--panel2)}
+.gs-act .gi{width:17px;height:17px;flex:none;fill:none;stroke:var(--muted);stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.gs-act:hover .gi,.gs-act.sel .gi{stroke:var(--brand2)}
+.gs-act small{color:var(--muted);font-size:11px;margin-left:auto;white-space:nowrap}
+.gs-empty{padding:16px 14px;color:var(--muted);font-size:13px;line-height:1.6}
+
+.badge{background:var(--red);color:#fff;border-radius:8px;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;margin-left:auto;flex:none}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--text);flex-shrink:0}
+main{flex:1;min-width:0;max-width:1180px;padding:28px 26px;
+  padding-right:calc(26px + env(safe-area-inset-right));
+  padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+.grid{display:grid;gap:14px}
+.grid-2{grid-template-columns:1fr 1fr}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:820px){.grid-2,.grid-3{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.card h3{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}
+.big{font-family:var(--mono);font-size:24px;font-weight:600;letter-spacing:-.2px;font-variant-numeric:tabular-nums}
+.pos{color:var(--green)} .neg{color:var(--red)} .warn{color:var(--yellow)}
+.muted{color:var(--muted);font-size:13px}
+/* Test-account banner. Deliberately loud: a demo mistaken for the real account is how someone
+   concludes their portfolio has been wiped. */
+body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. Nothing here is real.";
+  display:block;background:var(--amber,#d9a441);color:#151515;font:700 11px/1 var(--mono);
+  letter-spacing:.09em;text-transform:uppercase;text-align:center;padding:7px 10px;position:sticky;top:0;z-index:300}
+
+/* ---- thesis probability ---- */
+.prob-box{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px;margin:12px 0 4px}
+.prob-head{font:11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.prob-row{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.prob-k{font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:7px}
+.prob-v{font:700 24px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.prob-n{font-size:11px;line-height:1.5;color:var(--muted);margin-top:6px}
+.prob-own{display:flex;align-items:baseline;gap:5px}
+.prob-own input{width:82px;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:5px 9px;font:700 20px/1.15 var(--mono);font-variant-numeric:tabular-nums}
+.prob-own span{font:600 18px/1 var(--mono);color:var(--muted)}
+/* The assumption is not a footnote. A probability printed without it is false precision with a
+   Nobel Prize stapled to it, so it renders in warning colour directly beneath the number. */
+.prob-warn{font-size:11px;line-height:1.55;color:var(--yellow);margin-top:13px;padding-top:11px;border-top:1px solid var(--border)}
+.prob-warn b{color:var(--text)}
+@media(max-width:760px){.prob-row{grid-template-columns:1fr;gap:14px}.prob-v{font-size:20px}}
+
+/* ---- TRACK RECORD STRIP ----
+   The Council's verdict was that the track record is the product and the portfolio value is not,
+   so the record gets real estate above the fold on both the Command screen and the Dashboard.
+   It leads with EXPECTANCY. It used to lead with "8 of 10 right", which is the most manufacturable
+   statistic in the discipline: sell covered calls, take profit at +0.5%, never stop out, and you can
+   report 95% right while losing money on every third gap-down. Expectancy cannot be gamed that way,
+   because a large loss is still in the average. */
+.rec{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
+.rec-head{font:11px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
+  display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.rec-head:before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent);flex:none}
+.rec-top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.rec-val{font:700 30px/1 var(--mono);letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.rec-unit{font:400 12px/1 var(--mono);color:var(--muted);margin-left:7px;letter-spacing:0}
+.rec-ci{font-size:12px;color:var(--muted);line-height:1.5}
+/* The reading is the sentence that matters, so it is not muted into the furniture. */
+.rec-read{font-size:13px;line-height:1.5;margin-top:3px}
+.rec-read.thin{color:var(--yellow)}
+.rec-bar{height:5px;border-radius:4px;background:var(--panel2);overflow:hidden;margin-top:12px;border:1px solid var(--border)}
+.rec-bar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
+.rec-bar i.done{background:var(--green)}
+.rec-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  font:11px/1.5 var(--mono);color:var(--muted);margin-top:7px}
+.rec-foot b{color:var(--text);font-weight:600}
+/* ---- marks schedule ---- */
+.md{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px;margin-bottom:18px}
+.md-head{font:11px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+.md-head b{color:var(--text)}
+.md-row{display:flex;align-items:baseline;gap:12px;padding:6px 0;border-top:1px solid var(--border);flex-wrap:wrap}
+.md-row:first-of-type{border-top:none}
+.md-when{font:700 11px/1 var(--mono);letter-spacing:.04em;min-width:74px;color:var(--muted)}
+.md-sym{font:700 13px/1 var(--mono);letter-spacing:-.01em}
+.md-meta{font:11px/1.4 var(--mono);color:var(--faint)}
+@media(max-width:600px){.rec-val{font-size:24px}}
+.hero{padding:8px 0 28px}
+.hero-label{font-family:var(--mono);color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.hero-value{font-family:var(--mono);font-size:48px;font-weight:600;letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1.1}
+/* Square icon button for the header, sized to sit level with the avatar and the Go button. */
+.icon-btn{background:transparent;border:1px solid var(--border);color:var(--text);cursor:pointer;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;transition:border-color .12s,color .12s}
+.icon-btn:hover{border-color:var(--text)}
+.icon-btn.open{border-color:var(--accent);color:var(--accent)}
+.privacy-btn{background:rgba(255,255,255,.08);border:none;color:var(--muted);cursor:pointer;width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;transition:background .15s,color .15s}
+.privacy-btn:hover{background:rgba(255,255,255,.15);color:var(--text)}
+.privacy-btn svg{width:18px;height:18px;display:block}
+.hero-change{display:inline-flex;align-items:center;gap:4px;margin-top:10px;font-family:var(--mono);font-size:14px;font-weight:600;padding:4px 10px;border-radius:16px}
+.hero-change.pos{background:rgba(46,160,67,.15)}
+.hero-change.neg{background:rgba(229,83,75,.15)}
+.hero-change.flat{background:var(--panel2);color:var(--muted)}
+/* Stat cards. Each one carries a coloured left rule keyed to WHAT KIND of number it is, so a row of
+   four dollar figures stops reading as four copies of the same thing. */
+.stat-row{display:flex;gap:14px;padding:18px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:24px;flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;gap:5px;padding:10px 14px;border-left:3px solid var(--border);background:var(--panel);flex:1;min-width:150px}
+.stat-label{font-family:var(--mono);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.stat-value{font-family:var(--mono);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat.s-out{border-left-color:var(--c-out)}
+.stat.s-in{border-left-color:var(--c-in)}
+.stat.s-profit{border-left-color:var(--c-profit)}
+.stat.s-income{border-left-color:var(--c-income)}
+.stat.s-count{border-left-color:var(--muted)}
+.stat.s-out .stat-label{color:var(--c-out)}
+.stat.s-in .stat-label{color:var(--c-in)}
+.stat.s-profit .stat-label{color:var(--c-profit)}
+.stat.s-income .stat-label{color:var(--c-income)}
+/* Column-type tinting: score columns, the app's call, and your own call each get their own hue so
+   adjacent columns of similar-looking pills are immediately separable. */
+.th-quality{color:var(--green)!important}
+.th-value{color:var(--accent)!important}
+.th-momentum{color:var(--yellow)!important}
+.th-ai{color:var(--brand2)!important}
+.th-mine{color:var(--c-mine)!important}
+.th-profit{color:var(--c-profit)!important}
+.th-den{opacity:.6;font-weight:400}
+/* Your own manual call is an input, not a computed badge, dashed border keeps it reading as something
+   you filled in, while the colour tells you what you picked at a glance. */
+.mycall{max-width:112px;font-size:12px;padding:5px 8px;border-style:dashed;border-width:1px;background:transparent;font-weight:600}
+.mycall-buy{border-color:var(--green);color:var(--green)}
+.mycall-hold{border-color:var(--c-mine);color:var(--c-mine)}
+.mycall-sell{border-color:var(--red);color:var(--red)}
+.mycall-watching{border-color:var(--accent);color:var(--accent)}
+/* Unset: deliberately low-contrast so untagged rows stay quiet. */
+.mycall-none{border-color:var(--border);color:var(--muted);opacity:.65;font-weight:400}
+.mycall-none:hover{opacity:1}
+.mycall option{background:var(--panel);color:var(--text);font-weight:400}
+.greeting{font-size:20px;font-weight:700;letter-spacing:-.3px;margin-bottom:2px}
+.greeting-sub{color:var(--muted);font-size:14px;margin-bottom:24px}
+.welcome-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px}
+.welcome-card h2{font-size:18px;margin-bottom:6px;font-weight:700}
+.step-num{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);color:var(--text);align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:8px;flex-shrink:0}
+/* ---- "+ Add" dialogs ----
+   The add forms used to sit permanently at the top of their tabs, so the first thing you saw on
+   Portfolio was a data-entry row rather than your portfolio. They are unchanged internally, same
+   markup, same element ids, same functions, and are simply hidden until asked for, then shown as
+   a centred sheet. Nothing about how an add works changed; only when the form is on screen. */
+.tab-actions{display:flex;justify-content:flex-end;margin-bottom:12px}
+.btn-add{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;
+  font-size:13px;font-weight:600;border:1px solid var(--border);background:var(--panel);
+  color:var(--text);cursor:pointer;font-family:inherit}
+.btn-add:hover{border-color:#3d434f;background:var(--panel2)}
+.btn-add .plus{font-size:14px;line-height:1;color:var(--accent)}
+.addwrap{display:none}
+.addwrap.open{display:block;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6);
+  padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.addwrap.open>.card{max-width:560px;margin:8vh auto 40px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.addwrap .add-close{position:absolute;top:14px;right:16px;background:none;border:none;
+  color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:4px 8px}
+.addwrap .add-close:hover{color:var(--text)}
+@media(max-width:600px){.addwrap.open>.card{margin:4vh auto 40px}}
+.agree-row{display:flex;gap:9px;align-items:flex-start;margin:14px 0 12px;font-size:12px;
+  line-height:1.5;color:var(--muted)}
+.agree-row input{width:auto;margin-top:2px;flex:none}
+.agree-row a{color:var(--accent)}
+.ovf-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:6px;
+  display:inline-flex;align-items:center;line-height:1}
+.ovf-btn:hover{color:var(--text);background:var(--panel2)}
+.ovf-btn svg{fill:currentColor}
+/* ---- QUIET NOTES ----
+   Every panel had grown a paragraph or three explaining itself. Individually each was defensible;
+   together they read as software apologising for its own output, which is the surest sign of a
+   thing built by a model rather than for a professional. A terminal states the number.
+
+   The content is not deleted, because the reasoning is what makes these figures honest and the
+   caveats are load-bearing. It is folded shut. One quiet line, opened only by someone who wants
+   it, closed by default for someone who already knows. */
+.aside{margin-top:8px}
+.aside>summary{cursor:pointer;list-style:none;color:var(--muted);font-size:var(--fs-caption);
+  letter-spacing:.02em;display:inline-flex;align-items:center;gap:5px;padding:2px 0}
+.aside>summary::-webkit-details-marker{display:none}
+.aside>summary::before{content:'+';font-family:var(--mono);opacity:.7}
+.aside[open]>summary::before{content:'\2212'}
+.aside>summary:hover{color:var(--text)}
+.aside>div{margin-top:7px;font-size:var(--fs-sm);line-height:1.65;color:var(--muted);
+  border-left:1px solid var(--border);padding-left:11px;max-width:78ch}
+.prov{border-bottom:1px dotted var(--muted);cursor:help}
+.prov:hover{border-bottom-style:solid;color:var(--accent)}
+.prov:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.ovf-menu{position:fixed;z-index:500;min-width:170px;background:var(--panel);border:1px solid var(--line2);
+  border-radius:8px;padding:5px;box-shadow:0 12px 34px rgba(0,0,0,.5)}
+.ovf-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);
+  font:inherit;font-size:13px;padding:8px 10px;border-radius:6px;cursor:pointer}
+.ovf-item:hover{background:var(--panel2)}
+.ovf-item.danger{color:var(--red)}
+.ovf-swatches{display:flex;gap:5px;padding:8px 10px 6px;border-top:1px solid var(--line);margin-top:4px}
+.ovf-swatches button{width:15px;height:15px;border-radius:50%;cursor:pointer;padding:0}
+
+/* list rows */
+.list-rows{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel)}
+.list-row{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);
+  cursor:pointer;transition:background .12s}
+.list-row:last-child{border-bottom:none}
+.list-row:hover{background:var(--panel2)}
+.list-row-dot{width:9px;height:9px;border-radius:50%;flex:none}
+.list-row-name{font-size:14px;font-weight:600}
+.list-row-tag{font:10px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+  border:1px solid var(--border);border-radius:4px;padding:3px 5px}
+.list-row-n{margin-left:auto;font:12px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:14px}
+.crumb a{cursor:pointer;color:var(--muted)}
+.crumb a:hover{color:var(--text)}
+.crumb .sep{opacity:.5}
+.crumb .cur{color:var(--text);font-weight:650}
+.list-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.list-card{display:flex;flex-direction:column;gap:6px;text-align:left;cursor:pointer;
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 16px 14px;
+  color:var(--text);font-family:inherit;transition:border-color .14s,background .14s}
+.list-card:hover{border-color:#3d434f;background:var(--panel2)}
+.list-card-top{display:flex;align-items:center;gap:8px;font-size:14px}
+.list-card-dot{width:9px;height:9px;border-radius:50%;flex:none}
+.list-card-tag{font:10px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+  border:1px solid var(--border);border-radius:4px;padding:3px 5px}
+.list-card-n{font:700 24px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.list-card-sub{font-size:11px;color:var(--muted);line-height:1.45;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list-head{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:16px 18px;margin-bottom:16px}
+.list-head-main{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+.list-head-dot{width:12px;height:12px;border-radius:50%;flex:none}
+.list-head-name{font-size:20px;letter-spacing:-.02em;font-weight:700;margin:0}
+.list-pick{background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+  border-radius:6px;padding:2px 6px;font-size:11px;max-width:110px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-family:var(--mono);text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--border)}
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{color:var(--text)}
+td{padding:12px 10px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.pill{display:inline-block;padding:3px 9px;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.pill-buy{background:rgba(46,160,67,.15);color:var(--green)}
+.pill-sell{background:rgba(229,83,75,.15);color:var(--red)}
+.pill-hold{background:rgba(217,164,65,.15);color:var(--yellow)}
+.pill-watch{background:rgba(59,130,246,.15);color:var(--accent)}
+.pill-na{background:var(--panel2);color:var(--muted)}
+.research-card{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--research);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.research-badge{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--research);background:rgba(201,130,42,.14);padding:3px 8px;border-radius:6px}
+.research-stat{font-family:var(--mono);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.1px}
+.research-stat-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-weight:600}
+.research-tag{background:var(--panel2);color:var(--muted);font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:16px;border:1px solid var(--border)}
+.check-pass{color:var(--green);font-weight:600}
+.check-fail{color:var(--red);font-weight:600}
+.check-na{color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.section-title{font-family:var(--mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:34px 0 14px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.alert-item{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;background:var(--panel)}
+.alert-dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.disclaimer{font-size:12px;color:var(--muted);border-top:1px solid var(--border);margin-top:40px;padding:20px 0;text-align:center;line-height:1.6}
+/* ---- SIGN-IN ----
+   A split front door: what this is on the left, the form on the right. The old version stacked the
+   log-in form and the create-account form on top of each other, so the screen you use every day was
+   half-filled with a form you use once. They're a toggle now.
+   Deliberately the same palette and type as the app, executed with more room, clicking through
+   should feel continuous, not like arriving somewhere else. */
+.auth{min-height:100vh;display:grid;grid-template-columns:1.05fr .95fr}
+.auth-brand{position:relative;overflow:hidden;background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;justify-content:center;padding:56px 60px}
+/* Faint blueprint grid, faded out at the edges with a mask so it never competes with the text. */
+.auth-grid{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:44px 44px;opacity:.25;
+  -webkit-mask-image:radial-gradient(ellipse 75% 65% at 32% 42%,#000,transparent 78%);
+  mask-image:radial-gradient(ellipse 75% 65% at 32% 42%,#000,transparent 78%)}
+.auth-brand-inner{position:relative;max-width:470px}
+.auth-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--brand2);margin-bottom:24px}
+.auth-h1{font-size:40px;line-height:1.12;letter-spacing:-.022em;font-weight:700;margin-bottom:16px}
+.auth-sub{color:var(--muted);font-size:16px;line-height:1.65;margin-bottom:34px;max-width:430px}
+.auth-points{list-style:none;display:flex;flex-direction:column;gap:15px}
+.auth-points li{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:1.5}
+.auth-points b{display:block;margin-bottom:3px;font-weight:600}
+.auth-points span{color:var(--muted)}
+.auth-dot{width:6px;height:6px;border-radius:50%;background:var(--brand2);margin-top:7px;flex-shrink:0}
+.auth-foot{margin-top:40px;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.auth-panel{display:flex;align-items:center;justify-content:center;padding:40px 32px}
+.auth-card{width:100%;max-width:380px}
+.auth-title{font-size:24px;font-weight:700;letter-spacing:-.012em;margin-bottom:7px}
+.auth-note{color:var(--muted);font-size:13px;line-height:1.55;margin-bottom:24px}
+.auth-switch{display:flex;gap:3px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:22px}
+.auth-switch button{flex:1;background:transparent;border:none;color:var(--muted);font-family:var(--mono);
+  font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:9px 0;border-radius:6px;transition:background .12s ease,color .12s ease}
+.auth-switch button.on{background:var(--text);color:var(--bg)}
+.auth-legal{margin-top:22px;padding-top:18px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);line-height:1.65}
+.login-wrap{max-width:380px;margin:9vh auto;padding:20px}
+.login-wrap .card{padding:28px;border-radius:var(--radius)}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.chart-box{position:relative;height:240px}
+.score-bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:8px}
+.score-bar div{height:100%;border-radius:4px}
+.tooltip{cursor:help;border-bottom:1px dotted var(--muted)}
+.tabs-hidden{display:none}
+.empty{color:var(--muted);text-align:center;padding:34px 16px;font-size:14px;line-height:1.6}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--btn-bg);color:var(--btn-fg);padding:13px 18px;border-radius:12px;z-index:100;max-width:340px;font-size:14px;font-weight:500}
+.verdict-box{padding:16px;border-radius:var(--radius);margin-bottom:16px;font-size:14px;border:1px solid var(--border)}
+.v-buy{background:rgba(46,160,67,.10);border-left:3px solid var(--green)}
+.v-watch{background:rgba(59,130,246,.10);border-left:3px solid var(--accent)}
+.v-avoid{background:rgba(229,83,75,.10);border-left:3px solid var(--red)}
+.v-hold{background:rgba(217,164,65,.10);border-left:3px solid var(--yellow)}
+small.src{color:var(--muted)}
+/* ---- Command screen ----
+   Deliberately a list, not a stack of cards. The question is "what do I do today", which should be
+   answerable in one glance; a card per item with a paragraph of reasoning buries three actions under
+   a page of prose. Reasoning is one click away, not in your face. */
+.cmd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:4px;flex-wrap:wrap}
+.cmd-list{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--panel)}
+.cmd-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.cmd-row:last-child{border-bottom:none}
+.cmd-row:hover{background:var(--panel2)}
+.cmd-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cmd-kind{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.06em;width:56px;flex-shrink:0}
+.cmd-sym{font-weight:700;font-size:14px;width:64px;flex-shrink:0}
+.cmd-why{flex:1;font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmd-score{font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0}
+.cmd-chev{color:var(--muted);font-size:11px;flex-shrink:0;transition:transform .15s}
+.cmd-row.open .cmd-chev{transform:rotate(90deg)}
+.cmd-detail{padding:0 16px 16px 60px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:13px;line-height:1.6}
+.cmd-detail:last-child{border-bottom:none}
+.cmd-empty{padding:26px 16px;text-align:center}
+/* Section lead-ins on the Projections tab, separating ranges from signals. */
+.sec-lead{display:flex;gap:16px;align-items:flex-start;margin:4px 0 20px}
+.sec-lead .sec-no{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--accent);
+  border:1px solid var(--border);border-radius:6px;padding:6px 9px;flex-shrink:0;margin-top:2px}
+
+/* ---------- first-run walkthrough ---------- */
+.tour-wrap{display:none;position:fixed;inset:0;z-index:200;background:rgba(6,7,9,.72);
+  backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:20px}
+.tour-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+  width:100%;max-width:470px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
+.tour-head{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--border);background:var(--panel2)}
+.tour-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand2)}
+.tour-count{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.tour-x{background:none;border:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:0 2px}
+.tour-x:hover{color:var(--text)}
+.tour-body{padding:24px 22px 20px;min-height:172px}
+.tour-tag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:700;padding:4px 8px;border-radius:4px;margin-bottom:13px}
+.t-blue{background:rgba(59,130,246,.15);color:#79a8f4}
+.t-green{background:rgba(46,160,67,.15);color:#5fc275}
+.t-violet{background:rgba(139,92,246,.15);color:#a98bf3}
+.t-amber{background:rgba(217,164,65,.16);color:#e0bc72}
+.t-red{background:rgba(229,83,75,.15);color:#ef8b85}
+.tour-q{font-size:20px;line-height:1.28;font-weight:700;letter-spacing:-.015em;margin-bottom:11px}
+.tour-p{color:var(--muted);font-size:14px;line-height:1.66}
+.tour-foot{display:flex;align-items:center;gap:8px;padding:13px 18px;border-top:1px solid var(--border);background:var(--panel2)}
+.tour-dots{display:flex;gap:5px}
+.tour-dot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:background .18s}
+.tour-dot.on{background:var(--brand2)}
+/* The nav button being described gets a ring, so the copy attaches to a place on screen.
+   The header is position:sticky with z-index:50, which makes it its OWN stacking context, a child
+   with z-index:201 is confined to that context and would render behind the overlay at 200 no matter
+   how high its number went. So the header itself is lifted while the tour runs. */
+/* Both, now that the nav moved: header holds the avatar (the Settings step) and the sidebar holds
+   every other target. Each is position:sticky, so each is its own stacking context. */
+body.touring header,body.touring #sidebar{z-index:201}
+.tour-lit{position:relative;box-shadow:0 0 0 2px var(--brand2),0 0 0 7px rgba(31,158,140,.22);border-radius:8px}
+/* DESIGN.md's typographic principles, applied as rules rather than per-component values.
+   Negative tracking on display sizes stops large text looking gappy; 600 on headings and 500 on
+   button labels is its weight hierarchy; generous body leading is for reading, and is deliberately
+   NOT applied to table cells, which are scanned in columns and want to stay tight. */
+h1,h2,.hero-value,.auth-h1{letter-spacing:var(--tr-display);font-weight:var(--fw-heading)}
+h3,h4,.section-title{letter-spacing:var(--tr-heading);font-weight:var(--fw-heading)}
+.btn,.btn-add,button{font-weight:var(--fw-medium)}
+p,.muted{line-height:var(--lh-body)}
+table td,table th{line-height:var(--lh-normal)}
+/* The source's rule, which happens to match this project's own ban on pill buttons: a full radius
+   is for a status badge and never for a control. */
+.pill,.badge{border-radius:var(--r-full)}
+.btn,.btn-add,input,select,textarea{border-radius:var(--r-md)}
+.card,.ovf-menu{border-radius:var(--r-lg)}
+.ovf-menu{box-shadow:var(--el-4)}
+
+/* Skip link. First focusable thing on the page, invisible until focused. A keyboard user should
+   not have to tab through fifteen navigation items to reach the table they came for. */
+.skip-link{position:absolute;left:-9999px;top:0;z-index:9999;background:var(--btn-bg);color:var(--btn-fg);
+  padding:10px 16px;border-radius:0 0 var(--r-md) 0;font-weight:var(--fw-medium)}
+.skip-link:focus{left:0}
+
+/* Sticky table headers. A quant table is scrolled; a header that scrolls away turns a column of
+   numbers into a column of unlabelled numbers. */
+table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
+
+/* Back to top. Only on genuinely long documents, and only once you are far enough down that it
+   saves something. */
+#toTop{position:fixed;right:18px;bottom:18px;z-index:120;display:none;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);border-radius:var(--r-md);padding:10px 13px;cursor:pointer;
+  box-shadow:var(--el-2);font-size:var(--fs-sm)}
+#toTop.show{display:block}
+
+/* Copy affordance. */
+.copy-btn{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:var(--r-xs);
+  padding:2px 7px;font-size:var(--fs-caption);cursor:pointer;margin-left:6px;vertical-align:middle}
+.copy-btn:hover{color:var(--text);border-color:var(--muted)}
+.copy-btn.done{color:var(--green);border-color:var(--green)}
+
+/* Password reveal sits inside the field rather than beside it. */
+.pw-wrap{position:relative;display:block}
+.pw-wrap input{padding-right:64px !important}
+.pw-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;
+  border:none;color:var(--muted);font-size:var(--fs-caption);cursor:pointer;padding:6px 8px}
+.pw-toggle:hover{color:var(--text)}
+
+/* ---- PRINT ----
+   A record is worth having on paper: an accountant, a compliance file, a year-end review. The
+   screen is a dark instrument and paper is not, so this is a genuine restyle rather than a
+   hidden-navigation hack. Interactive chrome goes, the record stays, and every panel prints in
+   black on white with its borders intact. */
+@media print{
+  :root{--bg:#fff;--panel:#fff;--panel2:#f4f4f5;--border:#c8ccd2;--text:#111;--muted:#555;
+        --btn-bg:#111;--btn-fg:#fff}
+  body{background:#fff;color:#111}
+  #sidebar,#toTop,.btn,.btn-add,.ovf-btn,.copy-btn,.pw-toggle,.skip-link,
+  #cmdBar,#provPanel,#offlineBanner,#saveFailBanner,#backupBanner,.tour-wrap,.calc-panel{display:none !important}
+  #shell{display:block}
+  .tabs-hidden{display:block !important}          /* print the whole record, not the open tab only */
+  .card{break-inside:avoid;page-break-inside:avoid;border:1px solid var(--border);box-shadow:none}
+  table{break-inside:auto} tr{break-inside:avoid;page-break-inside:avoid}
+  thead{display:table-header-group}               /* repeat headers across pages */
+  a[href^="http"]::after{content:" (" attr(href) ")";font-size:10px;color:#555}
+  .prov{border-bottom:none}
+  @page{margin:16mm}
+}
+
+/* ============================ P4. CRAFT ============================
+   SKELETONS, NOT SPINNERS. A spinner says "something is happening"; a skeleton says "a table with
+   four rows is arriving here". The second one lets the eye settle before the data lands, and it
+   stops the layout jumping when it does, which is the actual complaint behind "it feels slow".
+   Deliberately no shimmer animation: this is a terminal, and a pulsing gradient on every panel is
+   decoration masquerading as feedback. A quiet static block is enough. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.sk{background:var(--panel2);border-radius:4px;display:block}
+.sk-row{height:13px;margin:9px 0}
+.sk-w1{width:92%}.sk-w2{width:74%}.sk-w3{width:58%}.sk-w4{width:83%}
+.sk-stat{height:34px;margin:6px 0;width:100%}
+.sk-wrap{padding:4px 0}
+@media (prefers-reduced-motion:no-preference){
+  .sk{animation:skfade 1.6s ease-in-out infinite}
+  @keyframes skfade{0%,100%{opacity:.55}50%{opacity:.85}}
+}
+
+/* TAP FEEDBACK. On a phone there is no hover, so without this a button gives no sign it was
+   pressed until the work finishes, and people press again. The transform is small on purpose. */
+.btn:active,.btn-add:active,.ovf-btn:active,.prov:active{transform:scale(.97)}
+.btn,.btn-add,.ovf-btn{transition:transform .06s ease,background .12s ease,border-color .12s ease;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+@media (prefers-reduced-motion:reduce){
+  .btn,.btn-add,.ovf-btn{transition:none}
+  .btn:active,.btn-add:active,.ovf-btn:active{transform:none}
+}
+
+/* Numbers are read down a column, so they align down a column. */
+.stat-value,table td,table th{font-variant-numeric:tabular-nums}
+
+@media (max-width:768px){
+  .cmd-why{white-space:normal;font-size:12px}
+  .cmd-row{align-items:flex-start;flex-wrap:wrap;padding:12px}
+  .cmd-detail{padding-left:16px}
+  .cmd-score{display:none}
+}
+/* ---- Theme slide switch: light on the left, dark on the right ---- */
+.theme-switch{position:relative;width:240px;height:42px;background:var(--panel2);border:1px solid var(--border);border-radius:16px;cursor:pointer;user-select:none;overflow:hidden}
+.theme-knob{position:absolute;top:3px;left:3px;width:117px;height:34px;background:var(--accent);border-radius:16px;transition:transform .22s ease}
+.theme-switch.is-dark .theme-knob{transform:translateX(117px)}
+.theme-side{position:absolute;top:0;width:120px;height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;pointer-events:none;color:var(--muted);transition:color .22s ease}
+.theme-switch:not(.is-dark) .theme-side:first-of-type{color:#fff}
+.theme-switch.is-dark .theme-side:last-of-type{color:#fff}
+/* ---- Floating calculator ---- */
+/* Plain flat calculator panel. Square corners, no shadow, no floating-bubble look. Anchored under
+   the calculator button on the left of the header controls. */
+.calc-panel{position:fixed;top:56px;width:380px;background:var(--panel);border:1px solid var(--border);z-index:91;display:none;max-height:82vh;overflow-y:auto}
+.calc-head{display:flex;align-items:center;gap:6px;padding:10px;border-bottom:1px solid var(--border)}
+.calc-tabbtn{flex:1;padding:7px 0;font-size:12px;font-weight:600;background:var(--panel2);color:var(--muted);border:1px solid var(--border);cursor:pointer}
+.calc-tabbtn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.calc-body{padding:10px}
+.calc-display{background:var(--bg);border:1px solid var(--border);padding:12px;text-align:right;font-family:var(--mono);font-size:24px;margin-bottom:8px;min-height:52px;word-break:break-all;color:var(--text)}
+.calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.calc-grid button{padding:13px 0;font-size:16px;font-weight:600;background:var(--panel2);color:var(--text);border:1px solid var(--border);cursor:pointer;font-family:var(--mono)}
+.calc-grid button:hover{background:var(--border)}
+.calc-grid button.op{background:var(--accent);color:#fff;border-color:var(--accent)}
+.calc-grid button.wide{grid-column:span 2}
+.calc-out{background:var(--panel2);border:1px solid var(--border);padding:11px 12px;margin-top:10px;font-size:14px;line-height:1.55}
+.calc-panel input{border-radius:0}
+/* Finance mode: each tool gets its own breathing room instead of everything jammed into one row. */
+.fc-block{padding:16px 0;border-bottom:1px solid var(--border)}
+.fc-block:first-child{padding-top:2px}
+.fc-block:last-of-type{border-bottom:none}
+.fc-title{font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)}
+.fc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fc-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.fc-f{display:flex;flex-direction:column;gap:5px}
+.fc-f>span{font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.01em}
+.fc-f>input{padding:9px 10px;font-size:14px;width:100%}
+.fc-go{width:100%;margin-top:11px;padding:10px 0;font-size:13px;border-radius:0}
+/* Result breakdown rows inside .calc-out */
+.fc-head{font-size:20px;font-weight:700;margin-bottom:9px;font-family:var(--mono)}
+.fc-line{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3px 0}
+.fc-line span:first-child{color:var(--muted)}
+.fc-line span:last-child{font-family:var(--mono);font-weight:600}
+.fc-note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;display:block}
+
+/* =========================================================================
+   PHONE LAYOUT
+   Deliberately the LAST thing in the stylesheet. A media query adds no
+   specificity, so at equal specificity whichever rule comes last wins. Put
+   these earlier and a later plain rule like .fc-grid-2 silently overrides them.
+   Everything here applies only at 768px and under, so the desktop layout is
+   untouched by construction.
+   ========================================================================= */
+@media (max-width:768px){
+
+  /* Header becomes two rows: logo + controls on top, tabs scrolling underneath.
+     Eight tabs cannot fit across a phone, and shrinking them to fit makes them
+     untappable, so they scroll sideways instead. */
+  header{flex-wrap:wrap;height:auto;align-items:center;gap:8px;
+    padding:8px 12px;
+    padding-top:calc(8px + env(safe-area-inset-top));
+    padding-left:calc(12px + env(safe-area-inset-left));
+    padding-right:calc(12px + env(safe-area-inset-right))}
+  header>.row{flex:1;min-width:0;justify-content:flex-end;gap:6px;flex-wrap:nowrap;margin-left:auto}
+  #globalSearch{max-width:none!important;min-width:0;flex:1}
+  /* No room for the section name or the collapse control on a phone, the rail never expands there. */
+  .hd-where,.hd-div,#sideToggle{display:none}
+  header>.logo .logo-word{display:none}
+  /* On a phone the sidebar becomes a rail: icons only, always, no labels and no toggle. A 214px
+     drawer would eat more than half a phone screen, and a hamburger that hides navigation behind a
+     tap is worse than a rail you can always see. */
+  #shell{min-height:0}
+  #sidebar{width:52px!important;padding:8px 4px;
+    top:0;height:auto;position:sticky;align-self:stretch;
+    padding-left:calc(4px + env(safe-area-inset-left))}
+  #sidebar .lbl{display:none}
+  #sidebar nav button{justify-content:center;padding:11px 0}
+  #sidebar nav button .ico{font-size:18px}
+  #sideToggle{display:none}
+  .nav-sep{margin:6px 8px}
+  .badge{position:absolute;top:5px;right:5px;margin-left:0}
+
+  main{padding:18px 12px;
+    padding-left:calc(12px + env(safe-area-inset-left));
+    padding-right:calc(12px + env(safe-area-inset-right));
+    padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+
+  .greeting{font-size:20px}
+  .hero{padding:4px 0 20px}
+  .hero-value{font-size:30px;letter-spacing:-.5px}
+  .section-title{margin:24px 0 12px}
+
+  /* Two stat cards per row rather than four squeezed flat. */
+  .stat{min-width:calc(50% - 7px);padding:9px 11px}
+  .stat-value{font-size:16px}
+
+  /* Wide tables scroll sideways inside their card instead of stretching the page. */
+  .card{padding:13px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{font-size:12px}
+  th{padding:7px 7px;font-size:10px}
+  td{padding:9px 7px}
+
+  /* Form rows stack. Inputs carry inline max-widths sized for desktop, which is why
+     these need !important. It's overriding a style attribute, not another rule. */
+  .card .row>input,.card .row>select,.card .row>textarea{
+    max-width:none!important;width:100%;flex:1 1 100%}
+  .card .row>.btn,.card .row>button{flex:1 1 auto}
+
+  /* iOS zooms the whole page when you focus an input under 16px. Bumping the font
+     size is the only reliable way to stop it. The .fc-f and .mycall selectors are
+     listed explicitly because they outrank a bare `input` on specificity. */
+  input,select,textarea{font-size:16px}
+  .fc-f>input{font-size:16px}
+  .mycall{font-size:16px}
+  .calc-display{font-size:24px}
+
+  /* Calculator fills the screen width rather than overflowing it. The left offset is
+     set inline by JS, hence !important. */
+  .calc-panel{width:auto!important;left:8px!important;right:8px!important;max-height:72vh}
+  .fc-grid-2{grid-template-columns:1fr 1fr}
+  .fc-grid-3{grid-template-columns:1fr 1fr}
+
+  /* Account menu was pinned to a desktop-width column. */
+  #accountMenu{width:min(280px,calc(100vw - 24px))}
+
+  .theme-switch{width:100%;max-width:260px}
+  .theme-knob{width:calc(50% - 3px)}
+  .theme-switch.is-dark .theme-knob{transform:translateX(100%)}
+  .theme-side{width:50%}
+
+  .login-wrap{margin:5vh auto;padding:16px}
+  .toast{left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));max-width:none}
+  .chart-box{height:210px}
+}
+
+/* Sign-in on small screens: stack the two panels, and drop the feature list.
+   On a phone this is a screen you use every day, not a pitch, scrolling past four selling points to
+   reach a password field you've typed a hundred times is the wrong trade. The headline stays so it
+   still looks like something; the argument goes. */
+@media (max-width:900px){
+  .auth{grid-template-columns:1fr;min-height:0}
+  .auth-brand{padding:38px 24px 30px;border-right:none;border-bottom:1px solid var(--border);justify-content:flex-start}
+  .auth-h1{font-size:30px}
+  .auth-sub{font-size:14px;margin-bottom:0}
+  .auth-points{display:none}
+  .auth-foot{display:none}
+  .auth-panel{padding:26px 24px calc(44px + env(safe-area-inset-bottom))}
+  .auth-card{max-width:none}
+}
+
+/* Very narrow phones (SE, mini): one stat per row rather than two cramped ones. */
+@media (max-width:400px){
+  .stat{min-width:100%}
+  .hero-value{font-size:30px}
+  .fc-grid-2,.fc-grid-3{grid-template-columns:1fr}
+  .auth-h1{font-size:24px}
+}
+
+/* P4. TOUCH TARGETS, and this block is deliberately last: media queries add no specificity (I9),
+   so anything after it would win. A 30px control is comfortable with a mouse and a coin toss with
+   a thumb, and the ones that were too small here are exactly the ones a phone user reaches for
+   most, the row overflow menus. Gated on a coarse pointer rather than on width, because a small
+   window on a desktop is still being driven by a mouse and does not need fat controls. */
+@media (pointer:coarse){
+  .btn-sm,.icon-btn,.ovf-btn{min-height:40px;min-width:40px}
+  .ovf-btn{display:inline-flex;align-items:center;justify-content:center}
+  .ovf-item{min-height:44px;display:flex;align-items:center}
+  .mycall{min-height:40px}
+  select,input[type=number],input[type=text],input[type=password]{min-height:40px}
+}
+</style>
+
+<style id="v2-surface">
+/* ===== Surface pass, 2026-09-13. Additive; remove this block to revert. =====
+   From the research in PRD §5 and DESIGN.md: on a dark ground, depth is a scale of lighter
+   surfaces, not shadows; a faint ambient gradient keeps the page from reading as a void; a
+   1px top highlight inside a card is what makes it look lit rather than drawn; glow belongs on
+   the one active thing. Green and red stay reserved for P&L, so the stat tiles keep their
+   semantic colour as a dot with a halo instead of a 3px bar. */
+:root{--panel:#14171d;--panel2:#1b1f27;--panel3:#222731;--border:#2a2f39;--radius:12px;--glow:rgba(31,158,140,.38)}
+body{background:
+  radial-gradient(1100px 520px at 18% -8%,rgba(59,130,246,.09),transparent 62%),
+  radial-gradient(900px 480px at 92% 0%,rgba(31,158,140,.06),transparent 60%),
+  var(--bg)}
+.card{box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 10px 30px -18px rgba(0,0,0,.7);border-color:var(--border)}
+.card:hover{border-color:#343a46}
+nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px var(--glow)}
+.greeting{font-size:26px;letter-spacing:-.02em}
+.big{font-size:30px;letter-spacing:-.025em}
+.stat{border:1px solid var(--border);border-radius:10px;padding:12px 14px 12px 28px;position:relative;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);transition:border-color .16s,transform .16s}
+.stat:hover{border-color:#343a46;transform:translateY(-1px)}
+.stat::before{content:"";position:absolute;left:13px;top:16px;width:6px;height:6px;border-radius:50%;
+  background:var(--dot,var(--muted));box-shadow:0 0 0 3px color-mix(in srgb,var(--dot,var(--muted)) 18%,transparent)}
+.stat.s-in{--dot:var(--c-in);border-left-color:var(--border)}
+.stat.s-out{--dot:var(--c-out);border-left-color:var(--border)}
+.stat.s-profit{--dot:var(--c-profit);border-left-color:var(--border)}
+.stat.s-income{--dot:var(--c-income);border-left-color:var(--border)}
+.stat.s-count{--dot:var(--muted);border-left-color:var(--border)}
+.research-card{border-left-width:1px;border-left-color:var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+.research-card::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--research);margin-right:8px;vertical-align:middle;box-shadow:0 0 0 3px rgba(201,138,63,.18)}
+@media (prefers-reduced-motion:reduce){.stat,.stat:hover{transition:none;transform:none}}
+/* Hick's law in the sidebar. Four tabs are the work; the rest are tools you reach for. Compact is
+   the default and remembered per device; opening an advanced tab expands the list on its own.
+   Hiding is done by a class on <nav>, so removing it restores the original rules untouched. */
+#sidebar nav.pf-compact button.pf-adv{display:none}
+#sidebar nav.pf-compact .nav-sep{display:none}
+#sidebar nav.pf-compact button{order:10}
+#sidebar nav.pf-compact button[data-tab="dashboard"]{order:1}
+#sidebar nav.pf-compact button[data-tab="portfolio"]{order:2}
+#sidebar nav.pf-compact button[data-tab="analyzer"]{order:3}
+#sidebar nav.pf-compact button[data-tab="history"]{order:4}
+#sidebar nav.pf-compact button.pf-more{order:5}
+#sidebar nav button.pf-more .ico svg{transform:rotate(-90deg);transition:transform .2s var(--ease)}
+#sidebar nav:not(.pf-compact) button.pf-more .ico svg{transform:rotate(90deg)}
+#sidebar nav button.pf-more{color:var(--muted)}
+</style>
+<style>html,body{overflow:hidden!important;pointer-events:none}</style><style>body.demo #app::before,body.is-demo #app::before{display:none!important}.toast,[class*="toast"]{display:none!important}</style>
+<!-- A static snapshot of the terminal dashboard on the sandbox account, taken 2026-09-13 with scripts removed. Illustrative values; nothing here is live. Regenerate with the procedure in DESIGN.md. -->
+</head>
+<body class="">
+
+<!-- ============ LOGIN SCREEN ============ -->
+<!-- A landmark on the LOGIN screen too. The real <main> lives inside #app, which is display:none
+     until someone signs in, so the first screen every visitor meets had no landmark at all.
+
+     role="main" rather than a <main> ELEMENT, deliberately. Swapping the tag meant moving a closing
+     tag 120 lines away, and my first attempt closed the wrong one: it landed on the div that ends
+     the left-hand brand panel, which pushed the sign-in form outside the container and left a stray
+     close that swallowed the app below. The attribute is semantically identical to assistive
+     technology and changes no structure at all. -->
+
+
+<!-- ============ APP ============ -->
+<!-- FIRST-RUN WALKTHROUGH. Sits above everything, shown once to genuinely new accounts. -->
+<div id="tourWrap" class="tour-wrap">
+  <div class="tour-card" role="dialog" aria-modal="true" aria-label="Getting started">
+    <div class="tour-head">
+      <span class="tour-eyebrow">Getting started</span>
+      <span class="spacer"></span>
+      <span class="tour-count" id="tourCount">1 / 7</span>
+      <button class="tour-x" title="Skip" aria-label="Skip" tabindex="-1" disabled="">×</button>
+    </div>
+    <div class="tour-body" id="tourBody"></div>
+    <div class="tour-foot">
+      <div class="tour-dots" id="tourDots"></div>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="tourBack" tabindex="-1" disabled="">Back</button>
+      <button class="btn btn-sm" id="tourNext" tabindex="-1" disabled="">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- ICON SPRITE. Defined once, referenced by <use> everywhere. This replaced unicode glyphs
+     (▤ ⌘ ◈ ☆) which rendered as a different shape, weight and baseline on every platform and
+     occasionally as a blank box. These are identical everywhere and inherit currentColor. -->
+<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true"><defs>
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"></rect><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"></rect><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"></rect><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"></rect></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></symbol>
+  <symbol id="i-portfolio" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></symbol>
+  <symbol id="i-watch" viewBox="0 0 24 24"><polygon points="12 2.6 15 8.7 21.7 9.7 16.8 14.4 18 21 12 17.9 6 21 7.2 14.4 2.3 9.7 9 8.7 12 2.6"></polygon></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><polyline points="12 6.8 12 12 15.6 14"></polyline></symbol>
+  <symbol id="i-market" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></symbol>
+  <symbol id="i-news" viewBox="0 0 24 24"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1z"></path><path d="M18 8h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2"></path><line x1="7" y1="8.5" x2="14" y2="8.5"></line><line x1="7" y1="12" x2="14" y2="12"></line><line x1="7" y1="15.5" x2="11" y2="15.5"></line></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.8"></circle><circle cx="6" cy="12" r="2.8"></circle><circle cx="18" cy="19" r="2.8"></circle><line x1="8.5" y1="10.6" x2="15.5" y2="6.4"></line><line x1="8.5" y1="13.4" x2="15.5" y2="17.6"></line></symbol>
+  <symbol id="i-screener" viewBox="0 0 24 24"><polygon points="21.5 3.5 2.5 3.5 10 12.4 10 19 14 21 14 12.4 21.5 3.5"></polygon></symbol>
+  <symbol id="i-analyzer" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.2" y2="16.2"></line></symbol>
+  <symbol id="i-risk" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><line x1="12" y1="9.5" x2="12" y2="13.5"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></symbol>
+  <symbol id="i-projections" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></symbol>
+  <symbol id="i-alerts" viewBox="0 0 24 24"><path d="M18 8.5A6 6 0 0 0 6 8.5c0 7-2.5 8.5-2.5 8.5h17S18 15.5 18 8.5"></path><path d="M13.7 20.5a2 2 0 0 1-3.4 0"></path></symbol>
+  <symbol id="i-clients" viewBox="0 0 24 24"><path d="M16 20.5v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="3.6"></circle><path d="M22 20.5v-2a4 4 0 0 0-3-3.8"></path><path d="M16.5 3.7a4 4 0 0 1 0 6.6"></path></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><polyline points="14.5 18 8.5 12 14.5 6"></polyline></symbol>
+</defs></svg>
+
+<div id="app" style="">
+<!-- B2. The whole product lives in this browser's localStorage. Safari evicts localStorage for
+     sites not visited in 7 days; a cleared cache does it anywhere; and the record being protected
+     cannot be rebuilt afterwards — the marks are forward-only by design. So the app nags, in
+     proportion to what would actually be lost. -->
+<div id="backupBanner" style="display:none"></div>
+<header>
+  <button id="sideToggle" aria-label="Toggle sidebar" title="Collapse the sidebar  ·  [" tabindex="-1" disabled="">
+    <svg viewBox="0 0 24 24"><use href="#i-chev"></use></svg>
+  </button>
+  <a class="logo" aria-label="PerceptFolio">
+    <svg class="logo-mark" width="1.5em" height="1.5em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"></rect><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg>
+    <span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span>
+  </a>
+  <span class="hd-div"></span>
+  <div class="hd-where"><span id="hdSection">Dashboard</span></div>
+
+  <!-- Centre: the ticker command palette. Typing a symbol offers everywhere it can be taken,
+       and marks the places it already exists. -->
+  <div class="hd-search">
+    <svg class="hd-search-ico" viewBox="0 0 24 24"><use href="#i-analyzer"></use></svg>
+    <input id="globalSearch" placeholder="Search a ticker…  /" autocomplete="off" spellcheck="false" oninput="renderTickerPalette()" onfocus="renderTickerPalette()" onkeydown="paletteKey(event)" tabindex="-1" disabled="">
+    <div id="gsPanel" class="gs-panel"></div>
+  </div>
+
+  <div class="row" style="position:relative">
+    <button class="icon-btn" id="calcToggleBtn" title="Calculator" aria-label="Calculator" tabindex="-1" disabled="">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="2" width="16" height="20" rx="2.5"></rect>
+        <rect x="7.5" y="5.5" width="9" height="3.5" rx="1"></rect>
+        <line x1="8" y1="13" x2="8" y2="13"></line><line x1="12" y1="13" x2="12" y2="13"></line><line x1="16" y1="13" x2="16" y2="13"></line>
+        <line x1="8" y1="17" x2="8" y2="17"></line><line x1="12" y1="17" x2="12" y2="17"></line><line x1="16" y1="17" x2="16" y2="17"></line>
+      </svg>
+    </button>
+    <span class="avatar" id="avatarInitial" style="cursor: pointer; background-image: none; border-color: var(--border); border-width: 1px;">T</span>
+    <div id="accountMenu" class="card" style="display:none;position:absolute;top:46px;right:0;width:262px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.5);padding:0;overflow:hidden">
+      <!-- Identity block: avatar on top (click to change), name under it (click to edit) -->
+      <div style="padding:18px 16px 14px;text-align:center;border-bottom:1px solid var(--border)">
+        <div style="position:relative;display:inline-block;cursor:pointer" title="Click to change your photo or colour">
+          <span class="avatar" id="menuAvatar" style="width: 60px; height: 60px; font-size: 23px; background-image: none; border-color: var(--border); border-width: 1px;">T</span>
+          <span style="position:absolute;bottom:0;right:0;background:var(--accent);color:#fff;border-radius:50%;width:21px;height:21px;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid var(--panel)">Edit</span>
+        </div>
+        <div id="menuNameDisplay" style="margin-top:10px;font-weight:600;font-size:15px;cursor:pointer" title="Click to edit your name">Sample account</div>
+        <input id="displayNameInput" placeholder="Your name" style="display:none;margin-top:10px;text-align:center" onchange="setDisplayName(this.value)" onblur="finishEditName()" onkeydown="if(event.key==='Enter')this.blur()" tabindex="-1" disabled="">
+        <div class="muted" id="acctEmail" style="margin-top:4px;font-size:12px;word-break:break-all">test1212</div>
+        <div class="muted" id="acctIdLine" style="margin-top:2px;font-size:11px;font-family:var(--mono)"></div>
+      </div>
+      <!-- Avatar editor, collapsed until the avatar is clicked -->
+      <div id="avatarEditor" style="display:none;padding:14px 16px;border-bottom:1px solid var(--border)">
+        <div class="field">
+          <label>Photo</label>
+          <input type="file" id="avatarUpload" accept="image/*" style="display:none" onchange="handleAvatarUpload(event)" tabindex="-1" disabled="">
+          <div class="row" style="gap:6px">
+            <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Upload</button>
+            <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Remove</button>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Colour <span class="muted">(used if no photo)</span></label>
+          <div class="row" id="avatarColorPicker" style="gap:6px"></div>
+        </div>
+      </div>
+      <!-- Menu actions -->
+      <div style="padding:8px">
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:6px;text-align:left" tabindex="-1" disabled="">Settings</button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:6px;text-align:left" tabindex="-1" disabled="">Switch account</button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:6px;text-align:left" tabindex="-1" disabled="">Log out</button>
+        <button class="btn-danger btn btn-sm" style="width:100%;text-align:left" tabindex="-1" disabled="">Delete account</button>
+      </div>
+    </div>
+  </div>
+</header>
+<div id="bizBanner" class="row" style="display:none;background:var(--panel2);border-bottom:1px solid var(--border);padding:8px 24px;font-size:13px;color:var(--muted)">
+  <span>Working on <b id="bizBannerClient" style="color:var(--text)"></b>'s account</span>
+  <div class="spacer"></div>
+  <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Return to my account</button>
+</div>
+
+<!-- SIDEBAR. Thirteen destinations across a top bar squeezed every label; down the side there is
+     room for all of them, and collapsed to icons it costs 56px. -->
+<a class="skip-link">Skip to content</a>
+<div id="shell">
+<aside id="sidebar">
+  <nav class="pf-compact">
+    <button data-tab="dashboard" class="active" data-tip="Dashboard" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-dash"></use></svg></span><span class="lbl">Dashboard</span></button>
+    <button data-tab="command" id="navCommand" data-tip="Command" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-command"></use></svg></span><span class="lbl">Command</span></button>
+    <button data-tab="portfolio" id="navPortfolio" data-tip="Portfolio" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"></use></svg></span><span class="lbl">Portfolio</span></button>
+    <button data-tab="watchlist" id="navWatchlist" data-tip="Lists" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"></use></svg></span><span class="lbl">Lists</span></button>
+    <button data-tab="history" id="navHistory" data-tip="History" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"></use></svg></span><span class="lbl">History</span></button><button type="button" class="pf-more" data-tip="More" aria-expanded="false" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-chev"></use></svg></span><span class="lbl">More</span></button>
+    <div class="nav-sep"></div>
+    <button data-tab="market" id="navMarket" data-tip="Market" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"></use></svg></span><span class="lbl">Market</span></button>
+    <button data-tab="news" id="navNews" data-tip="News" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-news"></use></svg></span><span class="lbl">News</span></button>
+    <button data-tab="map" id="navMap" data-tip="Map" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"></use></svg></span><span class="lbl">Map</span></button>
+    <button data-tab="screener" id="navScreener" data-tip="Screener" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"></use></svg></span><span class="lbl">Screener</span></button>
+    <button data-tab="analyzer" id="navAnalyzer" data-tip="Analyzer" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"></use></svg></span><span class="lbl">Analyzer</span></button>
+    <div class="nav-sep"></div>
+    <button data-tab="risk" id="navRisk" data-tip="Risk" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"></use></svg></span><span class="lbl">Risk</span></button>
+    <button data-tab="projections" id="navProjections" data-tip="Projections" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"></use></svg></span><span class="lbl">Projections</span></button>
+    <button data-tab="alerts" id="navAlerts" data-tip="Alerts" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-alerts"></use></svg></span><span class="lbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
+    <button data-tab="clients" id="navClients" style="display:none" data-tip="Clients" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-clients"></use></svg></span><span class="lbl">Clients</span></button>
+  </nav>
+  <div class="side-foot"><span class="lbl">Press <b>[</b> to collapse</span></div>
+</aside>
+<main id="main" tabindex="-1">
+
+<!-- COMMAND — the morning screen -->
+<div id="tab-command" class="tabs-hidden">
+  <!-- E1. The monthly close. Appears on the 1st and stays until it is read. -->
+  <div id="monthlyClose" style="display:none"></div>
+  <div class="cmd-head">
+    <div>
+      <div class="greeting" id="cmdGreeting">Good afternoon.</div>
+      <div class="muted" id="cmdSub" style="font-size:13.5px;margin-top:2px"><b class="warn">10 need you</b> · $75,839.71 · not reviewed yet</div>
+    </div>
+    <button class="btn" id="cmdRunBtn" tabindex="-1" disabled="">Run review</button>
+  </div>
+  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"><b>Nothing checked yet today.</b> Run review pulls fresh prices, re-scores every holding and watchlist name, records any verdict that changed, and stamps any call that has reached its horizon. It is the one action that keeps the record accumulating, because a mark can only be taken while this app is open.</div>
+  <!-- The track record sits above the actions on purpose. Anything that tells you what to do should
+       have to state, in the same breath, how often it has been right. -->
+  <div id="cmdRecord" class="rec"><div class="rec-head">Track record · 90-day marks</div><div class="rec-top"><span class="rec-val muted">-<span class="rec-unit">no expectancy yet</span></span></div><div class="rec-read thin">Nothing has been marked at 90 days. The app cannot claim an edge it has not measured, and it will not estimate one from a shorter window to fill the space.</div><div class="rec-bar"><i style="width:0%"></i></div><div class="rec-foot"><span><b>0</b> of ~139 marked calls <span class="muted" style="font-weight:400">(assumes a 2pt edge at 12pt dispersion, an assumption, not a measurement)</span></span><span>nothing logged yet · <a style="color:var(--accent)">every call</a></span></div></div>
+  <!-- The schedule sits beside the record because it is the thing that keeps the record
+       honest: a mark not taken on the day cannot be taken later. -->
+  <div id="marksDue" class="md"><div class="md-head">Marks</div><p class="muted" style="font-size:13px;line-height:1.6">Nothing falls due in the next fortnight. Marks are taken automatically whenever the app is open and a call crosses 30, 90, 180 or 365 days, so the only thing required of you is opening it.</p></div>
+  <div id="commandQueue"><div class="cmd-list"><div class="cmd-row"><span class="cmd-dot" style="background:var(--yellow)"></span><span class="cmd-kind warn">RISK</span><span class="cmd-sym">AAPL</span><span class="cmd-why">17.3% of portfolio, over your 10% cap</span><span class="cmd-score">over cap</span><span class="cmd-chev">▶</span></div><div class="cmd-row"><span class="cmd-dot" style="background:var(--yellow)"></span><span class="cmd-kind warn">RISK</span><span class="cmd-sym">MSFT</span><span class="cmd-why">12.1% of portfolio, over your 10% cap</span><span class="cmd-score">over cap</span><span class="cmd-chev">▶</span></div><div class="cmd-row"><span class="cmd-dot" style="background:var(--yellow)"></span><span class="cmd-kind warn">RISK</span><span class="cmd-sym">NVDA</span><span class="cmd-why">18.1% of portfolio, over your 10% cap</span><span class="cmd-score">over cap</span><span class="cmd-chev">▶</span></div><div class="cmd-row"><span class="cmd-dot" style="background:var(--yellow)"></span><span class="cmd-kind warn">RISK</span><span class="cmd-sym">KO</span><span class="cmd-why">10.5% of portfolio, over your 10% cap</span><span class="cmd-score">over cap</span><span class="cmd-chev">▶</span></div><div class="cmd-row"><span class="cmd-dot" style="background:var(--yellow)"></span><span class="cmd-kind warn">RISK</span><span class="cmd-sym">SPY</span><span class="cmd-why">25.5% of portfolio, over your 10% cap</span><span class="cmd-score">over cap</span><span class="cmd-chev">▶</span></div><div class="cmd-row"><span class="cmd-dot" style="background:var(--accent)"></span><span class="cmd-kind warn">CASH</span><span class="cmd-sym">-</span><span class="cmd-why">$12,500 idle, 16.5% vs 3% target</span><span class="cmd-score">over target</span><span class="cmd-chev">▶</span></div><div class="cmd-row"><span class="cmd-dot" style="background:var(--muted)"></span><span class="cmd-kind muted">DATA</span><span class="cmd-sym">-</span><span class="cmd-why">5 prices over 3 days old</span><span class="cmd-score">stale</span><span class="cmd-chev">▶</span></div><div class="cmd-row"><span class="cmd-dot" style="background:var(--yellow)"></span><span class="cmd-kind warn">REVIEW</span><span class="cmd-sym">MSFT</span><span class="cmd-why">No thesis written, and it's 12.1% of the book</span><span class="cmd-chev">▶</span></div><div class="cmd-row"><span class="cmd-dot" style="background:var(--yellow)"></span><span class="cmd-kind warn">REVIEW</span><span class="cmd-sym">NVDA</span><span class="cmd-why">No thesis written, and it's 18.1% of the book</span><span class="cmd-chev">▶</span></div><div class="cmd-row"><span class="cmd-dot" style="background:var(--yellow)"></span><span class="cmd-kind warn">REVIEW</span><span class="cmd-sym">KO</span><span class="cmd-why">No thesis written, and it's 10.5% of the book</span><span class="cmd-chev">▶</span></div></div><p class="muted" style="margin-top:14px;font-size:11.5px;line-height:1.55">Click any row for the reasoning. Nothing here places a trade. PerceptFolio has no broker connection and reports only what your own rules flagged.</p></div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="tab-dashboard" class="">
+  <div id="greetingBlock">
+    <div class="greeting" id="greetingText">Good afternoon.</div>
+    <div class="greeting-sub" id="greetingSub">Here's where things stand today.</div>
+  </div>
+  <!-- Business account's own dashboard: earnings summary + client list, no personal-investing entry points -->
+  <div id="bizDashboardBody" style="display:none">
+    <div class="hero">
+      <div class="hero-label">Est. earnings across all clients</div>
+      <span class="hero-value" id="bizTotalEarnings">$0</span>
+      <div class="hero-change flat" id="bizEarningsSub">From client accounts with a fee % set</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat s-count"><span class="stat-label"># Clients</span><span class="stat-value" id="bizClientCount">0</span></div>
+      <div class="stat s-in"><span class="stat-label">Combined client AUM</span><span class="stat-value" id="bizTotalAUM">$0</span></div>
+    </div>
+    <div class="section-title">Your Clients</div>
+    <div class="card" style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Client</th><th>Login email</th><th>Portfolio value</th><th>Unrealized gain</th><th>Your fee</th><th>Est. fee owed</th><th></th></tr></thead>
+        <tbody id="bizDashClientsBody"></tbody>
+      </table>
+      <div id="bizDashClientsEmpty" class="empty">No clients yet. Head to the <b>Clients</b> tab to create one.</div>
+    </div>
+    <p class="muted" style="margin-top:12px;font-size:12px">Same private-note caveat as the Clients tab: this isn't a billing system, and taking a cut of gains has real regulatory strings attached (SEC Rule 205-3). See the Clients tab for the full disclaimer.</p>
+  </div>
+  <!-- Personal dashboard: hidden entirely for a business account's own view -->
+  <div id="personalDashboardBody" style="display: block;">
+    <div id="welcomeCard" class="welcome-card" style="display:none">
+      <h2>Let's set up your portfolio</h2>
+      <p class="muted" style="margin-bottom:16px">Three steps and PerceptFolio starts working for you.</p>
+      <p style="margin-bottom:10px"><span class="step-num">1</span>Add a Finnhub API key in <b>Settings</b>. Free at finnhub.io, about 2 minutes, no card. This is what loads prices.</p>
+      <p style="margin-bottom:10px"><span class="step-num">2</span>Add what you own in <b>Portfolio</b>. Stocks, ETFs, mutual funds, and cash on hand.</p>
+      <p style="margin-bottom:18px"><span class="step-num">3</span>Add a few tickers to your <b>Watchlist</b>. PerceptFolio scores them automatically.</p>
+      <button class="btn" tabindex="-1" disabled="">Add your first holding</button>
+    </div>
+    <!-- THE RECORD SITS ABOVE THE PORTFOLIO VALUE, deliberately.
+         What this screen led with before was a number that goes up when the market goes up. It
+         tells the operator nothing about whether their judgment is any good, and reading it every
+         morning trains the wrong reflex. The record is the one thing here that is actually earned,
+         so it goes first and the balance goes second. -->
+    <div id="dashRecord" class="rec"><div class="rec-head">Track record · 90-day marks</div><div class="rec-top"><span class="rec-val muted">-<span class="rec-unit">no expectancy yet</span></span></div><div class="rec-read thin">Nothing has been marked at 90 days. The app cannot claim an edge it has not measured, and it will not estimate one from a shorter window to fill the space.</div><div class="rec-bar"><i style="width:0%"></i></div><div class="rec-foot"><span><b>0</b> of ~139 marked calls <span class="muted" style="font-weight:400">(assumes a 2pt edge at 12pt dispersion, an assumption, not a measurement)</span></span><span>nothing logged yet · <a style="color:var(--accent)">every call</a></span></div></div>
+    <div class="hero">
+      <div class="hero-label" id="heroLabel">Portfolio value</div>
+      <span class="hero-value" id="dTotal">$75,839.71</span><button class="privacy-btn" id="privacyToggleBtn" title="Show/hide dollar amounts" tabindex="-1" disabled=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+      <div class="hero-change flat" id="dChange" title="">No live prices yet. Hit Refresh data</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat s-in"><span class="stat-label">Cash to invest</span><span class="stat-value" id="dCash">$12,500</span></div>
+      <div class="stat s-income"><span class="stat-label">Today's gain / loss</span><span class="stat-value muted" id="dToday">-</span><span class="muted" id="dTodayPct" style="font-size:11px">refresh for live prices</span></div>
+      <div class="stat s-profit"><span class="stat-label">Total gain / loss</span><span class="stat-value pos" id="dGain">$27,048.81</span><span class="muted" id="dGainPct" style="font-size:11px" title="All from open positions, nothing sold yet.">+74.53% vs cost basis</span></div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:12px">
+        <div class="row" style="gap:6px">
+          <button class="btn btn-ghost btn-sm" id="gvBtn_valuegain" style="border-color: var(--accent); color: var(--accent);" tabindex="-1" disabled="">Total Value</button>
+          <button class="btn btn-ghost btn-sm" id="gvBtn_growth" tabindex="-1" disabled="">Growth</button>
+          <button class="btn btn-ghost btn-sm" id="gvBtn_vsspy" tabindex="-1" disabled="">vs S&amp;P 500</button>
+          <button class="btn btn-ghost btn-sm" id="gvBtn_dividends" tabindex="-1" disabled="">Dividends</button>
+        </div>
+        <div class="row" style="gap:6px">
+          <button class="btn btn-ghost btn-sm" id="grBtn_30" tabindex="-1" disabled="">30D</button>
+          <button class="btn btn-ghost btn-sm" id="grBtn_365" tabindex="-1" disabled="">1Y</button>
+          <button class="btn btn-ghost btn-sm" id="grBtn_1095" tabindex="-1" disabled="">3Y</button>
+          <button class="btn btn-ghost btn-sm" id="grBtn_0" style="border-color: var(--accent); color: var(--accent);" tabindex="-1" disabled="">Max</button>
+        </div>
+      </div>
+      <h3 id="growthChartTitle">Portfolio growth</h3>
+      <div class="chart-box" id="growthChartBox" style="display:none"><canvas id="growthChart"></canvas></div>
+      <div id="growthChartEmpty" class="empty" style="display: block;">PerceptFolio can only track what happens from here; it has no record of your portfolio before today. Hit Refresh Data (or just keep using the app) and this fills in day by day.</div>
+    </div>
+    <div class="grid grid-2" style="margin-top:16px">
+      <div class="card"><h3>Stocks, ETFs &amp; cash</h3><div class="chart-box"><canvas id="pieType" width="1046" height="480" style="display: block; box-sizing: border-box; height: 240px; width: 523px;"></canvas></div></div>
+      <div class="card"><h3>By holding</h3><div class="chart-box"><canvas id="pieHold" width="1046" height="480" style="display: block; box-sizing: border-box; height: 240px; width: 523px;"></canvas></div></div>
+    </div>
+    <div class="section-title">★ Favorites. Stocks you're watching closely</div>
+    <div class="card"><div id="favoritesList"><div class="empty">Star any stock in Portfolio, Watchlist, or the Analyzer to pin it here for a quick daily check. Separate from your full Watchlist, which can grow long.</div></div></div>
+    <div class="section-title">Today's signals</div>
+    <div class="card"><div id="signalsList"><div class="alert-item"><div class="alert-dot" style="background:var(--green)"></div><div><b>AAPL</b>, <span class="pill pill-buy">BUY candidate</span><br><span class="muted">Quality 9/12 · Price 4/6 · You own this</span></div><div class="spacer"></div><button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Review</button></div><div class="alert-item"><div class="alert-dot" style="background:var(--green)"></div><div><b>MSFT</b>, <span class="pill pill-buy">BUY candidate</span><br><span class="muted">Quality 9/12 · Price 4/6 · You own this</span></div><div class="spacer"></div><button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Review</button></div><div class="alert-item"><div class="alert-dot" style="background:var(--green)"></div><div><b>NVDA</b>, <span class="pill pill-buy">BUY candidate</span><br><span class="muted">Quality 9/12 · Price 4/6 · You own this</span></div><div class="spacer"></div><button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Review</button></div><div class="alert-item"><div class="alert-dot" style="background:var(--green)"></div><div><b>KO</b>, <span class="pill pill-buy">BUY candidate</span><br><span class="muted">Quality 9/12 · Price 4/6 · You own this</span></div><div class="spacer"></div><button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Review</button></div></div></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" tabindex="-1" disabled="">Refresh data</button>
+      <span class="muted" id="lastRefresh"></span>
+    </div>
+  </div>
+</div>
+
+<!-- PORTFOLIO -->
+<div id="tab-portfolio" class="tabs-hidden">
+  <div class="tab-actions"><button class="btn-add" tabindex="-1" disabled=""><span class="plus">+</span> Add holding</button></div>
+  <div class="addwrap" id="add-holding">
+  <div class="card" style="position:relative">
+    <button class="add-close" title="Close" tabindex="-1" disabled="">✕</button>
+    <h3>Add Holding</h3>
+    <div class="row">
+      <input id="hTicker" placeholder="Ticker (e.g. AAPL, VOO)" style="max-width:150px" tabindex="-1" disabled="">
+      <select id="hType" style="max-width:130px" tabindex="-1" disabled=""><option value="Stock">Stock</option><option value="ETF">ETF</option><option value="Fund">Mutual Fund</option></select>
+      <select id="hUnit" style="max-width:130px" onchange="updateAmountLabel()" tabindex="-1" disabled="">
+        <option value="shares">Enter shares</option>
+        <option value="dollars">Enter dollars</option>
+      </select>
+      <input id="hAmount" type="number" step="any" placeholder="Shares" style="max-width:130px" oninput="updateBuyPreview()" tabindex="-1" disabled="">
+      <input id="hCost" type="number" step="any" placeholder="Price / share $" style="max-width:150px" oninput="updateBuyPreview()" tabindex="-1" disabled="">
+      <!-- M2. The one field that makes implementation cost measurable instead of assumed. Optional
+           on purpose: left blank it contributes nothing, which is the honest treatment of a number
+           nobody recorded. -->
+      <input id="hDecided" type="number" step="any" placeholder="Price when I decided $" style="max-width:180px" title="Optional. The price when you decided to buy, before you actually filled. The gap between this and your fill is what hesitation and spread cost you." tabindex="-1" disabled="">
+      <select id="hBroker" style="max-width:140px" tabindex="-1" disabled="">
+        <option>Fidelity</option><option>Robinhood</option><option>Schwab</option><option>Vanguard</option>
+        <option>E*TRADE</option><option>Webull</option><option>Merrill</option><option>Other</option>
+      </select>
+      <button class="btn" tabindex="-1" disabled="">Add</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="row" style="gap:6px;align-items:center;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="hDeductCash" checked="" style="width:auto" tabindex="-1" disabled=""> Take this out of my cash
+      </label>
+      <span class="muted" id="buyPreview" style="font-size:13px"></span>
+    </div>
+    <p class="muted" style="margin-top:8px">Switch to <b>Enter dollars</b> to buy by amount instead of share count. PerceptFolio works out the fractional shares from the price. Mutual funds (e.g. FSKAX, FXAIX, FZILX) don't have a live exchange quote, so add them as <b>Mutual Fund</b> and enter the NAV yourself in the table below.</p>
+  </div>
+  </div>
+  <!-- TRADE IMPACT — the sizing step the app never had -->
+  <div class="card" style="margin-top:16px">
+    <h3>Before You Trade: What this does to the portfolio</h3>
+    <p class="muted" style="margin-bottom:12px">Every BUY verdict in this app tells you <b>what</b> and never <b>how much</b>, and size decides the outcome more than selection does, you can be right about the company and ruined by the position. Nothing here is a forecast. It is arithmetic on the portfolio you already have.</p>
+    <div class="row">
+      <input id="tiTicker" placeholder="Ticker" style="max-width:130px" oninput="renderTradeImpact()" tabindex="-1" disabled="">
+      <select id="tiSide" style="max-width:110px" onchange="renderTradeImpact()" tabindex="-1" disabled="">
+        <option value="buy">Buy</option><option value="sell">Sell</option>
+      </select>
+      <input id="tiAmount" type="number" step="any" placeholder="$ amount" style="max-width:160px" oninput="renderTradeImpact()" tabindex="-1" disabled="">
+      <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Largest size your policy allows</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="row" style="gap:6px;align-items:center;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="tiFromCash" checked="" style="width:auto" onchange="renderTradeImpact()" tabindex="-1" disabled=""> Funded from cash (uncheck if this is new money going in)
+      </label>
+    </div>
+    <div id="tradeImpact" style="margin-top:14px"><div class="empty">Enter a ticker and a dollar amount. You'll get the position size, the cash left, the market exposure and the policy check. Before the money moves, not after.</div></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Cash Available to Invest</h3>
+    <div class="row">
+      <input id="cashInput" type="number" step="any" placeholder="$ amount" style="max-width:180px" tabindex="-1" disabled="">
+      <button class="btn btn-ghost" tabindex="-1" disabled="">Update Cash</button>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Investment Thesis</h3>
+    <p class="muted" style="margin-bottom:12px">Write down why you bought something and what would make you sell it, <b>while you still remember</b>. Six months from now the price will have moved and you'll be tempted to invent a reason for whatever it did. A thesis written in advance is the only thing that stops that.</p>
+    <div class="row" style="margin-bottom:10px">
+      <select id="thesisSym" style="max-width:200px" onchange="loadThesis()" tabindex="-1" disabled=""><option value="AAPL">AAPL ✓</option><option value="KO">KO. None written</option><option value="MSFT">MSFT. None written</option><option value="NVDA">NVDA. None written</option><option value="SPY">SPY. None written</option></select>
+      <span class="muted" id="thesisStatus" style="font-size:12.5px">Written 2026-09-14 at 9/12</span>
+    </div>
+    <div class="field"><label>Why do we own it?</label><textarea id="thesisWhy" rows="2" placeholder="Durable advantage in X, strong free cash flow, reasonable price…" style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical" tabindex="-1" disabled=""></textarea></div>
+    <div class="field"><label>What must stay true?</label><textarea id="thesisMust" rows="2" placeholder="Margins stay above X. Revenue growth stays above Y. No major competitor displacement." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical" tabindex="-1" disabled=""></textarea></div>
+    <div class="field"><label>What would make us sell?</label><textarea id="thesisInvalid" rows="2" placeholder="Quality score drops below 8. Margins compress two quarters running. Valuation exceeds X." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical" tabindex="-1" disabled=""></textarea></div>
+    <div class="row">
+      <div class="field" style="max-width:200px;margin-bottom:0"><label>Target price ($)</label><input id="thesisTarget" type="number" step="any" min="0" placeholder="where you think it goes" oninput="updatePlannedRR()" tabindex="-1" disabled=""></div>
+      <div class="field" style="max-width:200px;margin-bottom:0"><label>Stop price ($). Sell below</label><input id="thesisStop" type="number" step="any" min="0" placeholder="where you're wrong" oninput="updatePlannedRR()" tabindex="-1" disabled=""></div>
+      <div class="field" style="max-width:200px;margin-bottom:0"><label>Deadline. Exit if it hasn't worked</label><input id="thesisDeadline" type="date" onchange="updatePlannedRR()" tabindex="-1" disabled=""></div>
+    </div>
+    <div class="muted" id="plannedRR" style="font-size:12.5px;margin:10px 0 4px">At $328.21: risking <b class="neg">11.6%</b> to make <b class="pos">15.8%</b>, payoff <b class="warn">1.36×</b>. You need to be right <b>42%</b> of the time just to break even.</div>
+
+    <!-- ---- THE THESIS PROBABILITY ----
+         A target and a date are a strike and an expiry wearing different words. N(d2) — the one term
+         in Black–Scholes that needs no options chain, no strike quote and no implied vol — turns
+         them into a stated likelihood under the volatility this app already measures.
+
+         The point is not options. It is that a thesis with no probability attached cannot be graded
+         properly: when it fails you cannot tell "I was wrong" from "I was right and it was a 20%
+         shot that missed", and those two errors need opposite corrections.
+
+         Your own number goes in beside the model's, because the GAP between them is the thing
+         actually worth recording. In ninety days it is a calibration score, and nothing else in
+         retail finance keeps one. -->
+    <div class="prob-box" id="thesisProbBox" style="display: block;">
+      <div class="prob-head">Probability the target is reached by the deadline</div>
+      <div class="prob-row">
+        <div class="prob-cell">
+          <div class="prob-k">Model. N(d2)</div>
+          <div class="prob-v" id="probModel"><span class="neg">22%</span></div>
+          <div class="prob-n" id="probInputs">Chance of reaching $380 from $328.21 within 120 days.<br>Volatility 31%, measured from 60 of your own logged closes.<br>Drift 8.0%/yr (CAPM, beta 1.00).</div>
+        </div>
+        <div class="prob-cell">
+          <div class="prob-k">Your own estimate</div>
+          <div class="prob-own">
+            <input id="thesisPrior" type="number" min="1" max="99" step="1" placeholder="-" oninput="updatePlannedRR()" tabindex="-1" disabled=""><span>%</span>
+          </div>
+          <div class="prob-n">What you actually believe, before you saw the model.</div>
+        </div>
+        <div class="prob-cell">
+          <div class="prob-k">Gap, logged</div>
+          <div class="prob-v" id="probGap"><span class="muted">-</span></div>
+          <div class="prob-n" id="probGapNote">Put your own number in and the gap is saved with the thesis, then graded at the deadline.</div>
+        </div>
+      </div>
+      <p class="prob-warn" id="probAssume"><details class="aside"><summary>How this can be wrong</summary><div>It assumes returns are lognormal and volatility stays at 31% until the deadline. Both are false: real returns have fat tails, and this app's own GARCH panel exists because volatility clusters. Treat it as an order of magnitude, not a figure to two significant figures. It checks whether your target is plausible; it is not a forecast.</div></details></p>
+    </div>
+    <div class="row">
+      <div class="field" style="max-width:250px;margin-bottom:0"><label>Sell if quality drops below (of 12)</label><input id="thesisSellBelow" type="number" min="0" max="12" step="1" placeholder="e.g. 8" tabindex="-1" disabled=""></div>
+      <div class="field" style="max-width:220px;margin-bottom:0"><label>Next review</label><input id="thesisReview" type="date" tabindex="-1" disabled=""></div>
+      <button class="btn" style="align-self:flex-end" tabindex="-1" disabled="">Save thesis</button>
+      <button class="btn-danger btn btn-ghost" style="align-self:flex-end" tabindex="-1" disabled="">Delete</button>
+    </div>
+    <details class="aside"><summary>Four of these the app can act on</summary><div>the target, the stop, the deadline and the quality threshold. The free text it can store but never read. The stop is what actually limits a loss, it turns "how often am I right" into "how much do I make when I'm right versus lose when I'm wrong", which is the number that decides whether the account grows. The deadline handles the third outcome nobody plans for: the thesis was neither right nor wrong, it just never happened, and the money sat there.</div></details>
+  </div>
+
+  <div class="section-title">Your Holdings</div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="row">
+      <input id="pfFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderAll()" tabindex="-1" disabled="">
+      <select id="pfFilterType" style="max-width:130px" onchange="renderAll()" tabindex="-1" disabled="">
+        <option value="All">All types</option><option value="Stock">Stock</option><option value="ETF">ETF</option><option value="Fund">Mutual Fund</option>
+      </select>
+      <select id="pfFilterBroker" style="max-width:150px" onchange="renderAll()" tabindex="-1" disabled=""><option value="All">All brokers</option><option value="undefined">undefined</option></select>
+      <select id="pfFilterSignal" style="max-width:150px" onchange="renderAll()" tabindex="-1" disabled="">
+        <option value="All">All verdicts</option><option value="buy">System: BUY</option><option value="sell">System: SELL</option><option value="watch">System: Watch</option><option value="hold">System: Hold</option>
+      </select>
+      <select id="pfFilterMine" style="max-width:150px" onchange="renderAll()" tabindex="-1" disabled="">
+        <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
+      </select>
+      <button class="btn-ghost btn btn-sm" tabindex="-1" disabled="">Clear</button>
+      <div class="spacer"></div>
+      <select id="pfGlMode" style="max-width:190px" onchange="renderAll()" title="What the Gain/Loss column shows" tabindex="-1" disabled="">
+        <option value="total">Gain/Loss: Total</option>
+        <option value="today">Gain/Loss: Today</option>
+      </select>
+    </div>
+  </div>
+  <div class="card" style="overflow-x:auto">
+    <table id="holdingsTable">
+      <thead><tr>
+        <th class="sortable" id="pfTh_sym">Ticker</th>
+        <th class="sortable" id="pfTh_type">Type</th>
+        <th class="sortable" id="pfTh_broker">Broker</th>
+        <th class="sortable" id="pfTh_shares">Shares</th>
+        <th class="sortable" id="pfTh_cost">Avg Cost</th>
+        <th class="sortable" id="pfTh_price">Price Now</th>
+        <th class="sortable" id="pfTh_value">Market Value</th>
+        <th class="sortable th-profit" id="pfTh_gl">Total Gain/Loss</th>
+        <th class="sortable th-ai" id="pfTh_signal">Verdict</th>
+        <th class="th-mine">My Call</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="holdingsBody"><tr><td><b>AAPL</b></td><td>Stock</td><td class="muted">undefined</td><td>40</td><td>$171.2</td><td><input type="number" step="any" style="width:100px" value="328.21" placeholder="set price" onchange="setHoldingPrice(0,this.value)" tabindex="-1" disabled=""><div class="muted" style="font-size:11px">auto</div></td><td>$13,128.4</td><td class="pos">$6,280.4<div style="font-size:11px;opacity:.8">+91.71%</div></td><td><span class="pill pill-buy">BUY candidate</span></td><td class="mycall-cell"><select class="mycall mycall-none" onchange="setMyTag('AAPL',this.value)" tabindex="-1" disabled=""><option value="" selected="">-</option><option value="buy">Buy</option><option value="hold">Hold</option><option value="sell">Sell</option><option value="watching">Watching</option></select></td><td style="text-align:right"><button class="ovf-btn" title="AAPL options" aria-label="AAPL options" tabindex="-1" disabled=""><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="3" r="1.4"></circle><circle cx="8" cy="8" r="1.4"></circle><circle cx="8" cy="13" r="1.4"></circle></svg></button></td></tr><tr><td><b>MSFT</b></td><td>Stock</td><td class="muted">undefined</td><td>18</td><td>$402.55</td><td><input type="number" step="any" style="width:100px" value="510.12" placeholder="set price" onchange="setHoldingPrice(1,this.value)" tabindex="-1" disabled=""><div class="muted" style="font-size:11px">auto</div></td><td>$9,182.16</td><td class="pos">$1,936.26<div style="font-size:11px;opacity:.8">+26.72%</div></td><td><span class="pill pill-buy">BUY candidate</span></td><td class="mycall-cell"><select class="mycall mycall-none" onchange="setMyTag('MSFT',this.value)" tabindex="-1" disabled=""><option value="" selected="">-</option><option value="buy">Buy</option><option value="hold">Hold</option><option value="sell">Sell</option><option value="watching">Watching</option></select></td><td style="text-align:right"><button class="ovf-btn" title="MSFT options" aria-label="MSFT options" tabindex="-1" disabled=""><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="3" r="1.4"></circle><circle cx="8" cy="8" r="1.4"></circle><circle cx="8" cy="13" r="1.4"></circle></svg></button></td></tr><tr><td><b>NVDA</b></td><td>Stock</td><td class="muted">undefined</td><td>60</td><td>$64.8</td><td><input type="number" step="any" style="width:100px" value="228.45" placeholder="set price" onchange="setHoldingPrice(2,this.value)" tabindex="-1" disabled=""><div class="muted" style="font-size:11px">auto</div></td><td>$13,707</td><td class="pos">$9,819<div style="font-size:11px;opacity:.8">+252.55%</div></td><td><span class="pill pill-buy">BUY candidate</span></td><td class="mycall-cell"><select class="mycall mycall-none" onchange="setMyTag('NVDA',this.value)" tabindex="-1" disabled=""><option value="" selected="">-</option><option value="buy">Buy</option><option value="hold">Hold</option><option value="sell">Sell</option><option value="watching">Watching</option></select></td><td style="text-align:right"><button class="ovf-btn" title="NVDA options" aria-label="NVDA options" tabindex="-1" disabled=""><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="3" r="1.4"></circle><circle cx="8" cy="8" r="1.4"></circle><circle cx="8" cy="13" r="1.4"></circle></svg></button></td></tr><tr><td><b>KO</b></td><td>Stock</td><td class="muted">undefined</td><td>90</td><td>$61.1</td><td><input type="number" step="any" style="width:100px" value="88.81" placeholder="set price" onchange="setHoldingPrice(3,this.value)" tabindex="-1" disabled=""><div class="muted" style="font-size:11px">auto</div></td><td>$7,992.9</td><td class="pos">$2,493.9<div style="font-size:11px;opacity:.8">+45.35%</div></td><td><span class="pill pill-buy">BUY candidate</span></td><td class="mycall-cell"><select class="mycall mycall-none" onchange="setMyTag('KO',this.value)" tabindex="-1" disabled=""><option value="" selected="">-</option><option value="buy">Buy</option><option value="hold">Hold</option><option value="sell">Sell</option><option value="watching">Watching</option></select></td><td style="text-align:right"><button class="ovf-btn" title="KO options" aria-label="KO options" tabindex="-1" disabled=""><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="3" r="1.4"></circle><circle cx="8" cy="8" r="1.4"></circle><circle cx="8" cy="13" r="1.4"></circle></svg></button></td></tr><tr><td><b>SPY</b></td><td>ETF</td><td class="muted">undefined</td><td>25</td><td>$512.4</td><td><input type="number" step="any" style="width:100px" value="773.17" placeholder="set price" onchange="setHoldingPrice(4,this.value)" tabindex="-1" disabled=""><div class="muted" style="font-size:11px">auto</div></td><td>$19,329.25</td><td class="pos">$6,519.25<div style="font-size:11px;opacity:.8">+50.89%</div></td><td><span class="pill pill-na">ETF</span></td><td class="mycall-cell"><select class="mycall mycall-none" onchange="setMyTag('SPY',this.value)" tabindex="-1" disabled=""><option value="" selected="">-</option><option value="buy">Buy</option><option value="hold">Hold</option><option value="sell">Sell</option><option value="watching">Watching</option></select></td><td style="text-align:right"><button class="ovf-btn" title="SPY options" aria-label="SPY options" tabindex="-1" disabled=""><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="3" r="1.4"></circle><circle cx="8" cy="8" r="1.4"></circle><circle cx="8" cy="13" r="1.4"></circle></svg></button></td></tr></tbody>
+    </table>
+    <p class="muted" style="margin-top:10px">Price column is editable. Click in and type to set/override any price (required for mutual funds, useful if an auto lookup fails). Click any column header to sort, click again to reverse.</p>
+    <div id="holdingsEmpty" class="empty" style="display: none;">No holdings yet. Add what you own above, PerceptFolio remembers it.</div>
+  </div>
+
+  <!-- QUALITY DRIFT -->
+  <div class="section-title">Quality Drift, which businesses are getting better or worse</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <select id="driftWindow" style="max-width:190px" onchange="renderDrift()" tabindex="-1" disabled="">
+        <option value="90">Change over 90 days</option>
+        <option value="180" selected="">Change over 180 days</option>
+        <option value="365">Change over 1 year</option>
+      </select>
+      <div class="spacer"></div>
+      <span class="muted" id="driftCount" style="font-size:12px"></span>
+    </div>
+    <div id="driftBody"><div class="empty">Nothing logged yet. Hit <b>Refresh data</b> and PerceptFolio starts recording each holding's checklist score daily. The first comparison needs about a week.</div></div>
+    <details class="aside"><summary>What this list is for</summary><div>Your sell rule fires when a company is <b>already</b> bad. This shows the ones on the way there, a score sliding from 10 to 7 across two quarters is a business deteriorating on your own criteria, often before the price reflects it. The scores were always being calculated; only the latest one used to be kept. This reads the daily log instead, so it starts thin and gets more useful every week you run a refresh.</div></details>
+  </div>
+</div>
+
+<!-- WATCHLIST -->
+<div id="tab-watchlist" class="tabs-hidden">
+  <!-- Two states in one tab. The overview shows every list as a card; opening one hides the others
+       and shows that list alone, with its own add button. The alternative, a single always-visible
+       table with a filter dropdown, made lists feel like a filter rather than a place. -->
+  <div class="tab-actions" id="listsTopActions" style="display: flex;">
+    <button class="btn-add" tabindex="-1" disabled=""><span class="plus">+</span> New list</button>
+  </div>
+  <div class="tab-actions" id="listOpenActions" style="display:none">
+    <button class="btn-add" tabindex="-1" disabled=""><span class="plus">+</span> Add ticker to this list</button>
+  </div>
+  <div class="addwrap" id="add-ticker">
+  <div class="card" style="position:relative">
+    <button class="add-close" title="Close" tabindex="-1" disabled="">✕</button>
+    <h3>Add a ticker</h3>
+    <div class="row">
+      <input id="wTicker" placeholder="Ticker (e.g. MSFT)" style="max-width:170px" onkeydown="if(event.key==='Enter')addWatch()" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Add</button>
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:12.5px" id="addTickerNote">Everything here is auto-scored on every refresh, in a list or not. When one passes your buy criteria, you get an alert.</p>
+  </div>
+  </div>
+
+  <!-- Lists are an organisational layer: a ticker is watched whether or not it belongs to one, and
+       deleting a list never deletes tickers. Both facts are stated on screen, because a grouping
+       control that might silently drop holdings is one people will not trust enough to use. -->
+  <div id="listOverview" style="display: block;"><div class="list-rows"><div class="list-row"><span class="list-row-dot" style="background:#7c8598"></span><span class="list-row-name">Watchlist</span><span class="list-row-tag">default</span><span class="list-row-n">4</span><span style="width:28px"></span></div></div><p class="muted" style="font-size:11.5px;margin-top:12px;line-height:1.5">Every ticker is scored on each refresh whether or not it is filed into a list. Deleting a list keeps its tickers; they return to <b>Watchlist</b>.</p></div>
+  <div id="listHeader" style="display:none"></div>
+
+  <div class="addwrap" id="add-list">
+  <div class="card" style="position:relative">
+    <button class="add-close" title="Close" tabindex="-1" disabled="">✕</button>
+    <h3>New list</h3>
+    <div class="row" style="margin-top:8px">
+      <input id="newListName" placeholder="e.g. Semis, Dividend, Watching closely" maxlength="40" style="max-width:280px" onkeydown="if(event.key==='Enter')createList()" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Create</button>
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:12.5px">A ticker can sit in several lists or none. Deleting a list never deletes its tickers, they move to Unlisted and carry on being scored.</p>
+  </div>
+  </div>
+
+  <div class="section-title" id="watchingTitle" style="display: none;">Watching</div>
+  <div class="card" style="margin-bottom: 14px; display: none;" id="watchFilters">
+    <div class="row">
+      <input id="wlFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderAll()" tabindex="-1" disabled="">
+      <select id="wlFilterMine" style="max-width:150px" onchange="renderAll()" tabindex="-1" disabled="">
+        <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
+      </select>
+      <select id="wlFilterVerdict" style="max-width:170px" onchange="renderAll()" tabindex="-1" disabled="">
+        <option value="All">All verdicts</option><option value="buy">BUY candidate</option><option value="watch">Watch</option><option value="no">Doesn't qualify</option><option value="na">No data yet</option>
+      </select>
+      <!-- The list picker and the group-by-list toggle are gone: inside a single list, one filters
+           to the list you are already in and the other groups a single group. -->
+      <span class="spacer"></span>
+      <span class="muted" id="wlCount" style="font-size:12.5px">0 tickers</span>
+      <button class="btn-ghost btn btn-sm" tabindex="-1" disabled="">Clear</button>
+    </div>
+  </div>
+  <div class="card" style="overflow-x: auto; display: none;">
+    <table>
+      <thead><tr>
+        <th class="sortable" id="wlTh_sym">Ticker</th>
+        <th class="sortable" id="wlTh_price">Share Price</th>
+        <th class="sortable th-quality sortable" id="wlTh_quality">Quality /12</th>
+        <th class="sortable th-value" id="wlTh_pricescore">Value /6</th>
+        <th class="sortable th-momentum" id="wlTh_momentum">Momentum /4</th>
+        <th class="sortable th-ai" id="wlTh_signal">Verdict</th>
+        <th>Lists</th>
+        <th class="th-mine">My Call</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="watchBody"><tr><td colspan="9" class="empty">Nothing matches these filters.</td></tr></tbody>
+    </table>
+    <p class="muted" style="margin-top:10px">Click any column header to sort, click again to reverse.</p>
+    <div id="watchEmpty" class="empty" style="display: none;">Watchlist is empty.</div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div id="tab-history" class="tabs-hidden">
+  <div class="stat-row">
+    <div class="stat s-in"><span class="stat-label">↓ Bought (logged here)</span><span class="stat-value" id="histTotalIn">$0</span></div>
+    <div class="stat s-out"><span class="stat-label">↑ Sold (logged here)</span><span class="stat-value" id="histTotalOut">$0</span></div>
+    <div class="stat s-profit"><span class="stat-label">✓ Realized gain / loss</span><span class="stat-value pos" id="histRealized">$0</span></div>
+    <!-- C8. "Dividends earned" reads as cash received. Nothing here is received: the figure accrues
+     day by day from each holding's declared rate, so it is a projection of what SHOULD have been
+     paid at rates that may since have been cut. Finnhub's free tier exposes no payment dates or
+     amounts, so the app cannot know. The label now says projected and the caveat sits in the tile
+     rather than only in a paragraph below it. -->
+<div class="stat s-income"><span class="stat-label">Dividends accrued <span class="muted" style="font-weight:400">(projected)</span></span><span class="stat-value" id="histTotalDiv">$0</span><span class="muted" style="font-size:11px">never received, accrued at declared rates</span></div>
+  </div>
+  <details class="aside"><summary>Bought</summary><div>and <b>Sold</b> add up the rows in the ledger below, nothing else. They only count trades you recorded <i>inside PerceptFolio</i>, so a position you typed in before the ledger existed won't appear, and Bought never goes down when you sell. They're a record of activity, not a statement of what you currently have in. For that, use <b>Portfolio value</b> and <b>Unrealized gain / loss</b> on the dashboard.</div></details>
+  <div class="card">
+    <h3>Dividend Income</h3>
+    <details class="aside"><summary>How this is worked out</summary><div>Worked out from your holdings automatically, nothing to log. The <b>Dividends accrued</b> figure above is a <b>projection, not income</b>, it accrues day by day from the rates below, so it grows the longer you hold, whether or not a payment ever lands. Finnhub's free tier doesn't expose actual payment dates or amounts, so this is an estimate at each company's current declared rate; it can't see a cut, a raise, or tax withheld.</div></details>
+    <div id="divBreakdown"><div class="empty">No dividend-paying stocks detected yet. Analyze your holdings and any that pay a dividend will show up here automatically.</div></div>
+  </div>
+  <div class="section-title">Transaction History</div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="row">
+      <input id="histFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderAll()" tabindex="-1" disabled="">
+      <select id="histFilterAction" style="max-width:150px" onchange="renderAll()" tabindex="-1" disabled="">
+        <option value="All">All activity</option><option value="buy">Buys</option><option value="sell">Sells</option>
+      </select>
+      <button class="btn-ghost btn btn-sm" tabindex="-1" disabled="">Clear</button>
+    </div>
+  </div>
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Date</th><th>Action</th><th>Ticker</th><th>Shares</th><th>Price</th><th>Amount</th><th>Realized</th><th>Note</th><th></th></tr></thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+    <div id="historyEmpty" class="empty" style="display: block;">No transactions yet. Every buy, sell, and dividend you record from here on shows up in this ledger, including buying more of something you already own.</div>
+    <p class="muted" style="margin-top:10px;font-size:12px">This ledger starts from the moment you record a trade in PerceptFolio; it can't reconstruct purchases you made before adding them here. Deleting a row only removes the history entry; it does not change your current holdings.</p>
+  </div>
+
+  <!-- HOW YOU BEHAVE -->
+  <div class="section-title">How You Behave, the pattern in your own trading</div>
+  <div class="card">
+    <details class="aside"><summary>Why this one analyses you</summary><div>Everything else in PerceptFolio analyses companies. This analyses <b>you</b>. Anyone can get price history; nobody else has yours. These are the four questions the ledger can answer about your habits. How long you actually hold, whether you sell too early, whether you keep to your own cash rule, and whether you trade more when things get loud.</div></details>
+    <div id="behaviourBody"><div style="padding:14px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">How long you actually hold</div><div class="muted" style="font-size:13.5px;line-height:1.65">Needs at least three closed positions recorded in the ledger. You have 0. Sells of positions you added before the ledger existed can't be matched to a buy, so they don't count here.</div></div><div style="padding:14px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">Whether you sell too early</div><div class="muted" style="font-size:13.5px;line-height:1.65">Nothing to measure yet. Once you sell something through PerceptFolio, it gets checked 30 and 90 days later to see whether it kept going without you.</div></div><div style="padding:14px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">Whether you keep to your own rules</div><div class="muted" style="font-size:13.5px;line-height:1.65">Needs at least five daily snapshots. Those accumulate every time you run a refresh. Today your largest position is 25.5% against your 10% cap.</div></div><div style="padding:14px 0;border-top:1px solid var(--border)"><div style="font-weight:700;margin-bottom:6px">Whether you trade in bursts</div><div class="muted" style="font-size:13.5px;line-height:1.65">Needs trades recorded across at least three different months.</div></div><details class="aside"><summary>Read the limits</summary><div>All of this measures only what is in the ledger, which starts when you began recording trades here. Positions carried in from before are invisible to it. Sample sizes will be small for a long time, and a handful of trades cannot distinguish a habit from a coincidence. Nothing here is advice; it is a mirror.</div></details></div>
+  </div>
+</div>
+
+<!-- MAP (Layer Deep) -->
+<div id="tab-map" class="tabs-hidden">
+  <div class="card">
+    <h3>Layer Deep: Who a company depends on</h3>
+    <p class="muted" style="margin-bottom:12px">Put a company in the middle and map what it depends on. Suppliers to the left, customers to the right, similar companies below. Bubble size reflects how much of its business each relationship represents.</p>
+    <div class="row">
+      <input id="mapTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')loadMap()" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Map it</button>
+      <button class="btn btn-ghost" id="mappedToggle" tabindex="-1" disabled="">All maps</button>
+      <button class="btn btn-ghost" title="Creates the missing opposite entry for every relationship that has a ticker" tabindex="-1" disabled="">⇄ Link</button>
+      <span class="muted" id="mapStatus"></span>
+    </div>
+    <div id="mappedList" style="margin-top:12px;display:none"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px;overflow-x:auto">
+    <div id="mapCanvas"><div class="empty">Enter a ticker above to build its map.</div></div>
+  </div>
+
+  <div id="mapDetail" style="margin-top:16px"></div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Add a Relationship</h3>
+    <details class="aside"><summary>What's automatic and what isn't</summary><div>Supplier and customer links have to be entered by hand. That data is assembled by vendors from filings and transcripts and sold at institutional rates, no free API publishes it. The <b>10-K</b> is where to find it: any customer worth more than 10% of revenue must be disclosed, usually under "Concentration of Credit Risk" or in the risk factors.</div></details>
+    <div class="row">
+      <select id="relSide" style="max-width:150px" tabindex="-1" disabled="">
+        <option value="suppliers">They buy from</option>
+        <option value="customers">They sell to</option>
+      </select>
+      <input id="relTicker" placeholder="Ticker (optional)" style="max-width:140px" tabindex="-1" disabled="">
+      <input id="relName" placeholder="Company name" style="max-width:200px" tabindex="-1" disabled="">
+      <input id="relWeight" type="number" step="1" min="1" max="100" placeholder="% of business" style="max-width:150px" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Add</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="relNote" placeholder="What flows between them. E.g. &quot;EUV lithography machines, sole source worldwide&quot;" style="flex:1;min-width:260px" tabindex="-1" disabled="">
+    </div>
+    <p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.55">The summary describes the <b>relationship</b>, not the company, so it reads correctly from both ends and is copied to the other company's map automatically. Edit it later on either side and the other side follows, unless you've already written something different there.</p>
+    <div id="relList" style="margin-top:14px"></div>
+  </div>
+
+  <details class="aside"><summary>What's automatic and what isn't</summary><div>The centre company's profile and the "similar companies" row come from Finnhub and fill in on their own. Suppliers and customers are yours to enter. Institutional holders were deliberately left out: the free source for that is quarterly 13F filings, which are up to four months stale, exclude short positions entirely, and would list Vanguard, BlackRock and State Street at the top of nearly every company you could look up. A list that says the same thing about everything isn't worth the screen space.</div></details>
+</div>
+
+<!-- MARKET -->
+<div id="tab-market" class="tabs-hidden">
+
+  <!-- 1. Today's move, in context -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">The Move, In Context</h3>
+      <div class="row" style="gap:6px">
+        <button class="btn btn-ghost btn-sm" id="mvBtn_today" tabindex="-1" disabled="">Today</button>
+        <button class="btn btn-ghost btn-sm" id="mvBtn_yesterday" tabindex="-1" disabled="">Yesterday</button>
+        <button class="btn btn-ghost btn-sm" id="mvBtn_tomorrow" tabindex="-1" disabled="">Tomorrow</button>
+        <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">↻</button>
+      </div>
+    </div>
+    <div id="todaysMove" style="margin-top:12px" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap" aria-hidden="true"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
+    <details class="aside"><summary>How the ruler works</summary><div>The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b>, it's a ruler, not a forecast.</div></details>
+  </div>
+
+  <!-- 1b. Calendar effects — CONTEXT ONLY, and the panel says so twice.
+       This exists because on the fourth of September somebody publishes "September is the worst
+       month for stocks" and does not divide by the standard deviation. The defence against a bad
+       statistic is the same statistic displayed properly, so the arithmetic is done here in full.
+       Nothing on this panel feeds a score, a verdict or a size. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Calendar effects: Context, not a signal</h3>
+      <span class="pill pill-na" style="font-size:10px">not used in any verdict</span>
+    </div>
+    <div id="seasonalBody" style="margin-top:12px"></div>
+  </div>
+
+  <!-- Hindsight. What the best and worst names DID, and why that is not a shopping list. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Hindsight</h3>
+      <div class="row" style="gap:6px">
+        <button class="btn btn-ghost btn-sm" id="hsBtn_m1" tabindex="-1" disabled="">1 month</button>
+        <button class="btn btn-ghost btn-sm" id="hsBtn_m6" tabindex="-1" disabled="">6 months</button>
+        <button class="btn btn-ghost btn-sm on" id="hsBtn_y1" tabindex="-1" disabled="">1 year</button>
+        <button class="btn btn-ghost btn-sm" id="hsBtn_y5" tabindex="-1" disabled="">5 years</button>
+      </div>
+    </div>
+    <div id="hindsightBody" style="margin-top:12px"></div>
+  </div>
+
+  <!-- 2. Market weather -->
+  <div id="regimeBanner" style="margin-top:16px"></div>
+
+  <div class="section-title">Market Weather. Long-run valuation</div>
+  <div id="weatherVerdict" style="margin-bottom:14px"></div>
+  <div class="grid grid-3" id="weatherCards">
+    <div class="card" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w4"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Figures With No Free Feed</h3>
+    <p class="muted" style="margin-bottom:12px">CAPE comes from Robert Shiller's spreadsheet and margin debt from FINRA. Neither publishes a free API, so these are typed in. Update them monthly; the cards show how stale they are.</p>
+    <div class="grid grid-3">
+      <div>
+        <div class="field"><label>CAPE (Shiller P/E), <a target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroCape" type="number" step="0.01" placeholder="e.g. 34.2" tabindex="-1" disabled=""></div>
+        <div class="field"><label>As of (month)</label><input id="macroCapeAsOf" type="month" tabindex="-1" disabled=""></div>
+      </div>
+      <div>
+        <div class="field"><label>Margin debt $bn, <a target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroMargin" type="number" step="0.1" placeholder="e.g. 1417.2" tabindex="-1" disabled=""></div>
+        <div class="field"><label>As of (month)</label><input id="macroMarginAsOf" type="month" tabindex="-1" disabled=""></div>
+      </div>
+      <div>
+        <div class="field"><label>Buffett indicator %, <a target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroBuffett" type="number" step="0.1" placeholder="e.g. 205" tabindex="-1" disabled=""></div>
+        <div class="field"><label>As of (month)</label><input id="macroBuffettAsOf" type="month" tabindex="-1" disabled=""></div>
+      </div>
+    </div>
+    <button class="btn" tabindex="-1" disabled="">Save figures</button>
+    <details class="aside"><summary>Entering your own figure</summary><div>A Buffett figure entered here overrides the one calculated from FRED. Worth doing. FRED's Wilshire series is a price index rather than a dollar market cap, so the calculated version tracks the right direction but isn't the textbook percentage. A number from a source that computes it properly is more trustworthy.</div></details>
+  </div>
+  <details class="aside"><summary>Read these as long-run expectations, not crash warnings</summary><div>All three describe what returns over the next ten to fifteen years are likely to look like from today's prices. They have almost no power to time the next twelve months. The Buffett indicator has read "expensive" since roughly 2013 and CAPE has been above 30 since 2017, through years of large gains. Use them to decide how much to put in, not when to get out.</div></details>
+
+  <!-- 3. Call scorecard -->
+  <div class="section-title">Your Call Scorecard. Is the checklist actually working?</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px;flex-wrap:wrap">
+      <select id="scoreWindow" style="max-width:200px" onchange="renderScorecard()" tabindex="-1" disabled="">
+        <option value="30">Marked at 30 days</option>
+        <option value="90" selected="">Marked at 90 days</option>
+        <option value="180">Marked at 180 days</option>
+        <option value="365">Marked at 1 year</option>
+        <option value="since">Since the call (open-ended)</option>
+      </select>
+      <select id="scoreVerdict" style="max-width:170px" onchange="renderScorecard()" tabindex="-1" disabled="">
+        <option value="buy">BUY calls only</option>
+        <option value="sell">SELL calls only</option>
+        <option value="all">All calls</option>
+      </select>
+      <select id="scoreTrack" style="max-width:210px" onchange="renderScorecard()" title="Which system's calls to grade" tabindex="-1" disabled="">
+        <option value="checklist">System: checklist</option>
+        <option value="herizen">System: Herizen momentum</option>
+        <option value="gated">System: checklist + momentum</option>
+        <option value="ewma">System: EWMA 50/200</option>
+      </select>
+      <div class="spacer"></div>
+      <span class="muted" id="scoreCount" style="font-size:12px"></span>
+    </div>
+    <div id="scorecardSummary"></div>
+    <div style="overflow-x:auto;margin-top:14px">
+      <table>
+        <thead><tr><th>Ticker</th><th>Called</th><th>Call</th><th>Scores</th><th>Held</th><th>Price then</th><th>At mark</th><th>Stock</th><th>SPY</th><th title="Return minus SPY, with no adjustment for the risk taken to get it">vs SPY <span style="font-weight:400;opacity:.6">(raw)</span></th><th title="Sensitivity to the market, estimated from daily closes">β</th><th title="Jensen's alpha: return in excess of what this beta earned you for free">α</th><th>Verdict</th></tr></thead>
+        <tbody id="scorecardBody"></tbody>
+      </table>
+    </div>
+    <div id="scorecardEmpty" class="empty" style="display: block;">No calls recorded yet. PerceptFolio logs a call every time its verdict on a ticker changes, from the next Refresh onward; it can't grade calls it never wrote down.</div>
+    <details class="aside"><summary>How marks are captured</summary><div>Marks are captured live: when a call crosses its 30/90/180/365-day anniversary and the app is open, the price and SPY at that moment are stamped onto the call permanently. Finnhub's free plan has no historical price lookup, so this is the only way to get a true fixed-horizon record, which means the record starts from today and builds forward. If a call's anniversary passes while the app is closed for too long, it is marked unmarkable and dropped rather than graded at the wrong holding period.</div></details>
+  </div>
+</div>
+
+<!-- NEWS -->
+<div id="tab-news" class="tabs-hidden">
+  <div class="card">
+    <div class="row" style="flex-wrap:wrap;margin-bottom:10px">
+      <input id="newsSearch" placeholder="Search any ticker…" style="max-width:190px" onkeydown="if(event.key==='Enter')searchNews()" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Search</button>
+      <div class="spacer"></div>
+      <span class="muted" id="newsStatus" style="font-size:12px"></span>
+    </div>
+    <div class="row" style="flex-wrap:wrap">
+      <div class="row" style="gap:2px">
+        <button class="btn btn-ghost btn-sm nw-win on" data-win="1" tabindex="-1" disabled="">Today</button>
+        <button class="btn btn-ghost btn-sm nw-win" data-win="7" tabindex="-1" disabled="">Week</button>
+        <button class="btn btn-ghost btn-sm nw-win" data-win="30" tabindex="-1" disabled="">Month</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost" id="newsLoadBtn" tabindex="-1" disabled="">Load my positions</button>
+    </div>
+    <p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">Loaded on demand, not on every page view. Each holding costs one API call and Finnhub's free tier allows sixty a minute. Cached for thirty minutes.</p>
+  </div>
+  <div id="newsBody" style="margin-top:16px"></div>
+</div>
+
+<!-- SCREENER -->
+<div id="tab-screener" class="tabs-hidden">
+  <div class="card">
+    <h3>Scan a list of tickers</h3>
+    <p class="muted" style="margin-bottom:12px">PerceptFolio doesn't browse the market on its own. Give it a list and it scores each ticker against your checklist. Scoring takes a few seconds per ticker to stay within Finnhub's free-tier rate limit, so this runs in the background; you can leave the tab and come back.</p>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Dow 30</button>
+      <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Mega-cap tech (12)</button>
+      <span class="muted" style="font-size:12px">Presets are a fixed snapshot, not a live index feed. Membership can drift over time.</span>
+    </div>
+    <div class="field">
+      <label>Or discover by sector/theme. Companies you may not have heard of yet</label>
+      <div class="row">
+        <input id="sectorSearchInput" placeholder="e.g. tech, water, healthcare, energy…" style="max-width:220px" onkeydown="if(event.key==='Enter')searchSectorPresets()" tabindex="-1" disabled="">
+        <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Search</button>
+      </div>
+      <div id="sectorMatches" class="row" style="margin-top:8px"></div>
+      <details class="aside"><summary>What this screener can and cannot see</summary><div>Not a live scan of the entire market. Finnhub's free tier doesn't offer that. These are curated snapshots per sector (10–20 well-known names each), same honest caveat as the Dow 30/Mega-cap Tech presets above. Loading a sector fills the box below; you still hit Run screen to score them. Or just paste your own list below.</div></details>
+    </div>
+    <div class="field">
+      <label>Or let PerceptFolio search on its own. Stocks you haven't found yet</label>
+      <div class="row">
+        <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">This week's picks (20)</button>
+        <span class="muted" style="font-size:12px" id="weeklyPicksNote">A rotating batch of ~20 from the ~350-ticker built-in universe, minus anything already in your Portfolio or Watchlist. Refreshes on a weekly cycle, some names carry over, some rotate out. Instead of dumping the whole list at once. Still just fills the box below. Hit Run screen to actually score them.</span>
+      </div>
+    </div>
+    <textarea id="screenerInput" rows="3" placeholder="AAPL, MSFT, NVDA, JNJ, ..." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 13px;font-size:14px;font-family:inherit;resize:vertical" tabindex="-1" disabled=""></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="screenerStartBtn" tabindex="-1" disabled="">Run screen</button>
+      <button class="btn btn-danger" id="screenerStopBtn" style="display:none" tabindex="-1" disabled="">Stop</button>
+      <span class="muted" id="screenerStatus"></span>
+    </div>
+  </div>
+  <div class="section-title">Results</div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="row">
+      <input id="scFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderScreenerTable()" tabindex="-1" disabled="">
+      <select id="scFilterVerdict" style="max-width:190px" onchange="renderScreenerTable()" tabindex="-1" disabled="">
+        <option value="All">All verdicts</option>
+        <option value="buy">BUY candidate</option>
+        <option value="watch">Watch</option>
+        <option value="hold">Hold</option>
+        <option value="sell">Consider selling</option>
+        <option value="no">Doesn't qualify</option>
+        <option value="na">No data</option>
+      </select>
+      <select id="scFilterMine" style="max-width:150px" onchange="renderScreenerTable()" tabindex="-1" disabled="">
+        <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
+      </select>
+      <button class="btn-ghost btn btn-sm" tabindex="-1" disabled="">Clear</button>
+      <span class="muted" id="screenerFilterCount"></span>
+    </div>
+  </div>
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Ticker</th><th>Share Price</th><th class="th-quality">Quality <span class="th-den">/12</span></th><th class="th-value">Value <span class="th-den">/6</span></th><th class="th-momentum">Momentum <span class="th-den">/4</span></th><th class="th-ai">Verdict</th><th class="th-mine">My Call</th><th></th></tr></thead>
+      <tbody id="screenerBody"></tbody>
+    </table>
+    <div id="screenerEmpty" class="empty">Run a screen to see results here. Anything scoring at or above your buy bar (Settings) will sort to the top.</div>
+  </div>
+</div>
+
+<!-- ANALYZER -->
+<div id="tab-analyzer" class="tabs-hidden">
+  <div class="card">
+    <h3>Analyze a Stock</h3>
+    <div class="row">
+      <input id="aTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:170px" onkeydown="if(event.key==='Enter')analyzeStock()" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Run Quality + Price Check</button>
+      <span class="muted">ETFs: quality checks apply to companies, not ETFs. Use this for individual stocks.</span>
+    </div>
+  </div>
+  <div id="analyzerResult"><div class="empty" style="text-align:left;line-height:1.7"><b>Nothing analysed yet.</b><br><span style="font-size:12.5px">Enter a US ticker above. The Analyzer runs the 22 checks, shows what each one measured and whether it passed, and records the verdict as a call so it can be graded later. It is deliberately not a recommendation.</span></div></div>
+  <div class="card" style="margin-top:16px">
+    <h3>Compare Two Stocks</h3>
+    <div class="row">
+      <input id="cmpTicker1" placeholder="Ticker A (e.g. AAPL)" style="max-width:170px" onkeydown="if(event.key==='Enter')compareStocks()" tabindex="-1" disabled="">
+      <input id="cmpTicker2" placeholder="Ticker B (e.g. MSFT)" style="max-width:170px" onkeydown="if(event.key==='Enter')compareStocks()" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Compare</button>
+    </div>
+  </div>
+  <div id="compareResult"></div>
+</div>
+
+<!-- RISK -->
+<div id="tab-risk" class="tabs-hidden">
+
+  <!-- ACTIVE RETURN. Placed first in the tab because it grades a decision made every week, whereas
+       everything below it measures exposure. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Are you paid for being different?</h3>
+      <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Recalculate</button>
+    </div>
+    <p class="muted" style="margin-top:6px;font-size:13px">Two benchmarks. One asks whether your sizing beats doing nothing clever with the same stocks; the other asks whether any of it beats the index.</p>
+    <div id="benchBody" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h3>Portfolio Risk</h3>
+    <p class="muted" style="margin-bottom:12px">Your single-stock scores can't see this: how concentrated you are in one sector, and how correlated your holdings are with each other (owning 5 stocks that all move together isn't 5 bets. It's 1). This uses extra API calls per stock, so it's calculated on demand rather than on every refresh.</p>
+    <div class="row">
+      <button class="btn" id="riskCalcBtn" tabindex="-1" disabled="">Calculate risk</button>
+      <span class="muted" id="riskStatus"></span>
+    </div>
+  </div>
+  <div id="riskResults"></div>
+
+  <div class="section-title">Where your risk actually sits</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:12px">Every holding's share of the portfolio's <b>variance</b>, against its share of the <b>money</b>. A 6% position in a violent name can own 20% of your risk, and no position-size percentage will ever show you that.</p>
+    <div id="riskContribBody"></div>
+  </div>
+
+
+  <!-- M9. Sizing counterfactual. Filed on RISK rather than PROJECTIONS deliberately: Projections is
+       for distributions of outcomes under assumptions, and for signals. This is neither. It is
+       arithmetic over closes already recorded, and it sits directly under "Where your risk actually
+       sits" because that section shows a 6% position can own 20% of the risk and this one answers
+       the obvious next question, what a different size would have done to the actual path. -->
+  <div class="section-title">Sizing counterfactual. Same trades, different size</div>
+  <div class="card">
+    <details class="aside"><summary>This is not a backtest, and the difference matters</summary><div>It does not choose different stocks, trade on different days, or use a single price that was not already recorded here. Every ticker is one you hold, every date is one this app logged a close for, and every entry and exit stays exactly where it happened. The only thing changed is how many dollars sat in each position. A backtest has to invent prices for trades you never made; this invents nothing, which is why it is allowed to exist here and a backtest is not.</div></details>
+    <div class="row" style="flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;max-width:200px"><label>Alternative A (% risk per position)</label><input id="cfRiskA" type="number" min="0.1" max="25" step="0.1" onkeydown="if(event.key==='Enter')renderCounterfactual()" tabindex="-1" disabled=""></div>
+      <div class="field" style="margin:0;max-width:200px"><label>Alternative B (% risk per position)</label><input id="cfRiskB" type="number" min="0.1" max="25" step="0.1" onkeydown="if(event.key==='Enter')renderCounterfactual()" tabindex="-1" disabled=""></div>
+      <button class="btn" id="cfRunBtn" tabindex="-1" disabled="">Recompute</button>
+    </div>
+    <div id="cfBody" style="margin-top:14px"></div>
+  </div>
+  <div class="section-title">Check any stock's risk</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:12px">Doesn't need to be in your Portfolio or Watchlist. Just check the risk/volatility profile of any ticker before you decide whether to add it.</p>
+    <div class="row">
+      <input id="soloRiskTicker" placeholder="e.g. NVDA" style="max-width:160px" onkeydown="if(event.key==='Enter')calcSoloRisk()" tabindex="-1" disabled="">
+      <button class="btn" id="soloRiskBtn" tabindex="-1" disabled="">Calculate</button>
+      <span class="muted" id="soloRiskStatus"></span>
+    </div>
+    <div id="soloRiskResults"></div>
+  </div>
+
+  <!-- The Quick calculator that lived here was a duplicate of the floating calculator in the header,
+       which does all of it and more. Two places to do the same sum is two places to maintain and one
+       more thing to scan past. -->
+
+  <div class="section-title">Risk-adjusted return</div>
+  <div class="card">
+    <details class="aside"><summary>What Sharpe measures here</summary><div>Return per unit of volatility, from your own daily snapshots. Shown with its confidence interval, because a Sharpe ratio computed on a few months of data carries an error bar usually wider than the number itself, and a point estimate without one is the same false precision as a hit rate without a sample size.</div></details>
+    <div id="sharpeBody"></div>
+  </div>
+
+  <div class="section-title">Loss severity. VaR and Expected Shortfall</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:12px">How bad a bad day gets, measured from your own daily history. <b>These do not predict returns.</b> They describe severity, which is what risk machinery is for, surviving being wrong, not being right more often.</p>
+    <div id="varBody"></div>
+  </div>
+
+</div>
+
+<!-- PROJECTIONS
+     Two sections, deliberately separated. A projection is a DISTRIBUTION of outcomes given
+     assumptions. A signal is a RULE that reads today and emits a position. Filing the second under
+     the first teaches you to read an instruction as a forecast, which is how people end up believing
+     a trading rule knows the future. -->
+<div id="tab-projections" class="tabs-hidden">
+  <div class="sec-lead">
+    <div class="sec-no">01</div>
+    <div>
+      <div class="section-title" style="margin-top:0">Ranges. What the spread of outcomes looks like</div>
+      <p class="muted" style="font-size:13px;max-width:70ch;line-height:1.6">These answer "where might this end up", not "what should I do today". Every one is a distribution under stated assumptions, and every one is wrong in a way the assumptions decide.</p>
+    </div>
+  </div>
+
+  <div class="section-title">Monte Carlo projection</div>
+  <div class="card">
+    <p class="muted" style="margin-bottom:12px">Simulates thousands of random possible futures based on estimated return and volatility, to show a realistic range of outcomes instead of a single guess. The return/volatility inputs below are assumptions you're setting. Adjust them to match your own view, they're not guaranteed numbers.</p>
+    <div class="field">
+      <label>What to simulate</label>
+      <input id="mcTickers" placeholder="Leave blank to simulate your whole portfolio, or list tickers e.g. AAPL, NVDA" oninput="toggleMcHypo()" tabindex="-1" disabled="">
+    </div>
+    <div class="field" id="mcHypoWrap" style="display:none">
+      <label>Amount to simulate (split evenly across the tickers above, used because you're simulating specific stocks, not your real position sizes)</label>
+      <input id="mcHypoAmount" type="number" min="0" step="100" value="10000" tabindex="-1" disabled="">
+    </div>
+    <div class="grid grid-2">
+      <div class="field"><label>Time horizon (years)</label><input id="mcYears" type="number" min="1" max="40" value="10" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Simulations</label><input id="mcSims" type="number" min="200" max="10000" step="200" value="10000" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Risk-free rate (%/yr). E.g. short-term Treasury yield</label><input id="mcRf" type="number" step="0.1" value="4.5" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Expected return of the whole market (%/yr)</label><input id="mcMkt" type="number" step="0.1" value="8" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Monthly contribution ($, optional)</label><input id="mcContrib" type="number" min="0" step="50" value="0" tabindex="-1" disabled=""></div>
+    </div>
+    <button class="btn" id="mcRunBtn" tabindex="-1" disabled="">Run simulation</button>
+    <span class="muted" id="mcStatus"></span>
+  </div>
+  <div id="mcResults"></div>
+
+  <div class="sec-lead" style="margin-top:34px">
+    <div class="sec-no" style="color:var(--yellow)">02</div>
+    <div>
+      <div class="section-title" style="margin-top:0">Signals. Rules that emit a position today</div>
+      <p class="muted" style="font-size:13px;max-width:70ch;line-height:1.6">Not forecasts. A signal reads the prices in front of it and tells you how much to hold right now. It says nothing about where the price is going, and it is separated from the section above for exactly that reason.</p>
+    </div>
+  </div>
+
+  <div class="section-title">Herizen momentum score</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <input id="hzTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')renderHerizen()" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Score it</button>
+      <div class="spacer"></div>
+      <span class="muted" id="hzCount" style="font-size:12px"></span>
+    </div>
+    <div id="herizenBody"></div>
+    <details class="aside"><summary>Four segments, not four lookbacks</summary><div>The strategy as described draws lines from one week, two weeks, one month and two months ago to today, but those windows are <i>nested</i>, so the same recent days are counted in all four and a single sharp move pushes every line at once. A +4 built that way is one observation counted four times. This uses <b>non-overlapping</b> segments instead. Two months to one month, one month to two weeks, two weeks to one week, one week to today, so a +4 means four separate stretches each rose, which is a genuinely stronger statement.</div></details>
+  </div>
+
+  <div class="card" style="margin-top:16px;border-left:3px solid var(--red)">
+    <h3 class="neg">Read this before you trust it</h3>
+    <details class="aside"><summary>What the evidence actually says</summary><div>The published evidence on price trends splits sharply by horizon. Momentum, winners keep winning. Is documented at roughly <b>three to twelve months</b>. At <b>one week and one month</b> the documented effect is the opposite: <b>short-term reversal</b>, where recent winners give it back. Three of this rule's four windows sit in that reversal band, which means the honest prior on it is somewhere between "no edge" and "negative edge", before costs.
+      <br><br>
+      That is why it is wired in as a <b>position cap and nothing else</b>. It can shrink a position the checklist already cleared. It cannot create a buy, block a sell, or change a verdict. A wrong cap costs you upside; a wrong verdict costs you capital, and this rule has not earned the right to cost you capital.
+      <br><br>
+      It is also being <b>graded against two alternatives</b> from today, checklist alone, this alone, and the two combined. On the Market tab. In ninety days that argument settles itself with numbers instead of citations.</div></details>
+  </div>
+</div>
+
+<!-- ALERTS -->
+<div id="tab-alerts" class="tabs-hidden">
+  <div class="tab-actions"><button class="btn-add" tabindex="-1" disabled=""><span class="plus">+</span> Add price alert</button></div>
+  <div class="row" style="margin-bottom:14px">
+    <div class="section-title" style="margin:0">Alerts</div>
+    <div class="spacer"></div>
+    <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Enable Browser Notifications</button>
+    <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Clear All</button>
+  </div>
+  <div id="alertsList"><div class="empty">No alerts yet. Alerts fire when a watchlist stock becomes a buy candidate, a holding turns into a sell candidate, or a price target you set is hit.</div></div>
+  <div class="addwrap" id="add-alert">
+  <div class="card" style="position:relative">
+    <button class="add-close" title="Close" tabindex="-1" disabled="">✕</button>
+    <h3>Set a Price Alert</h3>
+    <div class="row" style="margin-top:8px">
+      <input id="paTicker" placeholder="Ticker" style="max-width:120px" tabindex="-1" disabled="">
+      <select id="paDir" style="max-width:130px" tabindex="-1" disabled=""><option value="above">Rises above</option><option value="below">Falls below</option></select>
+      <input id="paPrice" type="number" step="any" placeholder="$ price" style="max-width:130px" onkeydown="if(event.key==='Enter')addPriceAlert()" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Set Alert</button>
+    </div>
+  </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Price alerts you have set</h3>
+    <div id="priceAlertsList" style="margin-top:12px"><span class="muted">No active price alerts.</span></div>
+  </div>
+</div>
+
+<!-- CLIENTS (business accounts only) -->
+<div id="tab-clients" class="tabs-hidden">
+  <p class="muted" style="margin-bottom:14px">A business account doesn't hold its own investments in PerceptFolio. Portfolio, Watchlist, and Alerts are hidden here for that reason. Manage client portfolios below, or click <b>Switch</b> on a client to work inside their account.</p>
+  <div class="card">
+    <h3>Create Client</h3>
+    <details class="aside"><summary>What a client account is, and is not</summary><div>This isn't a real brokerage account for your client. Their actual money stays wherever it's actually held (their own broker/custodian). This just gives you, the quant, a separate, walled-off place to track and score that client's holdings by hand, same as any other portfolio in this app. Most people never give the client login access at all. It's for your own recordkeeping. The email below is just an internal ID (it doesn't need to be real, and doesn't need to reach them) unless you specifically want them to log in themselves; if you do, set a password and hand them both. Either way, you can also work in their portfolio anytime via Switch, and export a snapshot for them via Settings → Export if you ever want to hand off a copy.</div></details>
+    <div class="row">
+      <input id="clientName" placeholder="Client name (e.g. Jane Smith)" style="max-width:200px" tabindex="-1" disabled="">
+      <input id="clientEmail" placeholder="ID (email format. Doesn't need to be real)" style="max-width:260px" tabindex="-1" disabled="">
+      <span class="pw-wrap"><input id="clientPassword" type="password" placeholder="Password (only if they'll log in)" style="max-width:220px" data-pw-wrapped="1" tabindex="-1" disabled=""><button type="button" class="pw-toggle" aria-label="Show password" tabindex="-1" disabled="">Show</button></span>
+      <input id="clientFeePct" type="number" min="0" max="100" step="0.1" placeholder="Fee % of gains (optional)" style="max-width:190px" tabindex="-1" disabled="">
+      <button class="btn" tabindex="-1" disabled="">Create Client</button>
+    </div>
+  </div>
+  <div class="section-title">Your Clients</div>
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Client</th><th>Login email</th><th>Portfolio value</th><th>Unrealized gain</th><th>Your fee</th><th>Est. fee owed</th><th></th></tr></thead>
+      <tbody id="clientsBody"></tbody>
+    </table>
+    <div id="clientsEmpty" class="empty">No clients yet. Create one above. Their portfolio is completely separate from yours.</div>
+  </div>
+  <details class="aside"><summary>This fee % is just a private note, not a billing system</summary><div>PerceptFolio has no payment processing and never moves money, "Est. fee owed" is a rough math estimate (fee % × unrealized gain, zero on losses), not an invoice. More importantly: taking a cut of a client's investment gains is a <b>performance-based fee</b>, and under SEC Rule 205-3 of the Investment Advisers Act, advisers generally can't charge performance fees except to "qualified clients" who clear specific net-worth/asset thresholds, and that's on top of needing to be a properly registered or exempt adviser in the first place just to manage someone else's investments for pay at all. Recording a number here doesn't make an arrangement compliant. Talk to a securities attorney before you charge anyone a percentage of their gains.</div></details>
+</div>
+
+<!-- SETTINGS -->
+<div id="tab-settings" class="tabs-hidden">
+
+  <div class="card" id="installCard" style="display:none">
+    <h3>Install PerceptFolio</h3>
+    <p class="muted" style="margin-bottom:12px">Install it and PerceptFolio gets its own icon, opens without browser chrome, and keeps working offline. On iPhone this also matters for your data: Safari clears storage for sites you haven't opened in 7 days, but installed apps are exempt.</p>
+    <button class="btn" id="installBtn" tabindex="-1" disabled="">Install app</button>
+    <p class="muted" id="installHint" style="margin-top:10px;font-size:12.5px;line-height:1.55"></p>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Getting Started</h3>
+    <p class="muted" style="margin-bottom:12px">A short pass over what each screen is for and the three things to do first. Shown automatically on a new account; replay it any time.</p>
+    <button class="btn btn-ghost" tabindex="-1" disabled="">Run the walkthrough</button>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Appearance</h3>
+    <label class="muted" style="display:block;font-size:13px;margin-bottom:8px">Theme</label>
+    <div class="theme-switch is-dark" id="themeSwitch" title="Click to switch between light and dark">
+      <div class="theme-knob" id="themeKnob"></div>
+      <span class="theme-side" style="left:0">☀ Light</span>
+      <span class="theme-side" style="right:0">☾ Dark</span>
+    </div>
+  </div>
+  <!-- MARKET DATA — HIDES ITSELF ONCE THE WORKER SUPPLIES THE KEY.
+       The card is not deleted, and the reason matters. A device only reaches the worker's key if
+       sync is configured AND the worker answers. If either is untrue — a browser that was never set
+       up, a custom domain not yet pointed, a secret typed into the wrong field — then deleting this
+       box would leave the terminal with no market data and no way to fix it from inside the app.
+       That is a dead end, and the fix would be editing HTML.
+
+       So it collapses instead. When the worker is answering, the card reports that in one line and
+       the input is folded away behind a disclosure. When it is not, the card is fully present with
+       instructions, because at that moment it is the only way to get prices on screen. -->
+  <div class="card" style="margin-top:16px" id="mktDataCard">
+    <h3 id="mktDataTitle">Market data API (Finnhub, free)</h3>
+    <p class="muted" id="fhViaWorker" style="margin-bottom:10px;display:none"></p>
+    <div id="fhManual" style="display: block;">
+      <p class="muted" style="margin-bottom:10px">Prices, fundamentals and news come from Finnhub. Get a free key at <b>finnhub.io/register</b> (about two minutes) and paste it here, it stays in this browser and is never sent to NorthBridge.</p>
+      <div class="row">
+        <input id="apiKeyInput" placeholder="Finnhub API key" style="max-width:340px" tabindex="-1" disabled="">
+        <button class="btn" tabindex="-1" disabled="">Save Key</button>
+        <span id="apiStatus" class="muted"></span>
+      </div>
+    </div>
+    <details id="fhAdvanced" style="display:none;margin-top:4px">
+      <summary style="cursor:pointer;font-size:12.5px;color:var(--muted)">Override with a key just for this device</summary>
+      <p class="muted" style="margin:9px 0 10px;font-size:12.5px">Only needed to spend a different quota here, or to keep working if the worker is unreachable. Leave it empty and the worker's key is used.</p>
+      <div class="row">
+        <input id="apiKeyInputAdv" placeholder="Finnhub API key" style="max-width:340px" tabindex="-1" disabled="">
+        <button class="btn" tabindex="-1" disabled="">Save Key</button>
+        <span id="apiStatusAdv" class="muted"></span>
+      </div>
+    </details>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Investment Policy</h3>
+    <p class="muted" style="margin-bottom:12px">The limits this portfolio is run to. Command checks every holding against these and flags breaches. Set per account, so a client with a three-year horizon can run different limits from your own book, the same stock can be a buy in one portfolio and a hold in another.</p>
+    <div class="grid grid-2">
+      <div class="field"><label>Risk profile</label><select id="polRisk" tabindex="-1" disabled="">
+        <option value="conservative">Conservative. Capital preservation</option>
+        <option value="moderate">Moderate, balanced</option>
+        <option value="aggressive">Aggressive. Growth, long horizon</option>
+      </select></div>
+      <div class="field"><label>Max single position (% of portfolio)</label><input id="polMaxPos" type="number" min="1" max="100" step="1" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Cash target (%). Flags idle cash above this</label><input id="polCash" type="number" min="0" max="100" step="1" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Risk budget per position (%)</label><input id="polRiskPerTrade" type="number" min="0.1" max="25" step="0.5" tabindex="-1" disabled="">
+        <span class="muted" style="font-size:11.5px;line-height:1.5;display:block;margin-top:4px">How much of the whole portfolio a single position is allowed to put at risk. With a stop set; this is the most you lose if it hits. Without one, it sizes by volatility instead. A flat cap treats a quiet utility and a violent semiconductor as the same bet; this doesn't.</span></div>
+      <div class="field"><label>Exclusions (tickers or sectors, comma separated)</label><input id="polExclusions" placeholder="e.g. XOM, tobacco, defense" tabindex="-1" disabled=""></div>
+    </div>
+    <button class="btn" tabindex="-1" disabled="">Save policy</button>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Buy / Sell Rules</h3>
+    <div class="grid grid-2">
+      <div class="field"><label>Min quality checks passed to be a BUY candidate (of 12)</label><input id="setQBuy" type="number" min="1" max="12" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Min price checks passed to be a BUY candidate (of 6)</label><input id="setPBuy" type="number" min="1" max="6" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Min momentum checks passed to be a BUY candidate (of 4, 0 = don't require it)</label><input id="setMBuy" type="number" min="0" max="4" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Quality score at/below which a holding flags SELL</label><input id="setQSell" type="number" min="0" max="12" tabindex="-1" disabled=""></div>
+      <div class="field"><label>Auto-refresh on page load</label><select id="setAutoRefresh" tabindex="-1" disabled=""><option value="yes">Yes</option><option value="no">No</option></select></div>
+    </div>
+    <button class="btn" tabindex="-1" disabled="">Save Rules</button>
+    <details class="aside"><summary>Why changing a bar splits the record</summary><div>Changing a buy or sell bar creates a <b>different system</b>. Every call graded before the change was made by one that no longer exists, so you'll be asked what you expect the change to do and what result would prove it wrong. Before you see any data. That's the only defence against searching a small sample until something looks significant.</div></details>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Rule Change Log</h3>
+    <p class="muted" style="margin-bottom:12px">Every change to the buy or sell bars, with the prediction you made at the time. Read it back when a change is a few months old and check whether what you expected is what happened.</p>
+    <div id="ruleLog"><div class="empty">No rule changes recorded. Every call in your scorecard was made by the same system, which is the cleanest a record can be.</div></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Copy Holdings / Watchlist to Another Account</h3>
+    <p class="muted" style="margin-bottom:12px">Copies from the account you're in right now into another one on this browser. Useful for setting a new client up with a starting book, or cloning your own list into a second account. It copies the positions and tickers only; cash, transaction history, dividends, alerts, and settings are left alone.</p>
+    <div class="row" style="margin-bottom:10px">
+      <select id="copyTarget" style="max-width:280px" tabindex="-1" disabled=""><option value="">No other accounts on this browser</option></select>
+      <select id="copyWhat" style="max-width:190px" tabindex="-1" disabled="">
+        <option value="both">Holdings + Watchlist</option>
+        <option value="holdings">Holdings only</option>
+        <option value="watchlist">Watchlist only</option>
+      </select>
+      <select id="copyMode" style="max-width:210px" tabindex="-1" disabled="">
+        <option value="merge">Merge into theirs</option>
+        <option value="replace">Replace theirs</option>
+      </select>
+      <button class="btn" tabindex="-1" disabled="">Copy</button>
+    </div>
+    <p class="muted" style="font-size:12px"><b>Merge</b> adds anything they don't already have and leaves their existing positions untouched. <b>Replace</b> wipes the selected lists on the target account first; that can't be undone, so it asks first.</p>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Sync Across Your Devices</h3>
+    <p class="muted" style="margin-bottom:12px">Keeps this account's holdings, watchlist, history and settings the same on your phone and your computer. Paste the same two values on every device. Setup instructions are in <b>SYNC-SETUP.md</b>.</p>
+    <div class="field"><label>Sync URL</label><input id="syncUrlInput" placeholder="https://perceptfolio-sync.yourname.workers.dev" autocomplete="off" tabindex="-1" disabled=""></div>
+    <div class="field"><label>Sync key</label><span class="pw-wrap"><input id="syncKeyInput" type="password" placeholder="The SYNC_SECRET you set in Cloudflare" autocomplete="off" data-pw-wrapped="1" tabindex="-1" disabled=""><button type="button" class="pw-toggle" aria-label="Show password" tabindex="-1" disabled="">Show</button></span></div>
+    <div class="row">
+      <button class="btn" tabindex="-1" disabled="">Save &amp; connect</button>
+      <button class="btn btn-ghost" tabindex="-1" disabled="">Sync now</button>
+      <button class="btn btn-ghost" tabindex="-1" disabled="">Pull from cloud</button>
+      <button class="btn btn-ghost" tabindex="-1" disabled="">Check connection</button>
+      <button class="btn-danger btn btn-ghost" tabindex="-1" disabled="">Turn off</button>
+    </div>
+    <!-- Shown only to a profile that holds an invite code and is not already syncing. The operator's
+         own account has no invite, so this never appears for them — it is the invited user's route
+         to the one thing the master key used to be the only way to get. -->
+    <div id="codeSyncOffer" style="display:none;margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:12px 14px">
+      <b style="font-size:13.5px">Sync with your invite code</b>
+      <p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.55">Your invite code can sync this account across your own devices, no operator key needed. Be aware of the trade: your portfolio is stored on the worker under that code and is readable by anyone holding it, and sync stops the moment your access is paused.</p>
+      <button class="btn btn-sm" style="margin-top:8px" tabindex="-1" disabled="">Turn on code sync</button>
+    </div>
+    <!-- F1. A managed or business profile is told why sync is off, up front. A panel that simply
+         does nothing when pressed reads as broken, and someone would go looking for the bug rather
+         than understand the refusal. -->
+    <div id="syncBlockedNotice" style="display:none;margin-top:12px;border:1px solid var(--border);border-left:3px solid var(--red,#e5534b);border-radius:8px;padding:12px 14px">
+      <b style="font-size:13.5px">Sync is off for this account</b>
+      <p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.55" id="syncBlockedWhy"></p>
+      <button class="btn btn-sm" style="margin-top:8px" tabindex="-1" disabled="">Export a backup</button>
+    </div>
+    <p class="muted" id="syncStatus" style="margin-top:10px;font-size:13px">Not connected on this device.</p>
+    <!-- Answers "is any of this actually working" without a terminal, a curl command, or a guess.
+         Every failure in this area so far has been one of four things — the worker not reachable,
+         an old build pasted, a secret missing, or sync simply not configured on this device — and
+         from inside the app all four looked identical. -->
+    <div id="connCheck" style="display:none;margin-top:12px"></div>
+    <details class="aside"><summary>How sync behaves</summary><div>Once connected it syncs automatically, when you open the app, a few seconds after you make changes, and when you close the tab. <b>This is whole-account last-write-wins, not a merge.</b> If you edit on your phone and your laptop without letting them sync in between, the device that saves last overwrites the other. It warns you before clobbering something newer, but the safe habit is to open the app on a device and let it sync before you start editing there.</div></details>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Backup / Restore</h3>
+    <div class="row">
+      <button class="btn btn-ghost" tabindex="-1" disabled="">Export All Data (JSON)</button>
+      <!-- Deliberately permissive: iOS matches by UTI rather than file extension, so a bare
+           accept=".json" greys the backup file out in the Files picker and makes import impossible. -->
+      <label class="btn btn-ghost" style="display:inline-block">Import JSON<input type="file" accept=".json,application/json,text/json,text/plain" style="display:none" onchange="importData(event)" tabindex="-1" disabled=""></label>
+    </div>
+    <p class="muted" style="margin-top:10px">Your data lives in this browser only. Export regularly, and import on a new device to move everything over.</p>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Danger Zone</h3>
+    <button class="btn-danger btn" tabindex="-1" disabled="">Delete This Profile</button>
+  </div>
+  <!-- P2. The terminal grades itself and publishes its own breaches. A product that argues numbers
+       must be checkable, and then cannot report on its own state, is making an exception for the one
+       claim it controls entirely. Every row here is read live — none is a stored assertion. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Audit</h3>
+      <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Re-check</button>
+    </div>
+    <p class="muted" style="margin-top:6px;font-size:13px">What this install actually is, as opposed to what any screen claims. Anything red is a promise this copy is not currently keeping.</p>
+    <div id="auditBody" style="margin-top:14px" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w4"></span><span class="sk sk-row sk-w3"></span></div></div>
+  </div>
+</div>
+
+<!-- CALCULATOR — opened from the header button, available on every tab -->
+<div class="calc-panel" id="calcPanel">
+  <div class="calc-head">
+    <button class="calc-tabbtn active" id="calcTabNormal" tabindex="-1" disabled="">Normal</button>
+    <button class="calc-tabbtn" id="calcTabFinance" tabindex="-1" disabled="">Finance</button>
+    <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">✕</button>
+  </div>
+  <div class="calc-body" id="calcNormalBody" style="display: block;">
+    <div class="calc-display" id="calcDisplay">0</div>
+    <div class="calc-grid">
+      <button tabindex="-1" disabled="">C</button>
+      <button tabindex="-1" disabled="">⌫</button>
+      <button tabindex="-1" disabled="">%</button>
+      <button class="op" tabindex="-1" disabled="">÷</button>
+      <button tabindex="-1" disabled="">7</button>
+      <button tabindex="-1" disabled="">8</button>
+      <button tabindex="-1" disabled="">9</button>
+      <button class="op" tabindex="-1" disabled="">×</button>
+      <button tabindex="-1" disabled="">4</button>
+      <button tabindex="-1" disabled="">5</button>
+      <button tabindex="-1" disabled="">6</button>
+      <button class="op" tabindex="-1" disabled="">−</button>
+      <button tabindex="-1" disabled="">1</button>
+      <button tabindex="-1" disabled="">2</button>
+      <button tabindex="-1" disabled="">3</button>
+      <button class="op" tabindex="-1" disabled="">+</button>
+      <button class="wide" tabindex="-1" disabled="">0</button>
+      <button tabindex="-1" disabled="">.</button>
+      <button class="op" tabindex="-1" disabled="">=</button>
+    </div>
+  </div>
+  <div class="calc-body" id="calcFinanceBody" style="display:none">
+
+    <div class="fc-block">
+      <div class="fc-title">Reach a goal. What do I put in monthly?</div>
+      <div class="fc-grid-2">
+        <label class="fc-f"><span>I want to have</span><input id="fcGoalTarget" type="number" step="any" placeholder="50000" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>In how many years</span><input id="fcGoalYears" type="number" step="any" placeholder="10" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>Expected return %/yr</span><input id="fcGoalRate" type="number" step="any" placeholder="8" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>Starting with (optional)</span><input id="fcGoalStart" type="number" step="any" placeholder="0" tabindex="-1" disabled=""></label>
+      </div>
+      <button class="btn fc-go" tabindex="-1" disabled="">Work out my monthly</button>
+      <div class="calc-out" id="fcGoalOut" style="display:none"></div>
+    </div>
+
+    <div class="fc-block">
+      <div class="fc-title">Grow an amount. What will I end up with?</div>
+      <div class="fc-grid-2">
+        <label class="fc-f"><span>Starting amount</span><input id="fcPrincipal" type="number" step="any" placeholder="1000" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>Return %/yr</span><input id="fcRate" type="number" step="any" placeholder="8" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>Years</span><input id="fcYears" type="number" step="any" placeholder="10" value="1" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>Adding monthly</span><input id="fcContrib" type="number" step="any" placeholder="0" tabindex="-1" disabled=""></label>
+      </div>
+      <button class="btn fc-go" tabindex="-1" disabled="">Calculate</button>
+      <div class="calc-out" id="fcCompoundOut" style="display:none"></div>
+    </div>
+
+    <div class="fc-block">
+      <div class="fc-title">How many shares can I buy?</div>
+      <div class="fc-grid-2">
+        <label class="fc-f"><span>Budget</span><input id="fcBudget" type="number" step="any" placeholder="500" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>Price per share</span><input id="fcPrice1" type="number" step="any" placeholder="100" tabindex="-1" disabled=""></label>
+      </div>
+      <button class="btn fc-go" tabindex="-1" disabled="">Calculate</button>
+      <div class="calc-out" id="fcSharesOut" style="display:none"></div>
+    </div>
+
+    <div class="fc-block">
+      <div class="fc-title">What are my shares worth?</div>
+      <div class="fc-grid-2">
+        <label class="fc-f"><span>Shares</span><input id="fcShares2" type="number" step="any" placeholder="2.34" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>Price per share</span><input id="fcPrice2" type="number" step="any" placeholder="100" tabindex="-1" disabled=""></label>
+      </div>
+      <button class="btn fc-go" tabindex="-1" disabled="">Calculate</button>
+      <div class="calc-out" id="fcValueOut" style="display:none"></div>
+    </div>
+
+    <div class="fc-block">
+      <div class="fc-title">Gain / loss on a position</div>
+      <div class="fc-grid-3">
+        <label class="fc-f"><span>Shares</span><input id="fcGlShares" type="number" step="any" placeholder="10" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>Avg cost</span><input id="fcGlCost" type="number" step="any" placeholder="90" tabindex="-1" disabled=""></label>
+        <label class="fc-f"><span>Price now</span><input id="fcGlNow" type="number" step="any" placeholder="100" tabindex="-1" disabled=""></label>
+      </div>
+      <button class="btn fc-go" tabindex="-1" disabled="">Calculate</button>
+      <div class="calc-out" id="fcGlOut" style="display:none"></div>
+    </div>
+
+    <p class="muted" style="font-size:11px;margin-top:14px;line-height:1.5">Everything here is arithmetic on the numbers you type. None of it is a forecast, and none of it accounts for fees, taxes, or the reality that returns arrive unevenly rather than as a smooth annual percentage.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  PerceptFolio is an educational analysis tool, not financial advice. Data via Finnhub may be delayed or incomplete. Always verify before trading.
+  Signals are rule-based scores of your own checklist, not predictions.
+</div>
+</main>
+</div>
+</div>
+
+
+
+
+
+<button id="toTop" type="button" aria-label="Back to top" tabindex="-1" disabled="">Top</button><script src="/i18n/es.js"></script>
+<script src="/i18n/lang.js"></script>
+</body></html>

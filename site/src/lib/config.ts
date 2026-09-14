@@ -8,7 +8,8 @@ export const PLANS = {
   business: { monthly: 119, yearly: 1190, minSeats: 3 },
 } as const;
 
-export type PlanId = 'personal-monthly' | 'personal-yearly' | 'business-monthly' | 'business-yearly';
+/* Firms with this many members get the discount on every seat; the quote email states it. */
+export const BUSINESS_DISCOUNT = { minSeats: 8, pct: 15 } as const;
 
 /* Named against the professional self-serve tier, never Bloomberg (PRD §6). Verify before publishing. */
 export const COMPARISONS: ReadonlyArray<{ name: string; monthly: number | string; note?: string }> = [
