@@ -19,7 +19,7 @@ export function Pricing() {
       <div className="mt-8 inline-flex rounded-[8px] border border-line2 p-1" role="group" aria-label="Billing period">
         {[['Yearly', true], ['Monthly', false]].map(([l, y]) => <button key={String(l)} type="button" onClick={() => setYearly(y as boolean)} aria-pressed={yearly === y} className={'rounded-[6px] px-4 py-2 text-[14px] font-semibold ' + (yearly === y ? 'bg-panel2 text-text' : 'text-dim hover:text-text')}>{l}</button>)}
       </div>
-      <div className="mt-8 grid grid-cols-2 gap-6 max-[900px]:grid-cols-1">
+      <div className="mt-8 grid grid-cols-2 gap-6 max-[780px]:grid-cols-1">
         <Card className={'p-7 ' + (yearly ? 'border-accent shadow-[inset_0_1px_0_rgba(255,255,255,.035),0_0_0_1px_rgba(59,130,246,.25),0_24px_60px_-24px_rgba(0,0,0,.6)]' : '')}>
           <h2 className="text-[28px]">Personal</h2>
           <p className="mt-2 text-dim">One person, one book, your own rules.</p>

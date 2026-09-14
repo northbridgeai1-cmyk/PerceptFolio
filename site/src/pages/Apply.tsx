@@ -22,7 +22,7 @@ export function Apply() {
   };
   return (
     <main id="main" className="wrap pt-[var(--spacing-sec)] pb-[var(--spacing-sec)]">
-      <div className="grid grid-cols-[minmax(0,560px)_1fr] items-start gap-[clamp(40px,6vw,96px)] max-[900px]:grid-cols-1">
+      <div className="grid grid-cols-[minmax(0,560px)_1fr] items-start gap-[clamp(40px,6vw,96px)] max-[780px]:grid-cols-1">
         <div>
           <h1 className="mb-4">Seats for a firm.</h1>
           <p className="lede mb-8">Tell us about the desk. Someone reads every application and replies personally. If it fits, the reply carries a checkout link for the seats you need, ${PLANS.business.yearly.toLocaleString()} a seat yearly or ${PLANS.business.monthly} monthly, minimum {PLANS.business.minSeats}.</p>
@@ -36,7 +36,7 @@ export function Apply() {
             <p role="status" aria-live="polite" className="mt-4 min-h-[1.5em] text-[14.5px] text-[#f87171]">{err}</p>
           </form></Card>
         </div>
-        <dl className="mt-2 max-[900px]:mt-0">
+        <dl className="mt-2 max-[780px]:mt-0">
           {[['One rulebook', 'Whoever runs the desk sets the checks, the limits and the horizons once. Every analyst works inside them and can see them, not change them.'], ['Every call has a name', 'The record shows who made each call, when, at what price, and how it marked. Per-analyst and whole-firm views.'], ['Client books', 'Each seat can hold several client books, kept separate, each with its own record.'], ['Compliance export', 'Every call with its stamp, its checks and its mark, as CSV or JSON, whenever you need it.']].map(([t, d]) => <div key={t} className="mb-5 border-b border-line pb-5 last:mb-0 last:border-b-0 last:pb-0"><dt className="mb-[6px] font-display text-[16px] font-bold tracking-[-.01em]">{t}</dt><dd className="max-w-[48ch] text-[15px] leading-[1.6] text-dim">{d}</dd></div>)}
         </dl>
       </div>

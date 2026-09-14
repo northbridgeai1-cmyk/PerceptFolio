@@ -64,14 +64,17 @@
   h2 { font-size: clamp(32px, 3.4vw, 44px); letter-spacing: -.025em; line-height: 1.05; }
   h3 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
   p { max-width: 64ch; }
-  @media (max-width: 900px) { :root { --spacing-sec: 72px; --spacing-sec-lg: 88px; --spacing-sec-sm: 48px; } }
+  /* Foldable band: an unfolded iPhone Duo is 890px wide with a crease at the centre; two-column
+     sections keep their columns here with the gutter on the crease. */
+  @media (max-width: 960px) and (min-width: 781px) { :root { --spacing-sec: 80px; --spacing-sec-lg: 96px; } }
+  @media (max-width: 780px) { :root { --spacing-sec: 72px; --spacing-sec-lg: 88px; --spacing-sec-sm: 48px; } }
   @media (max-width: 600px) { :root { --spacing-sec: 56px; --spacing-sec-lg: 64px; } h2 { font-size: 30px; } }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
 }
 
 @layer utilities {
-  .wrap { max-width: 1280px; margin-inline: auto; padding-inline: 40px; }
-  @media (max-width: 900px) { .wrap { padding-inline: 28px; } }
+  .wrap { max-width: 1280px; margin-inline: auto; padding-left: max(40px, env(safe-area-inset-left)); padding-right: max(40px, env(safe-area-inset-right)); }
+  @media (max-width: 960px) { .wrap { padding-left: max(28px, env(safe-area-inset-left)); padding-right: max(28px, env(safe-area-inset-right)); } }
   @media (max-width: 600px) { .wrap { padding-inline: 20px; } }
   .lede { font-size: 19px; line-height: 1.55; color: var(--color-dim); max-width: 58ch; }
   .num { font-variant-numeric: tabular-nums; }
