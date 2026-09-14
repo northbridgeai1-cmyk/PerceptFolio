@@ -444,7 +444,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -608,11 +608,16 @@ async function handle(request, env) {
       return json({ known: false, active: true, reason: 'no grant record' }, 200, env);
     }
     const rec = JSON.parse(g);
+    /* A subscription that stopped paying gets a grace window (set by the webhook); past it the
+       grant answers inactive with reason 'lapsed', which the gate turns into a billing-portal link
+       rather than a "contact the operator" message. */
+    const lapsed = !!(rec.graceUntil && Date.now() > rec.graceUntil);
     return json({
       known: true,
-      active: !rec.paused,
-      reason: rec.paused ? 'paused' : 'active',
-      tier: rec.tier || null
+      active: !rec.paused && !lapsed,
+      reason: rec.paused ? 'paused' : lapsed ? 'lapsed' : 'active',
+      tier: rec.tier || null,
+      sub: rec.subStatus ? { status: rec.subStatus, currentPeriodEnd: rec.currentPeriodEnd || null, graceUntil: rec.graceUntil || null } : null
     }, 200, env);
   }
 
@@ -928,6 +933,12 @@ async function handle(request, env) {
 
 
 
+  /* ---- Billing (M2): checkout, webhook, portal, business applications. Public by design: a buyer
+     holds no key, Stripe signs its own calls, and /apply/decide checks the operator key itself.
+     See the section at the end of this file. Returns null when the path is not one of its routes. ---- */
+  const billed = await handleBilling(request, env, url);
+  if (billed) return billed;
+
   // Auth: Authorization: Bearer <SYNC_SECRET>. Everything past this point is yours alone.
   const auth = request.headers.get('Authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
@@ -1150,4 +1161,288 @@ async function handle(request, env) {
   }
 
   return json({ error: 'Method not allowed.' }, 405, env);
+}
+
+/* =====================================================================================================
+   BILLING (M2, 2026-09-13)
+
+   Stripe does the money; this file does the access. Nothing here stores a card, a price, or an
+   amount: prices live in Stripe as Price IDs named in env, Checkout and the Customer Portal are
+   Stripe-hosted pages the visitor is redirected to, and the only thing that flows back is a signed
+   webhook. When the webhook says a checkout completed, an access code is minted exactly the way
+   /decide mints one, and the durable grant is what the gate checks from then on.
+
+   Env (all set in the dashboard, none in this file):
+     STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+     STRIPE_PRICE_PERSONAL_MONTHLY, STRIPE_PRICE_PERSONAL_YEARLY,
+     STRIPE_PRICE_BUSINESS_MONTHLY, STRIPE_PRICE_BUSINESS_YEARLY
+     SITE_URL (https://perceptfolio.com), OPERATOR_EMAIL (where applications are sent)
+
+   KV keys:
+     sub:<customerId>   the subscription record  {customerId, subscriptionId, email, plan, tier, seats, status, currentPeriodEnd, code, orgId}
+     cust:<code>        code -> customerId, for the portal
+     evt:<eventId>      webhook idempotency, 30 days
+     app:<id>           a business application  {id, token, firm, size, email, contact, runs, status, seats, at, decidedAt}
+     apptok:<token>     token -> application id, used once at checkout
+     org:<orgId>        {orgId, name, adminEmail, seats, adminCode, subscriptionId, status}
+   Grants gain: subStatus, currentPeriodEnd, graceUntil.
+   ===================================================================================================== */
+
+const PLANS = {
+  'personal-monthly': { priceVar: 'STRIPE_PRICE_PERSONAL_MONTHLY', tier: 'personal' },
+  'personal-yearly':  { priceVar: 'STRIPE_PRICE_PERSONAL_YEARLY',  tier: 'personal' },
+  'business-monthly': { priceVar: 'STRIPE_PRICE_BUSINESS_MONTHLY', tier: 'business', minSeats: 3 },
+  'business-yearly':  { priceVar: 'STRIPE_PRICE_BUSINESS_YEARLY',  tier: 'business', minSeats: 3 },
+};
+const GRACE_DAYS = 7;
+
+function billingConfigured(env) {
+  return !!(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET);
+}
+
+/* Stripe's API takes form encoding, including for nested keys: line_items[0][price]=... */
+async function stripe(env, path, params) {
+  const body = new URLSearchParams();
+  const add = (k, v) => { if (v === undefined || v === null) return; if (typeof v === 'object') { for (const [kk, vv] of Object.entries(v)) add(`${k}[${kk}]`, vv); } else body.append(k, String(v)); };
+  for (const [k, v] of Object.entries(params || {})) add(k, v);
+  const r = await fetch('https://api.stripe.com/v1' + path, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.STRIPE_SECRET_KEY, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': '2024-06-20' },
+    body,
+  });
+  let j = null; try { j = await r.json(); } catch (e) { /* handled by caller */ }
+  return { ok: r.ok, status: r.status, j };
+}
+
+/* Verify a Stripe-Signature header: t=<unix>,v1=<hex>. HMAC-SHA256 over "<t>.<raw body>" with
+   the endpoint secret, constant-time compare, five-minute tolerance against replay. */
+async function verifyStripeSignature(rawBody, header, secret) {
+  if (!header || !secret) return { ok: false, why: 'missing' };
+  const parts = Object.fromEntries(header.split(',').map(kv => kv.trim().split('=')));
+  const t = parseInt(parts.t, 10), v1 = parts.v1;
+  if (!t || !v1) return { ok: false, why: 'malformed' };
+  if (Math.abs(Date.now() / 1000 - t) > 300) return { ok: false, why: 'stale' };
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${t}.${rawBody}`));
+  const hex = [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
+  return { ok: safeEqual(hex, v1), why: 'signature' };
+}
+
+function purchaseEmailBody(rec, code, siteUrl) {
+  const plan = rec.tier === 'business' ? `Business, ${rec.seats} seats` : rec.plan.includes('yearly') ? 'Personal, yearly' : 'Personal, monthly';
+  return {
+    subject: 'Your PerceptFolio access code',
+    text: `Thank you. Your plan: ${plan}.
+
+Your access code is:
+
+    ${code}
+
+Open ${siteUrl}/enter/ and type it in. It works on every device you own and stays yours for as long as the subscription runs. Keep it private; anyone holding it can open your terminal.
+
+Billing, invoices and cancellation are in your customer portal, reachable from the terminal's settings. If anything is wrong, reply to this email.
+
+PerceptFolio is research software, not investment advice. It never places a trade.`
+  };
+}
+
+async function sendPlain(env, to, subject, text) {
+  if (!env.RESEND_API_KEY || !env.MAIL_FROM) return { attempted: false };
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
+    });
+    return { attempted: true, ok: r.ok, status: r.status };
+  } catch (e) { return { attempted: true, ok: false, error: String(e && e.message || e) }; }
+}
+
+/* Mint a code the way /decide does: a 30-day code record that the first /enter burns into a
+   durable grant. tier decides the gate's session lifetime. */
+async function mintCode(env, tier, email, extra) {
+  const code = makeCode();
+  await env.PF_SYNC.put('code:' + code, JSON.stringify({
+    code, tier, email, requestId: null, issuedAt: Date.now(), expiresAt: Date.now() + 30 * 86400000, usedAt: null, ...(extra || {})
+  }), { expirationTtl: 40 * 86400 });
+  return code;
+}
+
+/* Push subscription state onto the grant so /status and the gate see it without a Stripe call. */
+async function syncGrant(env, code, patch) {
+  if (!code) return;
+  const g = await env.PF_SYNC.get('grant:' + code);
+  const c = await env.PF_SYNC.get('code:' + code);
+  if (g) { const rec = JSON.parse(g); await env.PF_SYNC.put('grant:' + code, JSON.stringify({ ...rec, ...patch })); }
+  if (c) { const rec = JSON.parse(c); await env.PF_SYNC.put('code:' + code, JSON.stringify({ ...rec, ...patch }), { expirationTtl: 40 * 86400 }); }
+}
+
+function subPatch(status, currentPeriodEnd) {
+  /* active/trialing: fully on. past_due: on, with a grace window that lapses by itself.
+     canceled/unpaid/incomplete_expired: off. */
+  if (status === 'active' || status === 'trialing') return { subStatus: status, currentPeriodEnd, paused: false, graceUntil: null };
+  if (status === 'past_due') return { subStatus: status, currentPeriodEnd, paused: false, graceUntil: Date.now() + GRACE_DAYS * 86400000 };
+  return { subStatus: status, currentPeriodEnd, paused: true, graceUntil: null };
+}
+
+async function handleBilling(request, env, url) {
+  const site = (env.SITE_URL || 'https://perceptfolio.com').replace(/\/+$/, '');
+
+  /* ---- POST /checkout {plan, seats?, application?} -> {url} ---- */
+  if (url.pathname === '/checkout' && request.method === 'POST') {
+    if (!billingConfigured(env)) return json({ error: 'Billing is not open yet. Request a demo and we will let you know.' }, 503, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const plan = clean(body.plan, 24);
+    const P = PLANS[plan];
+    if (!P) return json({ error: 'Unknown plan.' }, 400, env);
+    const price = env[P.priceVar];
+    if (!price) return json({ error: 'That plan is not configured.' }, 503, env);
+
+    const params = {
+      mode: 'subscription',
+      'line_items[0][price]': price,
+      'line_items[0][quantity]': 1,
+      success_url: `${site}/thanks.html?type=purchase&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${site}/#request`,
+      allow_promotion_codes: 'true',
+      'automatic_tax[enabled]': 'true',
+      'metadata[plan]': plan,
+      'metadata[tier]': P.tier,
+    };
+
+    if (P.tier === 'business') {
+      /* A firm is accepted before it can pay (PRD D15). The acceptance token is single-use. */
+      const token = clean(body.application, 64);
+      const appId = token ? await env.PF_SYNC.get('apptok:' + token) : null;
+      if (!appId) return json({ error: 'Business plans are by application. Apply first; the checkout link arrives with the acceptance.' }, 403, env);
+      const app = JSON.parse(await env.PF_SYNC.get('app:' + appId) || 'null');
+      if (!app || app.status !== 'accepted') return json({ error: 'That application is not accepted.' }, 403, env);
+      const seats = Math.floor(Number(body.seats) || app.seats || 0);
+      if (!(seats >= P.minSeats)) return json({ error: `Business plans start at ${P.minSeats} seats.` }, 400, env);
+      params['line_items[0][quantity]'] = seats;
+      params['metadata[seats]'] = seats;
+      params['metadata[application]'] = appId;
+      params['metadata[firm]'] = app.firm;
+      params.customer_email = app.email;
+    }
+
+    const r = await stripe(env, '/checkout/sessions', params);
+    if (!r.ok || !r.j || !r.j.url) return json({ error: 'Stripe did not return a checkout page.', detail: r.j && r.j.error && r.j.error.message }, 502, env);
+    return json({ url: r.j.url }, 200, env);
+  }
+
+  /* ---- POST /stripe/webhook ---- */
+  if (url.pathname === '/stripe/webhook' && request.method === 'POST') {
+    if (!billingConfigured(env)) return json({ error: 'Billing is not configured.' }, 503, env);
+    const raw = await request.text();
+    const sig = await verifyStripeSignature(raw, request.headers.get('stripe-signature'), env.STRIPE_WEBHOOK_SECRET);
+    if (!sig.ok) return json({ error: 'Bad signature: ' + sig.why }, 400, env);
+    let ev; try { ev = JSON.parse(raw); } catch (e) { return json({ error: 'Not JSON.' }, 400, env); }
+    if (!ev || !ev.id || !ev.type) return json({ error: 'Not an event.' }, 400, env);
+
+    /* Idempotent: Stripe retries, and a retry must not mint a second code. */
+    if (await env.PF_SYNC.get('evt:' + ev.id)) return json({ ok: true, duplicate: true }, 200, env);
+    await env.PF_SYNC.put('evt:' + ev.id, String(Date.now()), { expirationTtl: 30 * 86400 });
+
+    const obj = (ev.data && ev.data.object) || {};
+
+    if (ev.type === 'checkout.session.completed') {
+      const customerId = obj.customer, subscriptionId = obj.subscription;
+      const email = (obj.customer_details && obj.customer_details.email) || obj.customer_email || null;
+      const md = obj.metadata || {};
+      const tier = md.tier === 'business' ? 'business' : 'personal';
+      const seats = tier === 'business' ? Math.max(3, parseInt(md.seats, 10) || 3) : 1;
+      if (!customerId || !email) return json({ error: 'Session has no customer or email.' }, 400, env);
+      if (await env.PF_SYNC.get('sub:' + customerId)) return json({ ok: true, duplicate: 'customer' }, 200, env);
+
+      let orgId = null;
+      const code = await mintCode(env, tier, email, { subscriptionId, customerId, subStatus: 'active' });
+      if (tier === 'business') {
+        orgId = 'org_' + makeCode().replace('-', '').toLowerCase();
+        await env.PF_SYNC.put('org:' + orgId, JSON.stringify({ orgId, name: md.firm || null, adminEmail: email, seats, adminCode: code, subscriptionId, customerId, status: 'active', members: [], createdAt: Date.now() }));
+        await syncGrant(env, code, { orgId, role: 'admin', seats });
+        if (md.application) { const app = JSON.parse(await env.PF_SYNC.get('app:' + md.application) || 'null'); if (app) { app.status = 'paid'; app.orgId = orgId; await env.PF_SYNC.put('app:' + md.application, JSON.stringify(app)); } }
+      }
+      await env.PF_SYNC.put('sub:' + customerId, JSON.stringify({ customerId, subscriptionId, email, plan: md.plan || null, tier, seats, status: 'active', currentPeriodEnd: null, code, orgId, createdAt: Date.now() }));
+      await env.PF_SYNC.put('cust:' + code, customerId);
+      const mail = await sendPlain(env, email, purchaseEmailBody({ tier, seats, plan: md.plan || '' }, code, site).subject, purchaseEmailBody({ tier, seats, plan: md.plan || '' }, code, site).text);
+      return json({ ok: true, provisioned: true, tier, mail: mail.attempted ? (mail.ok ? 'sent' : 'failed') : 'not configured' }, 200, env);
+    }
+
+    if (ev.type === 'customer.subscription.updated' || ev.type === 'customer.subscription.deleted' || ev.type === 'invoice.payment_failed') {
+      const customerId = obj.customer;
+      const s = await env.PF_SYNC.get('sub:' + customerId);
+      if (!s) return json({ ok: true, unknownCustomer: true }, 200, env);
+      const sub = JSON.parse(s);
+      const status = ev.type === 'customer.subscription.deleted' ? 'canceled' : ev.type === 'invoice.payment_failed' ? 'past_due' : (obj.status || sub.status);
+      const cpe = obj.current_period_end ? obj.current_period_end * 1000 : sub.currentPeriodEnd;
+      sub.status = status; sub.currentPeriodEnd = cpe; sub.updatedAt = Date.now();
+      await env.PF_SYNC.put('sub:' + customerId, JSON.stringify(sub));
+      const patch = subPatch(status, cpe);
+      await syncGrant(env, sub.code, patch);
+      if (sub.orgId) {
+        const o = JSON.parse(await env.PF_SYNC.get('org:' + sub.orgId) || 'null');
+        if (o) { o.status = status; await env.PF_SYNC.put('org:' + sub.orgId, JSON.stringify(o)); for (const m of (o.members || [])) await syncGrant(env, m.code, patch); }
+      }
+      return json({ ok: true, status }, 200, env);
+    }
+
+    return json({ ok: true, ignored: ev.type }, 200, env);
+  }
+
+  /* ---- POST /portal {code} -> {url} ---- */
+  if (url.pathname === '/portal' && request.method === 'POST') {
+    if (!billingConfigured(env)) return json({ error: 'Billing is not configured.' }, 503, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    const customerId = /^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code) ? await env.PF_SYNC.get('cust:' + code) : null;
+    if (!customerId) return json({ error: 'No billing account is attached to that code.' }, 404, env);
+    const r = await stripe(env, '/billing_portal/sessions', { customer: customerId, return_url: `${site}/terminal/` });
+    if (!r.ok || !r.j || !r.j.url) return json({ error: 'Stripe did not return a portal page.' }, 502, env);
+    return json({ url: r.j.url }, 200, env);
+  }
+
+  /* ---- POST /apply {firm, size, email, contact, runs} : a business application ---- */
+  if (url.pathname === '/apply' && request.method === 'POST') {
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    if (body.website) return json({ ok: true }, 200, env); /* honeypot: bots fill it, people never see it */
+    const firm = clean(body.firm, 120), email = clean(body.email, 160), contact = clean(body.contact, 120), runs = clean(body.runs, 1500);
+    const size = Math.floor(Number(body.size) || 0);
+    if (!firm || !contact || !runs) return json({ error: 'Firm, contact name and what you run are required.' }, 400, env);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400, env);
+    if (!(size >= 3)) return json({ error: 'Business plans start at three seats.' }, 400, env);
+    const id = 'app_' + makeCode().replace('-', '').toLowerCase();
+    await env.PF_SYNC.put('app:' + id, JSON.stringify({ id, firm, size, email, contact, runs, status: 'new', at: Date.now() }));
+    if (env.OPERATOR_EMAIL) await sendPlain(env, env.OPERATOR_EMAIL, `Business application: ${firm} (${size} seats)`, `${firm}\n${contact} <${email}>\n${size} seats\n\n${runs}\n\nDecide in admin.`);
+    return json({ ok: true, id }, 200, env);
+  }
+
+  /* ---- POST /apply/decide {id, decision:'accept'|'decline', seats?, note?}  (operator) ---- */
+  if (url.pathname === '/apply/decide' && request.method === 'POST') {
+    const auth = request.headers.get('Authorization') || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!env.SYNC_SECRET || !safeEqual(tok, env.SYNC_SECRET)) return json({ error: 'Unauthorized.' }, 401, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const id = clean(body.id, 40), decision = clean(body.decision, 10).toLowerCase(), note = clean(body.note, 1000);
+    const app = JSON.parse(await env.PF_SYNC.get('app:' + id) || 'null');
+    if (!app) return json({ error: 'No such application.' }, 404, env);
+    if (decision === 'accept') {
+      const seats = Math.max(3, Math.floor(Number(body.seats) || app.size || 3));
+      const token = makeCode() + makeCode();
+      app.status = 'accepted'; app.seats = seats; app.token = token; app.decidedAt = Date.now(); app.note = note;
+      await env.PF_SYNC.put('app:' + id, JSON.stringify(app));
+      await env.PF_SYNC.put('apptok:' + token, id, { expirationTtl: 30 * 86400 });
+      const link = `${site}/pricing/?business=${token}&seats=${seats}`;
+      const mail = await sendPlain(env, app.email, 'PerceptFolio: your application is accepted', `${note ? note + '\n\n' : ''}Your firm is accepted for ${seats} seats. Choose monthly or yearly and pay here:\n\n${link}\n\nThe link is yours alone and works once. After payment your admin code arrives by email; you invite your analysts from the terminal's org settings.`);
+      return json({ ok: true, status: 'accepted', link, mail: mail.attempted ? (mail.ok ? 'sent' : 'failed') : 'not configured' }, 200, env);
+    }
+    if (decision === 'decline') {
+      app.status = 'declined'; app.decidedAt = Date.now(); app.note = note;
+      await env.PF_SYNC.put('app:' + id, JSON.stringify(app));
+      await sendPlain(env, app.email, 'PerceptFolio: your application', `${note || 'Thank you for applying. PerceptFolio is not the right fit for your firm at the moment.'}`);
+      return json({ ok: true, status: 'declined' }, 200, env);
+    }
+    return json({ error: 'decision must be accept or decline.' }, 400, env);
+  }
+
+  return null;
 }

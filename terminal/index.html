@@ -952,6 +952,20 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 .research-card{border-left-width:1px;border-left-color:var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
 .research-card::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--research);margin-right:8px;vertical-align:middle;box-shadow:0 0 0 3px rgba(201,138,63,.18)}
 @media (prefers-reduced-motion:reduce){.stat,.stat:hover{transition:none;transform:none}}
+/* Hick's law in the sidebar. Four tabs are the work; the rest are tools you reach for. Compact is
+   the default and remembered per device; opening an advanced tab expands the list on its own.
+   Hiding is done by a class on <nav>, so removing it restores the original rules untouched. */
+#sidebar nav.pf-compact button.pf-adv{display:none}
+#sidebar nav.pf-compact .nav-sep{display:none}
+#sidebar nav.pf-compact button{order:10}
+#sidebar nav.pf-compact button[data-tab="dashboard"]{order:1}
+#sidebar nav.pf-compact button[data-tab="portfolio"]{order:2}
+#sidebar nav.pf-compact button[data-tab="analyzer"]{order:3}
+#sidebar nav.pf-compact button[data-tab="history"]{order:4}
+#sidebar nav.pf-compact button.pf-more{order:5}
+#sidebar nav button.pf-more .ico svg{transform:rotate(-90deg);transition:transform .2s var(--ease)}
+#sidebar nav:not(.pf-compact) button.pf-more .ico svg{transform:rotate(90deg)}
+#sidebar nav button.pf-more{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -15188,6 +15202,23 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     finishLogin(u);
   }
   setCalcMode('normal');calcRender();
+})();
+</script>
+<script>
+/* Sidebar disclosure (see the v2-surface styles). */
+(function(){
+  var nav=document.querySelector('nav'); if(!nav) return;
+  var ADV=['command','watchlist','market','news','map','screener','risk','projections','alerts','clients'];
+  ADV.forEach(function(t){ var b=nav.querySelector('button[data-tab="'+t+'"]'); if(b) b.classList.add('pf-adv'); });
+  var more=document.createElement('button'); more.type='button'; more.className='pf-more'; more.setAttribute('data-tip','More');
+  more.innerHTML='<span class="ico"><svg viewBox="0 0 24 24"><use href="#i-chev"/></svg></span><span class="lbl">More</span>';
+  var hist=nav.querySelector('button[data-tab="history"]'); (hist&&hist.parentNode===nav)?nav.insertBefore(more,hist.nextSibling):nav.appendChild(more);
+  function set(compact){ nav.classList.toggle('pf-compact',compact); more.setAttribute('aria-expanded',String(!compact)); more.querySelector('.lbl').textContent=compact?'More':'Less'; try{localStorage.setItem('pf_nav_compact',compact?'1':'0');}catch(e){} }
+  var stored=null; try{stored=localStorage.getItem('pf_nav_compact');}catch(e){}
+  set(stored===null?true:stored==='1');
+  more.addEventListener('click',function(){ set(!nav.classList.contains('pf-compact')); });
+  /* An advanced tab opened by any route (search, command palette, a link) expands the list. */
+  if(typeof window.showTab==='function'){ var _st=window.showTab; window.showTab=function(t){ var r=_st.apply(this,arguments); if(ADV.indexOf(t)>-1&&nav.classList.contains('pf-compact')) set(false); return r; }; }
 })();
 </script>
 </body>

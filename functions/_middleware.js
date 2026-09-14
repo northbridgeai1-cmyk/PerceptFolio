@@ -93,16 +93,18 @@ export async function onRequest(context) {
   let refreshed = null;
   const now = Date.now();
   if (session.t !== 'operator' && now - (session.chk || 0) > RECHECK_MS) {
-    let live = null;
+    let live = null, why = 'paused';
     try {
       const r = await fetch(`${(env.WORKER_URL || '').replace(/\/+$/, '')}/status?code=${encodeURIComponent(session.c)}`, {
         headers: { 'Accept': 'application/json' }, cf: { cacheTtl: 0 },
       });
-      if (r.ok) { const j = await r.json(); live = !!(j && j.known && j.active); }
+      if (r.ok) { const j = await r.json(); live = !!(j && j.known && j.active); if (live === false) why = (j && j.reason === 'lapsed') ? 'lapsed' : 'paused'; }
     } catch { live = null; }
 
     if (live === false) {
-      return withHeaders(toEnter(url, 'paused'), path, env, clearCookie());
+      /* lapsed: the subscription stopped paying and the grace window is over; the door offers the
+         billing portal. paused: the operator turned it off; the door says to contact them. */
+      return withHeaders(toEnter(url, why), path, env, clearCookie());
     }
     if (live === null && now - (session.chk || 0) > STALE_MS) {
       return withHeaders(toEnter(url, 'unavailable'), path, env, clearCookie());

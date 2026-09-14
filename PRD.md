@@ -247,7 +247,7 @@ On every push and pull request: the existing suite (extended); `site/` lint, typ
 |---|---|---|
 | M0 | PRD agreed; `.gitignore`; secret rotated; tools installed | `gitleaks` clean; you say go |
 | M1 | Cloudflare Pages project; session gate Function; `/enter`; employee permanent code issues and redeems; `/terminal/` unreachable without session | **Built 2026-09-13; `test/gate.mjs` 13/13 locally. Deploy needs `wrangler login` (§18).** |
-| M2 | Stripe integration against a local stub: Personal checkout, Business application → acceptance → checkout with seat quantity; webhook handler; portal; lapse flow; contract tests | Stub round-trip; activated at M7 |
+| M2 | Stripe integration against a local stub: Personal checkout, Business application → acceptance → checkout with seat quantity; webhook handler; portal; lapse flow; contract tests | **Built 2026-09-13; `test/billing.mjs` 31/31 against a stubbed Stripe. Live activation at M7 needs your Stripe account and Price IDs (§18).** |
 | M3 | `site/` React + shadcn: landing, pricing, how-it-works, enter, thanks, legal; skeleton loaders; banned-words test | Playwright pass; Lighthouse 100/100 |
 | M4 | Guided Finnhub-key onboarding; **Business mode** in the terminal (org rulebook, attribution, seats, export); admin shows subscribers, orgs, applications, employees | Onboarding test; a 3-seat org round-trips |
 | M5 | Security items 1–20 + P1–P3 closed with evidence; `SECURITY.md` | Every row has a link |
@@ -280,4 +280,6 @@ npx wrangler pages secret put SYNC_SECRET --project-name perceptfolio      # the
 npx wrangler pages deploy . --project-name perceptfolio --branch rebuild-v2   # preview URL; production cuts over at M7
 ```
 
-Then, in the Cloudflare dashboard: Security > WAF > Rate limiting rules, one rule for `/api/enter` at 10 requests per minute per IP. The custom domain moves at M7, not now; until then `perceptfolio.com` stays on GitHub Pages and the preview URL is where M2–M6 are verified.
+Then, in the Cloudflare dashboard: Security > WAF > Rate limiting rules, one rule for `/api/enter` at 10 requests per minute per IP.
+
+**Activating billing (M7), once the Stripe account exists.** In Stripe: create four Prices (Personal monthly $149, Personal yearly $1,490, Business monthly $119/seat, Business yearly $1,190/seat), enable Stripe Tax, and add a webhook endpoint at `<worker>/stripe/webhook` for `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. Then on the Worker: `wrangler secret put` for `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PERSONAL_MONTHLY`, `STRIPE_PRICE_PERSONAL_YEARLY`, `STRIPE_PRICE_BUSINESS_MONTHLY`, `STRIPE_PRICE_BUSINESS_YEARLY`, and variables `SITE_URL`, `OPERATOR_EMAIL`. Until those exist, `/checkout` answers 503 "Billing is not open yet" and the site shows Request a demo. The custom domain moves at M7, not now; until then `perceptfolio.com` stays on GitHub Pages and the preview URL is where M2–M6 are verified.
