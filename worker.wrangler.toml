@@ -10,3 +10,9 @@ keep_vars = true
 [[kv_namespaces]]
 binding = "PF_SYNC"
 id = "71ba2a59c5a746818a4d2446d3f75ac4"
+
+# Cloudflare Email Routing sender. Delivers only to addresses verified in this zone's Email Routing,
+# which is the operator's inbox: enough for request notifications with no third-party account.
+# Enable Email Routing on perceptfolio.com in the dashboard and verify the destination address first.
+[[send_email]]
+name = "NOTIFY"

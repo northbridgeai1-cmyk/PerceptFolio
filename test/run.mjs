@@ -1190,6 +1190,21 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: dist and node_modules are ignored', /site\/dist\//.test(read('.gitignore')) && /node_modules\//.test(read('.gitignore')));
 }
 
+/* ==================== M4: BUSINESS MODE, NOTIFICATION, ONBOARDING ==================== */
+G('A firm is one grant, one code per seat, one rulebook');
+{
+  t('the worker can notify the operator through Cloudflare Email Routing without a third party', /await import\('cloudflare:email'\)/.test(worker) && /env\.NOTIFY\.send\(new EmailMessage/.test(worker) && /\[\[send_email\]\]/.test(read('worker.wrangler.toml')));
+  t('a request answers with the notification state so a test shows where mail stands', /notified: notified\.attempted \? \(notified\.ok \? 'sent' : 'failed: '/.test(worker));
+  t('the per-IP daily limit is ten, not three', /if \(seen >= 10\)/.test(worker));
+  t('org routes: any seat reads its firm; only the admin seat publishes; the operator pauses one seat', /url\.pathname === '\/org' && request\.method === 'GET'/.test(worker) && /c\.seat && c\.seat !== 1\)\) return json\(\{ error: 'Only the firm/.test(worker) && /url\.pathname === '\/pause\/code'/.test(worker));
+  t('the terminal applies the firm rulebook and locks the inputs for members', /D\.rules\.qBuy=rb\.qBuy/.test(term) && /el\.disabled=lock/.test(term) && /Publish to all/.test(term));
+  t('every call is stamped with the seat and the name', /c\.by=\{seat:ORG\.seat,name:/.test(term));
+  t('first-run data key card: shown without a key, saves to the profile, removed once set', /pfKeyCard/.test(term) && /D\.apiKey=v; if\(typeof saveDB==='function'\) saveDB\(\); card\.remove\(\)/.test(term));
+  t('admin can pause or resume a single seat', /async function pauseSeat/.test(read('admin.html')) && /\/pause\/code/.test(read('admin.html')));
+  t('the worker deploys from its own config with the KV binding and kept vars', /keep_vars = true/.test(read('worker.wrangler.toml')) && /binding = "PF_SYNC"/.test(read('worker.wrangler.toml')));
+  t('the firm flow is contract-tested end to end', /pausing seat 3 pauses only seat 3/.test(read('test/billing.mjs')) && /the admin seat publishes it/.test(read('test/billing.mjs')));
+}
+
 /* ==================== BILLING (worker) ==================== */
 G('Stripe does the money; the worker does the access');
 {

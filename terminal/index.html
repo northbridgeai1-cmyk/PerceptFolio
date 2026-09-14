@@ -16,7 +16,7 @@
          to redirect every relative URL. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
 <meta name="referrer" content="no-referrer">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover,interactive-widget=resizes-content">
 <title>PerceptFolio | Your Portfolio Quant</title>
 <!-- Root-absolute, not relative. This file lives at /terminal/index.html so that the URL reads
      perceptfolio.com/terminal — a relative "favicon.svg" would resolve to /terminal/favicon.svg
@@ -15249,5 +15249,69 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 </script>
 <script src="/i18n/es.js"></script>
 <script src="/i18n/lang.js"></script>
+<script>
+/* ===== M4: business mode and the first-run data key (2026-09-14). Additive. =====
+   A business seat asks the worker about its firm once per session and again every ten minutes:
+   which seat it is, how many there are, and the rulebook if the admin seat has published one.
+   Members get the rulebook applied and the rule inputs locked; the admin seat gets a Publish
+   button. Every call is stamped with the seat and the person's name. Nothing here runs for a
+   personal account. */
+(function(){
+  var ORG=null, at=0, busy=false;
+  function prof(){ return (typeof DB!=='undefined'&&DB&&DB.profiles&&typeof USER!=='undefined'&&USER)?DB.profiles[USER]:null; }
+  function base(){ try{ return (typeof syncConfigured==='function'&&syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,''); }catch(e){ return ''; } }
+  function isBiz(){ var p=prof(); return !!(p&&p.invite&&(p.inviteTier==='business'||p.accountType==='business')); }
+  async function sync(force){
+    if(!isBiz()||busy) return; if(!force&&Date.now()-at<600000) return; busy=true;
+    try{
+      var r=await fetch(base()+'/org?code='+encodeURIComponent(prof().invite)); var j=await r.json(); ORG=j&&j.org||null; at=Date.now();
+      if(ORG&&ORG.rulebook&&typeof D!=='undefined'&&D){ var rb=ORG.rulebook; D.rules=D.rules||{}; D.rules.qBuy=rb.qBuy; D.rules.pBuy=rb.pBuy; D.rules.qSell=rb.qSell; D.rules.mBuy=rb.mBuy; }
+      paint();
+    }catch(e){}finally{busy=false;}
+  }
+  function paint(){
+    var b=document.getElementById('bizBanner'); if(!b) return;
+    var mine=document.getElementById('pfOrgLine'); if(!mine){ mine=document.createElement('span'); mine.id='pfOrgLine'; mine.style.cssText='margin-left:auto;font-family:var(--mono);font-size:12px;letter-spacing:.04em'; b.appendChild(mine); }
+    if(!ORG){ mine.textContent=''; return; }
+    b.style.display='flex'; mine.textContent=(ORG.firm?ORG.firm+' · ':'')+'seat '+ORG.seat+' of '+ORG.seats+(ORG.rulebook?' · firm rulebook applied':(ORG.isAdmin?' · no rulebook published yet':''));
+    var ids=['setQBuy','setPBuy','setMBuy','setQSell'];
+    ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; var lock=!!ORG.rulebook&&!ORG.isAdmin; el.disabled=lock; el.title=lock?'Set by your firm\'s admin seat':''; });
+    var host=document.getElementById('setQSell'); host=host&&host.closest('.field'); if(!host) return;
+    var note=document.getElementById('pfOrgNote'); if(!note){ note=document.createElement('div'); note.id='pfOrgNote'; note.className='muted'; note.style.cssText='font-size:12.5px;margin-top:8px;line-height:1.5'; host.parentNode.insertBefore(note,host.nextSibling); }
+    if(ORG.isAdmin){
+      note.innerHTML='<b style="color:var(--text)">Firm rulebook.</b> These four rules apply to every seat when you publish them. '+(ORG.rulebookAt?'Published '+new Date(ORG.rulebookAt).toLocaleDateString()+'. ':'Not published yet. ')+'<button type="button" class="btn btn-sm" id="pfPublishRules" style="margin-left:6px">Publish to all '+ORG.seats+' seats</button> <span id="pfPublishMsg"></span>';
+      var pb=document.getElementById('pfPublishRules'); pb.onclick=async function(){
+        pb.disabled=true; var m=document.getElementById('pfPublishMsg'); m.textContent='Publishing…';
+        try{ var body={code:prof().invite,rulebook:{qBuy:document.getElementById('setQBuy').value,pBuy:document.getElementById('setPBuy').value,qSell:document.getElementById('setQSell').value,mBuy:document.getElementById('setMBuy').value}};
+          var r=await fetch(base()+'/org/rulebook',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); var j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+          m.textContent='Published. Every seat picks it up within ten minutes.'; at=0; sync(true);
+        }catch(e){ m.textContent='Failed: '+e.message; } finally{ pb.disabled=false; }
+      };
+    } else {
+      note.innerHTML=ORG.rulebook?'<b style="color:var(--text)">Set by your firm.</b> The admin seat published these rules'+(ORG.rulebookAt?' on '+new Date(ORG.rulebookAt).toLocaleDateString():'')+'; they apply to every seat and cannot be changed here.':'Your firm\'s admin seat has not published a rulebook yet; these are your own rules until they do.';
+    }
+  }
+  /* Attribution: who made the call, on the record itself. */
+  if(typeof window.recordCall==='function'){ var _rc=window.recordCall; window.recordCall=function(){ var r=_rc.apply(this,arguments); try{ if(ORG&&D&&Array.isArray(D.calls)&&D.calls.length){ var c=D.calls[D.calls.length-1]; if(c&&!c.by) c.by={seat:ORG.seat,name:(D.displayName||'').trim()||null,firm:ORG.id}; } }catch(e){} return r; }; }
+  /* First-run data key. No key and no worker proxy means no prices; say so once, with the two steps. */
+  function keyNudge(){
+    try{
+      if(typeof D==='undefined'||!D||!USER) return; var have=!!D.apiKey||(typeof syncConfigured==='function'&&syncConfigured());
+      var host=document.getElementById('greetingText'); host=host&&host.parentElement; if(!host) return;
+      var card=document.getElementById('pfKeyCard');
+      if(have){ if(card) card.remove(); return; }
+      if(card) return;
+      card=document.createElement('div'); card.id='pfKeyCard'; card.className='card'; card.style.cssText='margin:14px 0 18px;padding:16px 18px';
+      card.innerHTML='<div style="font-weight:700;font-size:15px;margin-bottom:6px">Connect your free data key to see prices</div>'+
+        '<div class="muted" style="font-size:13px;line-height:1.55">1. Create a free account at <b>finnhub.io/register</b> and copy the API key it shows.<br>2. Paste it here. It stays in this browser; nothing is sent to NorthBridge.</div>'+
+        '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="pfKeyInput" placeholder="Finnhub API key" style="flex:1;min-width:220px;font-family:var(--mono)" autocomplete="off"><button type="button" class="btn btn-p btn-sm" id="pfKeySave">Save and refresh</button></div>';
+      host.insertBefore(card,host.firstChild.nextSibling);
+      document.getElementById('pfKeySave').onclick=function(){ var v=(document.getElementById('pfKeyInput').value||'').trim(); if(!v) return; D.apiKey=v; if(typeof saveDB==='function') saveDB(); card.remove(); if(typeof refreshAll==='function') refreshAll(); else if(typeof loadMarketData==='function') loadMarketData(true); };
+    }catch(e){}
+  }
+  if(typeof window.updateGreeting==='function'){ var _ug=window.updateGreeting; window.updateGreeting=function(){ var r=_ug.apply(this,arguments); try{ sync(false); keyNudge(); }catch(e){} return r; }; }
+  window.PF_ORG=function(){ return ORG; };
+})();
+</script>
 </body>
 </html>

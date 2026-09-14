@@ -18,7 +18,7 @@
      because a page that says nothing leaves this origin should not be pulling type from another. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'self'">
 <meta name="referrer" content="no-referrer">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>PerceptFolio | A research terminal that keeps score on itself</title>
 <meta name="description" content="A private research terminal for the people at NorthBridge who make equity calls and have to stand behind them. Twenty-two checks, one verdict, and a record that cannot be edited afterwards. Access by invitation.">
 <meta name="theme-color" content="#0b0c0f">
@@ -104,7 +104,7 @@ h3{font-size:22px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
 p{max-width:64ch}
 .lede{font-size:19px;line-height:1.55;color:var(--dim);max-width:58ch}
 .num{font-variant-numeric:tabular-nums}
-.wrap{max-width:var(--wrap);margin:0 auto;padding:0 var(--gutter)}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 max(var(--gutter),env(safe-area-inset-right)) 0 max(var(--gutter),env(safe-area-inset-left))}
 
 /* ---------- buttons ---------- */
 .btn{
@@ -425,7 +425,7 @@ details[open] summary svg{transform:rotate(45deg)}
 details p{color:var(--dim);font-size:16px;line-height:1.62;margin-top:12px;max-width:66ch}
 
 /* footer */
-footer{border-top:1px solid var(--line);padding:var(--s-40) 0 var(--s-32)}
+footer{border-top:1px solid var(--line);padding:var(--s-40) 0 calc(var(--s-32) + env(safe-area-inset-bottom))}
 .foot{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:start}
 .foot-l p{color:var(--faint);font-size:14px;line-height:1.6;max-width:70ch;margin-top:12px}
 .foot-r{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
@@ -444,7 +444,30 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 var(--s-32)}
 @media (max-width:1100px){
   .d-grid{grid-template-columns:1fr}
 }
-@media (max-width:900px){
+/* The foldable band. An unfolded iPhone Duo is 890px wide with a crease down the centre and Safari
+   exposes neither; the layout simply keeps two columns here, with the gutter widened so the
+   crease falls in empty space, and only collapses to one column below 780px, which is where the
+   folded Duo (466) and its Split View (about 445) live. */
+@media (max-width:960px) and (min-width:781px){
+  :root{--sec:80px;--sec-lg:96px;--gutter:28px}
+  .t-body{grid-template-columns:1fr}
+  .t-side,.t-search{display:none}
+  .stage-in::after{display:none}
+  .stage{padding-right:var(--gutter)}
+  .stage-in{width:100%}
+  .t-top,.t-main{padding-right:16px}
+  .two,.two.flip,.who,.access{gap:clamp(56px,9vw,96px)}
+  .two{grid-template-columns:1fr 1fr}
+  .two.flip{grid-template-columns:1fr 1fr}
+  .who{grid-template-columns:1fr 1fr}
+  .who-not{grid-template-columns:1fr 1fr;gap:clamp(56px,9vw,96px)}
+  .access{grid-template-columns:1fr 1fr}
+  .limits{grid-template-columns:repeat(5,1fr)}
+  .lim{padding:16px 12px 14px}
+  .lim h3{font-size:13px}
+  .foot{grid-template-columns:1fr auto}
+}
+@media (max-width:780px){
   :root{--sec:72px;--sec-lg:88px;--sec-sm:48px;--gutter:28px}
   .t-body{grid-template-columns:1fr}
   .t-side{display:none}
@@ -464,10 +487,15 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 var(--s-32)}
   .foot{grid-template-columns:1fr}
   .foot-r{justify-content:flex-start}
 }
+/* Below 700px (a rotated unfolded Duo is 626) the nav keeps only the language toggle and the one
+   action; the orientation links are one scroll away. */
+@media (max-width:700px){
+  .nav-links a:not(.btn){display:none}
+  .stage-in{max-height:380px}
+}
 @media (max-width:600px){
   :root{--sec:56px;--sec-lg:64px;--gutter:20px}
   nav{height:56px}
-  .nav-links a:not(.btn){display:none}
   .hero .lede{font-size:18px}
   .hero-actions .btn{flex:1 1 100%}
   .d-grid{grid-template-columns:1fr}
@@ -1096,7 +1124,7 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
    it does on a desktop at every viewport instead of reflowing into something else. */
 (function fitFrame(){
   const f=document.querySelector('.stage-frame'), box=f&&f.parentElement; if(!f)return;
-  const fit=()=>{ const w=box.clientWidth; const k=Math.min(1,w/1440); f.style.transform='scale('+k+')'; box.style.height=Math.round(Math.min(900,620/Math.max(k,.45))*k)+'px'; };
+  const fit=()=>{ const w=box.clientWidth; const k=Math.max(.6,Math.min(1,w/1440)); f.style.transform='scale('+k+')'; box.style.height=Math.round(Math.min(900*k,w<700?380:620))+'px'; };
   fit(); let t; addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(fit,120);});
 })();
 (function planToggle(){
