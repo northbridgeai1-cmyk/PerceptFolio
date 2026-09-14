@@ -1278,8 +1278,8 @@ G('The terminal is not served without a session');
     /name: 'HMAC', hash: 'SHA-256'/.test(sess) && /crypto\.subtle\.verify/.test(sess) && /Date\.now\(\) > p\.exp\) return null/.test(sess));
   t('employee and operator sessions are permanent; personal and business are 30 days',
     /personal: 30 \* DAY, business: 30 \* DAY, employee: 3650 \* DAY, operator: 3650 \* DAY/.test(sess));
-  t('the operator secret is compared in constant time',
-    /safeEqual\(body\.secret, env\.SYNC_SECRET\)/.test(enter) && /d \|= a\.charCodeAt\(i\) \^ b\.charCodeAt\(i\)/.test(sess));
+  t('the operator key is verified by the worker, never stored on Pages',
+    /\/version', \{ headers: \{ 'Authorization': 'Bearer ' \+ body\.secret/.test(enter) && /j\.configured && typeof j\.configured === 'object'/.test(enter) && !/env\.SYNC_SECRET/.test(enter));
   t('post-sign-in redirects are same-origin only',
     /!n\.startsWith\('\/'\) \|\| n\.startsWith\('\/\/'\)/.test(enter));
   t('the public CSP has no unsafe-inline; the gated CSP keeps it for the single-file terminal', (() => {
@@ -1296,6 +1296,8 @@ G('The terminal is not served without a session');
   /* robots.txt deliberately allows everything so crawlers can read each page's noindex; a
      Disallow would hide the tag and still let a bare URL surface. The gate now 302s crawlers away
      from /terminal/ and /admin to /enter/, which carries noindex itself. */
+  t('CI runs the suites, the build, the audit and gitleaks, and deploys main to Pages when a token exists', (() => { const w = read('.github/workflows/ci.yml'); return /node test\/run\.mjs/.test(w) && /node test\/billing\.mjs/.test(w) && /gitleaks/.test(w) && /pages deploy dist --project-name perceptfolio/.test(w) && /CLOUDFLARE_API_TOKEN/.test(w); })());
+  t('no 404.html in the Pages output, so unknown paths reach the React router', !/'404\.html'\]\) copy\(f\)/.test(read('scripts/assemble.mjs')));
   t('the entry page is noindex and robots keeps its allow-all design',
     /<meta name="robots" content="noindex,nofollow">/.test(read('enter/index.html')) && /^Allow: \/$/m.test(read('robots.txt')) && !/^Disallow:/m.test(read('robots.txt')));
   t('the worker accepts the employee tier', /\['personal', 'business', 'employee', 'denied'\]/.test(worker));

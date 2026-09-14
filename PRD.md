@@ -252,7 +252,7 @@ On every push and pull request: the existing suite (extended); `site/` lint, typ
 | M4 | Guided Finnhub-key onboarding; **Business mode** in the terminal (org rulebook, attribution, seats, export); admin shows subscribers, orgs, applications, employees; **the request-notification email** (added 2026-09-14 at Pierce's instruction) | **Built 2026-09-14.** Worker `2026-09-14.1` live: `/org`, `/org/rulebook`, `/pause/code`, Email Routing sender. Terminal: firm line, rulebook applied and locked for members, Publish for the admin seat, calls stamped `by`, first-run key card. Admin: per-seat pause. `test/billing.mjs` 43/43 including a 3-seat firm round-trip. **Remaining operator step: enable Email Routing on perceptfolio.com and verify the destination address** (§20). |
 | M5 | Security items 1–20 + P1–P3 closed with evidence; Strix run; `SECURITY.md` updated | **Built 2026-09-14.** Every row in `SECURITY.md` names its test or record. Closed today: PBKDF2 passwords with migration, per-minute limits and a body cap on the Worker, react-router 7 (two advisories), the automated audit's three findings (one HIGH). Open: rate-limit binding not verified live (WAF rule at M7); Strix needs a key. Access requests now deliver by FormSubmit; activation email sent. |
 | M6 | Kronos service deployed; Model view; forecasts recorded and marked | **Built 2026-09-14.** `kronos/app.py` (Modal, T4, Kronos-small, token-checked); worker `/kronos` (code-gated, Yahoo daily OHLCV, day cache, 503 until configured); terminal Projections gains a Model view whose direction records onto the `kronos` track and is marked like any call. Contract-tested. **Not yet running: needs your Modal account and two secrets (kronos/README.md).** |
-| M7 | CI/CD complete; DNS cut to Pages; GitHub Pages retired; Stripe account connected, test mode verified, then live | Production smoke test green; a real test purchase refunded |
+| M7 | CI/CD complete; DNS cut to Pages; GitHub Pages retired; Stripe account connected, test mode verified, then live | **Built 2026-09-14.** Pages project live at perceptfolio.pages.dev with the gate, real headers, SPA routing, the operator sign-in verified against the Worker (no second copy of the secret). CI workflow runs the suites, build, audit, gitleaks, and deploys on main once `CLOUDFLARE_API_TOKEN` exists. **Remaining, dashboard only: add the custom domain to the Pages project (retires GitHub Pages), add WAF rate-limiting rules, add the CI token (§21).** Stripe stays dormant by decision D15. |
 
 ## 17. Acceptance criteria
 
@@ -299,3 +299,11 @@ Why no email arrived: the Worker was the 6 September build until the evening of 
 **Operator step (two minutes, dashboard):** Cloudflare → perceptfolio.com → Email → Email Routing → Enable. Then Destination addresses → add `northbridgeai1@gmail.com` → click the verification link Cloudflare emails. Every request then emails you; the `/request` response reports `notified: sent`.
 
 For emails **to customers** (codes, quotes) a general sender is still required: Resend (`RESEND_API_KEY`, `MAIL_FROM`), or keep sending admin's drafts by hand. Firms of eight or more see the 15% in the suggested quote and the quote draft.
+
+## 21. Cut-over (2026-09-14): what only the dashboard can do
+
+The gated site is live at https://perceptfolio.pages.dev. Production (`perceptfolio.com`) still points at GitHub Pages until the domain moves. Three dashboard steps, in this order:
+
+1. **Custom domain.** Cloudflare → Workers & Pages → perceptfolio → Custom domains → Add `perceptfolio.com` (and `www`). Cloudflare writes the CNAME itself because the zone is here. When it shows Active, GitHub Pages is unreachable by that name and can be switched off in the repo settings.
+2. **WAF rate limits.** Security → WAF → Rate limiting rules: `/api/enter` 10 per minute per IP; the Worker hostname `crimson-hat-6ad9.northbridgeai1.workers.dev` 60 per minute per IP. This is the reliable layer the audit asked for.
+3. **CI deploys.** GitHub → repo → Settings → Secrets → `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with "Cloudflare Pages: Edit". From then on every push to main deploys itself.
