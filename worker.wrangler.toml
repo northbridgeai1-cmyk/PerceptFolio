@@ -1,0 +1,12 @@
+# The Worker's own config (the root wrangler.toml is for Pages). Deploy with:
+#   npx wrangler deploy -c worker.wrangler.toml
+# keep_vars: the dashboard holds ALLOWED_ORIGIN, MAIL_FROM and the like as plain variables; without
+# this a deploy replaces them with nothing and CORS breaks. Secrets persist on their own.
+name = "crimson-hat-6ad9"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+keep_vars = true
+
+[[kv_namespaces]]
+binding = "PF_SYNC"
+id = "71ba2a59c5a746818a4d2446d3f75ac4"

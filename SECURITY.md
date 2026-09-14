@@ -95,3 +95,15 @@ single-file CSP on the terminal. `test/gate.mjs` proves thirteen properties end 
 | Codes redeemed **before** `grant:` records existed cannot open a session: `/status` does not know them and `/invite` reports them already used. | **Operator action, once:** issue those accounts a fresh code from admin. The gate is a paywall and does not fail open for unknown codes, by design. |
 | The operator bootstrap accepts `SYNC_SECRET` at `/api/enter` and issues a permanent operator session. | Rate-limit `/api/enter` in Cloudflare (PRD §10 #8) before launch. The compare is constant-time. |
 | `wrangler pages dev` adds `Access-Control-Allow-Origin: *` locally. | The middleware deletes it; production Pages never adds it. Tested. |
+
+## Worker deployment (2026-09-13, evening)
+
+The live Worker was build 2026-09-06.4 until this evening; every route added since M2 existed only
+in the repo. Deployed as 2026-09-13.1 with `worker.wrangler.toml`: the KV binding declared
+(`PF_SYNC`, `71ba2a59…`) and `keep_vars = true` so the dashboard's plain variables (ALLOWED_ORIGIN
+among them) survive the deploy. Verified live: all routes present, CORS still pinned to
+perceptfolio.com, KV bound, quote helper correct.
+
+Secrets present: AI_API_KEY, FINNHUB_API_KEY, FRED_API_KEY, SYNC_SECRET, OPERATOR_EMAIL (set
+tonight). **Absent: RESEND_API_KEY and MAIL_FROM**, so no email is sent automatically by any route;
+admin's drafts are the only outbound mail. That is the reason "I didn't get an email".

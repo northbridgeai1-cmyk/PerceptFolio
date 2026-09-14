@@ -346,6 +346,7 @@ function render(){
             '<label for="n-'+esc(r.id)+'">Note (optional, stored with the decision)</label>'+
             '<input id="n-'+esc(r.id)+'" placeholder="Why you decided this way">'+
             '<div class="row" style="margin-top:11px">'+
+              (r.plan==='business'?'<div class="muted" style="font-size:12px;margin-bottom:8px;width:100%">A firm, '+esc(String(r.seats||'?'))+' seats. Send the quote; when they confirm, Grant business mints '+esc(String(r.seats||'the'))+' codes at once and emails them all to '+esc(r.email)+', one per member.</div>':'')+
               '<button class="btn btn-sm" onclick="mailQuote(\''+esc(r.id)+'\')">Send quote</button>'+
               '<button class="btn btn-g btn-sm" onclick="decide(\''+esc(r.id)+'\',\'personal\')">Grant personal</button>'+
               '<button class="btn btn-v btn-sm" onclick="decide(\''+esc(r.id)+'\',\'business\')">Grant business</button>'+
@@ -356,7 +357,12 @@ function render(){
           '</div>'
         : '<div class="decide">'+
             (r.status==='business'
-              ? '<div style="margin-bottom:12px"><b>Member codes.</b> <span class="muted">One code per member, each emailed to its owner. Paste their emails, one per line or comma-separated.</span>'+
+              ? ((r.seatCodes&&r.seatCodes.length>1)
+                  ? '<div style="margin-bottom:14px"><b>'+r.seatCodes.length+' seat codes</b>, one per member, sent to '+esc(r.email)+' in the grant email. Each makes its own account.'+
+                    '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">'+r.seatCodes.map((c,i)=>'<span style="font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 8px"><span class="muted">'+(i+1)+'</span> '+esc(c)+'</span>').join('')+'</div>'+
+                    '<button class="btn btn-sm" style="margin-top:8px" onclick="copyText(\''+esc(r.seatCodes.join(', '))+'\')">Copy all codes</button></div>'
+                  : '')+
+                '<div style="margin-bottom:12px"><b>Or email each member directly.</b> <span class="muted">Paste their emails and each gets their own code and their own email.</span>'+
                 '<textarea id="mem-'+esc(r.id)+'" rows="3" style="width:100%;margin-top:8px;font:inherit;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px" placeholder="analyst1@firm.com, analyst2@firm.com"></textarea>'+
                 '<div class="row" style="margin-top:8px;gap:8px;align-items:center"><button class="btn btn-v btn-sm" onclick="issueMembers(\''+esc(r.id)+'\')">Issue member codes</button><span class="muted" id="ms-'+esc(r.id)+'" style="font-size:12px"></span></div>'+
                 ((r.members&&r.members.length)
@@ -392,11 +398,13 @@ async function decide(id,decision){
   if(decision==='denied'&&!confirm('Deny this request? The record is kept but no code is issued.'))return;
   if(st)st.textContent='Saving…';
   try{
-    const r=await fetch(base()+'/decide',{method:'POST',headers:hdrs(),body:JSON.stringify({id,decision,note})});
+    const rq=requests.find(x=>x.id===id)||{};
+    const r=await fetch(base()+'/decide',{method:'POST',headers:hdrs(),body:JSON.stringify({id,decision,note,seats:decision==='business'?(rq.seats||1):undefined})});
     const j=await r.json();
     if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
     await load();
-    if(j.code)show('connMsg','ok','Granted <b>'+esc(decision)+'</b>. Code <b>'+esc(j.code)+'</b>. Single use, expires in 30 days. Opening the welcome email…');
+    if(j.seatCodes&&j.seatCodes.length>1)show('connMsg','ok','Granted <b>business</b>: '+j.seatCodes.length+' seat codes minted and '+(j.mail&&j.mail.ok?'emailed':'ready to send')+'. They are listed on the request.');
+    else if(j.code)show('connMsg','ok','Granted <b>'+esc(decision)+'</b>. Code <b>'+esc(j.code)+'</b>. Single use, expires in 30 days. Opening the welcome email…');
     else show('connMsg','ok','Request denied and recorded. Opening the decline email…');
     /* Deciding and telling them are one action in practice, so the draft opens straight away rather
        than waiting to be remembered. The button stays for redrafting. */
@@ -451,6 +459,7 @@ function quoteText(plan,seats){
   return 'Business, '+n+' seats: $'+m+' per seat a month ($'+(m*n).toLocaleString()+' for the firm), or $'+y.toLocaleString()+' per seat a year ($'+(y*n).toLocaleString()+' for the firm).'+
     (disc?' Because the firm has '+n+' members, each seat is '+disc+'% off the list price of $'+PRICES.business.monthly+' a month or $'+PRICES.business.yearly.toLocaleString()+' a year.':'');
 }
+function copyText(t){ try{ navigator.clipboard.writeText(t); show('connMsg','ok','Copied.'); }catch(e){ prompt('Copy:',t); } }
 function mailQuote(id){
   const r=requests.find(x=>x.id===id); if(!r)return;
   const body='Thank you for asking about PerceptFolio.\n\n'+quoteText(r.plan,r.seats)+'\n\n'+
@@ -496,6 +505,9 @@ function mailReply(id){
     : 'Congratulations. Your access to PerceptFolio has been approved.\n\n'+
       'YOUR INVITE CODE:  '+(r.code||'(missing. Reissue from the admin queue)')+'\n'+
       'This code works ONCE, and expires 30 days from today.\n\n'+
+      ((r.seatCodes&&r.seatCodes.length>1)
+        ? 'Your firm has '+r.seatCodes.length+' seats. One code per member; give each person their own and keep the first for yourself:\n\n'+r.seatCodes.map((c,i)=>'    seat '+(i+1)+':  '+c).join('\n')+'\n\nEach code makes its own account with its own record and its own sync.\n\n'
+        : '')+
       'Account type: '+tier+'\n'+
       'Sign in here: '+origin+'/terminal/\n\n'+
       'To get started, choose Create account and enter your email, a password, and the code above. '+

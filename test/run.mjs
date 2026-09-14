@@ -1451,7 +1451,8 @@ t('it is optional and does nothing without a key and a from address',
 /* Compare against the CALL site, not the function definition, which appears earlier in the file. */
 t('the code is minted and stored before mail is attempted, and returned either way',
   worker.indexOf("code = makeCode()") < worker.indexOf('mail = await sendDecisionEmail(') &&
-  /return json\(\{ ok: true, decision, code, mail \}/.test(worker));
+  /return json\(\{ seatCodes: rec\.seatCodes || null, ok: true, decision, code, mail \}/.test(worker));
+t('a firm grant mints one code per seat, together, and the email lists them', /rec\.seatCodes = \[code\]/.test(worker) && /seat: i \+ 1, firmContact: rec\.email/.test(worker) && /One code per member; give each person their own/.test(worker) && /Copy all codes/.test(read('admin.html')));
 t('a send failure is recorded rather than thrown', /return \{ attempted: true, ok: false/.test(worker));
 t('the outcome is stored on the request', /rec\.mail = mail;/.test(worker));
 /* A code minted and never delivered looks identical to one that was. */
