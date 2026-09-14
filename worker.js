@@ -418,9 +418,14 @@ async function handle(request, env) {
       calls.push({ sym, dir, target, stop, by });
     }
 
+    /* What they are asking for. plan and seats drive the suggested quote in the operator's email;
+       neither is binding, the operator replies with the price (PRD flow, 2026-09-13). */
+    const plan = clean(body.plan, 12).toLowerCase() === 'business' ? 'business' : 'personal';
+    const seats = plan === 'business' ? Math.max(1, Math.min(500, Math.floor(Number(body.seats) || 0))) : 1;
+
     const id = Date.now().toString(36) + '-' + makeCode().slice(0, 4).toLowerCase();
     const record = {
-      id, email, who, call, calls,
+      id, email, who, call, calls, plan, seats,
       status: 'pending',
       createdAt: Date.now(),
       date: new Date().toISOString().slice(0, 10),
@@ -430,6 +435,14 @@ async function handle(request, env) {
     await env.PF_SYNC.put('req:' + id, JSON.stringify(record));
     // Two-day TTL on the counter; the date in the key already scopes it to today.
     await env.PF_SYNC.put(rlKey, String(seen + 1), { expirationTtl: 172800 });
+
+    /* Tell the operator. Every request lands in their inbox with who, what, and the suggested
+       price, so the reply (more questions, or the quote) is one email away. */
+    if (env.OPERATOR_EMAIL) {
+      const q = quoteFor(plan, seats);
+      await sendPlain(env, env.OPERATOR_EMAIL, `Demo request: ${plan}${plan === 'business' ? ', ' + seats + ' seats' : ''} from ${email}`,
+        `${email}\n${plan === 'business' ? 'Business, ' + seats + ' seats' : 'Personal'}\n\nWho and what they run:\n${who}\n${call ? '\nA call they would stand behind:\n' + call + '\n' : ''}\nSuggested quote:\n${q.text}\n\nDecide in admin: ${(env.SITE_URL || 'https://perceptfolio.com')}/admin.html`);
+    }
     return json({ ok: true, id }, 200, env);
   }
 
@@ -444,7 +457,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -1196,6 +1209,23 @@ const PLANS = {
 };
 const GRACE_DAYS = 7;
 
+/* List prices, the same numbers the site shows. Business discount applies from BUSINESS_DISCOUNT
+   seats and must be stated in the quote email. The operator's reply is the binding price. */
+const PRICES = { personal: { monthly: 149, yearly: 1490 }, business: { monthly: 119, yearly: 1190 } };
+const BUSINESS_DISCOUNT = { minSeats: 8, pct: 15 };
+function quoteFor(plan, seats) {
+  if (plan !== 'business') {
+    return { plan, seats: 1, monthly: PRICES.personal.monthly, yearly: PRICES.personal.yearly, discountPct: 0,
+      text: `Personal: $${PRICES.personal.monthly} a month, or $${PRICES.personal.yearly.toLocaleString()} a year (two months free).` };
+  }
+  const n = Math.max(1, seats || 1);
+  const disc = n >= BUSINESS_DISCOUNT.minSeats ? BUSINESS_DISCOUNT.pct : 0;
+  const m = Math.round(PRICES.business.monthly * (1 - disc / 100)), y = Math.round(PRICES.business.yearly * (1 - disc / 100));
+  const line = disc ? `\nBecause the firm has ${n} members, each seat is ${disc}% off the list price of $${PRICES.business.monthly} a month or $${PRICES.business.yearly.toLocaleString()} a year.` : '';
+  return { plan, seats: n, monthly: m, yearly: y, discountPct: disc,
+    text: `Business, ${n} seats: $${m} per seat a month ($${(m * n).toLocaleString()} for the firm), or $${y.toLocaleString()} per seat a year ($${(y * n).toLocaleString()} for the firm).${line}` };
+}
+
 function billingConfigured(env) {
   return !!(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET);
 }
@@ -1414,6 +1444,45 @@ async function handleBilling(request, env, url) {
     await env.PF_SYNC.put('app:' + id, JSON.stringify({ id, firm, size, email, contact, runs, status: 'new', at: Date.now() }));
     if (env.OPERATOR_EMAIL) await sendPlain(env, env.OPERATOR_EMAIL, `Business application: ${firm} (${size} seats)`, `${firm}\n${contact} <${email}>\n${size} seats\n\n${runs}\n\nDecide in admin.`);
     return json({ ok: true, id }, 200, env);
+  }
+
+  /* ---- GET /quote?plan=&seats= : the suggested price, for admin's Send quote draft ---- */
+  if (url.pathname === '/quote' && request.method === 'GET') {
+    return json(quoteFor(clean(url.searchParams.get('plan'), 12).toLowerCase() === 'business' ? 'business' : 'personal', parseInt(url.searchParams.get('seats') || '1', 10)), 200, env);
+  }
+
+  /* ---- POST /decide/members {id, emails[]}  (operator) : one code per member of a granted firm ----
+     The firm's request was granted as business and the admin has the members' emails. Each member
+     gets their own code (tier business, tied to the request) and their own email; the codes are kept
+     on the request record so admin can show and pause them. Re-running with an email already issued
+     re-sends that member's existing code rather than minting a second. */
+  if (url.pathname === '/decide/members' && request.method === 'POST') {
+    const auth = request.headers.get('Authorization') || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!env.SYNC_SECRET || !safeEqual(tok, env.SYNC_SECRET)) return json({ error: 'Unauthorized.' }, 401, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const id = clean(body.id, 40);
+    const rec = JSON.parse(await env.PF_SYNC.get('req:' + id) || 'null');
+    if (!rec) return json({ error: 'No such request.' }, 404, env);
+    if (rec.status !== 'business') return json({ error: 'Grant the request as business first.' }, 409, env);
+    const emails = [...new Set((Array.isArray(body.emails) ? body.emails : String(body.emails || '').split(/[\s,;]+/)).map(e => clean(e, 160).toLowerCase()).filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)))].slice(0, 50);
+    if (!emails.length) return json({ error: 'No valid member emails.' }, 400, env);
+    rec.members = Array.isArray(rec.members) ? rec.members : [];
+    const results = [];
+    for (const email of emails) {
+      let m = rec.members.find(x => x.email === email);
+      if (!m) {
+        const code = await mintCode(env, 'business', email, { requestId: id, firm: rec.who.slice(0, 80), memberOf: rec.email });
+        m = { email, code, issuedAt: Date.now() };
+        rec.members.push(m);
+      }
+      const mail = await sendPlain(env, email, 'Your PerceptFolio access code',
+        `You have been given a seat on your firm's PerceptFolio account by ${rec.email}.\n\nYour access code is:\n\n    ${m.code}\n\nOpen ${(env.SITE_URL || 'https://perceptfolio.com')}/enter/ and type it in. It works on every device you own. Keep it private; anyone holding it can open your terminal.\n\nPerceptFolio is research software, not investment advice. It never places a trade.`);
+      m.mail = { attempted: mail.attempted, ok: !!mail.ok, at: Date.now() };
+      results.push({ email, code: m.code, mail: mail.attempted ? (mail.ok ? 'sent' : 'failed') : 'not configured' });
+    }
+    await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
+    return json({ ok: true, members: results }, 200, env);
   }
 
   /* ---- POST /apply/decide {id, decision:'accept'|'decline', seats?, note?}  (operator) ---- */

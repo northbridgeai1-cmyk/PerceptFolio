@@ -32,7 +32,7 @@ Kronos, a time-series forecasting model, joins the terminal as one input in Proj
 | D11 | magic-mcp and Strix are configured but dormant until you have keys. shadcn-ui-mcp and ui-ux-pro-max install now. | **DECIDED** |
 | D12 | No performance claims, no win rate, expectancy only; the record is new and says so. "What we refused" stays off the site. | **DECIDED** (standing) |
 | D13 | **Two plans.** Personal $149/mo · $1,490/yr. Business $119/seat/mo · $1,190/seat/yr, minimum 3 seats. Refunds 14 days. | **DECIDED** |
-| D15 | **Personal: instant access after payment. Business: apply → accepted by Pierce → pay.** One `approvalRequired` flag per plan. | **DECIDED** |
+| D15 | **Quote-first for everyone (revised 2026-09-13).** Request → Pierce is emailed who/what with a suggested quote → Pierce replies with the price (and questions) → Pierce grants; for a firm, admin issues one code per member email ("Issue member codes") → they enter their code. Firms of 8+ get 15% off every seat, stated in the quote. Stripe Checkout stays built for M7 but is not the site's path. | **DECIDED** |
 | D16 | **Business mode** changes terminal behaviour: org rulebook applied to all seats, per-analyst attribution on every call, client books on, seat admin, compliance export. | **DECIDED** |
 | D14 | Kronos hosts on **Modal**. Stripe is built against a stub and activated when the account exists. Legal entity: "NorthBridge", details pending. | **DECIDED** |
 
@@ -248,7 +248,7 @@ On every push and pull request: the existing suite (extended); `site/` lint, typ
 | M0 | PRD agreed; `.gitignore`; secret rotated; tools installed | `gitleaks` clean; you say go |
 | M1 | Cloudflare Pages project; session gate Function; `/enter`; employee permanent code issues and redeems; `/terminal/` unreachable without session | **Built 2026-09-13; `test/gate.mjs` 13/13 locally. Deploy needs `wrangler login` (§18).** |
 | M2 | Stripe integration against a local stub: Personal checkout, Business application → acceptance → checkout with seat quantity; webhook handler; portal; lapse flow; contract tests | **Built 2026-09-13; `test/billing.mjs` 31/31 against a stubbed Stripe. Live activation at M7 needs your Stripe account and Price IDs (§18).** |
-| M3 | `site/` React + shadcn: landing, pricing, how-it-works, enter, thanks, legal; skeleton loaders; banned-words test | Playwright pass; Lighthouse 100/100 |
+| M3 | `site/` React + shadcn: landing, pricing, apply, thanks, legal; skeleton loaders; banned-words test | **Built 2026-09-13.** Vite + React 18 + Tailwind v4 + shadcn-pattern primitives; 89 KB gzipped. Verified in the browser: hero, demo, pricing toggle, business acceptance state, apply, FAQ, zero console errors. `scripts/assemble.mjs` produces the Pages `dist/`. Lighthouse on the preview URL at M7. |
 | M4 | Guided Finnhub-key onboarding; **Business mode** in the terminal (org rulebook, attribution, seats, export); admin shows subscribers, orgs, applications, employees | Onboarding test; a 3-seat org round-trips |
 | M5 | Security items 1–20 + P1–P3 closed with evidence; `SECURITY.md` | Every row has a link |
 | M6 | Kronos service deployed; Model view; forecasts recorded and marked | A forecast appears in the record with a horizon |
@@ -283,3 +283,11 @@ npx wrangler pages deploy . --project-name perceptfolio --branch rebuild-v2   # 
 Then, in the Cloudflare dashboard: Security > WAF > Rate limiting rules, one rule for `/api/enter` at 10 requests per minute per IP.
 
 **Activating billing (M7), once the Stripe account exists.** In Stripe: create four Prices (Personal monthly $149, Personal yearly $1,490, Business monthly $119/seat, Business yearly $1,190/seat), enable Stripe Tax, and add a webhook endpoint at `<worker>/stripe/webhook` for `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. Then on the Worker: `wrangler secret put` for `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PERSONAL_MONTHLY`, `STRIPE_PRICE_PERSONAL_YEARLY`, `STRIPE_PRICE_BUSINESS_MONTHLY`, `STRIPE_PRICE_BUSINESS_YEARLY`, and variables `SITE_URL`, `OPERATOR_EMAIL`. Until those exist, `/checkout` answers 503 "Billing is not open yet" and the site shows Request a demo. The custom domain moves at M7, not now; until then `perceptfolio.com` stays on GitHub Pages and the preview URL is where M2–M6 are verified.
+
+## 19. Revisions of 2026-09-13 (evening)
+
+- **Access flow** is quote-first (D15 revised). Built: `/request` stores plan and seats and emails the operator with a suggested quote; admin shows plan, seats and the quote, has **Send quote** (draft with the discount stated) and, on a business grant, **Issue member codes** (`/decide/members`: one code per member email, each emailed, re-sent rather than re-minted). The site's pricing page asks for access instead of selling.
+- **The landing hero is the real dashboard**: `preview/dashboard.html` is a static snapshot of the terminal's own markup and styles on the sandbox account, framed and scaled. Regenerate it whenever the dashboard changes (procedure: open the sandbox dashboard, clone the DOM without scripts, strip the demo class, save).
+- **Language**: EN/ES on the landing, the door, the terminal chrome and the React site, from one dictionary (`i18n/es.js`) and one translator (`i18n/lang.js`); the choice persists. Deep terminal copy is translated as it is reached; a missing key stays English.
+- **Market page, "tomorrow"**: Finnhub's candle endpoint is paid-tier, so the S&P log used to fill one close per visit; it is now seeded from FRED's SP500 series when candles fail, so the realised-vol range exists on the first visit.
+- **Kronos**: not started. It is M6 and needs a Modal account (or a VPS) for the Python service; nothing shipped includes it.

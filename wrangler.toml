@@ -3,11 +3,11 @@
 #
 # Local: wrangler pages dev . --compatibility-date=2026-09-01
 #        with SESSION_SECRET, WORKER_URL and SYNC_SECRET in .dev.vars (gitignored; see .dev.vars.example)
-# Deploy: wrangler pages deploy . --project-name perceptfolio
+# Deploy: node scripts/assemble.mjs && wrangler pages deploy dist --project-name perceptfolio
 #
 # pages_build_output_dir is the repo root until M7 introduces a build step that assembles a clean
 # dist/ from site/dist, terminal/, admin.html and enter/. Until then the Functions gate what matters
 # and the rest of the tree is already public on GitHub.
 name = "perceptfolio"
 compatibility_date = "2026-09-01"
-pages_build_output_dir = "."
+pages_build_output_dir = "dist"

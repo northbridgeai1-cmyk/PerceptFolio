@@ -923,6 +923,10 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 })();
 </script>
 <style id="v2-surface">
+.lang-toggle{display:inline-flex;border:1px solid var(--line2,#2f333c);border-radius:8px;overflow:hidden;font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em}
+.lang-toggle button{background:transparent;border:0;color:var(--faint,#949aa6);padding:8px 10px;cursor:pointer}
+.lang-toggle button[aria-pressed="true"]{background:var(--panel2,#1a1d23);color:var(--text,#eef0f3)}
+.lang-toggle button:hover{color:var(--text,#eef0f3)}
 /* ===== Surface pass, 2026-09-13. Additive; remove this block to revert. =====
    From the research in PRD §5 and DESIGN.md: on a dark ground, depth is a scale of lighter
    surfaces, not shadows; a faint ambient gradient keeps the page from reading as a void; a
@@ -1141,6 +1145,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
         <line x1="8" y1="17" x2="8" y2="17"/><line x1="12" y1="17" x2="12" y2="17"/><line x1="16" y1="17" x2="16" y2="17"/>
       </svg>
     </button>
+    <div class="lang-toggle" style="margin-right:10px" role="group" aria-label="Language"><button type="button" data-lang-toggle="en" aria-pressed="true">EN</button><button type="button" data-lang-toggle="es" aria-pressed="false">ES</button></div>
     <span class="avatar" id="avatarInitial" onclick="toggleAccountMenu(event)" style="cursor:pointer"></span>
     <div id="accountMenu" class="card" style="display:none;position:absolute;top:46px;right:0;width:262px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.5);padding:0;overflow:hidden">
       <!-- Identity block: avatar on top (click to change), name under it (click to edit) -->
@@ -12761,9 +12766,30 @@ function spySessionMove(offset){
   return{pct:(cur.p-prev.p)/prev.p*100,date:cur.d||null};
 }
 
+/* FRED's S&P series as a second source for the index log. Finnhub's candle endpoint went behind a
+   paid tier, so backfillPrices('SPY') fails silently on a free key and the log used to fill forward
+   at one close per visit; "tomorrow" then read "No range yet" for three weeks on every new account.
+   The worker already proxies FRED's SP500 series into this panel for the VIX path; when the log is
+   thin, the same rows seed it here, so the realised-vol ruler exists on the first visit. Rows arrive
+   newest-first with {date, value}. */
+function seedSpyLogFromFred(spx){
+  if(!spx||spx.error||!Array.isArray(spx)||spx.length<12)return false;
+  if(!D.priceLog)D.priceLog={};
+  const merged={};
+  (D.priceLog.SPY||[]).forEach(r=>merged[r.d]=r.p);
+  let added=0;
+  for(const row of spx){
+    const d=String(row.date||'').slice(0,10), v=parseFloat(row.value);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d)&&isFinite(v)&&v>0&&merged[d]==null){merged[d]=v;added++;}
+  }
+  if(!added)return false;
+  D.priceLog.SPY=Object.keys(merged).sort().map(d=>({d,p:merged[d]})).slice(-300);
+  return true;
+}
 function renderMoveWithoutVix(el,data,errMsg){
   const live=data&&data.LIVE;
-  const rv=spyRealisedVol(20);
+  let rv=spyRealisedVol(20);
+  if(!rv&&data&&seedSpyLogFromFred(data.SP500))rv=spyRealisedVol(20);
 
   /* Genuinely nothing to show. Say what is missing and what each missing piece would buy, rather
      than repeating a worker error the reader cannot act on without translation. */
@@ -15221,5 +15247,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   if(typeof window.showTab==='function'){ var _st=window.showTab; window.showTab=function(t){ var r=_st.apply(this,arguments); if(ADV.indexOf(t)>-1&&nav.classList.contains('pf-compact')) set(false); return r; }; }
 })();
 </script>
+<script src="/i18n/es.js"></script>
+<script src="/i18n/lang.js"></script>
 </body>
 </html>

@@ -22,6 +22,7 @@
 import { verify, sign, readCookie, setCookie, clearCookie, LIFETIME } from './_lib/session.js';
 
 const GATED = [/^\/terminal(\/|$)/, /^\/admin(\.html|\/|$)/, /^\/app(\.html|\/|$)/];
+const FRAMEABLE = /^\/preview\//;
 const ADMIN = [/^\/admin(\.html|\/|$)/];
 const RECHECK_MS = 5 * 60 * 1000;
 const STALE_MS = 24 * 60 * 60 * 1000;
@@ -46,13 +47,15 @@ function csp(path, env) {
   if (GATED.some(re => re.test(path))) {
     return `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src ${connect}; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
   }
-  return `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect}; form-action 'self' https://checkout.stripe.com; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests`;
+  return `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect}; form-action 'self' https://checkout.stripe.com; base-uri 'self'; object-src 'none'; frame-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests`;
 }
 
 function withHeaders(res, path, env, extraCookie) {
   const h = new Headers(res.headers);
   for (const [k, v] of Object.entries(HEADERS)) h.set(k, v);
   h.set('Content-Security-Policy', csp(path, env));
+  /* The dashboard snapshot is framed by our own landing page and by nothing else. */
+  if (FRAMEABLE.test(path)) { h.set('X-Frame-Options', 'SAMEORIGIN'); h.set('Content-Security-Policy', csp(path, env).replace("frame-ancestors 'none'", "frame-ancestors 'self'")); }
   /* Nothing on this origin is a cross-origin API. The worker sets its own CORS; the site never
      answers a cross-origin request with anything but the browser's default refusal. */
   h.delete('Access-Control-Allow-Origin'); h.delete('Access-Control-Allow-Credentials');
