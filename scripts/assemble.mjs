@@ -18,8 +18,11 @@ copy('admin.html');                            // gated, operator only
 copy('enter');                                 // the door
 copy('functions');                             // the gate, /api/enter, /api/leave, /api/portal
 copy('fonts'); copy('demo'); copy('preview'); copy('favicon.svg'); copy('manifest.json'); copy('sw.js'); copy('robots.txt'); copy('sitemap.xml');
-for (const f of ['icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.svg', 'icon-maskable-512.png', 'apple-touch-icon.png', 'thanks.html', '404.html']) copy(f);
+/* No 404.html on Pages: its absence is what makes Pages serve index.html for unknown paths, which
+   is how /pricing, /apply and the rest reach the React router. The app has its own not-found page. */
+for (const f of ['icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.svg', 'icon-maskable-512.png', 'apple-touch-icon.png', 'thanks.html']) copy(f);
 
 /* SPA routes: Pages serves index.html for unknown paths only with a _redirects rule. */
-fs.writeFileSync(path.join(out, '_redirects'), ['/pricing /index.html 200', '/apply /index.html 200', '/thanks /index.html 200', '/terms /index.html 200', '/privacy /index.html 200', '/refunds /index.html 200', ''].join('\n'));
+/* Legacy static paths from the GitHub Pages era keep working. */
+fs.writeFileSync(path.join(out, '_redirects'), ['/privacy/ /privacy 301', '/terms/ /terms 301', '/thanks.html /thanks 301', ''].join('\n'));
 console.log('assembled', out, ':', fs.readdirSync(out).join(' '));

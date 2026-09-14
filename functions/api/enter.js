@@ -16,7 +16,7 @@
    Rate limiting is applied in front of this route by Cloudflare (see PRD §10 #8); the code alphabet
    and length make guessing impractical even without it, and a wrong code costs one KV read. */
 
-import { sign, setCookie, safeEqual, LIFETIME } from '../_lib/session.js';
+import { sign, setCookie, LIFETIME } from '../_lib/session.js';
 
 const CODE = /^[A-Z0-9]{5}-[A-Z0-9]{5}$/;
 const json = (obj, status = 200, cookie) => {
@@ -45,11 +45,18 @@ export async function onRequestPost({ request, env }) {
   try { body = await request.json(); } catch { return json({ ok: false, error: 'Send JSON.' }, 400); }
   const next = body && body.next;
 
-  /* Operator */
+  /* Operator. The key is checked by asking the worker, which alone holds SYNC_SECRET: /version
+     answers with a `configured` block only to a request bearing the real key. Pages therefore
+     never stores a second copy of the secret. */
   if (body && typeof body.secret === 'string') {
-    if (!env.SYNC_SECRET || !safeEqual(body.secret, env.SYNC_SECRET)) {
-      return json({ ok: false, error: 'That is not the operator key.' }, 401);
-    }
+    if (!body.secret || body.secret.length > 200) return json({ ok: false, error: 'That is not the operator key.' }, 401);
+    let okKey = false;
+    try {
+      const r = await fetch(env.WORKER_URL.replace(/\/+$/, '') + '/version', { headers: { 'Authorization': 'Bearer ' + body.secret, 'Accept': 'application/json' } });
+      const j = await r.json().catch(() => null);
+      okKey = !!(r.ok && j && j.configured && typeof j.configured === 'object');
+    } catch { return json({ ok: false, error: 'The access service is not reachable right now.' }, 502); }
+    if (!okKey) return json({ ok: false, error: 'That is not the operator key.' }, 401);
     return issue(env, 'OPERATOR', 'operator', next || '/admin.html');
   }
 
