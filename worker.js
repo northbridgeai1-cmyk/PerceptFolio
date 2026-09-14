@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-14.3';
+const WORKER_VERSION = '2026-09-14.4';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -464,7 +464,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -1376,6 +1376,18 @@ async function tooMany(env, request, name, perMinute) {
   await env.PF_SYNC.put(key, String(n + 1), { expirationTtl: 120 });
   return false;
 }
+/* Top-level twin of the handler's activeGrant, for routes that live in the billing section. A code
+   is live when its durable grant exists and is not paused, or, before redemption, when its code
+   record exists, is not paused and has not expired. Unknown codes are not live. */
+async function grantIsLive(env, code) {
+  if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return false;
+  const g = await env.PF_SYNC.get('grant:' + code);
+  if (g) { const rec = JSON.parse(g); return !rec.paused && !(rec.graceUntil && Date.now() > rec.graceUntil); }
+  const c = await env.PF_SYNC.get('code:' + code);
+  if (!c) return false;
+  const inv = JSON.parse(c);
+  return !inv.paused && !(inv.expiresAt && Date.now() > inv.expiresAt);
+}
 const MAX_BODY = 16 * 1024;
 function bodyTooLarge(request) { const n = parseInt(request.headers.get('Content-Length') || '0', 10); return isFinite(n) && n > MAX_BODY; }
 
@@ -1514,6 +1526,39 @@ async function handleBilling(request, env, url) {
     await env.PF_SYNC.put('app:' + id, JSON.stringify({ id, firm, size, email, contact, runs, status: 'new', at: Date.now() }));
     if (env.OPERATOR_EMAIL) await sendPlain(env, env.OPERATOR_EMAIL, `Business application: ${firm} (${size} seats)`, `${firm}\n${contact} <${email}>\n${size} seats\n\n${runs}\n\nDecide in admin.`);
     return json({ ok: true, id }, 200, env);
+  }
+
+  /* ---- POST /kronos {code, symbol, horizon} -> a model forecast, cached a day ----
+     Gated by a live access code. Daily OHLCV comes from Yahoo's chart endpoint (Finnhub's candle
+     route is paid-tier), goes to the Kronos service on Modal with the service token, and the
+     answer is cached per symbol, horizon and day. Never public, never a recommendation. */
+  if (url.pathname === '/kronos' && request.method === 'POST') {
+    if (!env.KRONOS_URL || !env.KRONOS_TOKEN) return json({ error: 'The model is not configured yet.', configured: false }, 503, env);
+    if (await tooMany(env, request, '/kronos', 10)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    if (!(await grantIsLive(env, code))) return json({ error: 'A live access code is required.' }, 401, env);
+    const sym = clean(body.symbol, 12).toUpperCase();
+    const horizon = Math.max(5, Math.min(180, Math.floor(Number(body.horizon) || 30)));
+    if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
+    const day = new Date().toISOString().slice(0, 10), ck = 'kronos:' + sym + ':' + horizon + ':' + day;
+    const cached = await env.PF_SYNC.get(ck); if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
+    let candles = [];
+    try {
+      const y = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=2y&interval=1d', { headers: { 'User-Agent': 'Mozilla/5.0 PerceptFolio' } });
+      const j = await y.json(); const r0 = j && j.chart && j.chart.result && j.chart.result[0]; const q = r0 && r0.indicators && r0.indicators.quote && r0.indicators.quote[0];
+      if (r0 && q) for (let i = 0; i < r0.timestamp.length; i++) if (isFinite(q.close[i]) && q.close[i] > 0) candles.push({ t: r0.timestamp[i], open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] || 0 });
+    } catch (e) { /* fall through */ }
+    if (candles.length < 60) return json({ error: 'Not enough price history for ' + sym + '.' }, 502, env);
+    let out;
+    try {
+      const r = await fetch(env.KRONOS_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + env.KRONOS_TOKEN }, body: JSON.stringify({ candles, horizon }) });
+      out = await r.json(); if (!r.ok || !out || !Array.isArray(out.path)) return json({ error: 'The model did not answer.', detail: out && out.detail }, 502, env);
+    } catch (e) { return json({ error: 'The model is not reachable.' }, 502, env); }
+    const last = candles[candles.length - 1];
+    const result = { symbol: sym, horizon, asOf: day, last: last.close, path: out.path, lo: out.lo, hi: out.hi, dates: out.dates, model: out.model, cached: false };
+    await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 86400 });
+    return json(result, 200, env);
   }
 
   /* ---- GET /quote?plan=&seats= : the suggested price, for admin's Send quote draft ---- */
