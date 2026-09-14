@@ -80,8 +80,8 @@ export function Landing() {
       </div></section>
 
       <section id="request" className="sec" aria-labelledby="h-access"><div className="wrap">
-        <h2 id="h-access" className="mb-4">See it on your own book.</h2>
-        <p className="lede mb-8">Tell us who you are and what you run. Someone at NorthBridge reads every request and replies personally to set up a demo. If it is not the right tool for your work, you will be told that plainly.</p>
+        <h2 id="h-access" className="mb-4">Ask for access by email.</h2>
+        <p className="lede mb-8">The more you tell us, the faster the reply. This goes straight to NorthBridge's inbox; someone reads it and replies personally with a demo and your price. If it is not the right tool for your work, you will be told that plainly.</p>
         <div className="grid grid-cols-[minmax(0,560px)_1fr] items-start gap-[clamp(40px,6vw,96px)] min-[781px]:max-[960px]:gap-[clamp(56px,9vw,96px)] max-[780px]:grid-cols-1 max-[780px]:gap-12">
           <RequestForm />
           <dl className="mt-[6px]">

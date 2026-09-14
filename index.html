@@ -16,7 +16,7 @@
          to redirect every relative URL.
      font-src is 'self' on purpose. The display face is served from /fonts/ rather than a font CDN,
      because a page that says nothing leaves this origin should not be pulling type from another. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io https://formsubmit.co; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'self'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>PerceptFolio | A research terminal that keeps score on itself</title>
@@ -394,6 +394,8 @@ section + section{border-top:1px solid var(--line)}
 .fg{margin-bottom:var(--s-20)}
 .fg label{display:block;font-weight:600;font-size:14px;margin-bottom:8px}
 .fg .req{color:var(--red)}
+.fg.two-up{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:600px){.fg.two-up{grid-template-columns:1fr}}
 .plan{border:0;padding:0}
 .plan legend{font-weight:600;font-size:14px;margin-bottom:8px}
 .plan .opt{display:inline-flex;align-items:center;gap:8px;margin-right:18px;font-size:15px;cursor:pointer}
@@ -699,14 +701,18 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 calc(var(--s-32) +
 
 <section id="request" aria-labelledby="h-access">
   <div class="wrap">
-    <h2 id="h-access">See it on your own book.</h2>
-    <p class="lede">Tell us who you are and what you run. Someone at NorthBridge reads every request and replies personally to set up a demo. If it is not the right tool for your work, you will be told that plainly.</p>
+    <h2 id="h-access">Ask for access by email.</h2>
+    <p class="lede">The more you tell us, the faster the reply. This goes straight to NorthBridge's inbox; someone reads it and replies personally with a demo and your price. If it is not the right tool for your work, you will be told that plainly.</p>
     <div class="access">
       <form class="form" id="reqForm" autocomplete="off">
         <div class="form-b">
-          <div class="fg">
-            <label for="rqEmail">Email <span class="req" aria-hidden="true">*</span></label>
-            <input id="rqEmail" type="email" required placeholder="you@example.com" autocomplete="email" inputmode="email">
+          <div class="fg two-up">
+            <div><label for="rqName">Your name <span class="req" aria-hidden="true">*</span></label><input id="rqName" required maxlength="120" autocomplete="name"></div>
+            <div><label for="rqRole">Your role</label><input id="rqRole" maxlength="120" placeholder="Portfolio manager, analyst, principal"></div>
+          </div>
+          <div class="fg two-up">
+            <div><label for="rqEmail">Email <span class="req" aria-hidden="true">*</span></label><input id="rqEmail" type="email" required placeholder="you@example.com" autocomplete="email" inputmode="email"></div>
+            <div><label for="rqFirm">Firm <span class="muted" style="font-weight:400">(if any)</span></label><input id="rqFirm" maxlength="120" autocomplete="organization"></div>
           </div>
           <fieldset class="fg plan">
             <legend>For</legend>
@@ -719,8 +725,12 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 calc(var(--s-32) +
             </div>
           </fieldset>
           <div class="fg">
-            <label for="rqWho">Who you are, and what you run <span class="req" aria-hidden="true">*</span></label>
-            <textarea id="rqWho" required placeholder="Your role, the size and style of the book, and what you want the terminal to do for it."></textarea>
+            <label for="rqBook">The book <span class="req" aria-hidden="true">*</span></label>
+            <textarea id="rqBook" required rows="2" placeholder="Roughly how large, how many positions, what style: concentrated long, long/short, income, sector focus."></textarea>
+          </div>
+          <div class="fg">
+            <label for="rqWho">What you want the terminal to do for it <span class="req" aria-hidden="true">*</span></label>
+            <textarea id="rqWho" required placeholder="The decision you keep having to make, and what a written record of it would change."></textarea>
           </div>
           <!-- The three-call requirement was removed on request. It is gone from the form, from the
                worker's validation and from the copy in the same change. The optional box keeps the
@@ -731,7 +741,12 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 calc(var(--s-32) +
             <textarea id="rqCalls" rows="2" placeholder="e.g. BUY NVDA, target 260, stop 190, by 2027-03-01, or leave blank"></textarea>
             <p class="hint">Not required, and not scored. A claim with a target, a stop and a date is simply harder to argue with later than a paragraph is.</p>
           </div>
-          <button class="btn btn-p btn-lg" type="submit" id="rqBtn">Request a demo</button>
+          <div class="fg">
+            <label for="rqWhen">Best time to talk <span class="muted" style="font-weight:400">(optional)</span></label>
+            <input id="rqWhen" maxlength="120" placeholder="Weekday mornings, US Eastern">
+          </div>
+          <button class="btn btn-p btn-lg" type="submit" id="rqBtn">Send the request</button>
+          <p class="hint" style="margin-top:12px">Delivered to NorthBridge by email. Prefer to write it yourself? Email <a href="mailto:northbridgeai1@gmail.com?subject=PerceptFolio%20access%20request">northbridgeai1@gmail.com</a> with the same details.</p>
           <div class="msg" id="rqMsg" role="status" aria-live="polite"></div>
         </div>
       </form>
@@ -1057,76 +1072,33 @@ function show(kind,text){
 
 document.getElementById('reqForm').addEventListener('submit',async ev=>{
   ev.preventDefault();
-  const email=document.getElementById('rqEmail').value.trim();
-  const who=document.getElementById('rqWho').value.trim();
-  const call=readCall();
-  const btn=document.getElementById('rqBtn');
+  const v=id=>((document.getElementById(id)||{}).value||'').trim();
+  const name=v('rqName'), role=v('rqRole'), email=v('rqEmail'), firm=v('rqFirm'), book=v('rqBook'), who=v('rqWho'), call=readCall(), when=v('rqWhen');
   const plan=(document.querySelector('input[name=plan]:checked')||{}).value||'personal';
-  const seats=plan==='business'?parseInt(document.getElementById('rqSeats').value,10)||3:1;
-  const payload={email,who,call,plan,seats,at:Date.now()};
-
-  /* The mail client is the floor this form cannot fall through. A visitor who has typed out who
-     they are must never lose it to a worker that happens to be unreachable. */
-  function mailFallback(note){
-    const body='Email: '+email+'\nFor: '+(plan==='business'?'a firm, '+seats+' seats':'myself')+'\n\nWho and what they run:\n'+who+(call?'\n\nA call they would stand behind:\n'+call:'');
-    location.href='mailto:'+PF.contact+'?subject='+encodeURIComponent('PerceptFolio access request')+'&body='+encodeURIComponent(body);
-    show('ok',(note||'')+'Opening your mail client. If nothing happened, send the details to <b>'+PF.contact+'</b> directly.');
-  }
-
-  if(!PF.worker) return mailFallback();
-
-  btn.disabled=true; show('ok','Submitting…');
+  const seats=plan==='business'?parseInt(v('rqSeats'),10)||3:1;
+  const btn=document.getElementById('rqBtn');
+  const subject='PerceptFolio access request: '+name+(firm?', '+firm:'')+(plan==='business'?' ('+seats+' seats)':'');
+  const fields={ Name:name, Role:role||'-', Email:email, Firm:firm||'-', For:plan==='business'?'a firm, '+seats+' seats':'myself', 'The book':book, 'What they want the terminal to do':who, 'A call they would stand behind':call||'-', 'Best time to talk':when||'-' };
+  /* A copy to the worker so admin lists it with plan and seats. Best effort; the email is the request. */
+  try{ fetch(PF.worker.replace(/\/+$/,'')+'/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,who:[name,role,firm,'',book,'',who].filter(Boolean).join('\n'),call,plan,seats,at:Date.now()}),keepalive:true}).catch(()=>{}); }catch(e){}
+  /* Delivery: FormSubmit posts the fields to NorthBridge's inbox with no server of our own. If it
+     cannot be reached, the visitor's own mail app carries the same message, so nothing is lost. */
+  const mailFallback=()=>{
+    const lines=Object.entries(fields).map(([k,val])=>k+': '+val).join('\n')+'\n\n(Sent from perceptfolio.com)';
+    show('ok','Opening your mail app with the request filled in. Press send there. If nothing opened, email <b>'+esc(PF.contact)+'</b> with the same details.');
+    location.href='mailto:'+PF.contact+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(lines);
+  };
+  btn.disabled=true; show('ok','Sending…');
   try{
-    const res=await fetch(PF.worker.replace(/\/+$/,'')+'/request',{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
-    });
-    const j=await res.json().catch(()=>({}));
-    /* A non-OK response is the worker TALKING to us, a bad ticker, a missing stop, the
-       daily rate limit. That is real feedback and the applicant has to see it, so it is
-       thrown as a REJECTED error and shown rather than buried in a mailto. */
-    if(!res.ok){ const err=new Error(j.error||('HTTP '+res.status)); err.rejected=true; throw err; }
-    /* Hand off to thanks.html rather than printing a line under the button.
-       That page explains what actually happens next, who reads it, how access
-       is granted, and that the scorecard starts empty, which is the part people
-       write in to ask. A success message the user has to scroll to find was
-       leaving thanks.html orphaned and the applicant uninformed. */
-    document.getElementById('reqForm').reset();
-    show('ok','<b>Request received.</b> Taking you to what happens next…');
-    location.href='./thanks.html?type=request';
-  }catch(e){
-    /* Two different failures wearing the same coat, and they need opposite treatment.
-
-       REJECTED, the worker answered and said no. Show it. The person can fix a typo'd
-       ticker or a missing stop and submit again; sending them to email would lose that.
-
-       UNREACHABLE, fetch never completed: the custom domain is not live yet, CORS is
-       misconfigured, the worker is down, an extension ate the request. Nothing the
-       applicant can fix and nothing they should have to read about. Hand them the mail
-       client with everything they typed already in the body. */
-    if(e && e.rejected){
-      show('err',e.message+' Fix it above and submit again, or send the details to <b>'+PF.contact+'</b>.');
-    }else{
-      mailFallback('<b>The request queue is not reachable right now.</b> ');
-    }
-  }finally{ btn.disabled=false; }
+    const r=await fetch('https://formsubmit.co/ajax/'+PF.contact,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(Object.assign({_subject:subject,_template:'table',_replyto:email,_honey:''},fields))});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok&&String(j.success)==='true'){ location.href='/thanks.html?type=request'; return; }
+    mailFallback();
+  }catch(e){ mailFallback(); }
+  finally{ btn.disabled=false; }
 });
 
-/* THE AUTO-FORWARD IS GONE, DELIBERATELY.
-   An earlier version checked localStorage for an existing profile and redirected straight to the
-   terminal, reasoning that staff shouldn't have to read the front door every morning. In practice
-   it meant the owner of the site could never see his own landing page without knowing a secret
-   query string, and a page that silently navigates elsewhere reads as broken rather than clever.
-   The primary action sits top right on every screen size. That is enough.
-
-   Signed-in users get a quiet relabel instead, a hint, not a navigation. */
-/* Seats only matter for a firm; the field stays hidden until it does (Hick's law). */
-/* The dashboard frame is rendered at 1440px and scaled to fit its container, so it looks exactly as
-   it does on a desktop at every viewport instead of reflowing into something else. */
-(function fitFrame(){
-  const f=document.querySelector('.stage-frame'), box=f&&f.parentElement; if(!f)return;
-  const fit=()=>{ const w=box.clientWidth; const k=Math.max(.6,Math.min(1,w/1440)); f.style.transform='scale('+k+')'; box.style.height=Math.round(Math.min(900*k,w<700?380:620))+'px'; };
-  fit(); let t; addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(fit,120);});
-})();
 (function planToggle(){
   const w=document.getElementById('seatsWrap'); if(!w)return;
   document.querySelectorAll('input[name=plan]').forEach(r=>r.addEventListener('change',()=>{ w.hidden=r.value!=='business'||!r.checked; if(!w.hidden)document.getElementById('rqSeats').focus(); }));

@@ -43,7 +43,7 @@ const HEADERS = {
    the worker. Stripe's hosted Checkout is a redirect, not an embed, so it needs no allowance. */
 function csp(path, env) {
   const worker = (env.WORKER_URL || '').replace(/\/+$/, '');
-  const connect = ["'self'", worker, 'https://*.workers.dev', 'https://finnhub.io'].filter(Boolean).join(' ');
+  const connect = ["'self'", worker, 'https://*.workers.dev', 'https://finnhub.io', 'https://formsubmit.co'].filter(Boolean).join(' ');
   if (GATED.some(re => re.test(path))) {
     return `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src ${connect}; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
   }

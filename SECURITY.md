@@ -107,3 +107,43 @@ perceptfolio.com, KV bound, quote helper correct.
 Secrets present: AI_API_KEY, FINNHUB_API_KEY, FRED_API_KEY, SYNC_SECRET, OPERATOR_EMAIL (set
 tonight). **Absent: RESEND_API_KEY and MAIL_FROM**, so no email is sent automatically by any route;
 admin's drafts are the only outbound mail. That is the reason "I didn't get an email".
+
+## M5 close-out (2026-09-14): the twenty items plus payments, with evidence
+
+Every row names where the proof lives. "Live at M7" means the code is built and tested but the
+Pages gate is not in front of production until the cut-over from GitHub Pages; until then the
+meta CSP in each file is the header layer.
+
+| # | Item | State | Evidence |
+|---|---|---|---|
+| 1 | Hide API keys | **Done** | Secret-shape scan over every tracked file (`test/run.mjs`, "no secret-shaped literal"); keys exist only as Worker secrets (`wrangler secret list`: AI, FINNHUB, FRED, SYNC_SECRET, OPERATOR_EMAIL). |
+| 2 | Env variables | **Done** | Listed above; `/version` reports booleans only with the operator token; `.dev.vars` ignored and documented. |
+| 3 | Admin routes | **Built, live at M7** | Pages gate requires an operator or employee session for `/admin`; admin itself still needs `SYNC_SECRET` for every call. `test/gate.mjs` 13/13; static guards. |
+| 4 | Authentication | **Built, live at M7** | HMAC-SHA256 session cookie, HttpOnly Secure SameSite=Strict, expiry, tamper refused, re-check every 5 minutes, paused/lapsed distinguished. `test/gate.mjs`. |
+| 5 | Least privilege | **Done** | Every worker route is public, code-scoped, or operator-only; `test/billing.mjs` proves the 401s and the admin-seat-only publish; only the operator pauses a seat. |
+| 6 | Sanitise forms | **Done** | `clean()` caps and strips on every field; honeypot on `/apply` and the request form; browser validation gates the form; 16 KB body cap on billing and org writes (new). |
+| 7 | XSS | **Done** | Mechanical scan: every request-derived value in `admin.html` is rendered through `esc()` (`test/run.mjs`); the terminal's M4 additions use `textContent`; React escapes by default. |
+| 8 | Rate limiting | **Partly verified** | `/request` 10/day/IP (KV, verified: the operator hit it). Per-minute limits on `/invite`, `/status`, `/org`, `/checkout`, `/apply`, `/portal`, `/org/rulebook` use Cloudflare's Rate Limiting binding (declared, bound, deployed as 2026-09-14.3) with a KV counter as fallback. **A live probe of 45 sequential calls at ~5/s did not trip the binding**; Cloudflare documents it as approximate and per-location, but that is not evidence, so this row is not closed. The reliable layer is a WAF rate-limiting rule on the Worker hostname and on `/api/enter`, set in the dashboard at M7. |
+| 9 | Secure API endpoints | **Done** | Role on every non-public route; method checks; JSON-only bodies with a cap; Stripe signature verified in constant time with a five-minute tolerance. |
+| 10 | CORS | **Done, verified live** | Preflight from perceptfolio.com returns exactly that origin; `keep_vars = true` preserved `ALLOWED_ORIGIN` through the deploy. |
+| 11 | Security headers | **Built, live at M7** | HSTS, nosniff, DENY, no-referrer, Permissions-Policy, COOP, CORP, strict CSP on public paths (`functions/_middleware.js`). Meta CSP on every file until then. |
+| 12 | Debug mode | **Done** | No `console.log` in `worker.js` (guarded); `/status` detail needs the operator token; Vite builds in production mode. |
+| 13 | Update dependencies | **Done today** | `react-router-dom` 6 → 7.18.3 closed GHSA-wrjc-x8rr-h8h6 and GHSA-337j-9hxr-rhxg; `npm audit` reports 0 vulnerabilities. |
+| 14 | Remove unused | **Done** | `site/` carries nine runtime dependencies, each imported; `vendor/` unchanged and served only to the terminal. |
+| 15 | Secure files | **Done** | `.gitignore` covers env files, keys, builds, tooling state (guarded). |
+| 16 | Database access | **Done** | Every KV write path requires the operator, a verified Stripe event, a live code, or is rate-limited (`/request`); no public list operation. |
+| 17 | Hash passwords | **Done today** | Terminal local password: PBKDF2-SHA256, 16-byte random salt per profile, 150,000 iterations (~450 ms per guess), constant-time compare; legacy SHA-256 hashes verify once and are rewritten. Guarded. The worker stores no passwords. |
+| 18 | Git secrets | **Done; CI at M7** | The historical secret is dead in HEAD and documented; the secret-shape scan runs on every suite run; `gitleaks` joins CI at M7. |
+| 19 | Full audit | **Done (automated review); Strix pending a key** | `ecc:security-reviewer` read every file in full and returned three findings, all fixed the same day and each now guarded by a test: (HIGH) member codes carried no seat, so a missing seat passed the admin-only rulebook check; admin is now stamped seat 1 and members carry an explicit seat, and a member's publish is refused. (MEDIUM) `/status` and `/org` had no rate limit; added. (LOW) an unset `ALLOWED_ORIGIN` emitted the string `null`; the header is now absent. Strix stays dormant until an LLM key exists. |
+| 20 | No mistakes | **Standing** | Every row here points at a test, a live check, or a recorded command. |
+| P1 | Webhook replay | **Done** | Event ids stored 30 days; duplicates answered 200 and ignored (`test/billing.mjs`). |
+| P2 | Code enumeration | **Done** | 31-symbol alphabet, 10 characters; `/invite` now 30/min/IP; constant-time compares. |
+| P3 | Checkout tampering | **Done** | Prices exist only as Stripe Price IDs in env; no amount is ever posted (`test/billing.mjs`). |
+
+### Access requests now travel by email
+
+The request form posts to FormSubmit (formsubmit.co), which delivers it to the operator's inbox
+and keeps no copy; if it cannot be reached the visitor's own mail app carries the same message.
+A copy still goes to the worker so admin lists the request with its plan and seats. FormSubmit is
+named in both privacy policies. One-time step: FormSubmit emails an activation link to the
+inbox on the first submission; nothing is delivered until it is clicked.
