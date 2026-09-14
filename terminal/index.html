@@ -8377,7 +8377,7 @@ function renderCounterfactual(){
    worth stating plainly rather than enforcing: every track added divides the same thin stream of
    tickers further, and with enough tracks sliced enough ways one of them looks like a winner by
    luck. Four is fine. Twelve would not be. */
-const ACTIVE_TRACKS=['checklist','herizen','gated','ewma'];
+const ACTIVE_TRACKS=['checklist','herizen','gated','ewma','kronos'];   // kronos: model forecasts, recorded and marked like every other track
 function trackIsLive(id){return ACTIVE_TRACKS.includes(id);}
 
 /* ================= EWMA 50/200 =================
@@ -15336,6 +15336,66 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   }
   if(typeof window.updateGreeting==='function'){ var _ug=window.updateGreeting; window.updateGreeting=function(){ var r=_ug.apply(this,arguments); try{ sync(false); keyNudge(); }catch(e){} return r; }; }
   window.PF_ORG=function(){ return ORG; };
+})();
+</script>
+<script>
+/* Model view (M6). Kronos runs on Modal behind the worker's /kronos; this panel asks for a forecast
+   of the ticker in the Projections search, draws the median path and the 10-90% band, and can
+   record the direction as a call on the kronos track, where it is marked against the index on
+   the same horizon as everything else. A forecast is a model's continuation of a series, and the
+   panel says so; it is never a recommendation. */
+(function(){
+  var HZ=[30,90,180];
+  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||''; }catch(e){ return ''; } }
+  function panel(){
+    var host=document.getElementById('tab-projections'); if(!host||document.getElementById('pfModel'))return;
+    var d=document.createElement('div'); d.id='pfModel'; d.className='card'; d.style.marginTop='16px';
+    d.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">'+
+      '<div><div style="font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Model view</div>'+
+      '<div style="font-size:15px;font-weight:600;margin-top:6px">Kronos, a K-line foundation model</div></div>'+
+      '<div style="display:flex;gap:8px;align-items:center"><input id="pfModelSym" placeholder="Ticker" style="width:110px;text-transform:uppercase">'+
+      '<select id="pfModelHz">'+HZ.map(function(h){return '<option value="'+h+'"'+(h===90?' selected':'')+'>'+h+' days</option>';}).join('')+'</select>'+
+      '<button class="btn btn-p btn-sm" id="pfModelGo">Ask the model</button></div></div>'+
+      '<div id="pfModelOut" style="margin-top:12px"><p class="muted" style="font-size:13px;margin:0">A forecast is the model\'s continuation of the price series, drawn as a median path with a 10 to 90 percent band. It is recorded and marked like any other call, and it is not a recommendation.</p></div>';
+    host.insertBefore(d, host.firstChild);
+    document.getElementById('pfModelGo').addEventListener('click', ask);
+  }
+  function draw(cv,last,path,lo,hi){
+    var dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight; if(!(w>0&&h>0))return;
+    cv.width=w*dpr; cv.height=h*dpr; var g=cv.getContext('2d'); g.scale(dpr,dpr);
+    var all=[last].concat(path,lo,hi), mn=Math.min.apply(null,all), mx=Math.max.apply(null,all), pad=(mx-mn)*.1||1; mn-=pad; mx+=pad;
+    var n=path.length, X=function(i){return 8+(i/n)*(w-16);}, Y=function(v){return h-10-((v-mn)/(mx-mn))*(h-20);};
+    g.fillStyle='rgba(59,130,246,.12)'; g.beginPath(); g.moveTo(X(0),Y(last)); hi.forEach(function(v,i){g.lineTo(X(i+1),Y(v));}); for(var i=lo.length-1;i>=0;i--)g.lineTo(X(i+1),Y(lo[i])); g.closePath(); g.fill();
+    g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=1; g.beginPath(); g.moveTo(0,Y(last)); g.lineTo(w,Y(last)); g.stroke();
+    g.strokeStyle='#3b82f6'; g.lineWidth=1.6; g.beginPath(); g.moveTo(X(0),Y(last)); path.forEach(function(v,i){g.lineTo(X(i+1),Y(v));}); g.stroke();
+  }
+  function ask(){
+    var sym=(document.getElementById('pfModelSym').value||'').trim().toUpperCase(), hz=parseInt(document.getElementById('pfModelHz').value,10), out=document.getElementById('pfModelOut');
+    if(!/^[A-Z.\-]{1,10}$/.test(sym)){ out.innerHTML='<p class="muted" style="font-size:13px">Enter a ticker.</p>'; return; }
+    out.innerHTML='<p class="muted" style="font-size:13px">Asking the model… a first answer takes a few seconds while it wakes.</p>';
+    var base=(typeof INVITE_WORKER==='string'&&INVITE_WORKER)||'';
+    fetch(base.replace(/\/+$/,'')+'/kronos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym,horizon:hz})})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+      .then(function(x){
+        var j=x.j;
+        if(!x.ok){ out.innerHTML='<p class="muted" style="font-size:13px">'+(j&&j.configured===false?'The model is not configured on this deployment yet. See kronos/README.md.':(j&&j.error)||'The model did not answer.')+'</p>'; return; }
+        var end=j.path[j.path.length-1], pct=(end-j.last)/j.last*100, dir=pct>=0?'up':'down';
+        out.innerHTML='<canvas id="pfModelCv" style="width:100%;height:180px;display:block;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></canvas>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;font-family:var(--mono);font-size:13px"><span>last <b>'+j.last.toFixed(2)+'</b></span><span>median at '+hz+'d <b class="'+(pct>=0?'pos':'neg')+'">'+end.toFixed(2)+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</b></span><span class="muted">band '+j.lo[j.lo.length-1].toFixed(2)+' to '+j.hi[j.hi.length-1].toFixed(2)+'</span><span class="muted">'+(j.cached?'cached today':'fresh')+'</span></div>'+
+          '<div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn btn-sm" id="pfModelRec">Record as a '+hz+'-day '+(dir==='up'?'BUY':'SELL')+' call on the model track</button><span class="muted" style="font-size:12px">Marked against the index on its anniversary, like every other call.</span></div>';
+        draw(document.getElementById('pfModelCv'),j.last,j.path,j.lo,j.hi);
+        document.getElementById('pfModelRec').addEventListener('click',function(){
+          try{
+            recordCall(sym,{price:j.last,qScore:null,pScore:null,mScore:null},dir==='up'?'buy':'sell','Kronos '+hz+'d '+(dir==='up'?'up':'down'),'kronos');
+            var c=D.calls&&D.calls[D.calls.length-1]; if(c&&c.sym===sym){ c.source='kronos'; c.horizonDays=hz; c.modelEnd=end; if(typeof saveDB==='function')saveDB(); }
+            this.textContent='Recorded'; this.disabled=true;
+          }catch(e){ this.textContent='Could not record: '+e.message; }
+        });
+      })
+      .catch(function(){ out.innerHTML='<p class="muted" style="font-size:13px">The worker is not reachable.</p>'; });
+  }
+  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='projections')setTimeout(panel,50); return r; }; }
+  document.addEventListener('DOMContentLoaded',function(){ if(document.getElementById('tab-projections')&&!document.getElementById('tab-projections').classList.contains('tabs-hidden'))panel(); });
 })();
 </script>
 </body>

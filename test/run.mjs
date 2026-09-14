@@ -1226,6 +1226,16 @@ G('Closed with evidence, not assurance');
   t('the request form has a honeypot and no card, no financial data', /_honey:''/.test(idx) && !/card|routing number|account number/i.test((idx.match(/<form class="form" id="reqForm"[\s\S]*?<\/form>/)||[''])[0]));
 }
 
+/* ==================== M6: KRONOS ==================== */
+G('A model is one more input, graded like everything else');
+{
+  t('the kronos service is a Modal app that checks a service token and loads the open model once', /modal\.App\("perceptfolio-kronos"/.test(read('kronos/app.py')) && /KRONOS_TOKEN/.test(read('kronos/app.py')) && /NeoQuasar\/Kronos-small/.test(read('kronos/app.py')));
+  t('the worker bridge is code-gated, cached a day, and fails closed when unconfigured', /url\.pathname === '\/kronos'/.test(worker) && /grantIsLive\(env, code\)/.test(worker) && /expirationTtl: 86400/.test(worker) && /configured: false \}, 503/.test(worker));
+  t('the terminal has a kronos track and the Model view records onto it', /'ewma','kronos'\]/.test(term) && /id="pfModelGo"/.test(term) && /,'kronos'\);/.test(term));
+  t('the model view says what a forecast is and is not', /not a recommendation/.test(term.slice(term.indexOf('Model view (M6)'))));
+  t('the model is never exposed on the public site', !/kronos/i.test(idx) && !/kronos/i.test(read('site/src/pages/Landing.tsx')));
+}
+
 /* ==================== BILLING (worker) ==================== */
 G('Stripe does the money; the worker does the access');
 {
