@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-06.4';
+const WORKER_VERSION = '2026-09-13.1';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -74,6 +74,9 @@ function escHtml(x) {
 }
 function decisionEmailBody(rec, decision, code, note) {
   const tier = decision === 'business' ? 'business' : decision === 'employee' ? 'employee' : 'personal';
+  const seatBlock = (decision === 'business' && Array.isArray(rec.seatCodes) && rec.seatCodes.length > 1)
+    ? `\nYour firm has ${rec.seatCodes.length} seats. One code per member; give each person their own and keep the first for yourself:\n\n${rec.seatCodes.map((c, i) => '    seat ' + (i + 1) + ':  ' + c).join('\n')}\n\nEach code makes its own account with its own record and its own sync. If you would rather we email each member directly, reply with their addresses.\n`
+    : '';
   if (decision === 'denied') {
     return {
       subject: 'Your PerceptFolio access request',
@@ -97,6 +100,7 @@ perceptfolio.com`
 
 Invite code: ${code}
 Account type: ${tier}
+${seatBlock}
 
 This code can be redeemed once, and expires 30 days from today.
 
@@ -1065,6 +1069,23 @@ async function handle(request, env) {
         code, tier: decision, email: rec.email, requestId: id,
         issuedAt: Date.now(), expiresAt: Date.now() + 30 * 86400000, usedAt: null
       }), { expirationTtl: 40 * 86400 });
+      /* A FIRM gets one code per seat, minted together and sent in one email: the contact hands one
+         to each member. Separate codes rather than one shared code, because sync is keyed by code;
+         eight people on one code would overwrite each other's book, and one pause would pause all
+         eight. The first code is the contact's own seat. */
+      if (decision === 'business') {
+        const seats = Math.max(1, Math.min(500, Math.floor(Number(body.seats) || rec.seats || 1)));
+        rec.seats = seats;
+        rec.seatCodes = [code];
+        for (let i = 1; i < seats; i++) {
+          const c = makeCode();
+          await env.PF_SYNC.put('code:' + c, JSON.stringify({
+            code: c, tier: 'business', email: rec.email, requestId: id, seat: i + 1, firmContact: rec.email,
+            issuedAt: Date.now(), expiresAt: Date.now() + 30 * 86400000, usedAt: null
+          }), { expirationTtl: 40 * 86400 });
+          rec.seatCodes.push(c);
+        }
+      }
     }
     /* ---- Send the decision, if a mail provider is configured ----
        The code is minted and stored BEFORE this runs and is returned regardless of the outcome.
@@ -1077,7 +1098,7 @@ async function handle(request, env) {
       rec.mail = mail;
     }
     await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
-    return json({ ok: true, decision, code, mail }, 200, env);
+    return json({ seatCodes: rec.seatCodes || null, ok: true, decision, code, mail }, 200, env);
   }
 
   /* ---- POST /pause — suspend or restore an issued grant ----
