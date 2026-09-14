@@ -16,3 +16,15 @@ id = "71ba2a59c5a746818a4d2446d3f75ac4"
 # Enable Email Routing on perceptfolio.com in the dashboard and verify the destination address first.
 [[send_email]]
 name = "NOTIFY"
+
+# Rate limiting at the edge (real sliding windows; KV counters cannot see a burst).
+# RL_TIGHT for writes that create records; RL_LOOSE for lookups by code.
+[[ratelimits]]
+name = "RL_TIGHT"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "RL_LOOSE"
+namespace_id = "1002"
+simple = { limit = 30, period = 60 }

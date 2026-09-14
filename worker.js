@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-14.1';
+const WORKER_VERSION = '2026-09-14.3';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -155,7 +155,7 @@ function corsHeaders(env) {
      An unset origin now denies cross-origin reads rather than permitting all of them. */
   const allowed = (env.ALLOWED_ORIGIN || '').trim().replace(/\/+$/, '');
   return Object.assign({}, SECURITY_HEADERS, {
-    'Access-Control-Allow-Origin': allowed || 'null',
+    ...(allowed ? { 'Access-Control-Allow-Origin': allowed } : {}),
     'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     'Access-Control-Max-Age': '86400',
@@ -492,6 +492,7 @@ async function handle(request, env) {
      have credentials. See the security note at the top of this file for what this does and does
      not protect. */
   if (url.pathname === '/invite') {
+    if (await tooMany(env, request, '/invite', 30)) return json({ valid: false, error: 'Too many attempts. Try again in a minute.' }, 429, env);
     const code = clean(url.searchParams.get('code'), 12).toUpperCase();
     if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return json({ valid: false, error: 'Malformed code.' }, 400, env);
     const stored = await env.PF_SYNC.get('code:' + code);
@@ -617,6 +618,7 @@ async function handle(request, env) {
 
      Answers on the durable grant: record, never the 40-day code: record. */
   if (url.pathname === '/status' && request.method === 'GET') {
+    if (await tooMany(env, request, '/status', 30)) return json({ known: false, active: false, reason: 'rate limited' }, 429, env);
     const code = clean(url.searchParams.get('code'), 12).toUpperCase();
     if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) {
       return json({ known: false, active: true, reason: 'malformed' }, 200, env);
@@ -1070,6 +1072,8 @@ async function handle(request, env) {
       rec.code = code;
       await env.PF_SYNC.put('code:' + code, JSON.stringify({
         code, tier: decision, email: rec.email, requestId: id,
+        /* seat 1 is the firm's admin seat, and the only seat that may publish the rulebook */
+        ...(decision === 'business' ? { seat: 1 } : {}),
         issuedAt: Date.now(), expiresAt: Date.now() + 30 * 86400000, usedAt: null
       }), { expirationTtl: 40 * 86400 });
       /* A FIRM gets one code per seat, minted together and sent in one email: the contact hands one
@@ -1353,8 +1357,35 @@ function subPatch(status, currentPeriodEnd) {
   return { subStatus: status, currentPeriodEnd, paused: true, graceUntil: null };
 }
 
+/* Per-IP, per-minute counter in KV for the public write routes. Coarse on purpose: a guess at an
+   access code costs one KV read, and 31^10 codes make guessing pointless, but a script hammering
+   /invite, /apply or /checkout should still be told to stop. Operator routes carry the secret and
+   are not limited here. */
+async function tooMany(env, request, name, perMinute) {
+  const ip = (request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown').split(',')[0].trim();
+  /* Cloudflare's Rate Limiting binding when it is bound (worker.wrangler.toml): a real sliding
+     window at the edge. KV reads are cached for up to a minute, so a KV counter cannot see a burst;
+     it remains only as the fallback where no binding exists, which is the Node test harness. */
+  const rl = perMinute <= 10 ? env.RL_TIGHT : env.RL_LOOSE;
+  if (rl && typeof rl.limit === 'function') {
+    try { const r = await rl.limit({ key: name + ':' + ip }); return r && r.success === false; } catch (e) { /* fall through to KV */ }
+  }
+  const key = 'rlm:' + name + ':' + Math.floor(Date.now() / 60000) + ':' + ip;
+  const n = parseInt((await env.PF_SYNC.get(key)) || '0', 10);
+  if (n >= perMinute) return true;
+  await env.PF_SYNC.put(key, String(n + 1), { expirationTtl: 120 });
+  return false;
+}
+const MAX_BODY = 16 * 1024;
+function bodyTooLarge(request) { const n = parseInt(request.headers.get('Content-Length') || '0', 10); return isFinite(n) && n > MAX_BODY; }
+
 async function handleBilling(request, env, url) {
   const site = (env.SITE_URL || 'https://perceptfolio.com').replace(/\/+$/, '');
+  if (request.method === 'POST' || request.method === 'PUT') {
+    if (bodyTooLarge(request)) return json({ error: 'Payload too large.' }, 413, env);
+    const limited = { '/checkout': 10, '/apply': 5, '/portal': 10, '/org/rulebook': 20 }[url.pathname];
+    if (limited && await tooMany(env, request, url.pathname, limited)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+  }
 
   /* ---- POST /checkout {plan, seats?, application?} -> {url} ---- */
   if (url.pathname === '/checkout' && request.method === 'POST') {
@@ -1511,7 +1542,10 @@ async function handleBilling(request, env, url) {
     for (const email of emails) {
       let m = rec.members.find(x => x.email === email);
       if (!m) {
-        const code = await mintCode(env, 'business', email, { requestId: id, firm: rec.who.slice(0, 80), memberOf: rec.email });
+        /* seat: an explicit member number, never 1. A missing seat used to read as the admin seat at
+           /org/rulebook; the check now requires seat === 1 and this stamps every member. */
+        const seatNo = (Array.isArray(rec.seatCodes) ? rec.seatCodes.length : 1) + rec.members.length + 1;
+        const code = await mintCode(env, 'business', email, { requestId: id, firm: rec.who.slice(0, 80), memberOf: rec.email, seat: seatNo });
         m = { email, code, issuedAt: Date.now() };
         rec.members.push(m);
       }
@@ -1529,6 +1563,7 @@ async function handleBilling(request, env, url) {
      the admin seat (the first code of the grant), and the rulebook if the admin has published one.
      Members apply that rulebook and cannot change it; that is what "one standard" means. */
   if (url.pathname === '/org' && request.method === 'GET') {
+    if (await tooMany(env, request, '/org', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
     const code = clean(url.searchParams.get('code'), 12).toUpperCase();
     if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return json({ org: null }, 200, env);
     const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
@@ -1545,7 +1580,7 @@ async function handleBilling(request, env, url) {
     let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
     const code = clean(body.code, 12).toUpperCase();
     const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
-    if (!c || c.tier !== 'business' || !c.requestId || (c.seat && c.seat !== 1)) return json({ error: 'Only the firm\'s admin seat can publish the rulebook.' }, 403, env);
+    if (!c || c.tier !== 'business' || !c.requestId || c.seat !== 1) return json({ error: 'Only the firm\'s admin seat can publish the rulebook.' }, 403, env);
     const rb = body.rulebook || {};
     const num = (v, lo, hi, d) => { const n = parseInt(v, 10); return isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
     const rulebook = { qBuy: num(rb.qBuy, 1, 12, 8), pBuy: num(rb.pBuy, 0, 6, 3), qSell: num(rb.qSell, 0, 12, 4), mBuy: num(rb.mBuy, 0, 4, 0) };

@@ -145,5 +145,25 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
 /* --- webhook with no billing configured --- */
 { const e2 = { ...env, STRIPE_WEBHOOK_SECRET: '' }; const s = signed(completed); const rr = await worker.fetch(new Request(W + '/stripe/webhook', { method: 'POST', body: s.raw, headers: { 'stripe-signature': s.header } }), e2); t('webhook with no secret configured is refused, never trusted', rr.status === 503); }
 
+
+/* --- audit finding 1: a member added by email carries a seat number and cannot publish --- */
+{
+  const firmId = [...store.keys()].filter(k => k.startsWith('req:')).map(k => JSON.parse(store.get(k))).find(x => x.status === 'business' && x.seatCodes)?.id;
+  if (firmId) {
+    r = await post('/decide/members', { id: firmId, emails: ['new.analyst@harborrow.example'] }, { Authorization: 'Bearer op-secret' }); j = await r.json();
+    const memberCode = j.members[0].code; const rec = JSON.parse(store.get('code:' + memberCode));
+    t('a member added by email carries an explicit seat number, never 1', typeof rec.seat === 'number' && rec.seat > 1);
+    r = await req('/org/rulebook', { method: 'PUT', body: JSON.stringify({ code: memberCode, rulebook: { qBuy: 9, pBuy: 4, qSell: 3, mBuy: 0 } }) }); const jb = await r.json().catch(() => ({}));
+    t('a member added by email cannot publish the rulebook (403)', r.status === 403, r.status + ' ' + JSON.stringify(jb).slice(0, 80));
+  } else t('firm fixture present for the member-publish check', false);
+}
+/* --- audit finding 3: no Access-Control-Allow-Origin at all when the origin is not allowed --- */
+{
+  const rr = await worker.fetch(new Request(W + '/status?code=AAAAA-AAAAA', { headers: { origin: 'https://evil.example' } }), env);
+  const acao = rr.headers.get('access-control-allow-origin');
+  t('the allow-origin header is the configured site, never the requester, never null or *', acao === 'https://perceptfolio.com');
+  const e2 = { ...env, ALLOWED_ORIGIN: '' }; const r2 = await worker.fetch(new Request(W + '/status?code=AAAAA-AAAAA', { headers: { origin: 'https://evil.example' } }), e2);
+  t('with no configured origin the header is absent rather than the string null', r2.headers.get('access-control-allow-origin') === null);
+}
 console.log(failed ? `\n${failed} FAILED` : '\nALL BILLING CHECKS PASSED');
 process.exit(failed ? 1 : 0);

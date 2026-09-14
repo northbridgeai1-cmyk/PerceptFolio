@@ -574,8 +574,12 @@ t('a never-exported profile is a red row',
 
 /* CLEANUP */
 t('the dead version-skew fallback is gone', !/queue is mid-update/.test(idx));
-t('the request form still distinguishes rejection from unreachable',
-  /err\.rejected=true/.test(idx) && /mailFallback\('<b>The request queue is not reachable/.test(idx));
+/* Access is by email now: the visitor's own mail app sends the request, so it always arrives and
+   nothing on this side has to be able to send; the worker copy is best-effort for admin's list. */
+t('the request is delivered to the inbox by FormSubmit, with a mailto fallback and a worker copy for admin',
+  /formsubmit\.co\/ajax\/'\+PF\.contact/.test(idx) && /_honey:''/.test(idx) && /location\.href='mailto:'\+PF\.contact\+'\?subject='/.test(idx) && /keepalive:true\}\)\.catch\(\(\)=>\{\}\)/.test(idx));
+t('the CSP allows the FormSubmit endpoint on both the page and the Pages gate', /connect-src 'self' https:\/\/\*\.workers\.dev https:\/\/finnhub\.io https:\/\/formsubmit\.co;/.test(idx) && /'https:\/\/formsubmit\.co'\]/.test(read('functions/_middleware.js')));
+t('the email asks for the detail that speeds the reply', ['rqName','rqRole','rqFirm','rqBook','rqWho','rqWhen','rqSeats'].every(id => new RegExp('id="' + id + '"').test(idx)) && /Best time to talk/.test(idx));
 
 /* ==================== SCHEMA INTEGRITY ==================== */
 G('defaultData must keep every key — a missing one is silent data loss');
@@ -1196,13 +1200,30 @@ G('A firm is one grant, one code per seat, one rulebook');
   t('the worker can notify the operator through Cloudflare Email Routing without a third party', /await import\('cloudflare:email'\)/.test(worker) && /env\.NOTIFY\.send\(new EmailMessage/.test(worker) && /\[\[send_email\]\]/.test(read('worker.wrangler.toml')));
   t('a request answers with the notification state so a test shows where mail stands', /notified: notified\.attempted \? \(notified\.ok \? 'sent' : 'failed: '/.test(worker));
   t('the per-IP daily limit is ten, not three', /if \(seen >= 10\)/.test(worker));
-  t('org routes: any seat reads its firm; only the admin seat publishes; the operator pauses one seat', /url\.pathname === '\/org' && request\.method === 'GET'/.test(worker) && /c\.seat && c\.seat !== 1\)\) return json\(\{ error: 'Only the firm/.test(worker) && /url\.pathname === '\/pause\/code'/.test(worker));
+  t('org routes: any seat reads its firm; only the admin seat publishes; the operator pauses one seat', /url\.pathname === '\/org' && request\.method === 'GET'/.test(worker) && /c\.seat !== 1\) return json\(\{ error: 'Only the firm/.test(worker) && /url\.pathname === '\/pause\/code'/.test(worker));
+  t('audit fix: admin is seat 1 by stamp, members carry a seat, a missing seat never passes', /\.\.\.\(decision === 'business' \? \{ seat: 1 \} : \{\}\)/.test(worker) && /memberOf: rec\.email, seat: seatNo/.test(worker));
+  t('audit fix: public lookups by code are rate-limited', /tooMany\(env, request, '\/status', 30\)/.test(worker) && /tooMany\(env, request, '\/org', 30\)/.test(worker));
+  t('audit fix: no allow-origin header when no origin is configured', /\.\.\.\(allowed \? \{ 'Access-Control-Allow-Origin': allowed \} : \{\}\)/.test(worker) && !/'Access-Control-Allow-Origin': allowed \|\| 'null'/.test(worker));
   t('the terminal applies the firm rulebook and locks the inputs for members', /D\.rules\.qBuy=rb\.qBuy/.test(term) && /el\.disabled=lock/.test(term) && /Publish to all/.test(term));
   t('every call is stamped with the seat and the name', /c\.by=\{seat:ORG\.seat,name:/.test(term));
   t('first-run data key card: shown without a key, saves to the profile, removed once set', /pfKeyCard/.test(term) && /D\.apiKey=v; if\(typeof saveDB==='function'\) saveDB\(\); card\.remove\(\)/.test(term));
   t('admin can pause or resume a single seat', /async function pauseSeat/.test(read('admin.html')) && /\/pause\/code/.test(read('admin.html')));
   t('the worker deploys from its own config with the KV binding and kept vars', /keep_vars = true/.test(read('worker.wrangler.toml')) && /binding = "PF_SYNC"/.test(read('worker.wrangler.toml')));
   t('the firm flow is contract-tested end to end', /pausing seat 3 pauses only seat 3/.test(read('test/billing.mjs')) && /the admin seat publishes it/.test(read('test/billing.mjs')));
+}
+
+/* ==================== M5: SECURITY CLOSE-OUT ==================== */
+G('Closed with evidence, not assurance');
+{
+  t('passwords: PBKDF2-SHA256, per-profile salt, 150k iterations, constant-time compare, legacy migrated on sign-in',
+    /const PW_ITER=150000/.test(term) && /name:'PBKDF2',hash:'SHA-256',salt,iterations:PW_ITER/.test(term) && /crypto\.getRandomValues\(new Uint8Array\(16\)\)/.test(term)
+    && /d\|=want\.charCodeAt\(i\)\^stored\.charCodeAt\(i\)/.test(term) && /p\.pinHash=await pwHash\(pw\); persistDB\(\)/.test(term) && !/pinHash:pw\?await sha\(pw\)/.test(term));
+  t('worker: per-minute per-IP limits on invite, checkout, apply, portal and rulebook', /tooMany\(env, request, '\/invite', 30\)/.test(worker) && /'\/checkout': 10, '\/apply': 5, '\/portal': 10, '\/org\/rulebook': 20/.test(worker));
+  t('worker: 16 KB body cap on billing and org writes', /const MAX_BODY = 16 \* 1024/.test(worker) && /bodyTooLarge\(request\)\) return json\(\{ error: 'Payload too large\.' \}, 413/.test(worker));
+  t('worker: no console.log in production code', !/console\.log/.test(worker));
+  t('admin: every request-derived value rendered through esc()', (() => { const s = read('admin.html'); const bad = []; for (const m of s.matchAll(/\+\s*((?:r|m)\.(?:email|who|call|note|firm|code|contact)[A-Za-z_.]*)\s*\+/g)) { if (!s.slice(Math.max(0, m.index - 12), m.index).includes('esc(')) bad.push(m[1]); } return bad.length === 0; })());
+  t('privacy pages name every processor, FormSubmit included', /FormSubmit/.test(read('privacy/index.html')) && /FormSubmit/.test(read('site/src/pages/Legal.tsx')));
+  t('the request form has a honeypot and no card, no financial data', /_honey:''/.test(idx) && !/card|routing number|account number/i.test((idx.match(/<form class="form" id="reqForm"[\s\S]*?<\/form>/)||[''])[0]));
 }
 
 /* ==================== BILLING (worker) ==================== */

@@ -2770,6 +2770,30 @@ function clearHistoryFilters(){
   renderAll();
 }
 
+/* Passwords: PBKDF2-SHA256, a random 16-byte salt per profile, 150,000 iterations, stored as
+   pbkdf2$iterations$salt$hash. The previous scheme was a bare SHA-256 of the password, which a
+   device thief could crack offline in seconds with a word list; a salted, iterated hash costs them
+   hours per guess. Old hashes still verify and are rewritten in the new form on the next sign-in,
+   so nobody is locked out by the upgrade. */
+const PW_ITER=150000;
+function b64(u8){return btoa(String.fromCharCode(...u8));}
+function unb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
+async function pwHash(pw,saltIn){
+  const salt=saltIn||crypto.getRandomValues(new Uint8Array(16));
+  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:PW_ITER},key,256);
+  return 'pbkdf2$'+PW_ITER+'$'+b64(salt)+'$'+b64(new Uint8Array(bits));
+}
+async function pwVerify(pw,stored){
+  if(!stored)return true;
+  if(stored.startsWith('pbkdf2$')){
+    const [,iters,salt]=stored.split('$');
+    const want=await pwHash(pw,unb64(salt));
+    if(want.length!==stored.length)return false;
+    let d=0; for(let i=0;i<want.length;i++)d|=want.charCodeAt(i)^stored.charCodeAt(i); return d===0&&parseInt(iters,10)===PW_ITER;
+  }
+  return (await sha(pw))===stored;   // legacy, rehashed by the caller after a successful check
+}
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
   return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
 
@@ -2828,7 +2852,7 @@ async function createProfile(){
      Clients tab — a decision the operator had explicitly made the other way. The dropdown is now a
      fallback for the case where a grant carries no tier at all. */
   const grantedTier=(inv.tier==='business'||inv.tier==='personal')?inv.tier:'personal';
-  DB.profiles[email]={pinHash:pw?await sha(pw):'',data:defaultData(),accountType:grantedTier,userId:makeUserId(),
+  DB.profiles[email]={pinHash:pw?await pwHash(pw):'',data:defaultData(),accountType:grantedTier,userId:makeUserId(),
                       invite:code,inviteTier:inv.tier||null,
                       /* Recorded on the profile: which documents were accepted and when. An
                          acceptance nobody can evidence later is not much of an acceptance. */
@@ -2937,7 +2961,8 @@ async function doLogin(){
   if(email===DEMO_ID&&pw===DEMO_PW)return enterDemo();
   if(!email||!DB.profiles[email])return toast('No account with that email. Create one below.');
   const p=DB.profiles[email];
-  if(p.pinHash&&p.pinHash!==await sha(pw))return toast('Wrong password.');
+  if(p.pinHash&&!(await pwVerify(pw,p.pinHash)))return toast('Wrong password.');
+  if(p.pinHash&&!p.pinHash.startsWith('pbkdf2$')){ p.pinHash=await pwHash(pw); persistDB(); }   // upgrade a legacy hash
   await finishLogin(email);
 }
 /* ================= ACCESS CHECK-IN =================
@@ -3377,7 +3402,7 @@ async function createClientProfile(){
   if(!name)return toast('Enter a client name.');
   if(!email||!email.includes('@'))return toast('Enter a valid email for this client to log in with.');
   if(DB.profiles[email])return toast('An account with that email already exists.');
-  DB.profiles[email]={pinHash:pw?await sha(pw):'',data:defaultData(),accountType:'personal',managedBy:USER,clientLabel:name,feePct,userId:makeUserId()};
+  DB.profiles[email]={pinHash:pw?await pwHash(pw):'',data:defaultData(),accountType:'personal',managedBy:USER,clientLabel:name,feePct,userId:makeUserId()};
   persistDB();
   document.getElementById('clientName').value='';
   document.getElementById('clientEmail').value='';
