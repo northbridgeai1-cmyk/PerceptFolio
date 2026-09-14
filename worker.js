@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-13.1';
+const WORKER_VERSION = '2026-09-14.1';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -385,7 +385,7 @@ async function handle(request, env) {
     const day = new Date().toISOString().slice(0, 10);
     const rlKey = 'rl:' + day + ':' + ip;
     const seen = parseInt((await env.PF_SYNC.get(rlKey)) || '0', 10);
-    if (seen >= 3) {
+    if (seen >= 10) {
       return json({ error: 'Too many requests from this address today. Email instead.' }, 429, env);
     }
 
@@ -442,12 +442,15 @@ async function handle(request, env) {
 
     /* Tell the operator. Every request lands in their inbox with who, what, and the suggested
        price, so the reply (more questions, or the quote) is one email away. */
+    let notified = { attempted: false };
     if (env.OPERATOR_EMAIL) {
       const q = quoteFor(plan, seats);
-      await sendPlain(env, env.OPERATOR_EMAIL, `Demo request: ${plan}${plan === 'business' ? ', ' + seats + ' seats' : ''} from ${email}`,
+      notified = await sendPlain(env, env.OPERATOR_EMAIL, `Demo request: ${plan}${plan === 'business' ? ', ' + seats + ' seats' : ''} from ${email}`,
         `${email}\n${plan === 'business' ? 'Business, ' + seats + ' seats' : 'Personal'}\n\nWho and what they run:\n${who}\n${call ? '\nA call they would stand behind:\n' + call + '\n' : ''}\nSuggested quote:\n${q.text}\n\nDecide in admin: ${(env.SITE_URL || 'https://perceptfolio.com')}/admin.html`);
     }
-    return json({ ok: true, id }, 200, env);
+    /* notified says whether the operator was told, so a test from the form shows where mail stands:
+       sent, failed (with the reason), or not configured. Nothing about the visitor is echoed. */
+    return json({ ok: true, id, notified: notified.attempted ? (notified.ok ? 'sent' : 'failed: ' + (notified.error || notified.status || 'unknown')) : 'not configured' }, 200, env);
   }
 
   /* ---- GET /version — which build is actually deployed ----
@@ -461,7 +464,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -1297,7 +1300,22 @@ PerceptFolio is research software, not investment advice. It never places a trad
   };
 }
 
+/* Two ways to send, tried in order.
+   1. Resend (RESEND_API_KEY + MAIL_FROM): any recipient. Needed for codes and quotes to customers.
+   2. Cloudflare Email Routing (the NOTIFY send_email binding + NOTIFY_FROM on the zone): only
+      recipients verified in the zone's Email Routing, which is exactly the operator's own inbox.
+      Free, no third party, and enough for "tell me when someone asks".
+   A failure is recorded, never thrown; the request that triggered it is already stored. */
 async function sendPlain(env, to, subject, text) {
+  if (!(env.RESEND_API_KEY && env.MAIL_FROM) && env.NOTIFY) {
+    try {
+      const { EmailMessage } = await import('cloudflare:email');
+      const from = env.NOTIFY_FROM || 'notify@perceptfolio.com';
+      const raw = `From: PerceptFolio <${from}>\r\nTo: ${to}\r\nSubject: ${subject.replace(/[\r\n]+/g, ' ')}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n${text}`;
+      await env.NOTIFY.send(new EmailMessage(from, to, raw));
+      return { attempted: true, ok: true, via: 'email-routing' };
+    } catch (e) { return { attempted: true, ok: false, via: 'email-routing', error: String(e && e.message || e) }; }
+  }
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) return { attempted: false };
   try {
     const r = await fetch('https://api.resend.com/emails', {
@@ -1504,6 +1522,56 @@ async function handleBilling(request, env, url) {
     }
     await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
     return json({ ok: true, members: results }, 200, env);
+  }
+
+  /* ---- GET /org?code=  : a business seat asks about its firm ----
+     Any live business code may read: the firm, how many seats, which seat this is, whether it is
+     the admin seat (the first code of the grant), and the rulebook if the admin has published one.
+     Members apply that rulebook and cannot change it; that is what "one standard" means. */
+  if (url.pathname === '/org' && request.method === 'GET') {
+    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return json({ org: null }, 200, env);
+    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
+    if (!c || c.tier !== 'business' || !c.requestId) return json({ org: null }, 200, env);
+    const rec = JSON.parse(await env.PF_SYNC.get('req:' + c.requestId) || 'null');
+    if (!rec) return json({ org: null }, 200, env);
+    const seat = c.seat || 1, seats = rec.seats || (rec.seatCodes ? rec.seatCodes.length : 1);
+    return json({ org: { id: rec.id, firm: rec.firm || null, contact: rec.email, seats, seat, isAdmin: seat === 1, paused: !!c.paused,
+      rulebook: rec.rulebook || null, rulebookAt: rec.rulebookAt || null } }, 200, env);
+  }
+
+  /* ---- PUT /org/rulebook {code, rulebook} : the admin seat publishes the firm's rules ---- */
+  if (url.pathname === '/org/rulebook' && request.method === 'PUT') {
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
+    if (!c || c.tier !== 'business' || !c.requestId || (c.seat && c.seat !== 1)) return json({ error: 'Only the firm\'s admin seat can publish the rulebook.' }, 403, env);
+    const rb = body.rulebook || {};
+    const num = (v, lo, hi, d) => { const n = parseInt(v, 10); return isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+    const rulebook = { qBuy: num(rb.qBuy, 1, 12, 8), pBuy: num(rb.pBuy, 0, 6, 3), qSell: num(rb.qSell, 0, 12, 4), mBuy: num(rb.mBuy, 0, 4, 0) };
+    const rec = JSON.parse(await env.PF_SYNC.get('req:' + c.requestId) || 'null');
+    if (!rec) return json({ error: 'No such firm.' }, 404, env);
+    rec.rulebook = rulebook; rec.rulebookAt = Date.now();
+    await env.PF_SYNC.put('req:' + c.requestId, JSON.stringify(rec));
+    return json({ ok: true, rulebook, rulebookAt: rec.rulebookAt }, 200, env);
+  }
+
+  /* ---- POST /pause/code {code, paused}  (operator) : pause one seat, not the whole firm ---- */
+  if (url.pathname === '/pause/code' && request.method === 'POST') {
+    const auth = request.headers.get('Authorization') || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!env.SYNC_SECRET || !safeEqual(tok, env.SYNC_SECRET)) return json({ error: 'Unauthorized.' }, 401, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase(), paused = !!body.paused;
+    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return json({ error: 'Malformed code.' }, 400, env);
+    let found = false;
+    for (const k of ['code:' + code, 'grant:' + code]) {
+      const v = await env.PF_SYNC.get(k); if (!v) continue; found = true;
+      const rec = JSON.parse(v); rec.paused = paused; rec.pausedAt = paused ? Date.now() : null;
+      await env.PF_SYNC.put(k, JSON.stringify(rec), k.startsWith('code:') ? { expirationTtl: 40 * 86400 } : undefined);
+    }
+    if (!found) return json({ error: 'Unknown code.' }, 404, env);
+    return json({ ok: true, code, paused }, 200, env);
   }
 
   /* ---- POST /apply/decide {id, decision:'accept'|'decline', seats?, note?}  (operator) ---- */

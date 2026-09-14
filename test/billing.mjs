@@ -118,6 +118,30 @@ t('the application is marked paid and linked to the org', app.status === 'paid' 
 r = await post('/portal', { code: sub2.code }); j = await r.json(); t('portal returns a Stripe-hosted billing URL for a known code', r.status === 200 && /billing\.stripe\.com/.test(j.url));
 r = await post('/portal', { code: 'ZZZZZ-ZZZZZ' }); t('portal refuses an unknown code (404)', r.status === 404);
 
+/* --- the firm flow: request -> grant mints one code per seat -> org -> rulebook -> per-seat pause --- */
+r = await post('/request', { email: 'desk@harborrow.example', who: 'A desk of three running a concentrated long book.', plan: 'business', seats: 3 }); j = await r.json();
+t('a firm request records plan and seats and reports the notification state', r.status === 200 && j.ok && /^(sent|failed|not configured)/.test(j.notified));
+const reqId = j.id;
+{ const rec = JSON.parse(store.get('req:' + reqId)); t('the stored request carries plan=business and seats=3', rec.plan === 'business' && rec.seats === 3); }
+r = await post('/decide', { id: reqId, decision: 'business', seats: 3 }, { Authorization: 'Bearer op-secret' }); j = await r.json();
+t('granting a firm mints one code per seat, together', r.status === 200 && Array.isArray(j.seatCodes) && j.seatCodes.length === 3 && j.seatCodes[0] === j.code);
+const [seat1, seat2, seat3] = j.seatCodes;
+{ const mailBody = JSON.parse(calls.filter(c => c.url.includes('resend')).pop().body); t('the grant email lists every seat code', j.seatCodes.every(c => mailBody.text.includes(c)) && /One code per member/.test(mailBody.text)); }
+r = await req('/org?code=' + seat2); j = await r.json();
+t('seat 2 reads its firm: seat 2 of 3, not admin, no rulebook yet', j.org && j.org.seat === 2 && j.org.seats === 3 && j.org.isAdmin === false && j.org.rulebook === null);
+r = await req('/org/rulebook', { method: 'PUT', body: JSON.stringify({ code: seat2, rulebook: { qBuy: 10, pBuy: 4, qSell: 5, mBuy: 1 } }), headers: { 'content-type': 'application/json' } });
+t('a member seat cannot publish the rulebook (403)', r.status === 403);
+r = await req('/org/rulebook', { method: 'PUT', body: JSON.stringify({ code: seat1, rulebook: { qBuy: 10, pBuy: 4, qSell: 5, mBuy: 1 } }), headers: { 'content-type': 'application/json' } }); j = await r.json();
+t('the admin seat publishes it, clamped to valid ranges', r.status === 200 && j.rulebook.qBuy === 10 && j.rulebook.pBuy === 4 && j.rulebook.mBuy === 1);
+r = await req('/org?code=' + seat2); j = await r.json();
+t('every seat now reads the published rulebook', j.org.rulebook && j.org.rulebook.qBuy === 10 && j.org.rulebookAt > 0);
+r = await req('/invite?code=' + seat3, { method: 'POST' }); r = await post('/pause/code', { code: seat3, paused: true }, { Authorization: 'Bearer op-secret' });
+t('the operator pauses one seat', r.status === 200);
+const s3 = await (await req('/status?code=' + seat3)).json(), s2 = await (await req('/status?code=' + seat2)).json();
+t('pausing seat 3 pauses only seat 3', s3.known && s3.active === false && s3.reason === 'paused' && (!s2.known || s2.active === true));
+r = await req('/org?code=' + seat1); j = await r.json(); t('seat 1 is the admin seat', j.org.isAdmin === true && j.org.seat === 1);
+r = await req('/org?code=' + code); j = await r.json(); t('a personal code has no firm', j.org === null);
+
 /* --- webhook with no billing configured --- */
 { const e2 = { ...env, STRIPE_WEBHOOK_SECRET: '' }; const s = signed(completed); const rr = await worker.fetch(new Request(W + '/stripe/webhook', { method: 'POST', body: s.raw, headers: { 'stripe-signature': s.header } }), e2); t('webhook with no secret configured is refused, never trusted', rr.status === 503); }
 

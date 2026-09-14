@@ -91,6 +91,7 @@ tr:last-child td{border-bottom:none}
 .rr{font-weight:700}
 .pos{color:var(--green)}.neg{color:var(--red)}.warn{color:var(--amber)}.dim{color:var(--faint)}
 .decide{border-top:1px solid var(--line);padding:14px 16px;background:var(--panel2)}
+.link-btn{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font:inherit;text-decoration:underline;text-underline-offset:.15em}
 .code{font:15px/1 var(--mono);letter-spacing:.12em;font-weight:700;color:var(--green);
   background:rgba(46,160,67,.08);border:1px solid rgba(46,160,67,.3);border-radius:6px;padding:11px 14px;display:inline-block}
 .msg{padding:12px 15px;border-radius:7px;font-size:13.5px;line-height:1.6;margin-top:14px;display:none}
@@ -359,7 +360,7 @@ function render(){
             (r.status==='business'
               ? ((r.seatCodes&&r.seatCodes.length>1)
                   ? '<div style="margin-bottom:14px"><b>'+r.seatCodes.length+' seat codes</b>, one per member, sent to '+esc(r.email)+' in the grant email. Each makes its own account.'+
-                    '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">'+r.seatCodes.map((c,i)=>'<span style="font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 8px"><span class="muted">'+(i+1)+'</span> '+esc(c)+'</span>').join('')+'</div>'+
+                    '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">'+r.seatCodes.map((c,i)=>'<span style="font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 8px"><span class="muted">'+(i+1)+(i===0?' admin':'')+'</span> '+esc(c)+' <button type="button" class="link-btn" style="margin-left:6px;font-size:11px" onclick="pauseSeat(\''+esc(c)+'\',true)">pause</button><button type="button" class="link-btn" style="font-size:11px" onclick="pauseSeat(\''+esc(c)+'\',false)">resume</button></span>').join('')+'</div>'+
                     '<button class="btn btn-sm" style="margin-top:8px" onclick="copyText(\''+esc(r.seatCodes.join(', '))+'\')">Copy all codes</button></div>'
                   : '')+
                 '<div style="margin-bottom:12px"><b>Or email each member directly.</b> <span class="muted">Paste their emails and each gets their own code and their own email.</span>'+
@@ -458,6 +459,10 @@ function quoteText(plan,seats){
   const m=Math.round(PRICES.business.monthly*(1-disc/100)), y=Math.round(PRICES.business.yearly*(1-disc/100));
   return 'Business, '+n+' seats: $'+m+' per seat a month ($'+(m*n).toLocaleString()+' for the firm), or $'+y.toLocaleString()+' per seat a year ($'+(y*n).toLocaleString()+' for the firm).'+
     (disc?' Because the firm has '+n+' members, each seat is '+disc+'% off the list price of $'+PRICES.business.monthly+' a month or $'+PRICES.business.yearly.toLocaleString()+' a year.':'');
+}
+async function pauseSeat(code,paused){
+  try{ const r=await fetch(base()+'/pause/code',{method:'POST',headers:hdrs(),body:JSON.stringify({code,paused})}); const j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status)); show('connMsg','ok',(paused?'Paused':'Resumed')+' seat <b>'+esc(code)+'</b>. Takes effect at that seat\'s next check-in.'); }
+  catch(e){ show('connMsg','err','Failed: '+esc(e.message)); }
 }
 function copyText(t){ try{ navigator.clipboard.writeText(t); show('connMsg','ok','Copied.'); }catch(e){ prompt('Copy:',t); } }
 function mailQuote(id){
