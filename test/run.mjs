@@ -1123,6 +1123,43 @@ G('Words that sell nothing, and strings that should never ship');
   t('.mcp.json carries no literal key', !/x-api-key":\s*"[^$]/.test(read('.mcp.json')) && /\$\{API_KEY_21ST\}/.test(read('.mcp.json')));
 }
 
+/* ==================== THE RULEBOOK STAYS INSIDE ==================== */
+G('The landing page sells the method without giving it away');
+{
+  /* The 22 check names and their bars are what a subscriber pays for. The page may say there are
+     twenty-two, how they split, and which passed on an example; it may not name one. */
+  const NAMES = ['Revenue growth','Gross margin','Operating margin','Free cash flow','Cash vs debt','Current ratio','ROE','EPS beats',
+    'Revenue guidance','Insider buying','Clear growth runway','Competitive moat','P/E vs own history','Comp analysis','DCF value',
+    'Forward P/E','PEG ratio','6-month return','12-month return','Near 52-week high','Beating the market'];
+  const shown = h => h.replace(/<!--[\s\S]*?-->/g,'').replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').toLowerCase();
+  const v = shown(idx);
+  const leaked = NAMES.filter(n => v.includes(n.toLowerCase()));
+  t('no check from the rulebook is named on the landing page', leaked.length === 0, leaked.length ? leaked.join(', ') : '21 names checked');
+  t('every check row on the page is redacted; none carries a name', (idx.match(/class="r (ok|no|na) red"/g)||[]).length >= 6 && !/class="r (ok|no|na)"[^>]*><span class="m">[^<]*<\/span><span class="n">[A-Za-z]/.test(idx));
+  t('the hero shows the dashboard, not the analyzer', /<span class="screen">Dashboard<\/span>/.test(idx) && /class="d-greet"/.test(idx) && !/class="t-cols"/.test(idx));
+  /* Hick's law: one primary action in the hero and one in the nav; the alternative is a text link,
+     and the terminal link is hidden until this browser has a profile. */
+  t('one primary button in the hero, no peer button beside it', (idx.match(/hero-actions[\s\S]*?<\/div>/)||[''])[0].split('class="btn').length === 2 && /class="hero-alt"/.test(idx));
+  t('the terminal link is hidden until relevant', /id="navOpen" hidden>/.test(idx) && /b\.hidden=false/.test(idx));
+  t('the terminal sidebar discloses advanced tabs behind More', /nav\.pf-compact button\.pf-adv\{display:none\}/.test(term) && /pf_nav_compact/.test(term) && /ADV\.indexOf\(t\)>-1/.test(term));
+  t('no threshold or limit value is printed', !/cap 7\.2%|floor 7\.5%|max 2\.0 d|≥ 10%|≥ 40%|Under 30|≤ 1\.5/.test(v));
+}
+
+/* ==================== BILLING (worker) ==================== */
+G('Stripe does the money; the worker does the access');
+{
+  t('billing routes are public, before the sync-key gate', worker.indexOf('const billed = await handleBilling') < worker.indexOf('// Auth: Authorization: Bearer <SYNC_SECRET>'));
+  t('webhook signatures are verified in constant time with a five-minute tolerance', /verifyStripeSignature/.test(worker) && /Math\.abs\(Date\.now\(\) \/ 1000 - t\) > 300/.test(worker) && /safeEqual\(hex, v1\)/.test(worker));
+  t('webhook events are idempotent by id', /'evt:' \+ ev\.id/.test(worker));
+  t('a second completion for the same customer never mints a second code', /if \(await env\.PF_SYNC\.get\('sub:' \+ customerId\)\) return json\(\{ ok: true, duplicate: 'customer' \}/.test(worker));
+  t('prices live in Stripe Price IDs from env; no amount is ever posted', /priceVar: 'STRIPE_PRICE_/.test(worker) && !/unit_amount/.test(worker));
+  t('business checkout requires an accepted, single-use application token', /apptok:/.test(worker) && /app\.status !== 'accepted'/.test(worker));
+  t('past_due grants a grace window and lapses on its own', /GRACE_DAYS = 7/.test(worker) && /graceUntil: Date\.now\(\) \+ GRACE_DAYS/.test(worker) && /reason: rec\.paused \? 'paused' : lapsed \? 'lapsed' : 'active'/.test(worker));
+  t('no billing without both Stripe secrets (fails closed)', /function billingConfigured\(env\)[\s\S]{0,120}STRIPE_SECRET_KEY && env\.STRIPE_WEBHOOK_SECRET/.test(worker));
+  t('the application form has a honeypot', /if \(body\.website\) return json\(\{ ok: true \}/.test(worker));
+  t('test/billing.mjs exists and covers the webhook, grace and org flows', fs.existsSync('test/billing.mjs') && /customer\.subscription\.deleted/.test(read('test/billing.mjs')) && /graceUntil/.test(read('test/billing.mjs')) && /org:/.test(read('test/billing.mjs')));
+}
+
 /* ==================== THE GATE (Pages Functions) ==================== */
 G('The terminal is not served without a session');
 
@@ -1138,8 +1175,10 @@ G('The terminal is not served without a session');
     /ADMIN\.some[\s\S]{0,120}session\.t !== 'operator' && session\.t !== 'employee'[\s\S]{0,80}404/.test(mw));
   t('the re-check requires known AND active; an unknown code is not trusted',
     /live = !!\(j && j\.known && j\.active\)/.test(mw));
-  t('a paused grant clears the cookie and says why',
-    /live === false[\s\S]{0,120}toEnter\(url, 'paused'\)[\s\S]{0,40}clearCookie\(\)/.test(mw));
+  t('a paused or lapsed grant clears the cookie and says which',
+    /live === false[\s\S]{0,400}toEnter\(url, why\)[\s\S]{0,40}clearCookie\(\)/.test(mw) && /j\.reason === 'lapsed'\) \? 'lapsed' : 'paused'/.test(mw));
+  t('a lapsed subscriber is offered the billing portal, via a Function that reads the code from the cookie',
+    /reason === 'lapsed'/.test(read('enter/enter.js')) && /\/portal'/.test(read('functions/api/portal.js')) && /session\.t === 'operator' \|\| session\.t === 'employee'/.test(read('functions/api/portal.js')));
   t('an outage is honoured for at most 24 hours, then refused',
     /STALE_MS = 24 \* 60 \* 60 \* 1000/.test(mw) && /live === null && now - \(session\.chk \|\| 0\) > STALE_MS/.test(mw));
   t('the cookie is HttpOnly, Secure and SameSite=Strict',

@@ -6,6 +6,7 @@
   const reason = q.get('reason');
   if (reason === 'paused') { lede.textContent = 'Access for your code has been paused. Contact the person who issued it.'; lede.classList.add('warn'); }
   else if (reason === 'unavailable') { lede.textContent = 'Your session could not be confirmed because the access service was unreachable for a day. Enter your code again.'; lede.classList.add('warn'); }
+  else if (reason === 'lapsed') { lede.textContent = 'Your subscription has lapsed. Update your payment details in the billing portal and your code works again within a few minutes.'; lede.classList.add('warn'); }
   const next = q.get('next') || '';
 
   const code = document.getElementById('code');
