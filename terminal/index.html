@@ -970,6 +970,26 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 #sidebar nav button.pf-more .ico svg{transform:rotate(-90deg);transition:transform .2s var(--ease)}
 #sidebar nav:not(.pf-compact) button.pf-more .ico svg{transform:rotate(90deg)}
 #sidebar nav button.pf-more{color:var(--muted)}
+/* Model view (Projections). One row of controls that never wraps its button; an empty state that
+   looks designed rather than logged. */
+#pfModel .mv-head{display:block}
+#pfModel .mv-form{margin-top:14px}
+#pfModel .mv-title{font-size:15px;font-weight:600;margin-top:6px}
+#pfModel .mv-kicker{font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+#pfModel .mv-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+#pfModel .mv-form input,#pfModel .mv-form select{height:40px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 12px;color:var(--text);font:inherit}
+#pfModel .mv-form input{width:120px;text-transform:uppercase;font-family:var(--mono);letter-spacing:.06em}
+#pfModel .mv-form select{width:auto;min-width:130px;flex:0 0 auto;padding-right:32px}
+#pfModel .mv-form input{flex:0 0 auto}
+#pfModel .mv-form .btn{white-space:nowrap;height:40px;padding:0 16px}
+#pfModel .mv-empty{margin-top:14px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:16px 18px;border:1px dashed var(--border);border-radius:10px;background:var(--bg)}
+#pfModel .mv-empty .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);margin-top:6px;box-shadow:0 0 0 4px rgba(148,154,166,.15)}
+#pfModel .mv-empty b{display:block;font-size:14px;margin-bottom:4px}
+#pfModel .mv-empty p{margin:0;font-size:13px;line-height:1.55;color:var(--muted);max-width:60ch}
+#pfModel .mv-empty code{font-family:var(--mono);font-size:12px;background:var(--panel2);padding:2px 6px;border-radius:5px}
+#pfModel .mv-stats{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:10px;font-family:var(--mono);font-size:13px}
+#pfModel .mv-note{margin-top:12px;font-size:13px;line-height:1.55;color:var(--muted);max-width:64ch}
+@media (max-width:600px){#pfModel .mv-form{width:100%}#pfModel .mv-form input{flex:1;min-width:0}#pfModel .mv-form .btn{width:100%}}
 </style>
 </head>
 <body>
@@ -15350,15 +15370,15 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   function panel(){
     var host=document.getElementById('tab-projections'); if(!host||document.getElementById('pfModel'))return;
     var d=document.createElement('div'); d.id='pfModel'; d.className='card'; d.style.marginTop='16px';
-    d.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">'+
-      '<div><div style="font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Model view</div>'+
-      '<div style="font-size:15px;font-weight:600;margin-top:6px">Kronos, a K-line foundation model</div></div>'+
-      '<div style="display:flex;gap:8px;align-items:center"><input id="pfModelSym" placeholder="Ticker" style="width:110px;text-transform:uppercase">'+
-      '<select id="pfModelHz">'+HZ.map(function(h){return '<option value="'+h+'"'+(h===90?' selected':'')+'>'+h+' days</option>';}).join('')+'</select>'+
-      '<button class="btn btn-p btn-sm" id="pfModelGo">Ask the model</button></div></div>'+
-      '<div id="pfModelOut" style="margin-top:12px"><p class="muted" style="font-size:13px;margin:0">A forecast is the model\'s continuation of the price series, drawn as a median path with a 10 to 90 percent band. It is recorded and marked like any other call, and it is not a recommendation.</p></div>';
+    d.innerHTML='<div class="mv-head">'+
+      '<div><div class="mv-kicker">Model view</div><div class="mv-title">Kronos, a K-line foundation model</div></div>'+
+      '<div class="mv-form"><input id="pfModelSym" placeholder="TICKER" aria-label="Ticker" maxlength="10" autocapitalize="characters" spellcheck="false">'+
+      '<select id="pfModelHz" aria-label="Horizon">'+HZ.map(function(h){return '<option value="'+h+'"'+(h===90?' selected':'')+'>'+h+' days</option>';}).join('')+'</select>'+
+      '<button class="btn btn-p" id="pfModelGo">Ask the model</button></div></div>'+
+      '<div id="pfModelOut"><p class="mv-note">A forecast is the model\'s continuation of the price series, drawn as a median path with a 10 to 90 percent band. It is recorded and marked like any other call, and it is not a recommendation.</p></div>';
     host.insertBefore(d, host.firstChild);
     document.getElementById('pfModelGo').addEventListener('click', ask);
+    document.getElementById('pfModelSym').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); ask(); } });
   }
   function draw(cv,last,path,lo,hi){
     var dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight; if(!(w>0&&h>0))return;
@@ -15371,18 +15391,23 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   }
   function ask(){
     var sym=(document.getElementById('pfModelSym').value||'').trim().toUpperCase(), hz=parseInt(document.getElementById('pfModelHz').value,10), out=document.getElementById('pfModelOut');
-    if(!/^[A-Z.\-]{1,10}$/.test(sym)){ out.innerHTML='<p class="muted" style="font-size:13px">Enter a ticker.</p>'; return; }
-    out.innerHTML='<p class="muted" style="font-size:13px">Asking the model… a first answer takes a few seconds while it wakes.</p>';
+    if(!/^[A-Z.\-]{1,10}$/.test(sym)){ out.innerHTML='<div class="mv-empty"><span class="dot"></span><div><b>Enter a ticker</b><p>A US listing, for example NVDA. The model needs about two years of daily closes, which the worker fetches for you.</p></div></div>'; document.getElementById('pfModelSym').focus(); return; }
+    out.innerHTML='<div class="mv-empty"><span class="dot" style="background:var(--accent);box-shadow:0 0 0 4px rgba(59,130,246,.18)"></span><div><b>Asking the model</b><p>A first answer takes a few seconds while the service wakes.</p></div></div>';
     var base=(typeof INVITE_WORKER==='string'&&INVITE_WORKER)||'';
     fetch(base.replace(/\/+$/,'')+'/kronos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym,horizon:hz})})
       .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
       .then(function(x){
         var j=x.j;
-        if(!x.ok){ out.innerHTML='<p class="muted" style="font-size:13px">'+(j&&j.configured===false?'The model is not configured on this deployment yet. See kronos/README.md.':(j&&j.error)||'The model did not answer.')+'</p>'; return; }
+        if(!x.ok){
+          out.innerHTML=(j&&j.configured===false)
+            ? '<div class="mv-empty"><span class="dot"></span><div><b>Not connected yet</b><p>The model runs as a separate service and this deployment has not been pointed at one. The operator connects it once: deploy <code>kronos/app.py</code> to Modal, then set <code>KRONOS_URL</code> and <code>KRONOS_TOKEN</code> on the worker. Until then this view stays quiet rather than guessing.</p></div></div>'
+            : '<div class="mv-empty"><span class="dot"></span><div><b>No answer</b><p>'+esc((j&&j.error)||'The model did not answer.')+'</p></div></div>';
+          return;
+        }
         var end=j.path[j.path.length-1], pct=(end-j.last)/j.last*100, dir=pct>=0?'up':'down';
         out.innerHTML='<canvas id="pfModelCv" style="width:100%;height:180px;display:block;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></canvas>'+
-          '<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;font-family:var(--mono);font-size:13px"><span>last <b>'+j.last.toFixed(2)+'</b></span><span>median at '+hz+'d <b class="'+(pct>=0?'pos':'neg')+'">'+end.toFixed(2)+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</b></span><span class="muted">band '+j.lo[j.lo.length-1].toFixed(2)+' to '+j.hi[j.hi.length-1].toFixed(2)+'</span><span class="muted">'+(j.cached?'cached today':'fresh')+'</span></div>'+
-          '<div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn btn-sm" id="pfModelRec">Record as a '+hz+'-day '+(dir==='up'?'BUY':'SELL')+' call on the model track</button><span class="muted" style="font-size:12px">Marked against the index on its anniversary, like every other call.</span></div>';
+          '<div class="mv-stats"><span>last <b>'+j.last.toFixed(2)+'</b></span><span>median at '+hz+'d <b class="'+(pct>=0?'pos':'neg')+'">'+end.toFixed(2)+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</b></span><span class="muted">band '+j.lo[j.lo.length-1].toFixed(2)+' to '+j.hi[j.hi.length-1].toFixed(2)+'</span><span class="muted">'+(j.cached?'cached today':'fresh')+'</span></div>'+
+          '<div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-sm" id="pfModelRec" style="white-space:nowrap">Record as a '+hz+'-day '+(dir==='up'?'BUY':'SELL')+' call</button><span class="muted" style="font-size:12px">On the model track, marked against the index on its anniversary like every other call.</span></div>';
         draw(document.getElementById('pfModelCv'),j.last,j.path,j.lo,j.hi);
         document.getElementById('pfModelRec').addEventListener('click',function(){
           try{
@@ -15392,7 +15417,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
           }catch(e){ this.textContent='Could not record: '+e.message; }
         });
       })
-      .catch(function(){ out.innerHTML='<p class="muted" style="font-size:13px">The worker is not reachable.</p>'; });
+      .catch(function(){ out.innerHTML='<div class="mv-empty"><span class="dot"></span><div><b>No connection</b><p>The worker is not reachable right now. Check your network and try again.</p></div></div>'; });
   }
   var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='projections')setTimeout(panel,50); return r; }; }
   document.addEventListener('DOMContentLoaded',function(){ if(document.getElementById('tab-projections')&&!document.getElementById('tab-projections').classList.contains('tabs-hidden'))panel(); });
