@@ -1236,6 +1236,16 @@ G('A model is one more input, graded like everything else');
   t('the model is never exposed on the public site', !/kronos/i.test(idx) && !/kronos/i.test(read('site/src/pages/Landing.tsx')));
 }
 
+/* ==================== M8: DATA ON DAY ONE, COMPANY, LENSES, KELLY ==================== */
+G('History is there on the first visit');
+{
+  t('the terminal backfills the price log from /history when candles refuse', /INVITE_WORKER\+'\/history\?symbol='/.test(term) && /scanSeries\(sym,Object\.keys\(merged\)\.sort\(\)/.test(term));
+  t('/history is public data, rate-limited, cached a day', /url\.pathname === '\/history'/.test(worker) && /'hist:' \+ sym \+ ':' \+ day/.test(worker) && /expirationTtl: 86400/.test(worker));
+  t('the council uses only free feeds plus the wired model, and is code-gated', /stock\/profile2/.test(worker) && /stock\/recommendation/.test(worker) && /url\.pathname === '\/council'/.test(worker) && /grantIsLive\(env, code\)\)\) return json\(\{ error: 'A live access code is required\.' \}, 401/.test(worker));
+  t('the six lenses are named after frameworks and disclaimed in the response and the panel', /Value \(after Buffett\)/.test(worker) && /disclaimer: 'The six readings are AI applications/.test(worker) && /esc\(j\.disclaimer\)/.test(term));
+  t('Kelly: half Kelly by default, capped by the concentration limit, p from the record only past thirty marks', /half=f\/2/.test(term) && /D\.rules\.maxPosition\/100/.test(term) && /marks\.length>=30/.test(term) && /not a recommendation; the five limits still decide/.test(term));
+}
+
 /* ==================== BILLING (worker) ==================== */
 G('Stripe does the money; the worker does the access');
 {

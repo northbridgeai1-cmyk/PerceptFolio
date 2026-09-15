@@ -307,3 +307,16 @@ The gated site is live at https://perceptfolio.pages.dev. Production (`perceptfo
 1. **Custom domain.** Cloudflare → Workers & Pages → perceptfolio → Custom domains → Add `perceptfolio.com` (and `www`). Cloudflare writes the CNAME itself because the zone is here. When it shows Active, GitHub Pages is unreachable by that name and can be switched off in the repo settings.
 2. **WAF rate limits.** Security → WAF → Rate limiting rules: `/api/enter` 10 per minute per IP; the Worker hostname `crimson-hat-6ad9.northbridgeai1.workers.dev` 60 per minute per IP. This is the reliable layer the audit asked for.
 3. **CI deploys.** GitHub → repo → Settings → Secrets → `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with "Cloudflare Pages: Edit". From then on every push to main deploys itself.
+
+## 22. M8 (2026-09-14): data on day one, the company view, six lenses, Kelly
+
+Built and live:
+- **History on the first visit.** The worker's `/history` returns two years of daily closes for any symbol (public data, cached a day); the terminal backfills its price log from it whenever Finnhub's paid candle route refuses. Charts, EWMA 50/200, realised volatility, portfolio growth and the market page's ranges are populated immediately.
+- **Company, analysts and six lenses**, beneath every analysis: profile, eighteen ratios, analyst buy/hold/sell counts and the consensus target (free feeds), then six short readings of the business in the published frameworks of Buffett (value), Lynch (growth), Dalio (macro), Wood (innovation), Burry (contrarian) and Marks (downside), written by the model already wired for news, labelled as AI applications of published frameworks and never as the people's views or as a recommendation. Cached a day.
+- **Kelly criterion**, in Risk: full and half Kelly from the thesis's price, target and stop, with the win probability taken from the marked record once it holds thirty marks (assumed 50% and said so until then), capped by the concentration limit, and framed as arithmetic on the user's own inputs.
+
+Needs data that must be bought, so specified but not built:
+- **Pre-filled buyer and supplier maps** (Bloomberg SPLC): Finnhub's supply-chain endpoint is paid-tier; no free source exists. The Map tab stays user-entered until a licence is bought.
+- **ESG** scores: paid on every provider.
+- **A world map of facilities** ("smart chip factories"): no free geospatial dataset of plants exists; a curated dataset or a paid one is the prerequisite.
+- **Heatmaps**: buildable from free quotes (holdings and sector ETFs by day change); scheduled next, no data cost.

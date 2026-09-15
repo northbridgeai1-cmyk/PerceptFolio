@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-14.4';
+const WORKER_VERSION = '2026-09-14.5';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -464,7 +464,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -1557,6 +1557,79 @@ async function handleBilling(request, env, url) {
     } catch (e) { return json({ error: 'The model is not reachable.' }, 502, env); }
     const last = candles[candles.length - 1];
     const result = { symbol: sym, horizon, asOf: day, last: last.close, path: out.path, lo: out.lo, hi: out.hi, dates: out.dates, model: out.model, cached: false };
+    await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 86400 });
+    return json(result, 200, env);
+  }
+
+  /* ---- GET /history?symbol=SPY : two years of daily closes, cached a day ----
+     The terminal's charts, averages, volatility and growth views read the app's own price log,
+     which used to fill forward one close per visit because Finnhub's candle route is paid-tier.
+     Public data, rate-limited, no key needed: a new account has its history on the first visit. */
+  if (url.pathname === '/history' && request.method === 'GET') {
+    if (await tooMany(env, request, '/history', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const sym = clean(url.searchParams.get('symbol'), 12).toUpperCase();
+    if (!/^[A-Z.\-^=]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
+    const day = new Date().toISOString().slice(0, 10), ck = 'hist:' + sym + ':' + day;
+    const cached = await env.PF_SYNC.get(ck); if (cached) return new Response(cached, { status: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, corsHeaders(env)) });
+    let dates = [], closes = [];
+    try {
+      const y = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=2y&interval=1d', { headers: { 'User-Agent': 'Mozilla/5.0 PerceptFolio' } });
+      const j = await y.json(); const r0 = j && j.chart && j.chart.result && j.chart.result[0]; const q = r0 && r0.indicators && r0.indicators.quote && r0.indicators.quote[0];
+      if (r0 && q) for (let i = 0; i < r0.timestamp.length; i++) if (isFinite(q.close[i]) && q.close[i] > 0) { dates.push(new Date(r0.timestamp[i] * 1000).toISOString().slice(0, 10)); closes.push(Math.round(q.close[i] * 10000) / 10000); }
+    } catch (e) { /* fall through */ }
+    if (closes.length < 20) return json({ error: 'No history for ' + sym + '.' }, 502, env);
+    const out = JSON.stringify({ symbol: sym, asOf: day, dates, closes, source: 'yahoo' });
+    await env.PF_SYNC.put(ck, out, { expirationTtl: 86400 });
+    return new Response(out, { status: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, corsHeaders(env)) });
+  }
+
+  /* ---- POST /council {code, symbol} : the facts, and six lenses on the business ----
+     Facts from Finnhub's free tier (profile, metrics, analyst recommendation counts) and Yahoo
+     (consensus target). Then one call to the model already wired for news summaries, asking for
+     six short readings of the business in the published frameworks of six investors: value,
+     growth, macro, innovation, contrarian, risk. Labelled as AI applications of those frameworks,
+     never as anyone's actual view, and never as a recommendation. Cached a day per symbol. */
+  if (url.pathname === '/council' && request.method === 'POST') {
+    if (await tooMany(env, request, '/council', 10)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    if (!(await grantIsLive(env, code))) return json({ error: 'A live access code is required.' }, 401, env);
+    const sym = clean(body.symbol, 12).toUpperCase();
+    if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
+    const day = new Date().toISOString().slice(0, 10), ck = 'council:' + sym + ':' + day;
+    const cached = await env.PF_SYNC.get(ck); if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
+    const fh = async (path) => { try { const r = await fetch('https://finnhub.io/api/v1' + path + (path.includes('?') ? '&' : '?') + 'token=' + env.FINNHUB_API_KEY); return r.ok ? await r.json() : null; } catch (e) { return null; } };
+    const [profile, metric, recs] = await Promise.all([fh('/stock/profile2?symbol=' + sym), fh('/stock/metric?symbol=' + sym + '&metric=all'), fh('/stock/recommendation?symbol=' + sym)]);
+    let target = null, recMean = null;
+    try {
+      const y = await fetch('https://query1.finance.yahoo.com/v10/finance/quoteSummary/' + encodeURIComponent(sym) + '?modules=financialData', { headers: { 'User-Agent': 'Mozilla/5.0 PerceptFolio' } });
+      const j = await y.json(); const fd = j && j.quoteSummary && j.quoteSummary.result && j.quoteSummary.result[0] && j.quoteSummary.result[0].financialData;
+      if (fd) { target = fd.targetMeanPrice && fd.targetMeanPrice.raw; recMean = fd.recommendationMean && fd.recommendationMean.raw; }
+    } catch (e) { /* optional */ }
+    const m = (metric && metric.metric) || {};
+    const rec = Array.isArray(recs) && recs[0] ? recs[0] : null;
+    const facts = {
+      symbol: sym, name: profile && profile.name || sym, industry: profile && profile.finnhubIndustry || null, marketCap: profile && profile.marketCapitalization || null, ipo: profile && profile.ipo || null, web: profile && profile.weburl || null,
+      pe: m.peTTM ?? m.peBasicExclExtraTTM ?? null, forwardPe: m.forwardPE ?? null, pb: m.pbAnnual ?? null, ps: m.psTTM ?? null, evEbitda: m['evEbitdaTTM'] ?? null,
+      grossMargin: m.grossMarginTTM ?? null, opMargin: m.operatingMarginTTM ?? null, netMargin: m.netProfitMarginTTM ?? null, roe: m.roeTTM ?? null, roa: m.roaTTM ?? null,
+      revGrowth: m.revenueGrowthTTMYoy ?? null, epsGrowth: m.epsGrowthTTMYoy ?? null, eps: m.epsTTM ?? null, revPerShare: m.revenuePerShareTTM ?? null,
+      debtEquity: m['totalDebt/totalEquityAnnual'] ?? null, currentRatio: m.currentRatioAnnual ?? null, divYield: m.dividendYieldIndicatedAnnual ?? null, beta: m.beta ?? null,
+      high52: m['52WeekHigh'] ?? null, low52: m['52WeekLow'] ?? null,
+      analysts: rec ? { period: rec.period, strongBuy: rec.strongBuy, buy: rec.buy, hold: rec.hold, sell: rec.sell, strongSell: rec.strongSell } : null,
+      targetMean: target, recommendationMean: recMean,
+    };
+    let lenses = null, note = null;
+    if (env.AI_API_KEY) {
+      const system = 'You write six short readings of a listed business, each applying the PUBLISHED investment framework of a named investor. You are not those people and you must never claim to be; the reader sees a label saying these are AI applications of published frameworks. Use only the facts given. Each reading: 3 to 4 plain sentences, no jargon, no hedging padding, one concrete number from the facts where possible, and a one-word stance from {favourable, cautious, unfavourable, insufficient}. Argue honestly: two of the lenses are meant to disagree with the others when the facts warrant. End with "whatWouldChangeMyMind" per lens, one sentence. Never say buy, sell, hold, or recommend; describe how the framework reads the business. Output strict JSON: {"lenses":[{"id":"value","name":"Value (after Buffett)","stance":"","reading":"","whatWouldChangeMyMind":""},{"id":"growth","name":"Growth (after Lynch)",...},{"id":"macro","name":"Macro (after Dalio)",...},{"id":"innovation","name":"Innovation (after Wood)",...},{"id":"contrarian","name":"Contrarian (after Burry)",...},{"id":"risk","name":"Downside (after Marks)",...}]}';
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': env.AI_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+          body: JSON.stringify({ model: env.AI_MODEL || 'claude-haiku-4-5-20251001', max_tokens: 1800, temperature: 0, system, messages: [{ role: 'user', content: 'Facts (null means unavailable):\n' + JSON.stringify(facts) }] }) });
+        const j = await res.json(); const text = j && j.content && j.content[0] && j.content[0].text || '';
+        const start = text.indexOf('{'), end = text.lastIndexOf('}');
+        lenses = start >= 0 ? JSON.parse(text.slice(start, end + 1)).lenses : null;
+      } catch (e) { note = 'The six readings could not be produced right now; the facts stand.'; }
+    } else note = 'The six readings need the AI key on the worker; the facts stand.';
+    const result = { facts, lenses, note, asOf: day, disclaimer: 'The six readings are AI applications of each investor’s published framework to the facts above. They are not those people’s views, and nothing here is a recommendation.', cached: false };
     await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 86400 });
     return json(result, 200, env);
   }
