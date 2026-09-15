@@ -8718,7 +8718,20 @@ async function backfillPrices(sym){
     /* A hundred days of backfilled candles is the likeliest place a split already sits, so the
        series is scanned before it is stored rather than after it has poisoned a statistic. */
     D.priceLog[sym]=scanSeries(sym,series);
-  }catch(e){/* candle endpoint refused; the log fills forward from here instead */}
+  }catch(e){
+    /* Candles are paid-tier on Finnhub; the worker's /history route (two years of daily closes,
+       public, cached a day) fills the log instead, so charts, averages, volatility and growth are
+       populated on the first visit rather than after a month of them. */
+    try{
+      const r=await fetch(INVITE_WORKER+'/history?symbol='+encodeURIComponent(sym),{cache:'no-store'});
+      const h=r.ok?await r.json():null;
+      if(h&&Array.isArray(h.closes)&&h.closes.length>=20){
+        const merged={};(D.priceLog[sym]||[]).forEach(r=>merged[r.d]=r.p);
+        h.dates.forEach((d,i)=>{ if(isFinite(h.closes[i])&&h.closes[i]>0&&merged[d]==null)merged[d]=h.closes[i]; });
+        D.priceLog[sym]=scanSeries(sym,Object.keys(merged).sort().map(d=>({d,p:merged[d]})).slice(-300));
+      }
+    }catch(e2){/* offline; the log fills forward from here */}
+  }
 }
 /* ================= PRICE CHART =================
    Drawn from D.priceLog, which is the app's own daily close history. That log is backfilled from
@@ -15421,6 +15434,63 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   }
   var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='projections')setTimeout(panel,50); return r; }; }
   document.addEventListener('DOMContentLoaded',function(){ if(document.getElementById('tab-projections')&&!document.getElementById('tab-projections').classList.contains('tabs-hidden'))panel(); });
+})();
+</script>
+<script>
+/* Company, analysts and six lenses (under an analysis) and Kelly (in Risk). Data via the worker:
+   Finnhub's free profile, metrics and recommendation counts, a consensus target, and six short
+   readings written by the model in the published frameworks of six investors, labelled as such. */
+(function(){
+  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||''; }catch(e){ return ''; } }
+  function fmt(v,kind){ if(v==null||!isFinite(v))return '–'; if(kind==='pct')return (v).toFixed(1)+'%'; if(kind==='x')return (+v).toFixed(1)+'×'; if(kind==='cap')return v>=1e6?'$'+(v/1e6).toFixed(2)+'T':v>=1e3?'$'+(v/1e3).toFixed(1)+'B':'$'+(+v).toFixed(0)+'M'; return (+v).toFixed(2); }
+  var STANCE={favourable:'pos',cautious:'warn',unfavourable:'neg',insufficient:'muted'};
+  function council(sym,host){
+    if(!host||!sym)return;
+    var box=document.getElementById('pfCouncil'); if(!box){ box=document.createElement('div'); box.id='pfCouncil'; box.className='card'; box.style.marginTop='14px'; host.appendChild(box); }
+    box.innerHTML='<div class="mv-kicker">Company, analysts and six lenses</div><div class="mv-empty" style="margin-top:10px"><span class="dot" style="background:var(--accent);box-shadow:0 0 0 4px rgba(59,130,246,.18)"></span><div><b>Reading '+esc(sym)+'</b><p>Profile, ratios and analyst counts first; the six readings take a few seconds.</p></div></div>';
+    fetch(INVITE_WORKER+'/council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym})})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+      .then(function(x){
+        var j=x.j; if(!x.ok){ box.innerHTML='<div class="mv-kicker">Company, analysts and six lenses</div><div class="mv-empty" style="margin-top:10px"><span class="dot"></span><div><b>Not available</b><p>'+esc((j&&j.error)||'No answer.')+'</p></div></div>'; return; }
+        var f=j.facts, a=f.analysts, total=a?(a.strongBuy+a.buy+a.hold+a.sell+a.strongSell):0;
+        var bar=a&&total?'<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-top:8px"><i style="flex:'+(a.strongBuy+a.buy)+';background:var(--green)"></i><i style="flex:'+a.hold+';background:var(--yellow)"></i><i style="flex:'+(a.sell+a.strongSell)+';background:var(--red)"></i></div><div class="muted" style="font-size:12px;margin-top:6px;font-family:var(--mono)">'+(a.strongBuy+a.buy)+' buy · '+a.hold+' hold · '+(a.sell+a.strongSell)+' sell, '+total+' analysts, '+esc(a.period||'')+(f.targetMean?' · consensus target '+fmt(f.targetMean):'')+'</div>':'<div class="muted" style="font-size:12px;margin-top:8px">No analyst coverage in the free feed.</div>';
+        var rows=[['Market cap',fmt(f.marketCap,'cap')],['P/E (TTM)',fmt(f.pe,'x')],['Forward P/E',fmt(f.forwardPe,'x')],['EV/EBITDA',fmt(f.evEbitda,'x')],['P/S',fmt(f.ps,'x')],['P/B',fmt(f.pb,'x')],['Gross margin',fmt(f.grossMargin,'pct')],['Operating margin',fmt(f.opMargin,'pct')],['Net margin',fmt(f.netMargin,'pct')],['ROE',fmt(f.roe,'pct')],['Revenue growth',fmt(f.revGrowth,'pct')],['EPS growth',fmt(f.epsGrowth,'pct')],['EPS (TTM)',fmt(f.eps)],['Debt/equity',fmt(f.debtEquity)],['Current ratio',fmt(f.currentRatio)],['Dividend yield',fmt(f.divYield,'pct')],['Beta',fmt(f.beta)],['52-week',fmt(f.low52)+' to '+fmt(f.high52)]];
+        var grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;margin-top:12px">'+rows.map(function(r){return '<div style="border-top:1px solid var(--border);padding-top:6px"><div class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase">'+r[0]+'</div><div style="font-family:var(--mono);font-size:14px;margin-top:2px">'+r[1]+'</div></div>';}).join('')+'</div>';
+        var lens=j.lenses?'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:16px">'+j.lenses.map(function(l){return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b style="font-size:13px">'+esc(l.name)+'</b><span class="'+(STANCE[l.stance]||'muted')+'" style="font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase">'+esc(l.stance||'')+'</span></div><p style="font-size:13px;line-height:1.55;margin:8px 0 0">'+esc(l.reading||'')+'</p><p class="muted" style="font-size:12px;line-height:1.5;margin:8px 0 0"><b>What would change this reading:</b> '+esc(l.whatWouldChangeMyMind||'')+'</p></div>';}).join('')+'</div>':'<p class="muted" style="font-size:13px;margin-top:12px">'+esc(j.note||'')+'</p>';
+        box.innerHTML='<div class="mv-kicker">Company, analysts and six lenses</div>'+
+          '<div style="margin-top:8px"><b style="font-size:15px">'+esc(f.name)+'</b> <span class="muted" style="font-size:13px">'+esc(f.industry||'')+(f.ipo?' · listed '+esc(String(f.ipo).slice(0,4)):'')+'</span>'+(f.web?' <a href="'+esc(f.web)+'" target="_blank" rel="noopener" style="font-size:12px">site</a>':'')+'</div>'+bar+grid+lens+
+          '<p class="muted" style="font-size:12px;line-height:1.5;margin:14px 0 0">'+esc(j.disclaimer)+(j.cached?' Cached today.':'')+'</p>';
+      })
+      .catch(function(){ box.innerHTML='<div class="mv-kicker">Company, analysts and six lenses</div><div class="mv-empty" style="margin-top:10px"><span class="dot"></span><div><b>No connection</b><p>The worker is not reachable right now.</p></div></div>'; });
+  }
+  /* After an analysis renders, read the ticker from the result and attach the panel beneath it. */
+  var host=document.getElementById('analyzerResult');
+  if(host){ var last=''; new MutationObserver(function(){ var t=(host.querySelector('h2,h3,.sym,[data-sym]')||{}).textContent||''; var m=(host.getAttribute('data-sym')||t).match(/\b[A-Z]{1,6}\b/); var sym=m?m[0]:''; if(sym&&sym!==last&&!/Nothing analysed/.test(host.textContent)){ last=sym; setTimeout(function(){ council(sym,host); },400); } }).observe(host,{childList:true}); }
+
+  /* Kelly, in Risk. f* = p/L − q/W with W and L as fractions of price from the thesis's target and
+     stop; p from the marked record of the checklist track when it has thirty marks, otherwise a
+     stated 50%. Shown as full and half Kelly, capped by the concentration limit, and never as an
+     instruction: the terminal's five limits still decide. */
+  function kelly(){
+    var host=document.getElementById('tab-risk'); if(!host||document.getElementById('pfKelly'))return;
+    var d=document.createElement('div'); d.id='pfKelly'; d.className='card'; d.style.marginTop='14px';
+    d.innerHTML='<div class="mv-kicker">Kelly criterion</div><div class="mv-title">How much, if the odds were exactly as your thesis says</div>'+
+      '<div class="mv-form"><input id="kPrice" placeholder="PRICE" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><input id="kTarget" placeholder="TARGET" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><input id="kStop" placeholder="STOP" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><input id="kP" placeholder="P(WIN) %" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><button class="btn btn-p" id="kGo">Size it</button></div>'+
+      '<div id="kOut"><p class="mv-note">Kelly maximises the growth rate of a bankroll if the odds are exactly right, and halves your capital on the way when they are not; that is why the default shown is half Kelly. Win probability comes from your marked record once it has thirty marks; until then it is 50% and says so.</p></div>';
+    host.insertBefore(d,host.firstChild);
+    var marks=(D&&D.calls||[]).filter(function(c){return c.track==='checklist'&&c.mark&&isFinite(c.mark.edge);});
+    var pRec=marks.length>=30?marks.filter(function(c){return c.mark.edge>0;}).length/marks.length:null;
+    document.getElementById('kP').value=pRec!=null?(pRec*100).toFixed(0):'50';
+    document.getElementById('kGo').addEventListener('click',function(){
+      var px=parseFloat(document.getElementById('kPrice').value), tg=parseFloat(document.getElementById('kTarget').value), st=parseFloat(document.getElementById('kStop').value), p=parseFloat(document.getElementById('kP').value)/100, out=document.getElementById('kOut');
+      if(!(px>0&&tg>px&&st>0&&st<px&&p>0&&p<1)){ out.innerHTML='<div class="mv-empty"><span class="dot"></span><div><b>Needs a price, a target above it, a stop below it, and a probability between 0 and 100</b><p>The target and stop are your thesis; Kelly only turns them into a fraction.</p></div></div>'; return; }
+      var W=(tg-px)/px, L=(px-st)/px, q=1-p, f=p/L-q/W, half=f/2, cap=(D&&D.rules&&isFinite(D.rules.maxPosition)?D.rules.maxPosition/100:null);   // maxPosition is a percent
+      var line=function(l,v){return '<span>'+l+' <b class="'+(v>0?'pos':'neg')+'">'+(v*100).toFixed(1)+'%</b></span>';};
+      out.innerHTML='<div class="mv-stats">'+line('full Kelly',f)+line('half Kelly',half)+'<span>odds <b>'+(W/L).toFixed(2)+'</b> to 1</span><span>p(win) <b>'+(p*100).toFixed(0)+'%</b>'+(pRec==null?' <span class="muted">(assumed)</span>':' <span class="muted">(your record)</span>')+'</span></div>'+
+        '<p class="mv-note">'+(f<=0?'Negative Kelly: at these odds and this probability the bet has no edge, and the fraction to hold is zero.':'Half Kelly of the portfolio is <b>'+(half*100).toFixed(1)+'%</b>'+(cap!=null&&half>cap?', which the concentration limit of '+(cap*100).toFixed(0)+'% caps.':'.'))+' This is arithmetic on your own inputs, not a recommendation; the five limits still decide.</p>';
+    });
+  }
+  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='risk')setTimeout(kelly,50); return r; }; }
 })();
 </script>
 </body>

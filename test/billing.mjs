@@ -5,6 +5,7 @@
    Run:  node test/billing.mjs */
 
 import fs from 'fs';
+const read = f => fs.readFileSync(f, 'utf8');
 import path from 'path';
 import os from 'os';
 import { createHmac } from 'crypto';
@@ -190,6 +191,35 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
   const calls = seen.length; rr = await kpost({ code: live.code, symbol: 'SPY', horizon: 30 }); kj = await rr.json();
   t('kronos: the second ask the same day is served from cache without calling the model', kj.cached === true && seen.length === calls);
   globalThis.fetch = prevFetch;
+}
+
+/* --- history on day one, and the council --- */
+{
+  const prev = globalThis.fetch; const hits = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url); hits.push(u);
+    if (u.includes('query1.finance.yahoo.com/v8')) { const n = 500; const ts = [...Array(n)].map((_, i) => 1690000000 + i * 86400); const px = ts.map((_, i) => 400 + i * 0.1); return new Response(JSON.stringify({ chart: { result: [{ timestamp: ts, indicators: { quote: [{ open: px, high: px, low: px, close: px, volume: px }] } }] } }), { status: 200 }); }
+    if (u.includes('finnhub.io/api/v1/stock/profile2')) return new Response(JSON.stringify({ name: 'NVIDIA Corp', finnhubIndustry: 'Semiconductors', marketCapitalization: 4500000, ipo: '1999-01-22', weburl: 'https://nvidia.com' }), { status: 200 });
+    if (u.includes('finnhub.io/api/v1/stock/metric')) return new Response(JSON.stringify({ metric: { peTTM: 52.1, grossMarginTTM: 74.6, roeTTM: 91.9, beta: 1.7 } }), { status: 200 });
+    if (u.includes('finnhub.io/api/v1/stock/recommendation')) return new Response(JSON.stringify([{ period: '2026-09-01', strongBuy: 20, buy: 30, hold: 6, sell: 1, strongSell: 0 }]), { status: 200 });
+    if (u.includes('quoteSummary')) return new Response(JSON.stringify({ quoteSummary: { result: [{ financialData: { targetMeanPrice: { raw: 210 }, recommendationMean: { raw: 1.6 } } }] } }), { status: 200 });
+    if (u.includes('api.anthropic.com')) return new Response(JSON.stringify({ content: [{ text: JSON.stringify({ lenses: [{ id: 'value', name: 'Value (after Buffett)', stance: 'cautious', reading: 'A wonderful business at a price that leaves no margin of safety at 52 times earnings.', whatWouldChangeMyMind: 'A multiple below 25.' }] }) }] }), { status: 200 });
+    return prev(url, opts);
+  };
+  let rr = await req('/history?symbol=SPY'); let hj = await rr.json();
+  t('history: two years of daily closes for any symbol, no key needed', rr.status === 200 && hj.closes.length === 500 && hj.dates.length === 500 && hj.source === 'yahoo');
+  const n1 = hits.filter(u => u.includes('yahoo')).length; rr = await req('/history?symbol=SPY'); await rr.json();
+  t('history: cached for the day', hits.filter(u => u.includes('yahoo')).length === n1);
+  rr = await req('/history?symbol=$$'); t('history: a bad symbol is refused', rr.status === 400);
+  const e3 = { ...env, FINNHUB_API_KEY: 'fh', AI_API_KEY: 'ai' };
+  const live = [...store.keys()].filter(k => k.startsWith('code:')).map(k => JSON.parse(store.get(k))).find(g => g && g.code && !g.paused && g.tier === 'business');
+  rr = await worker.fetch(new Request(W + '/council', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: 'ZZZZZ-ZZZZZ', symbol: 'NVDA' }) }), e3);
+  t('council: refused without a live code', rr.status === 401);
+  rr = await worker.fetch(new Request(W + '/council', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA' }) }), e3); const cj = await rr.json();
+  t('council: profile, ratios, analyst counts and target from the free feeds', rr.status === 200 && cj.facts.name === 'NVIDIA Corp' && cj.facts.pe === 52.1 && cj.facts.analysts.buy === 30 && cj.facts.targetMean === 210);
+  t('council: six-lens readings arrive as structured JSON with a stance and a what-would-change line', Array.isArray(cj.lenses) && cj.lenses[0].stance === 'cautious' && /margin of safety/.test(cj.lenses[0].reading) && !!cj.lenses[0].whatWouldChangeMyMind);
+  t('council: labelled as AI applications of published frameworks, never the people’s views, never a recommendation', /published framework/.test(cj.disclaimer) && /not those people/.test(cj.disclaimer) && /never say buy, sell, hold, or recommend/i.test(read('worker.js')));
+  globalThis.fetch = prev;
 }
 console.log(failed ? `\n${failed} FAILED` : '\nALL BILLING CHECKS PASSED');
 process.exit(failed ? 1 : 0);
