@@ -15987,13 +15987,15 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
     }).catch(function(){ return false; }).then(function(ok){ delete filling[sym]; return ok; });
     return filling[sym];
   };
-  /* The long series for a ticker: the five-year history with the synced log laid over it, so the
-     most recent sessions (which the log has and the daily history may not yet) are always present. */
+  /* The long series for a ticker: the five-year history, with the synced log filling only the most
+     recent sessions the daily history does not yet carry. */
   window.longSeries=function(sym){
     var h=loadH()[sym]; var log=(typeof D!=='undefined'&&D&&D.priceLog&&D.priceLog[sym])||[];
     if(!(h&&h.d&&h.d.length>20))return null;
     h.used=Date.now();
-    var m={}; for(var i=0;i<h.d.length;i++)m[h.d[i]]=h.p[i]; log.forEach(function(r){ if(r&&r.d&&isFinite(r.p)&&r.p>0)m[r.d]=r.p; });
+    /* The vendor's daily close wins wherever both exist; the log only supplies the sessions the daily
+       history does not carry yet (today, and yesterday before the close is published). */
+    var m={}; log.forEach(function(r){ if(r&&r.d&&isFinite(r.p)&&r.p>0)m[r.d]=r.p; }); for(var i=0;i<h.d.length;i++)m[h.d[i]]=h.p[i];
     return Object.keys(m).sort().map(function(d){return {d:d,p:m[d]};});
   };
   /* the listing */
