@@ -105,6 +105,25 @@ blur-to-sharp. Everything is visible from the first frame at reduced opacity, so
 or a reduced-motion user sees the finished screen. prefers-reduced-motion removes all of it and
 smooth scrolling. Hover transitions are 180ms on the same curve. Nothing else moves.
 
+## The terminal's surface (ledger pass, 2026-09-20)
+
+The terminal is set like a statement, not a dashboard template. One block, `<style id="v3-ledger">`,
+last in terminal/index.html, carries the whole decision and can be removed to revert it.
+
+- Ground: flat --bg, no ambient gradient. Panels are --panel with a 1px --border and a 4px radius;
+  no inset highlights, no drop shadows, no glow on the active tab.
+- Type: Archivo for the page heading (the date), section titles, the hero figure and the stat
+  figures; the system stack for everything else; mono only for tickers, tables and code. Labels are
+  sentence case, 12px, --muted. No uppercase monospace kickers anywhere.
+- Boxes: a card inside a card is a hairline row. The stat row is four figures separated by
+  hairlines. The track record and marks schedule are hairline sections, not boxes.
+- Colour: the primary button, the active tab's rule and links carry the accent; green and red are
+  for numbers that moved and for a verdict word; nothing else is tinted. A verdict is a coloured
+  word, not a chip. No halos on dots.
+- Empty states are one sentence, left-aligned, no dashed frame.
+- The sign-in screen shows the wordmark, the sentence and the form; the feature list stays on the
+  landing page.
+
 ## Browser surfaces
 
 Selection is --accent at .35. Scrollbars are --line2 thumbs on the page ground. Caret is --accent.

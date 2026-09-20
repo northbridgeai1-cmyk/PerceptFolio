@@ -85,6 +85,7 @@ Kronos, a time-series forecasting model, joins the terminal as one input in Proj
 - Pricing block: two plans, yearly highlighted, the saving stated as a number, the three named comparisons with prices, one line on the data key ("you connect a free Finnhub key; two minutes, no card").
 - The honest note stays: the record is new; first marks land in about a quarter.
 - Type: Archivo (self-hosted) for headings, system stack for body, mono only for data. Tokens in `DESIGN.md`.
+- The terminal's surface follows the ledger pass in `DESIGN.md` (2026-09-20): flat ground, hairlines for boxes, sentence-case labels, Archivo for headings and figures, no chips, no halos, no glow. The tells are pinned absent by the test suite.
 - **Skeleton loaders** on every async surface: hero facsimile during font load, demo during data load, checkout button while Stripe initialises, `/enter` while the code validates.
 
 ### 5.3 Copy rules
