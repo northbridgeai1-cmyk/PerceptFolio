@@ -1246,6 +1246,33 @@ G('History is there on the first visit');
   t('Kelly: half Kelly by default, capped by the concentration limit, p from the record only past thirty marks', /half=f\/2/.test(term) && /D\.rules\.maxPosition\/100/.test(term) && /marks\.length>=30/.test(term) && /not a recommendation; the five limits still decide/.test(term));
 }
 
+/* ==================== M9: THE WORLD, ON A GLOBE ==================== */
+G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
+{
+  const mw = read('functions/_middleware.js'), asm = read('scripts/assemble.mjs'), sw = read('sw.js');
+  t('the World tab exists, is reachable from the sidebar, and hides behind More with the other advanced tabs', /id="tab-world"/.test(term) && /data-tab="world"/.test(term) && /var ADV=\[[^\]]*'world'/.test(term));
+  t('Cesium is vendored, not loaded from a CDN, and only when the tab opens', /BASE='\/vendor\/cesium\/'/.test(term) && /s\.src=BASE\+'Cesium\.js'/.test(term) && !/cdnjs\.cloudflare\.com\/ajax\/libs\/cesium/.test(term) && exists('vendor/cesium/Cesium.js') && exists('vendor/cesium/Workers/createGeometry.js') && exists('vendor/cesium/LICENSE.md'));
+  const cz = read('vendor/cesium/Cesium.js');
+  t('the vendored Cesium carries the two CSP patches: Knockout finds the global without eval, and workers come from Workers/ as same-origin modules', /var t=this\|\|globalThis,n=t\.document/.test(cz) && !/\(0,eval\)\("this"\)/.test(cz) && /if\(!1&&!n&&typeof CESIUM_WORKERS<"u"\)/.test(cz) && /new C\.CesiumWidget\('wdGlobe'/.test(term) && !/new C\.Viewer\(/.test(term));
+  t('the globe is Natural Earth II from this origin: no Cesium ion token, no Google, no Esri, no OSM tile server', /Ion\.defaultAccessToken=''/.test(term) && /Assets\/Textures\/NaturalEarthII/.test(term) && exists('vendor/cesium/Assets/Textures/NaturalEarthII/tilemapresource.xml') && !/tile\.openstreetmap\.org|arcgisonline|api\.cesium\.com|googleapis/.test(term));
+  t('both CSPs allow same-origin workers and wasm compilation for Cesium, and still forbid eval and blob: scripts', (() => { const meta = term.match(/http-equiv="Content-Security-Policy" content="([^"]*)"/)[1]; return /worker-src 'self';/.test(meta) && /worker-src 'self';/.test(mw) && /'wasm-unsafe-eval'/.test(meta) && /'wasm-unsafe-eval'/.test(mw) && !/'unsafe-eval'/.test(meta) && !/'unsafe-eval'/.test(mw) && !/blob:/.test(meta.match(/script-src[^;]*/)[0]) && !/worker-src[^;]*blob:/.test(mw); })());
+  t('the Pages build ships vendor/ (Chart.js was silently missing on Pages) and the World data', /copy\('vendor'\)/.test(asm) && /copy\('world\/data'\)/.test(asm) && /copy\('world\/ne110\.json'\)/.test(asm) && !/copy\('world'\)/.test(asm));
+  const idx = exists('world/data/index.json') ? JSON.parse(read('world/data/index.json')) : null;
+  t('the bundled manifest names both licences and carries a country table and per-layer counts and dates', !!idx && /ODbL/.test(idx.source) && /CC0/.test(idx.source) && idx.countries && idx.countries.TW === 'Taiwan' && Array.isArray(idx.industries) && idx.industries.length >= 12 && idx.industries.every(i => 'count' in i && 'asOf' in i && 'file' in i && 'partial' in i));
+  const layers = idx ? idx.industries.filter(i => exists('world/data/' + i.file)).map(i => JSON.parse(read('world/data/' + i.file))) : [];
+  t('every shipped layer is compact features with a name and coordinates, a source flag, and provenance', layers.length > 0 && layers.every(l => l.provenance && Array.isArray(l.features) && l.features.every(f => typeof f.n === 'string' && f.n && Number.isFinite(f.la) && Number.isFinite(f.lo) && /^[ow]+$/.test(f.s || 'o') && !('_tags' in f))));
+  t('no layer carries contact fields or anything but plant facts', layers.every(l => l.features.every(f => Object.keys(f).every(k => ['i','n','la','lo','o','p','c','w','q','t','s'].includes(k)))));
+  t('websites in the layers are http(s) only, so a click can never run a scheme', layers.every(l => l.features.every(f => !f.w || /^https:\/\/|^http:\/\//.test(f.w))));
+  const cat = read('world/catalog.mjs');
+  t('the catalogue matches operators as whole words, case-insensitively, and the extractor never sends a regex to Overpass', /\(\^\|\[\^A-Za-z\]\)/.test(cat) && /keywords:/.test(cat) && /wikidata:/.test(cat) && /BASE_SETS/.test(read('scripts/world-extract.mjs')) && /out:csv/.test(read('scripts/world-extract.mjs')) && !/\["name"~/.test(read('scripts/world-extract.mjs')));
+  t('the search box routes an industry phrase to a bundled layer and a company to the worker, and the worker route is code-gated', /function route\(phrase\)/.test(term) && /INVITE_WORKER\+'\/world'/.test(term) && /url\.pathname === '\/world'/.test(worker) && /grantIsLive\(env, code\)/.test(worker.slice(worker.indexOf("url.pathname === '/world'"), worker.indexOf("url.pathname === '/world'") + 800)));
+  t('the worker sends the phrase to Nominatim as a plain term, identified, at most once a second, caps the answer and caches a week', /\[A-Za-z0-9&'\.\\- \]\{2,40\}/.test(worker) && /nominatim\.openstreetmap\.org\/search/.test(worker) && /PerceptFolio-world\/1\.0/.test(worker) && /nominatim:last/.test(worker) && /WORLD_CAP = 50/.test(worker) && /expirationTtl: 7 \* 86400/.test(worker) && !/overpass-api|interpreter/i.test(worker));
+  t('the page says where the data comes from, that it is incomplete, and credits God\'s Eye View', /OpenStreetMap contributors/.test(term) && /incomplete by nature/.test(term) && /God’s Eye View|God's Eye View/.test(term) && /Natural Earth/.test(term));
+  t('plant links open in a new tab without a referrer', /rel="noopener noreferrer"/.test(term.slice(term.indexOf('id="v2-world"'))));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v110/.test(sw));
+  t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
+}
+
 /* ==================== BILLING (worker) ==================== */
 G('Stripe does the money; the worker does the access');
 {
@@ -1294,7 +1321,7 @@ G('The terminal is not served without a session');
     /!n\.startsWith\('\/'\) \|\| n\.startsWith\('\/\/'\)/.test(enter));
   t('the public CSP has no unsafe-inline; the gated CSP keeps it for the single-file terminal', (() => {
     const pub = (mw.match(/return `default-src 'self'; script-src 'self'; style-src 'self';[^`]*`/)||[''])[0];
-    const gated = (mw.match(/return `default-src 'self'; script-src 'self' 'unsafe-inline';[^`]*`/)||[''])[0];
+    const gated = (mw.match(/return `default-src 'self'; script-src 'self' 'unsafe-inline'(?: 'wasm-unsafe-eval')?;[^`]*`/)||[''])[0];
     return pub && !/unsafe-inline/.test(pub) && /frame-ancestors 'none'/.test(pub) && gated && /frame-ancestors 'none'/.test(gated);
   })());
   t('HSTS, nosniff, DENY framing, no-referrer and a Permissions-Policy are set on every response',

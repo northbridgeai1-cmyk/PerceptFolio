@@ -147,3 +147,30 @@ and keeps no copy; if it cannot be reached the visitor's own mail app carries th
 A copy still goes to the worker so admin lists the request with its plan and seats. FormSubmit is
 named in both privacy policies. One-time step: FormSubmit emails an activation link to the
 inbox on the first submission; nothing is delivered until it is clicked.
+
+## M9 (2026-09-20): the World route and the vendored globe
+
+- `POST /world` on the Worker: live-code gated (an anonymous caller cannot make the site hammer
+  OSM's geocoder), the phrase is `[A-Za-z0-9&'.\- ]{2,40}` and travels only as a URL-encoded query
+  term to Nominatim, never into a query language; `RL_TIGHT` (10/min) via `tooMany` plus a global
+  one-call-a-second timestamp in KV (Nominatim's policy); result filtered to industrial object
+  classes, capped at 50 and cached a week under a case-folded key; a busy or rate-limited geocoder
+  is a 503 with a sentence and is never cached. Evidence: `test/billing.mjs` ("world:" block,
+  13 checks).
+- CesiumJS is vendored from the npm tarball after comparing its SHA-512 with the registry's
+  integrity field (hash recorded in `vendor/README.md`); nothing loads from a CDN. `Ion.defaultAccessToken`
+  is emptied before the viewer is built and the base layer is served from this origin, so the page
+  makes no request to api.cesium.com, Google or any tile company. Evidence: `test/run.mjs` M9 block.
+- CSP: `'unsafe-eval'` stays forbidden. Stock Cesium needs it twice (Knockout's `(0,eval)("this")`
+  at load, and a worker bootstrap that `importScripts` a blob: URL), so the vendored bundle carries
+  two one-token patches instead (`vendor/README.md`), pinned by a test, and the globe is built with
+  `CesiumWidget`, which applies no Knockout bindings. What both policies did gain: `worker-src 'self'`
+  (same-origin module workers under /vendor/cesium/Workers) and `'wasm-unsafe-eval'` (Cesium
+  compiles its mesh decoders at load; the token permits WebAssembly compilation only, never string
+  evaluation). Verified in the browser: Cesium 1.145 boots under the policy with zero console
+  errors.
+- Data hygiene: the extract script never copies contact tags (email, phone) from OSM; websites are
+  kept only when they start with http(s); links open with `rel="noopener noreferrer"` under the
+  site's `Referrer-Policy: no-referrer`.
+- Found and fixed: the Pages build was missing `vendor/` entirely (Chart.js requests returned the SPA
+  index page). `scripts/assemble.mjs` now copies it; a test pins it.

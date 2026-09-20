@@ -58,8 +58,24 @@ window.PF_ES = {
   'Analyze a stock': 'Analizar una acción', 'Run Quality + Price Check': 'Comprobar calidad y precio', 'Compare two stocks': 'Comparar dos acciones', 'Compare': 'Comparar', 'Nothing analysed yet.': 'Nada analizado todavía.',
   'Sign out': 'Cerrar sesión', 'Sign in': 'Iniciar sesión', 'Create account': 'Crear cuenta', 'Password': 'Contraseña', 'Show': 'Mostrar', 'Hide': 'Ocultar', 'Cancel': 'Cancelar', 'Save': 'Guardar', 'Delete': 'Eliminar', 'Close': 'Cerrar', 'Export': 'Exportar', 'Import': 'Importar',
   'Today': 'Hoy', 'Yesterday': 'Ayer', 'Tomorrow': 'Mañana',
+  /* World: the globe of plants */
+  'World': 'Mundo', 'Where the plants are': 'Dónde están las plantas', 'Show': 'Mostrar', 'Industries': 'Industrias',
+  'An industry or a company, and the globe shows every plant OpenStreetMap knows: fabs, cell plants, refineries, shipyards, mines. Community-mapped, so incomplete by nature; the count and the date say how much is known.': 'Una industria o una empresa, y el globo muestra cada planta que OpenStreetMap conoce: fábricas de chips, plantas de celdas, refinerías, astilleros, minas. Está cartografiado por la comunidad, así que es incompleto por naturaleza; el recuento y la fecha dicen cuánto se sabe.',
+  'smart chip factories, or a company: TSMC': 'fábricas de chips, o una empresa: TSMC',
+  'Pick an industry above, or type a company': 'Elige una industria arriba o escribe una empresa',
+  'Every dot is a plant someone has drawn on OpenStreetMap. Click one for its name, operator and country.': 'Cada punto es una planta que alguien dibujó en OpenStreetMap. Haz clic en uno para ver su nombre, operador y país.',
+  'Chips and wafers': 'Chips y obleas', 'Electronics assembly': 'Ensamblaje electrónico', 'Batteries and cells': 'Baterías y celdas', 'Vehicle plants': 'Plantas de vehículos',
+  'Aircraft, engines and space': 'Aviones, motores y espacio', 'Steel, aluminium and metals': 'Acero, aluminio y metales', 'Mines': 'Minas', 'Refineries and petrochemicals': 'Refinerías y petroquímica',
+  'Chemicals and fertilisers': 'Química y fertilizantes', 'Pharmaceuticals and biologics': 'Farmacéutica y biológicos', 'Shipyards': 'Astilleros', 'Solar and wind manufacturing': 'Fabricación solar y eólica',
+  'Data centres': 'Centros de datos', 'Nuclear power plants': 'Centrales nucleares', 'Cement and building materials': 'Cemento y materiales de construcción',
+  'Operator': 'Operador', 'Makes': 'Produce', 'Country': 'País', 'Where': 'Dónde', 'Unplaced': 'Sin país', 'Website': 'Sitio web', 'On OpenStreetMap': 'En OpenStreetMap',
+  'Plants worldwide': 'Plantas en el mundo', 'from OpenStreetMap': 'de OpenStreetMap', 'Globe': 'Globo', 'On Wikidata': 'En Wikidata', 'Owner listed as': 'Propietario cotiza como',
+  'The source capped this answer, so the map is a sample rather than the whole set.': 'La fuente limitó esta respuesta, así que el mapa es una muestra y no el conjunto completo.',
+  'Part of the source could not be reached when this layer was built, so the count is a floor.': 'Parte de la fuente no respondió cuando se construyó esta capa, así que el recuento es un mínimo.',
+  'Nothing drawn on OpenStreetMap under that name. Try the company’s short name, or an industry above.': 'No hay nada dibujado en OpenStreetMap con ese nombre. Prueba el nombre corto de la empresa o una industria arriba.',
 };
 window.PF_ES_RX = [
+  [/^(\d+) plants · (\d+) countries · OpenStreetMap as of (.+)$/, '$1 plantas · $2 países · OpenStreetMap al $3'], [/^Loading (.+)…$/, 'Cargando $1…'], [/^Asking OpenStreetMap about (.+)…$/, 'Preguntando a OpenStreetMap por $1…'],
   [/^Good morning\b/, 'Buenos días'], [/^Good afternoon\b/, 'Buenas tardes'], [/^Good evening\b/, 'Buenas noches'],
   [/^your record:/, 'tu historial:'], [/^(\d+) of (\d+) right/, '$1 de $2 aciertos'],
 ];

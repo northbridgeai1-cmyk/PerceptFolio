@@ -221,5 +221,48 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
   t('council: labelled as AI applications of published frameworks, never the people’s views, never a recommendation', /published framework/.test(cj.disclaimer) && /not those people/.test(cj.disclaimer) && /never say buy, sell, hold, or recommend/i.test(read('worker.js')));
   globalThis.fetch = prev;
 }
+/* --- the world: a company's plants from OpenStreetMap, through Nominatim --- */
+{
+  const prev = globalThis.fetch; const hits = []; let mode = 'ok';
+  const osm = [
+    { osm_type: 'way', osm_id: 1, lat: '24.7736', lon: '121.0121', category: 'landuse', type: 'industrial', name: 'TSMC Fab 12', display_name: 'TSMC Fab 12, Hsinchu, Taiwan', address: { country_code: 'tw' }, extratags: { operator: 'TSMC', product: 'semiconductor', website: 'https://www.tsmc.com', wikidata: 'Q713418' } },
+    { osm_type: 'way', osm_id: 2, lat: '24.7740', lon: '121.0125', category: 'man_made', type: 'works', name: 'TSMC Fab 12', display_name: 'TSMC Fab 12', address: { country_code: 'tw' }, extratags: {} },
+    { osm_type: 'node', osm_id: 3, lat: '33.3', lon: '-111.9', category: 'building', type: 'factory', name: 'TSMC Arizona', display_name: 'TSMC Arizona, Phoenix', address: { country_code: 'us' }, extratags: {} },
+    { osm_type: 'node', osm_id: 4, lat: '25.0', lon: '121.5', category: 'office', type: 'company', name: 'TSMC headquarters', display_name: 'TSMC HQ', address: { country_code: 'tw' }, extratags: {} },
+    { osm_type: 'node', osm_id: 5, lat: '25.1', lon: '121.6', category: 'highway', type: 'bus_stop', name: 'TSMC', display_name: 'TSMC bus stop', address: { country_code: 'tw' }, extratags: {} },
+    { osm_type: 'relation', osm_id: 6, lat: 'x', lon: '1', category: 'man_made', type: 'works', name: 'no coordinates', display_name: 'no coordinates', extratags: {} },
+  ];
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url); hits.push({ u, headers: opts.headers || {} });
+    if (u.includes('nominatim.openstreetmap.org/search')) {
+      if (mode === 'busy') return new Response('Bandwidth limit exceeded', { status: 509 });
+      if (mode === 'down') throw new Error('connect timeout');
+      return new Response(JSON.stringify(osm), { status: 200 });
+    }
+    return prev(url, opts);
+  };
+  const live = [...store.keys()].filter(k => k.startsWith('code:')).map(k => JSON.parse(store.get(k))).find(g => g && g.code && !g.paused);
+  const ask = (body) => worker.fetch(new Request(W + '/world', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), env);
+  let rr = await ask({ code: 'ZZZZZ-ZZZZZ', q: 'TSMC' }); t('world: refused without a live code (the geocoder is a shared resource)', rr.status === 401);
+  rr = await ask({ code: live.code, q: 'a' }); t('world: a one-letter phrase is refused', rr.status === 400);
+  rr = await ask({ code: live.code, q: 'TSMC"]; out;' }); t('world: query characters are refused, so the phrase is only ever a plain search term', rr.status === 400);
+  rr = await ask({ code: live.code, q: '  tsmc   fab ' }); let wj = await rr.json();
+  t('world: a company search answers from OpenStreetMap with compact features', rr.status === 200 && wj.count === 2 && wj.features[0].n === 'TSMC Fab 12' && wj.features[0].c === 'TW' && wj.features[0].w === 'https://www.tsmc.com' && wj.features[0].q === 'Q713418' && Math.abs(wj.features[0].la - 24.774) < 0.001);
+  t('world: the same plant drawn twice (site and works polygon) is one feature; the better-tagged copy wins', wj.features.filter(f => f.n === 'TSMC Fab 12').length === 1 && wj.features.find(f => f.n === 'TSMC Fab 12').p === 'semiconductor');
+  t('world: offices, bus stops and objects without coordinates are dropped; a factory building is kept', !wj.features.some(f => /headquarters|bus/.test(f.n)) && !wj.features.some(f => f.n === 'no coordinates') && wj.features.some(f => f.n === 'TSMC Arizona' && f.c === 'US'));
+  const sent = hits.filter(h => h.u.includes('nominatim')).pop();
+  t('world: the phrase is sent as a plain query, identified, English, capped, de-duplicated, with tags and address', /q=tsmc%20fab/.test(sent.u) && /limit=50/.test(sent.u) && /extratags=1/.test(sent.u) && /addressdetails=1/.test(sent.u) && /dedupe=1/.test(sent.u) && /PerceptFolio-world/.test(sent.headers['User-Agent']) && sent.headers['Accept-Language'] === 'en');
+  t('world: labelled as OpenStreetMap via Nominatim, community-mapped and incomplete', /OpenStreetMap contributors/.test(wj.source) && /Nominatim/.test(wj.source) && /incomplete/.test(wj.source) && wj.cached === false);
+  const n1 = hits.filter(h => h.u.includes('nominatim')).length; rr = await ask({ code: live.code, q: 'TSMC fab' }); wj = await rr.json();
+  t('world: cached for a week, case-insensitively', hits.filter(h => h.u.includes('nominatim')).length === n1 && wj.cached === true);
+  t('world: never more than one geocoder call a second across everyone (a timestamp in KV)', store.has('nominatim:last') && /nominatim:last/.test(read('worker.js')));
+  mode = 'busy'; rr = await ask({ code: live.code, q: 'Foxconn' }); wj = await rr.json();
+  t('world: a rate-limited geocoder is a plain 503 that says so', rr.status === 503 && /rate-limiting/.test(wj.error));
+  mode = 'down'; rr = await ask({ code: live.code, q: 'Foxconn' }); wj = await rr.json();
+  t('world: an unreachable geocoder is a 503, not a crash', rr.status === 503 && /did not answer/.test(wj.error));
+  mode = 'ok'; rr = await ask({ code: live.code, q: 'Foxconn' }); wj = await rr.json();
+  t('world: a failure is never cached; the next try asks again', rr.status === 200 && wj.cached === false);
+  globalThis.fetch = prev;
+}
 console.log(failed ? `\n${failed} FAILED` : '\nALL BILLING CHECKS PASSED');
 process.exit(failed ? 1 : 0);
