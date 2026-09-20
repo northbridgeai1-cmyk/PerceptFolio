@@ -26,5 +26,8 @@ for (const f of ['icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.svg'
 
 /* SPA routes: Pages serves index.html for unknown paths only with a _redirects rule. */
 /* Legacy static paths from the GitHub Pages era keep working. */
-fs.writeFileSync(path.join(out, '_redirects'), ['/privacy/ /privacy 301', '/terms/ /terms 301', '/thanks.html /thanks 301', ''].join('\n'));
+/* One origin. An account lives in the browser's storage for the exact address, so www.perceptfolio.com
+   and perceptfolio.com would be two different terminals with two different accounts; everyone lands
+   on the bare domain. */
+fs.writeFileSync(path.join(out, '_redirects'), ['https://www.perceptfolio.com/* https://perceptfolio.com/:splat 301', '/privacy/ /privacy 301', '/terms/ /terms 301', '/thanks.html /thanks 301', ''].join('\n'));
 console.log('assembled', out, ':', fs.readdirSync(out).join(' '));

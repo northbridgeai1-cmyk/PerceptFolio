@@ -82,6 +82,14 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
+  /* One origin. An account lives in the browser's storage for the exact address, so www and the
+     bare domain would be two terminals with two accounts. Everyone lands on the bare domain;
+     this runs before the gate because Functions run before _redirects. */
+  if (url.hostname === 'www.perceptfolio.com') {
+    url.hostname = 'perceptfolio.com';
+    return Response.redirect(url.toString(), 301);
+  }
+
   if (!GATED.some(re => re.test(path))) {
     return withHeaders(await next(), path, env);
   }
