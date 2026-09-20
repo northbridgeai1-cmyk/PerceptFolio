@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-09-20T17:39:27.001Z",
+ "generatedAt": "2026-09-20T18:10:52.017Z",
  "source": "OpenStreetMap contributors (ODbL 1.0) and Wikidata (CC0). Community-mapped; incomplete by nature.",
  "countries": {
   "FJ": "Fiji",
@@ -316,9 +316,9 @@
     "mill",
     "mills"
    ],
-   "count": 3000,
+   "count": 4427,
    "asOf": "2026-09-20",
-   "saturated": true,
+   "saturated": false,
    "partial": false,
    "file": "steel.json"
   },
@@ -365,9 +365,9 @@
     "ethylene",
     "cracker"
    ],
-   "count": 3000,
+   "count": 3874,
    "asOf": "2026-09-20",
-   "saturated": true,
+   "saturated": false,
    "partial": false,
    "file": "refineries.json"
   },
@@ -391,9 +391,9 @@
     "paint",
     "gases"
    ],
-   "count": 3000,
+   "count": 3411,
    "asOf": "2026-09-20",
-   "saturated": true,
+   "saturated": false,
    "partial": false,
    "file": "chemicals.json"
   },
@@ -483,9 +483,9 @@
     "colocation",
     "servers"
    ],
-   "count": 3000,
+   "count": 4049,
    "asOf": "2026-09-20",
-   "saturated": true,
+   "saturated": false,
    "partial": false,
    "file": "datacenters.json"
   },
@@ -520,9 +520,9 @@
     "lime",
     "bricks"
    ],
-   "count": 3000,
+   "count": 3366,
    "asOf": "2026-09-20",
-   "saturated": true,
+   "saturated": false,
    "partial": false,
    "file": "cement.json"
   }

@@ -31,6 +31,9 @@ What was taken from it and what was not:
   makes, `c` ISO country, `w` website (http(s) only), `q` Wikidata QID, `t` owner's ticker when
   Wikidata has it, `s` source (`o` OSM, `w` Wikidata, `ow` both). Plus `provenance` (what each source
   answered), `byCountry`, `asOf`, `saturated`, `partial`.
+- `../.github/workflows/world-refresh.yml` — runs the extractor on the first of every month (or on
+  demand from the Actions tab, optionally for a few industries) and opens a pull request with the
+  refreshed `data/`, counts and partial flags in the body, so a person looks before it ships.
 - `../scripts/world-extract.mjs` — regenerates `data/`. Run it occasionally (it keeps layers younger
   than seven days unless `--force`). It pulls the OSM base sets (every named `man_made=works`,
   `industrial=*` and `landuse=industrial` object) once as CSV into `.cache/` (gitignored, kept a month), asks the small

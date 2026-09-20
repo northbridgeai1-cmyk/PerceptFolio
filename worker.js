@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-20.1';
+const WORKER_VERSION = '2026-09-20.2';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -464,7 +464,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -1658,6 +1658,8 @@ async function handleBilling(request, env, url) {
     } catch (e) { /* optional */ }
     const m = (metric && metric.metric) || {};
     const rec = Array.isArray(recs) && recs[0] ? recs[0] : null;
+    /* The free feed returns one row per month; the last twelve make the counts a trend instead of a snapshot. */
+    const history = Array.isArray(recs) ? recs.slice(0, 12).filter(r => r && r.period).map(r => ({ period: r.period, strongBuy: r.strongBuy | 0, buy: r.buy | 0, hold: r.hold | 0, sell: r.sell | 0, strongSell: r.strongSell | 0 })) : [];
     const facts = {
       symbol: sym, name: profile && profile.name || sym, industry: profile && profile.finnhubIndustry || null, marketCap: profile && profile.marketCapitalization || null, ipo: profile && profile.ipo || null, web: profile && profile.weburl || null,
       pe: m.peTTM ?? m.peBasicExclExtraTTM ?? null, forwardPe: m.forwardPE ?? null, pb: m.pbAnnual ?? null, ps: m.psTTM ?? null, evEbitda: m['evEbitdaTTM'] ?? null,
@@ -1666,6 +1668,7 @@ async function handleBilling(request, env, url) {
       debtEquity: m['totalDebt/totalEquityAnnual'] ?? null, currentRatio: m.currentRatioAnnual ?? null, divYield: m.dividendYieldIndicatedAnnual ?? null, beta: m.beta ?? null,
       high52: m['52WeekHigh'] ?? null, low52: m['52WeekLow'] ?? null,
       analysts: rec ? { period: rec.period, strongBuy: rec.strongBuy, buy: rec.buy, hold: rec.hold, sell: rec.sell, strongSell: rec.strongSell } : null,
+      analystsHistory: history,
       targetMean: target, recommendationMean: recMean,
     };
     let lenses = null, note = null;
@@ -1711,6 +1714,35 @@ async function handleBilling(request, env, url) {
     const result = { q, count: features.length, saturated: r.results.length >= WORLD_CAP, asOf: new Date().toISOString().slice(0, 10), source: 'OpenStreetMap contributors, ODbL 1.0, via Nominatim. Community-mapped; incomplete by nature.', features, cached: false };
     await env.PF_SYNC.put(key, JSON.stringify(result), { expirationTtl: 7 * 86400 });
     return json(result, 200, env);
+  }
+
+  /* ---- POST /world/batch {code, qs:[...]} : every plant of every company you hold, one request ----
+     Twelve holdings would be twelve /world calls and trip the per-IP limiter on the eleventh, so
+     the terminal sends the names together. Each name is validated exactly as /world does, served
+     from the same week-long cache when it can be, and asked of Nominatim one call a second when it
+     cannot, so a first look at twelve unseen names takes about twelve seconds and the second look
+     is instant. Twenty names at most; a name that fails simply comes back empty and says so. */
+  if (url.pathname === '/world/batch' && request.method === 'POST') {
+    if (await tooMany(env, request, '/world/batch', 5)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    if (!(await grantIsLive(env, code))) return json({ error: 'A live access code is required.' }, 401, env);
+    const raw = Array.isArray(body.qs) ? body.qs.slice(0, 20) : [];
+    const qs = [...new Set(raw.map(q => clean(q, 40).replace(/\s+/g, ' ')).filter(q => q.length >= 2 && /^[A-Za-z0-9&'.\- ]{2,40}$/.test(q)))];
+    if (!qs.length) return json({ error: 'Send up to twenty company names.' }, 400, env);
+    const results = {};
+    for (const q of qs) {
+      const key = 'world:q:' + q.toLowerCase();
+      const cached = await env.PF_SYNC.get(key);
+      if (cached) { const c = JSON.parse(cached); results[q] = { count: c.count, features: c.features, cached: true }; continue; }
+      const r = await nominatim(env, q);
+      if (!r.ok) { results[q] = { count: 0, features: [], error: r.error }; continue; }
+      const features = worldFeatures(r.results);
+      const result = { q, count: features.length, saturated: r.results.length >= WORLD_CAP, asOf: new Date().toISOString().slice(0, 10), source: 'OpenStreetMap contributors, ODbL 1.0, via Nominatim. Community-mapped; incomplete by nature.', features, cached: false };
+      await env.PF_SYNC.put(key, JSON.stringify(result), { expirationTtl: 7 * 86400 });
+      results[q] = { count: features.length, features, cached: false };
+    }
+    return json({ asOf: new Date().toISOString().slice(0, 10), source: 'OpenStreetMap contributors, ODbL 1.0, via Nominatim. Community-mapped; incomplete by nature.', results }, 200, env);
   }
 
   /* ---- GET /quote?plan=&seats= : the suggested price, for admin's Send quote draft ---- */
