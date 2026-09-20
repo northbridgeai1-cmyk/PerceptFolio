@@ -1705,7 +1705,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
      industry layers) and the worker's /world route (company search). Cesium is loaded the first time
      the tab opens, from /vendor/cesium, so nobody who never opens it pays for it. -->
 <div id="tab-world" class="tabs-hidden">
-  <div class="card">
+  <div class="card wd-intro">
     <h3>Where the plants are</h3>
     <p class="muted" style="margin-bottom:12px;max-width:72ch">An industry or a company, and the globe shows every plant OpenStreetMap knows: fabs, cell plants, refineries, shipyards, mines. Community-mapped, so incomplete by nature; the count and the date say how much is known.</p>
     <div class="wd-form">
@@ -15564,8 +15564,46 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 #tab-world .wd-kv .mono{font-family:var(--mono);font-size:12px}
 #tab-world .wd-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 #tab-world .wd-links a{text-decoration:none;display:inline-flex;align-items:center;padding:8px 12px}
-@media (max-width:960px){#tab-world .wd-stage{grid-template-columns:1fr}#tab-world .wd-globe-wrap{min-height:440px}}
-@media (max-width:600px){#tab-world .wd-globe-wrap{min-height:340px}#tab-world .wd-form input{flex-basis:100%}}
+/* Phones (768 and under, where the terminal's own phone layout lives): the globe is what you came
+   for, so it sits right under the box; the fifteen chips become one rail you swipe, not a column
+   that pushes the globe off the screen; the explanation moves under the chips; the panel follows
+   the globe. Chips grow to a thumb's height on a coarse pointer. */
+@media (max-width:768px){
+  #tab-world .wd-intro{display:flex;flex-direction:column}
+  #tab-world .wd-intro>p.muted{order:9;margin:12px 0 0!important;font-size:12.5px}
+  #tab-world .wd-form input{flex:1 1 0;min-width:0}
+  #tab-world .wd-form .btn{flex:none}
+  #tab-world .wd-form #wdStatus{flex-basis:100%}
+  #tab-world .wd-chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+  #tab-world .wd-chips::-webkit-scrollbar{display:none}
+  #tab-world .wd-chip{flex:none;scroll-snap-align:start}
+  #tab-world .wd-stage{grid-template-columns:1fr;gap:12px}
+  #tab-world .wd-globe-wrap{min-height:min(62vh,480px)}
+  #tab-world .wd-idle{padding:14px}
+  #tab-world .wd-idle .mv-empty{padding:12px 14px}
+  #tab-world .wd-side{gap:10px}
+}
+@media (pointer:coarse){#tab-world .wd-chip{min-height:40px;padding-left:12px;padding-right:13px}}
+/* The foldable band. An unfolded iPhone Duo is 890px wide with a crease down the centre and Safari
+   exposes neither (the landing page uses the same band). The sidebar becomes the rail here, so the
+   content's centre lands within a wide gutter of the crease; two-column grids keep their columns
+   with that gutter on the crease; the World stage puts the globe on the left leaf and the panel on
+   the right, which is what a hinge is for. A rotated unfolded Duo (626) and the folded one (466)
+   fall into the phone layout above. */
+@media (max-width:960px) and (min-width:781px){
+  #sidebar{width:52px!important;padding:8px 4px;padding-left:calc(4px + env(safe-area-inset-left))}
+  #sidebar .lbl{display:none}
+  #sidebar nav button{justify-content:center;padding:11px 0}
+  #sidebar nav button .ico{font-size:18px}
+  #sideToggle,.hd-where,.hd-div{display:none}
+  .nav-sep{margin:6px 8px}
+  .badge{position:absolute;top:5px;right:5px;margin-left:0}
+  .grid-2{gap:60px}
+  .grid-3{grid-template-columns:1fr 1fr;gap:60px}
+  #tab-world .wd-stage{grid-template-columns:1fr 1fr;gap:60px;align-items:start}
+  #tab-world .wd-globe-wrap{min-height:min(72vh,560px)}
+  #tab-world .wd-side{position:sticky;top:calc(72px + env(safe-area-inset-top))}
+}
 </style>
 <script>
 /* World: every plant OpenStreetMap knows for an industry or a company, on a CesiumJS globe.
