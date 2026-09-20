@@ -20,30 +20,39 @@ cd "$(dirname "$0")/.."
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 
 say "1/6 Modal CLI"
-if ! command -v modal >/dev/null 2>&1; then
-  python3 -m pip install --user --quiet modal
-  export PATH="$HOME/.local/bin:$HOME/Library/Python/3.9/bin:$HOME/Library/Python/3.11/bin:$HOME/Library/Python/3.12/bin:$HOME/Library/Python/3.13/bin:$PATH"
+# Modal supports Python 3.9 to 3.13, and its cbor2 6.x dependency is Rust-compiled with no wheel
+# for every Mac, so pip asks for a Rust compiler. cbor2 5.x builds without one and Modal accepts
+# it. uv runs Modal on 3.13 with that pin in one line and keeps it out of the system Python; a
+# plain python3.13/3.12/3.11 works too; failing both, brew installs uv.
+MODAL=""
+if command -v uv >/dev/null 2>&1; then
+  MODAL="uv tool run --python 3.13 --with cbor2<6 modal"
+else
+  for py in python3.13 python3.12 python3.11 python3.10; do
+    if command -v "$py" >/dev/null 2>&1; then "$py" -m pip install --user --quiet "cbor2<6" modal && MODAL="$py -m modal" && break; fi
+  done
 fi
-command -v modal >/dev/null 2>&1 || { echo "modal is installed but not on PATH; open a new shell and run this again"; exit 1; }
-modal --version
+if [ -z "$MODAL" ] && command -v brew >/dev/null 2>&1; then brew install uv >/dev/null 2>&1 && MODAL="uv tool run --python 3.13 --with cbor2<6 modal"; fi
+[ -n "$MODAL" ] || { echo "No supported Python (3.10 to 3.13) and no uv or Homebrew found. Install uv (https://docs.astral.sh/uv/) and run this again."; exit 1; }
+$MODAL --version
 
 say "2/6 Modal sign-in"
 if [ ! -f "$HOME/.modal.toml" ]; then
   echo "A browser window will open. Sign in (or create the account) and come back here."
-  modal setup
+  $MODAL setup
 fi
 
 say "3/6 the shared token"
 TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
-if modal secret list 2>/dev/null | grep -q '^kronos-token\b\|kronos-token'; then
-  modal secret create kronos-token "KRONOS_TOKEN=$TOKEN" --force >/dev/null
+if $MODAL secret list 2>/dev/null | grep -q '^kronos-token\b\|kronos-token'; then
+  $MODAL secret create kronos-token "KRONOS_TOKEN=$TOKEN" --force >/dev/null
 else
-  modal secret create kronos-token "KRONOS_TOKEN=$TOKEN" >/dev/null
+  $MODAL secret create kronos-token "KRONOS_TOKEN=$TOKEN" >/dev/null
 fi
 echo "stored on Modal as kronos-token"
 
 say "4/6 deploy kronos/app.py (first run builds the image and downloads the weights; a few minutes)"
-modal deploy kronos/app.py | tee /tmp/kronos-deploy.log | grep -v -i "token" || true
+$MODAL deploy kronos/app.py | tee /tmp/kronos-deploy.log | grep -v -i "token" || true
 URL="$(grep -o 'https://[a-z0-9.-]*modal\.run[^ ]*' /tmp/kronos-deploy.log | head -1)"
 [ -n "$URL" ] || { echo "could not find the endpoint URL in Modal's output; see /tmp/kronos-deploy.log"; exit 1; }
 echo "endpoint: $URL"
