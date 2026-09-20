@@ -1285,7 +1285,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('the intro paragraphs are folded into one-line asides, none left standing', (term.match(/class="aside about"/g) || []).length === 16 && !/<p class="muted" style="margin-bottom:12px/.test(term));
   t('five years of history: the worker serves 5y, the device keeps it outside the synced log, charts and windows read it', /range=5y/.test(worker) && /HKEY='pf_hist_v1'/.test(term) && /window\.longSeries=function\(sym\)/.test(term) && /longSeries\(sym\)\)\|\|\(D\.priceLog\|\|\{\}\)\[sym\]/.test(term) && /histFill\(sym\);   \/\* five years/.test(term) && /HMAX=120/.test(term));
   t('the whole listing is built in: /universe daily from the worker key, name search in the palette, a whole-market scan in the Screener', /url\.pathname === '\/universe'/.test(worker) && /stock\/symbol\?exchange=US/.test(worker) && /type === 'Common Stock'/.test(worker) && /window\.universeMatches=function/.test(term) && /universeMatches\(raw,6\)/.test(term) && /window\.scanUniverse=function/.test(term) && /onclick="scanUniverse\(\)"/.test(term) && /startScreener\(givenList\)/.test(term));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v113/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v114/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
