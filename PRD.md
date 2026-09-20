@@ -417,8 +417,10 @@ the Worker already uses, labelled "model", weights rough, editable, never over a
 touched (`/map/prefill`, cached thirty days); **Today's heat switches** between the holdings and
 the market (the Dow 30 and twelve mega-caps); Calendar effects sits under The Move; the Top
 button is round with an arrow. Found on the way: the Anthropic account behind `AI_API_KEY` has no
-credit, so the six lenses had never produced a reading live; both routes now say so in the panel
-and no longer cache an empty day. Adding credit switches both on.
+credit, so the six lenses had never produced a reading live. Fixed the same night without
+Anthropic: Cloudflare's own Workers AI (the `AI` binding, free daily allowance) answers whenever
+Anthropic cannot, for the lenses, the pre-fill and the news summary; Anthropic takes over again
+the moment its account has credit.
 
 Coverage is what the community has drawn. Fabs on Wikidata skew to the former Soviet Union; OSM
 carries TSMC, Samsung and Intel because people drew them. The page says "community-mapped,
