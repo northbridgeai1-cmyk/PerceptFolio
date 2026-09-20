@@ -58,6 +58,11 @@ window.PF_ES = {
   'Analyze a stock': 'Analizar una acción', 'Run Quality + Price Check': 'Comprobar calidad y precio', 'Compare two stocks': 'Comparar dos acciones', 'Compare': 'Comparar', 'Nothing analysed yet.': 'Nada analizado todavía.',
   'Sign out': 'Cerrar sesión', 'Sign in': 'Iniciar sesión', 'Create account': 'Crear cuenta', 'Password': 'Contraseña', 'Show': 'Mostrar', 'Hide': 'Ocultar', 'Cancel': 'Cancelar', 'Save': 'Guardar', 'Delete': 'Eliminar', 'Close': 'Cerrar', 'Export': 'Exportar', 'Import': 'Importar',
   'Today': 'Hoy', 'Yesterday': 'Ayer', 'Tomorrow': 'Mañana',
+  /* Today's heat (Market) */
+  'Today’s heat': 'El calor de hoy', 'Your holdings, sized by value, coloured by the day’s move': 'Tus posiciones, por tamaño según su valor y color según el movimiento del día', 'Sectors': 'Sectores',
+  'Nothing priced yet. Add holdings, then Refresh data.': 'Nada con precio todavía. Añade posiciones y luego Actualizar datos.',
+  'Connect your data key, then Refresh data, and the holdings colour in.': 'Conecta tu clave de datos, luego Actualizar datos, y las posiciones se colorean.',
+  'Technology': 'Tecnología', 'Financials': 'Finanzas', 'Health care': 'Salud', 'Discretionary': 'Consumo discrecional', 'Staples': 'Consumo básico', 'Energy': 'Energía', 'Industrials': 'Industria', 'Communication': 'Comunicación', 'Utilities': 'Servicios públicos', 'Real estate': 'Inmobiliario', 'Materials': 'Materiales',
   /* World: the globe of plants */
   'World': 'Mundo', 'Where the plants are': 'Dónde están las plantas', 'Show': 'Mostrar', 'Industries': 'Industrias',
   'An industry or a company, and the globe shows every plant OpenStreetMap knows: fabs, cell plants, refineries, shipyards, mines. Community-mapped, so incomplete by nature; the count and the date say how much is known.': 'Una industria o una empresa, y el globo muestra cada planta que OpenStreetMap conoce: fábricas de chips, plantas de celdas, refinerías, astilleros, minas. Está cartografiado por la comunidad, así que es incompleto por naturaleza; el recuento y la fecha dicen cuánto se sabe.',
@@ -75,6 +80,7 @@ window.PF_ES = {
   'Nothing drawn on OpenStreetMap under that name. Try the company’s short name, or an industry above.': 'No hay nada dibujado en OpenStreetMap con ese nombre. Prueba el nombre corto de la empresa o una industria arriba.',
 };
 window.PF_ES_RX = [
+  [/^Sector tiles are the SPDR sector ETFs, quoted when this tab opens and held for five minutes\.(.*)$/, 'Las casillas de sectores son los ETF sectoriales SPDR, cotizados al abrir esta pestaña y guardados cinco minutos.$1'], [/^Sectors need the data key\.(.*)$/, 'Los sectores necesitan la clave de datos.$1'],
   [/^(\d+) plants · (\d+) countries · OpenStreetMap as of (.+)$/, '$1 plantas · $2 países · OpenStreetMap al $3'], [/^Loading (.+)…$/, 'Cargando $1…'], [/^Asking OpenStreetMap about (.+)…$/, 'Preguntando a OpenStreetMap por $1…'],
   [/^Good morning\b/, 'Buenos días'], [/^Good afternoon\b/, 'Buenas tardes'], [/^Good evening\b/, 'Buenas noches'],
   [/^your record:/, 'tu historial:'], [/^(\d+) of (\d+) right/, '$1 de $2 aciertos'],

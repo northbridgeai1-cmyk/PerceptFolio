@@ -15758,5 +15758,99 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='world'){ loadIndex().catch(function(){ status('The industry list did not load.'); }); if(viewer){ viewer.resize(); viewer.scene.requestRender(); } } return r; }; }
 })();
 </script>
+<style id="v2-heat">
+/* Today's heat: a treemap of the holdings sized by value and coloured by the day's move, and the
+   eleven sectors as equal tiles. Colour runs from the terminal's red to its green through the
+   panel colour, so a flat day looks flat rather than faintly alarmed. */
+#pfHeat .ht-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:14px;margin-top:12px}
+#pfHeat .ht-map{position:relative;height:260px;border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--border)}
+#pfHeat .ht-tile{position:absolute;box-sizing:border-box;border:1px solid var(--bg);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;overflow:hidden;cursor:pointer;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);transition:filter .12s}
+#pfHeat .ht-tile:hover{filter:brightness(1.12)}
+#pfHeat .ht-tile b{font:600 13px/1 var(--mono);letter-spacing:.02em}
+#pfHeat .ht-tile span{font:500 11.5px/1 var(--mono);opacity:.92}
+#pfHeat .ht-tile.sm b{font-size:11px}
+#pfHeat .ht-tile.xs b,#pfHeat .ht-tile.sm span,#pfHeat .ht-tile.xs span{display:none}
+#pfHeat .ht-sectors{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:60px;gap:4px}
+#pfHeat .ht-sec{border-radius:8px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;cursor:pointer;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);transition:filter .12s;padding:4px}
+#pfHeat .ht-sec:hover{filter:brightness(1.12)}
+#pfHeat .ht-sec b{font:600 12px/1 var(--mono)}
+#pfHeat .ht-sec span{font:500 11px/1 var(--mono);opacity:.92}
+#pfHeat .ht-sec small{font-size:10px;line-height:1;opacity:.85;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#pfHeat .ht-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+#pfHeat .ht-scale{display:inline-flex;align-items:center;gap:6px;font:11px/1 var(--mono);color:var(--muted)}
+#pfHeat .ht-scale i{display:inline-block;width:56px;height:8px;border-radius:4px;background:linear-gradient(90deg,#e5534b,var(--panel2),#2ea043)}
+#pfHeat .ht-note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+@media (max-width:768px){#pfHeat .ht-grid{grid-template-columns:1fr}#pfHeat .ht-map{height:220px}#pfHeat .ht-sectors{grid-template-columns:repeat(3,1fr);grid-auto-rows:56px}}
+@media (max-width:960px) and (min-width:781px){#pfHeat .ht-grid{grid-template-columns:1fr 1fr;gap:60px}}
+</style>
+<script>
+/* Today's heat, in Market: the holdings as a treemap (size = value, colour = day change, from the
+   prices the last refresh already fetched) and the eleven S&P sectors through their SPDR ETFs
+   (eleven quotes, fetched when the tab opens, held for five minutes). Bloomberg's heatmaps, on
+   free quotes. Colour is the day's percentage on a scale that saturates at three percent. */
+(function(){
+  var SECTORS=[['XLK','Technology'],['XLF','Financials'],['XLV','Health care'],['XLY','Discretionary'],['XLP','Staples'],['XLE','Energy'],['XLI','Industrials'],['XLC','Communication'],['XLU','Utilities'],['XLRE','Real estate'],['XLB','Materials']];
+  var cache={at:0,quotes:{}};
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function mix(a,b,t){ return [0,1,2].map(function(i){ return Math.round(a[i]+(b[i]-a[i])*t); }); }
+  var RED=[229,83,75], GREEN=[46,160,67];
+  function panel(){ var s=getComputedStyle(document.body).getPropertyValue('--panel2').trim(); var m=/^#([0-9a-f]{6})$/i.exec(s); return m?[parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4,6),16)]:[30,33,40]; }
+  function colour(pct){ if(pct==null||!isFinite(pct))return 'rgb('+panel().join(',')+')'; var t=Math.min(1,Math.abs(pct)/3); var c=mix(panel(),pct>=0?GREEN:RED,0.25+0.75*t); return 'rgb('+c.join(',')+')'; }
+  /* Squarified treemap (Bruls, Huizing, van Wijk): rows of tiles whose aspect ratios stay close to one. */
+  function treemap(items,W,H){
+    var total=items.reduce(function(s,i){return s+i.v;},0); if(!total||!W||!H)return [];
+    var scale=W*H/total, rects=[], x=0,y=0,w=W,h=H, row=[];
+    var areas=items.map(function(i){return {a:i.v*scale,item:i};});
+    function worst(r,len){ var s=0,mx=0,mn=Infinity; r.forEach(function(i){s+=i.a; if(i.a>mx)mx=i.a; if(i.a<mn)mn=i.a;}); return Math.max(len*len*mx/(s*s), s*s/(len*len*mn)); }
+    function lay(r){ var s=r.reduce(function(a,i){return a+i.a;},0); if(w>=h){ var rw=s/h, cy=y; r.forEach(function(i){ var rh=i.a/rw; rects.push({x:x,y:cy,w:rw,h:rh,item:i.item}); cy+=rh; }); x+=rw; w-=rw; } else { var rh2=s/w, cx=x; r.forEach(function(i){ var rw2=i.a/rh2; rects.push({x:cx,y:y,w:rw2,h:rh2,item:i.item}); cx+=rw2; }); y+=rh2; h-=rh2; } }
+    areas.forEach(function(a){ var len=Math.min(w,h); if(!row.length||worst(row.concat([a]),len)<=worst(row,len))row.push(a); else { lay(row); row=[a]; } });
+    if(row.length)lay(row);
+    return rects;
+  }
+  function card(){
+    var host=document.getElementById('tab-market'); if(!host)return null;
+    var c=document.getElementById('pfHeat');
+    if(!c){ c=document.createElement('div'); c.id='pfHeat'; c.className='card'; c.style.marginTop='16px'; var first=host.querySelector('.card'); if(first&&first.nextSibling)host.insertBefore(c,first.nextSibling); else host.appendChild(c); }
+    return c;
+  }
+  function pctText(p){ return p==null||!isFinite(p)?'–':(p>0?'+':'')+p.toFixed(2)+'%'; }
+  function render(){
+    var c=card(); if(!c)return;
+    var hold=((typeof D!=='undefined'&&D&&D.holdings)||[]).filter(function(h){ return h&&h.sym&&isFinite(h.shares)&&h.shares>0&&isFinite(h.price)&&h.price>0; }).map(function(h){ return {sym:h.sym,v:h.shares*h.price,pct:isFinite(h.dayPct)?h.dayPct:null}; }).sort(function(a,b){return b.v-a.v;});
+    var hasKey=typeof hasMarketData==='function'&&hasMarketData();
+    c.innerHTML='<div class="ht-head"><h3 style="margin:0">Today’s heat</h3><span class="ht-scale">−3%<i></i>+3%</span></div>'+
+      '<div class="ht-grid"><div><div class="muted" style="margin-bottom:6px">Your holdings, sized by value, coloured by the day’s move</div><div class="ht-map" id="htMap"></div></div>'+
+      '<div><div class="muted" style="margin-bottom:6px">Sectors</div><div class="ht-sectors" id="htSec"></div></div></div>'+
+      '<div class="ht-note" id="htNote"></div>';
+    var map=document.getElementById('htMap'), note=document.getElementById('htNote');
+    if(!hold.length){ map.innerHTML='<div class="empty" style="padding:24px 12px">'+(hasKey?'Nothing priced yet. Add holdings, then Refresh data.':'Connect your data key, then Refresh data, and the holdings colour in.')+'</div>'; }
+    else {
+      var W=map.clientWidth||600, H=map.clientHeight||260;
+      treemap(hold,W,H).forEach(function(r){
+        var d=document.createElement('div'); d.className='ht-tile'+(r.w<64||r.h<40?' xs':(r.w<90||r.h<52?' sm':'')); d.style.cssText='left:'+r.x.toFixed(1)+'px;top:'+r.y.toFixed(1)+'px;width:'+r.w.toFixed(1)+'px;height:'+r.h.toFixed(1)+'px;background:'+colour(r.item.pct);
+        d.title=r.item.sym+' · '+(typeof fmt$==='function'?fmt$(r.item.v):r.item.v.toFixed(0))+' · '+pctText(r.item.pct); d.innerHTML='<b>'+esc(r.item.sym)+'</b><span>'+pctText(r.item.pct)+'</span>';
+        d.onclick=function(){ if(typeof analyzeStock==='function')analyzeStock(r.item.sym); };
+        map.appendChild(d);
+      });
+    }
+    var sec=document.getElementById('htSec');
+    SECTORS.forEach(function(s){ var q=cache.quotes[s[0]]; var d=document.createElement('div'); d.className='ht-sec'; d.style.background=colour(q?q.dp:null); d.title=s[1]+' ('+s[0]+') · '+pctText(q?q.dp:null); d.innerHTML='<b>'+s[0]+'</b><span>'+pctText(q?q.dp:null)+'</span><small>'+esc(s[1])+'</small>'; d.onclick=function(){ if(typeof analyzeStock==='function')analyzeStock(s[0]); }; sec.appendChild(d); });
+    var unpriced=hold.filter(function(h){return h.pct==null;}).length;
+    note.textContent=(hasKey?'Sector tiles are the SPDR sector ETFs, quoted when this tab opens and held for five minutes.':'Sectors need the data key.')+(unpriced?' '+unpriced+' holding'+(unpriced>1?'s have':' has')+' a price but no day change yet; Refresh data fills it in.':'')+' Colour saturates at three percent either way; click a tile to analyze it.';
+  }
+  function load(){
+    render();
+    if(!(typeof hasMarketData==='function'&&hasMarketData()))return;
+    if(Date.now()-cache.at<5*60*1000)return;
+    cache.at=Date.now();
+    /* Eleven quotes, one after another, well inside the free tier's sixty a minute. */
+    (function next(i){ if(i>=SECTORS.length){ render(); return; } var sym=SECTORS[i][0];
+      (typeof getQuote==='function'?getQuote(sym):Promise.reject()).then(function(q){ cache.quotes[sym]=q; }).catch(function(){}).then(function(){ next(i+1); }); })(0);
+  }
+  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='market')setTimeout(load,30); return r; }; }
+  window.addEventListener('resize',function(){ if(document.getElementById('pfHeat')&&document.getElementById('tab-market')&&!document.getElementById('tab-market').classList.contains('tabs-hidden'))render(); });
+  window.renderHeat=load;
+})();
+</script>
 </body>
 </html>

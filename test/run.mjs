@@ -1275,7 +1275,8 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('the landing page keeps its own foldable band at the same widths', /@media \(max-width:960px\) and \(min-width:781px\)/.test(read('index.html')) && /max-width: ?960px\) and \(min-width: ?781px/.test(read('site/src/index.css')));
   t('the terminal viewport meta covers the notch and resizes for the keyboard', /viewport-fit=cover/.test(term) && /interactive-widget=resizes-content/.test(term));
   t('the layers are complete: fifteen, none partial, every plant named and placed or honestly unplaced', (() => { const idx2 = JSON.parse(read('world/data/index.json')); return idx2.industries.length === 15 && idx2.industries.every(i => !i.partial && i.count >= 100); })());
-  t('sw.js was bumped for the new terminal', /perceptfolio-v110/.test(sw));
+  t('heatmaps: holdings as a squarified treemap by value and day change, sectors as the eleven SPDR ETFs, in Market, free quotes only', /id="v2-heat"/.test(term) && /function treemap\(items,W,H\)/.test(term) && /\['XLK','Technology'\]/.test(term) && /Math\.min\(1,Math\.abs\(pct\)\/3\)/.test(term) && /if\(t==='market'\)setTimeout\(load,30\)/.test(term) && !/finnhub\.io\/api\/v1\/stock\/candle/.test(term.slice(term.indexOf('id="v2-heat"'))));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v111/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 

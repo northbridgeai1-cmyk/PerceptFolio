@@ -60,7 +60,7 @@ const only = flag('only').split(',').filter(Boolean);
 const source = flag('source') || 'both';
 const force = args.includes('--force');
 const MAX_AGE_DAYS = 7;
-const CAP = 3000;
+const CAP = 5000;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);

@@ -346,7 +346,7 @@ Needs data that must be bought, so specified but not built:
 - **Pre-filled buyer and supplier maps** (Bloomberg SPLC): Finnhub's supply-chain endpoint is paid-tier; no free source exists. The Map tab stays user-entered until a licence is bought.
 - **ESG** scores: paid on every provider.
 - **A world map of facilities** ("smart chip factories"): this line was wrong. OpenStreetMap and Wikidata carry plants with coordinates, and God's Eye View shows how to use them properly. Built as M9, §23.
-- **Heatmaps**: buildable from free quotes (holdings and sector ETFs by day change); scheduled next, no data cost.
+- **Heatmaps**: built 2026-09-20, in Market: the holdings as a squarified treemap (size = value, colour = the day's move from the last refresh) and the eleven S&P sectors through their SPDR ETFs (eleven quotes when the tab opens, held five minutes). Colour saturates at three percent; a tile opens the analysis.
 
 ## 23. M9 (2026-09-20): the world map of factories, built on God's Eye View
 
