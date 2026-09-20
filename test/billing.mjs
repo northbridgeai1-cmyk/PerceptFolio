@@ -219,6 +219,23 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
   t('council: profile, ratios, analyst counts and target from the free feeds', rr.status === 200 && cj.facts.name === 'NVIDIA Corp' && cj.facts.pe === 52.1 && cj.facts.analysts.buy === 30 && cj.facts.targetMean === 210);
   t('council: the analyst counts carry a twelve-month history, newest first', Array.isArray(cj.facts.analystsHistory) && cj.facts.analystsHistory.length === 12 && cj.facts.analystsHistory[0].strongBuy === 20 && cj.facts.analystsHistory[11].hold === 17 && cj.facts.analysts.buy === 30);
   t('council: six-lens readings arrive as structured JSON with a stance and a what-would-change line', Array.isArray(cj.lenses) && cj.lenses[0].stance === 'cautious' && /margin of safety/.test(cj.lenses[0].reading) && !!cj.lenses[0].whatWouldChangeMyMind);
+  /* the Map's pre-fill from the model */
+  {
+    const inner = globalThis.fetch; const asked = [];
+    globalThis.fetch = async (url, opts = {}) => {
+      const u = String(url); asked.push(u);
+      if (u.includes('api.anthropic.com')) return new Response(JSON.stringify({ content: [{ text: 'Here you go: ' + JSON.stringify({ suppliers: [{ name: 'Taiwan Semiconductor', ticker: 'TSM', weight: 40, note: 'makes the GPUs' }, { name: 'SK hynix', ticker: '', weight: 15, note: 'HBM memory' }, { name: 'NVIDIA itself', ticker: 'NVDA', weight: 5, note: 'self' }, { name: '', ticker: 'X', weight: 1, note: '' }], customers: [{ name: 'Microsoft', ticker: 'MSFT', weight: 150, note: 'Azure' }] }) }] }), { status: 200 });
+      return inner(url, opts);
+    };
+    rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: 'ZZZZZ-ZZZZZ', symbol: 'NVDA' }) }), e3);
+    t('map prefill: refused without a live code', rr.status === 401);
+    rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA' }) }), e3); const mj = await rr.json();
+    t('map prefill: suppliers and customers from the model, tidied: no self-links, no nameless rows, weights clamped, tickers only when plausible', rr.status === 200 && mj.suppliers.length === 2 && mj.suppliers[0].ticker === 'TSM' && mj.suppliers[1].ticker === '' && !mj.suppliers.some(x => x.ticker === 'NVDA') && mj.customers[0].weight === 100 && mj.name === 'NVIDIA Corp');
+    t('map prefill: labelled as the model’s knowledge, not filings, and editable', /general knowledge/.test(mj.disclaimer) && /not from filings/.test(mj.disclaimer) && /Edit anything/.test(mj.disclaimer) && /Never invent a company, a ticker or a number/.test(read('worker.js')));
+    const n = asked.filter(u => u.includes('anthropic')).length; rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA' }) }), e3); const mj2 = await rr.json();
+    t('map prefill: cached thirty days per symbol', asked.filter(u => u.includes('anthropic')).length === n && mj2.cached === true && /expirationTtl: 30 \* 86400/.test(read('worker.js')));
+    globalThis.fetch = inner;
+  }
   t('council: labelled as AI applications of published frameworks, never the people’s views, never a recommendation', /published framework/.test(cj.disclaimer) && /not those people/.test(cj.disclaimer) && /never say buy, sell, hold, or recommend/i.test(read('worker.js')));
   globalThis.fetch = prev;
 }

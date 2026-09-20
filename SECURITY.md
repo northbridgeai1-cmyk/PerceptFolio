@@ -187,3 +187,15 @@ inbox on the first submission; nothing is delivered until it is clicked.
 - A String.replace with a string replacement once swallowed `$&` into the matched text and shipped
   a regex-escape helper that was wrong for names with a dot; a test now pins every escape helper
   and both insertion scripts use function replacements.
+
+## The Map's pre-fill and the model's account (2026-09-20, evening)
+
+- `POST /map/prefill`: live-code gated, `RL_TIGHT`-class limit (10/min), the symbol validated as
+  `[A-Z.\-]{1,10}`, the model's answer parsed as strict JSON and tidied (no self-links, no nameless
+  rows, weights clamped to 1–100, tickers only when they look like tickers), cached thirty days
+  per symbol, and a failure never cached. The prompt forbids inventing companies, tickers or
+  numbers; the panel labels every row "model" and the person's edits win. Evidence: four checks
+  in `test/billing.mjs`.
+- The Anthropic account behind `AI_API_KEY` has no credit (the API answers 400 "credit balance is
+  too low"). Both model routes now surface that sentence in their note instead of an empty answer,
+  and the council no longer caches a day of nothing. No key material is ever echoed.

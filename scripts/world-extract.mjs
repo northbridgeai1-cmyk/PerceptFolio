@@ -52,6 +52,29 @@ function postForm(url, body, timeoutMs, headers = {}) {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'world', 'data');
 const NE = JSON.parse(fs.readFileSync(path.join(ROOT, 'world', 'ne110.json'), 'utf8')).countries;
+const PLACES = JSON.parse(fs.readFileSync(path.join(ROOT, 'world', 'places.json'), 'utf8')).rows;
+const COUNTRY_NAME = {}; for (const c of NE) COUNTRY_NAME[c.cc] = c.name;
+/* Countries whose first-level region is what a person says after the city ("Miami, Florida");
+   everywhere else the country reads better ("Dresden, Germany"). */
+const REGION_CC = new Set(['US', 'CA', 'AU', 'BR', 'MX', 'IN']);
+/* The nearest Natural Earth place: the city itself within 15 km, "near" it within 80 km, else
+   nothing but the country. Same-country places are preferred so a border town is not named
+   after the wrong side. */
+function placeOf(lat, lon, cc) {
+  const cl = Math.cos(lat * Math.PI / 180); let best = null, bd = Infinity;
+  for (const p of PLACES) {
+    const dy = p[3] - lat; if (dy > 0.75 || dy < -0.75) continue;
+    const dx = (p[4] - lon) * cl; if (dx > 0.75 || dx < -0.75) continue;
+    let d = dx * dx + dy * dy; if (cc && p[2] && p[2] !== cc) d *= 4;
+    if (d < bd) { bd = d; best = p; }
+  }
+  if (!best) return '';
+  const km = Math.sqrt(bd) * 111;
+  if (km > 80) return '';
+  const tail = REGION_CC.has(best[2]) && best[1] ? best[1] : (COUNTRY_NAME[best[2]] || best[2]);
+  const name = tail && tail !== best[0] ? best[0] + ', ' + tail : best[0];
+  return (km > 15 ? 'near ' : '') + name;
+}
 const UA = 'PerceptFolio-world/1.0 (+https://perceptfolio.com)';
 
 const args = process.argv.slice(2);
@@ -244,7 +267,7 @@ async function osmFor(ind, mirrors, base) {
 
 /* ------------------------------------------------------------------ merge, dedupe, write */
 function finish(feats) {
-  for (const f of feats) if (!f.c) { const cc = countryOf(f.lo, f.la); if (cc) f.c = cc; }
+  for (const f of feats) { if (!f.c) { const cc = countryOf(f.lo, f.la); if (cc) f.c = cc; } const pl = placeOf(f.la, f.lo, f.c); if (pl) f.pl = pl; }
   /* Same name within ~2 km is one plant, whatever the source; keep the better-described copy and
      carry the other's identifiers along so a Wikidata QID or ticker is never lost. */
   const near = (a, b) => Math.abs(a.la - b.la) < 0.02 && Math.abs((a.lo - b.lo) * Math.cos(a.la * Math.PI / 180)) < 0.02;
@@ -255,7 +278,7 @@ function finish(feats) {
     const g = groups.get(key) || []; groups.set(key, g);
     const i = g.findIndex(x => near(x, f));
     if (i < 0) g.push(f);
-    else { const keep = better(f, g[i]) ? f : g[i], drop = keep === f ? g[i] : f; for (const k of ['o', 'c', 'w', 'q', 't']) if (!keep[k] && drop[k]) keep[k] = drop[k]; if (drop.p && (!keep.p || /^(works|factory|industrial( land)?)$/.test(keep.p))) keep.p = drop.p; if (keep.s !== drop.s) keep.s = 'ow'; keep._tags += drop._tags; g[i] = keep; }
+    else { const keep = better(f, g[i]) ? f : g[i], drop = keep === f ? g[i] : f; for (const k of ['o', 'c', 'w', 'q', 't', 'pl']) if (!keep[k] && drop[k]) keep[k] = drop[k]; if (drop.p && (!keep.p || /^(works|factory|industrial( land)?)$/.test(keep.p))) keep.p = drop.p; if (keep.s !== drop.s) keep.s = 'ow'; keep._tags += drop._tags; g[i] = keep; }
   }
   const out = [...groups.values()].flat().sort((a, b) => (b._tags - a._tags) || a.n.localeCompare(b.n)).slice(0, CAP);
   for (const f of out) { delete f._tags; delete f._works; }
@@ -283,9 +306,9 @@ function writeIndex() {
   const seen = new Set(), rows = [];
   for (const ind of INDUSTRIES) {
     const file = path.join(OUT, ind.id + '.json'); if (!fs.existsSync(file)) continue;
-    for (const f of JSON.parse(fs.readFileSync(file, 'utf8')).features) { const k = f.i.replace(/^[a-z]+:/, ''); if (seen.has(k)) continue; seen.add(k); rows.push([f.n, f.o || '', f.la, f.lo, f.c || '', ind.id, f.q || '']); }
+    for (const f of JSON.parse(fs.readFileSync(file, 'utf8')).features) { const k = f.i.replace(/^[a-z]+:/, ''); if (seen.has(k)) continue; seen.add(k); rows.push([f.n, f.o || '', f.la, f.lo, f.c || '', ind.id, f.q || '', f.pl || '']); }
   }
-  fs.writeFileSync(path.join(OUT, 'all.json'), JSON.stringify({ asOf: new Date().toISOString().slice(0, 10), columns: ['name', 'operator', 'lat', 'lon', 'country', 'industry', 'wikidata'], rows }));
+  fs.writeFileSync(path.join(OUT, 'all.json'), JSON.stringify({ asOf: new Date().toISOString().slice(0, 10), columns: ['name', 'operator', 'lat', 'lon', 'country', 'industry', 'wikidata', 'place'], rows }));
   return index;
 }
 

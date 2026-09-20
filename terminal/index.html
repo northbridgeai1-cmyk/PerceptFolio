@@ -660,10 +660,11 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 
 /* Back to top. Only on genuinely long documents, and only once you are far enough down that it
    saves something. */
-#toTop{position:fixed;right:18px;bottom:18px;z-index:120;display:none;border:1px solid var(--border);
-  background:var(--panel);color:var(--text);border-radius:var(--r-md);padding:10px 13px;cursor:pointer;
-  box-shadow:var(--el-2);font-size:var(--fs-sm)}
-#toTop.show{display:block}
+#toTop{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:120;display:none;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);border-radius:50%;width:44px;height:44px;padding:0;cursor:pointer;
+  box-shadow:var(--el-2);align-items:center;justify-content:center}
+#toTop.show{display:inline-flex}
+#toTop:hover{background:var(--panel2)}
 
 /* Copy affordance. */
 .copy-btn{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:var(--r-xs);
@@ -1387,7 +1388,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   <!-- TRADE IMPACT — the sizing step the app never had -->
   <div class="card" style="margin-top:16px">
     <h3>Before You Trade: What this does to the portfolio</h3>
-    <details class="aside about"><summary>About this</summary><div>Every BUY verdict in this app tells you <b>what</b> and never <b>how much</b>, and size decides the outcome more than selection does, you can be right about the company and ruined by the position. Nothing here is a forecast. It is arithmetic on the portfolio you already have.</div></details>
     <div class="row">
       <input id="tiTicker" placeholder="Ticker" style="max-width:130px" oninput="renderTradeImpact()">
       <select id="tiSide" style="max-width:110px" onchange="renderTradeImpact()">
@@ -1413,7 +1413,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Investment Thesis</h3>
-    <details class="aside about"><summary>About this</summary><div>Write down why you bought something and what would make you sell it, <b>while you still remember</b>. Six months from now the price will have moved and you'll be tempted to invent a reason for whatever it did. A thesis written in advance is the only thing that stops that.</div></details>
     <div class="row" style="margin-bottom:10px">
       <select id="thesisSym" style="max-width:200px" onchange="loadThesis()"></select>
       <span class="muted" id="thesisStatus" style="font-size:12.5px"></span>
@@ -1661,7 +1660,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 <div id="tab-map" class="tabs-hidden">
   <div class="card">
     <h3>Layer Deep: Who a company depends on</h3>
-    <details class="aside about"><summary>About this</summary><div>Put a company in the middle and map what it depends on. Suppliers to the left, customers to the right, similar companies below. Bubble size reflects how much of its business each relationship represents.</div></details>
     <div class="row">
       <input id="mapTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')loadMap()">
       <button class="btn" onclick="loadMap()">Map it</button>
@@ -1725,7 +1723,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
       <div id="wdDetail"></div>
     </div>
   </div>
-  <details class="aside"><summary>What's automatic and what isn't</summary><div>An industry or a company, and the globe shows every plant OpenStreetMap knows: fabs, cell plants, refineries, shipyards, mines. Community-mapped, so incomplete by nature; the count and the date say how much is known. Plants come from OpenStreetMap contributors (Open Database License 1.0): the industry layers were extracted from it and ship with the terminal, and a company search asks it live through the worker, cached for a week. It is community-mapped, so a plant nobody has drawn is not here, and a plant drawn without a name is skipped. The globe is CesiumJS (Apache 2.0) with Natural Earth II imagery (public domain), served from this site, not from a map company, so nothing here is metered or watched. The approach follows God's Eye View by Bilawal Sidhu (MIT). Nothing on this page is a recommendation.</div></details>
 </div>
 
 <!-- MARKET -->
@@ -1783,7 +1780,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="margin-top:14px">
     <h3>Figures With No Free Feed</h3>
-    <details class="aside about"><summary>About this</summary><div>CAPE comes from Robert Shiller's spreadsheet and margin debt from FINRA. Neither publishes a free API, so these are typed in. Update them monthly; the cards show how stale they are.</div></details>
     <div class="grid grid-3">
       <div>
         <div class="field"><label>CAPE (Shiller P/E), <a href="https://www.multpl.com/shiller-pe" target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroCape" type="number" step="0.01" placeholder="e.g. 34.2"></div>
@@ -1868,7 +1864,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 <div id="tab-screener" class="tabs-hidden">
   <div class="card">
     <h3>Scan the market</h3>
-    <details class="aside about"><summary>About this</summary><div>Every US-listed common stock is built in (about six thousand, refreshed daily), so a scan can cover the whole market; at the free tier's pace that is about fifteen tickers a minute, so a full pass runs for hours in the background and picks up where it left off, and scores under twelve hours old are reused. Give it a list and it scores each ticker against your checklist. Scoring takes a few seconds per ticker to stay within Finnhub's free-tier rate limit, so this runs in the background; you can leave the tab and come back.</div></details>
     <div class="row" style="margin-bottom:10px">
       <button class="btn btn-ghost btn-sm" onclick="loadPreset('dow30')">Dow 30</button>
       <button class="btn btn-ghost btn-sm" onclick="loadPreset('megatech')">Mega-cap tech (12)</button>
@@ -1965,7 +1960,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="card">
     <h3>Portfolio Risk</h3>
-    <details class="aside about"><summary>About this</summary><div>Your single-stock scores can't see this: how concentrated you are in one sector, and how correlated your holdings are with each other (owning 5 stocks that all move together isn't 5 bets. It's 1). This uses extra API calls per stock, so it's calculated on demand rather than on every refresh.</div></details>
     <div class="row">
       <button class="btn" id="riskCalcBtn" onclick="calculateRisk()">Calculate risk</button>
       <span class="muted" id="riskStatus"></span>
@@ -1975,7 +1969,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="section-title">Where your risk actually sits</div>
   <div class="card">
-    <details class="aside about"><summary>About this</summary><div>Every holding's share of the portfolio's <b>variance</b>, against its share of the <b>money</b>. A 6% position in a violent name can own 20% of your risk, and no position-size percentage will ever show you that.</div></details>
     <div id="riskContribBody"><div class="empty" style="text-align:left;line-height:1.7"><b>Risk needs at least two holdings.</b><br><span style="font-size:12.5px">This panel splits your risk by where it actually sits rather than by position size, which needs at least two positions with enough price history to estimate volatility. Add holdings in Portfolio and refresh once; it fills in on its own.</span></div></div>
   </div>
 
@@ -1997,7 +1990,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="section-title">Check any stock's risk</div>
   <div class="card">
-    <details class="aside about"><summary>About this</summary><div>Doesn't need to be in your Portfolio or Watchlist. Just check the risk/volatility profile of any ticker before you decide whether to add it.</div></details>
     <div class="row">
       <input id="soloRiskTicker" placeholder="e.g. NVDA" style="max-width:160px" onkeydown="if(event.key==='Enter')calcSoloRisk()">
       <button class="btn" id="soloRiskBtn" onclick="calcSoloRisk()">Calculate</button>
@@ -2018,7 +2010,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="section-title">Loss severity. VaR and Expected Shortfall</div>
   <div class="card">
-    <details class="aside about"><summary>About this</summary><div>How bad a bad day gets, measured from your own daily history. <b>These do not predict returns.</b> They describe severity, which is what risk machinery is for, surviving being wrong, not being right more often.</div></details>
     <div id="varBody"></div>
   </div>
 
@@ -2040,7 +2031,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="section-title">Monte Carlo projection</div>
   <div class="card">
-    <details class="aside about"><summary>About this</summary><div>Simulates thousands of random possible futures based on estimated return and volatility, to show a realistic range of outcomes instead of a single guess. The return/volatility inputs below are assumptions you're setting. Adjust them to match your own view, they're not guaranteed numbers.</div></details>
     <div class="field">
       <label>What to simulate</label>
       <input id="mcTickers" placeholder="Leave blank to simulate your whole portfolio, or list tickers e.g. AAPL, NVDA" oninput="toggleMcHypo()">
@@ -2149,13 +2139,11 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="card" id="installCard" style="display:none">
     <h3>Install PerceptFolio</h3>
-    <details class="aside about"><summary>About this</summary><div>Install it and PerceptFolio gets its own icon, opens without browser chrome, and keeps working offline. On iPhone this also matters for your data: Safari clears storage for sites you haven't opened in 7 days, but installed apps are exempt.</div></details>
     <button class="btn" id="installBtn" onclick="promptInstall()">Install app</button>
     <p class="muted" id="installHint" style="margin-top:10px;font-size:12.5px;line-height:1.55"></p>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Getting Started</h3>
-    <details class="aside about"><summary>About this</summary><div>A short pass over what each screen is for and the three things to do first. Shown automatically on a new account; replay it any time.</div></details>
     <button class="btn btn-ghost" onclick="replayTour()">Run the walkthrough</button>
   </div>
 
@@ -2201,7 +2189,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Investment Policy</h3>
-    <details class="aside about"><summary>About this</summary><div>The limits this portfolio is run to. Command checks every holding against these and flags breaches. Set per account, so a client with a three-year horizon can run different limits from your own book, the same stock can be a buy in one portfolio and a hold in another.</div></details>
     <div class="grid grid-2">
       <div class="field"><label>Risk profile</label><select id="polRisk">
         <option value="conservative">Conservative. Capital preservation</option>
@@ -2231,12 +2218,10 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="card" style="margin-top:16px">
     <h3>Rule Change Log</h3>
-    <details class="aside about"><summary>About this</summary><div>Every change to the buy or sell bars, with the prediction you made at the time. Read it back when a change is a few months old and check whether what you expected is what happened.</div></details>
     <div id="ruleLog"></div>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Copy Holdings / Watchlist to Another Account</h3>
-    <details class="aside about"><summary>About this</summary><div>Copies from the account you're in right now into another one on this browser. Useful for setting a new client up with a starting book, or cloning your own list into a second account. It copies the positions and tickers only; cash, transaction history, dividends, alerts, and settings are left alone.</div></details>
     <div class="row" style="margin-bottom:10px">
       <select id="copyTarget" style="max-width:280px"></select>
       <select id="copyWhat" style="max-width:190px">
@@ -2254,7 +2239,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Sync Across Your Devices</h3>
-    <details class="aside about"><summary>About this</summary><div>Keeps this account's holdings, watchlist, history and settings the same on your phone and your computer. Paste the same two values on every device. Setup instructions are in <b>SYNC-SETUP.md</b>.</div></details>
     <div class="field"><label>Sync URL</label><input id="syncUrlInput" placeholder="https://perceptfolio-sync.yourname.workers.dev" autocomplete="off"></div>
     <div class="field"><label>Sync key</label><input id="syncKeyInput" type="password" placeholder="The SYNC_SECRET you set in Cloudflare" autocomplete="off"></div>
     <div class="row">
@@ -4669,7 +4653,7 @@ window.addEventListener('offline',renderOfflineState);
 function initToTop(){
   if(document.getElementById('toTop'))return;
   const b=document.createElement('button');
-  b.id='toTop'; b.type='button'; b.textContent='Top';
+  b.id='toTop'; b.type='button'; b.innerHTML='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5.5 12.5 12 6l6.5 6.5"/></svg>';
   b.setAttribute('aria-label','Back to top');
   b.onclick=()=>window.scrollTo({top:0,behavior:(matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth')});
   document.body.appendChild(b);
@@ -12305,6 +12289,7 @@ async function loadMap(){
      profile and the peer row do. Draw first, enrich after — that way a missing key, a rate limit or
      a foreign ticker Finnhub can't price still gives you a working map. */
   drawMap();renderRelList();
+  if(typeof prefillMap==='function')prefillMap(t);   /* an empty map opens pre-filled from the model, labelled and editable */
   if(!hasMarketData()){
     mapLoading=false;
     if(st)st.textContent='';
@@ -12698,7 +12683,7 @@ function renderRelList(){
   const rel=relationsFor(mapSym);
   const row=(x,side,i)=>'<tr>'+
     '<td><b>'+esc(x.name)+'</b>'+(x.ticker?' <span class="muted">'+esc(x.ticker)+'</span>':'')+
-      (x.linked?' <span class="pill pill-na" title="Created automatically from the other company\'s map. Edit freely, the weight often differs by direction.">⇄ linked</span>':'')+'</td>'+
+      (x.linked?' <span class="pill pill-na" title="Created automatically from the other company\'s map. Edit freely, the weight often differs by direction.">⇄ linked</span>':'')+(x.prefilled?' <span class="pill pill-na" title="Pre-filled from the model\'s general knowledge of publicly documented supply chains, not from filings. Edit anything wrong.">model</span>':'')+'</td>'+
     '<td>'+(side==='suppliers'?'<span class="pill pill-watch">BUYS FROM</span>':'<span class="pill pill-buy">SELLS TO</span>')+'</td>'+
     '<td><input type="number" min="1" max="100" value="'+(x.weight||10)+'" style="width:70px" onchange="setRelWeight(\''+side+'\','+i+',this.value)">%</td>'+
     '<td><input value="'+esc(x.note||'')+'" placeholder="what they do…" onchange="setRelNote(\''+side+'\','+i+',this.value)"></td>'+
@@ -12706,7 +12691,7 @@ function renderRelList(){
   const rows=rel.suppliers.map((x,i)=>row(x,'suppliers',i)).join('')+rel.customers.map((x,i)=>row(x,'customers',i)).join('');
   el.innerHTML=rows
     ?'<div style="overflow-x:auto"><table><thead><tr><th>Company</th><th>Direction</th><th>Weight</th><th>What they do</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
-    :'<div class="empty">Nothing added for '+esc(mapSym)+' yet.</div>';
+    :'<div class="empty">Nothing on '+esc(mapSym)+'\'s map yet.</div>';
 }
 
 /* ================= MARKET TAB =================
@@ -15464,7 +15449,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
         var j=x.j;
         if(!x.ok){
           out.innerHTML=(j&&j.configured===false)
-            ? '<div class="mv-empty"><span class="dot"></span><div><b>Not connected yet</b><p>The model runs as a separate service and this deployment has not been pointed at one. The operator connects it once: deploy <code>kronos/app.py</code> to Modal, then set <code>KRONOS_URL</code> and <code>KRONOS_TOKEN</code> on the worker. Until then this view stays quiet rather than guessing.</p></div></div>'
+            ? '<div class="mv-empty"><span class="dot"></span><div><b>Not connected yet</b></div></div>'
             : '<div class="mv-empty"><span class="dot"></span><div><b>No answer</b><p>'+esc((j&&j.error)||'The model did not answer.')+'</p></div></div>';
           return;
         }
@@ -15539,7 +15524,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     var d=document.createElement('div'); d.id='pfKelly'; d.className='card'; d.style.marginTop='14px';
     d.innerHTML='<div class="mv-kicker">Kelly criterion</div><div class="mv-title">How much, if the odds were exactly as your thesis says</div>'+
       '<div class="mv-form"><input id="kPrice" placeholder="PRICE" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><input id="kTarget" placeholder="TARGET" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><input id="kStop" placeholder="STOP" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><input id="kP" placeholder="P(WIN) %" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><button class="btn btn-p" id="kGo">Size it</button></div>'+
-      '<div id="kOut"><p class="mv-note">Kelly maximises the growth rate of a bankroll if the odds are exactly right, and halves your capital on the way when they are not; that is why the default shown is half Kelly. Win probability comes from your marked record once it has thirty marks; until then it is 50% and says so.</p></div>';
+      '<div id="kOut"></div>';
     host.insertBefore(d,host.firstChild);
     var marks=(D&&D.calls||[]).filter(function(c){return c.track==='checklist'&&c.mark&&isFinite(c.mark.edge);});
     var pRec=marks.length>=30?marks.filter(function(c){return c.mark.edge>0;}).length/marks.length:null;
@@ -15559,8 +15544,6 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 <style id="v2-world">
 /* World: the globe of plants. Scoped to the tab so the Cesium widget CSS cannot leak into the rest
    of the terminal, and the terminal's tokens cannot fight the canvas. */
-.card>h3+details.aside.about,.card>.row+details.aside.about{margin:-2px 0 12px}
-details.aside.about summary{font-size:12px;color:var(--muted)}
 #tab-world .wd-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 #tab-world .wd-form input{flex:1 1 300px;min-width:220px;height:40px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 12px;color:var(--text);font:inherit}
 #tab-world .wd-form input:focus{outline:none;border-color:var(--brand2);box-shadow:0 0 0 3px var(--glow)}
@@ -15722,7 +15705,7 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
       h.setInputAction(function(m){
         var now=Date.now(); if(now-last<40)return; last=now;
         var p=sc.pick(m.endPosition), tip=$('wdTip'), f=p&&p.id&&p.id.n?p.id:null;
-        if(f){ tip.textContent=(f.sym?f.sym+' · ':'')+f.n+(f.o&&f.o!==f.n?' · '+f.o:'')+(names()[f.c]?' · '+names()[f.c]:''); tip.style.left=m.endPosition.x+'px'; tip.style.top=m.endPosition.y+'px'; tip.hidden=false; sc.canvas.style.cursor='pointer'; }
+        if(f){ tip.textContent=(f.sym?f.sym+' · ':'')+f.n+(f.o&&f.o!==f.n?' · '+f.o:'')+(f.pl?' · '+f.pl:(names()[f.c]?' · '+names()[f.c]:'')); tip.style.left=m.endPosition.x+'px'; tip.style.top=m.endPosition.y+'px'; tip.hidden=false; sc.canvas.style.cursor='pointer'; }
         else { tip.hidden=true; sc.canvas.style.cursor=''; }
       },C.ScreenSpaceEventType.MOUSE_MOVE);
       h.setInputAction(function(m){ var p=sc.pick(m.position); if(p&&p.id&&p.id.n)showDetail(p.id); },C.ScreenSpaceEventType.LEFT_CLICK);
@@ -15774,7 +15757,7 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
   function showDetail(f){
     var nm=names(), osm={n:'node',w:'way',r:'relation'}[f.i[0]]+'/'+f.i.slice(1);
     $('wdDetail').innerHTML='<div class="wd-detail"><h4>'+esc(f.n)+'</h4><div class="wd-kv">'+(f.sym?'<span>Holding</span><span class="mono">'+esc(f.sym)+'</span>':'')+(f.o?'<span>Operator</span><span>'+esc(f.o)+'</span>':'')+(f.p?'<span>Makes</span><span>'+esc(f.p)+'</span>':'')+
-      '<span>Country</span><span>'+esc(nm[f.c]||f.c||'Unplaced')+'</span>'+(f.t?'<span>Owner listed as</span><span class="mono">'+esc(f.t)+'</span>':'')+'<span>Where</span><span class="mono">'+f.la.toFixed(3)+', '+f.lo.toFixed(3)+'</span></div><div class="wd-links">'+
+      '<span>Where</span><span>'+esc(f.pl||nm[f.c]||f.c||'Unplaced')+'</span>'+(f.pl&&(nm[f.c]||f.c)&&!(new RegExp(', '+String(nm[f.c]||f.c).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$')).test(f.pl)?'<span>Country</span><span>'+esc(nm[f.c]||f.c)+'</span>':'')+(f.t?'<span>Owner listed as</span><span class="mono">'+esc(f.t)+'</span>':'')+'</div><div class="wd-links">'+
       (f.t&&typeof analyzeStock==='function'?'<button class="btn btn-ghost btn-sm" type="button" onclick="analyzeStock('+JSON.stringify(String(f.t).replace(/[^A-Z0-9.\-]/gi,''))+')">Analyze '+esc(f.t)+'</button>':'')+
       (f.w?'<a class="btn btn-ghost btn-sm" href="'+esc(f.w)+'" target="_blank" rel="noopener noreferrer">Website</a>':'')+
       (/^Q\d+$/.test(f.i)?'<a class="btn btn-ghost btn-sm" href="https://www.wikidata.org/wiki/'+esc(f.i)+'" target="_blank" rel="noopener noreferrer">On Wikidata</a>':'<a class="btn btn-ghost btn-sm" href="https://www.openstreetmap.org/'+esc(osm)+'" target="_blank" rel="noopener noreferrer">On OpenStreetMap</a>')+'</div></div>';
@@ -15792,9 +15775,9 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
 
   /* ---- a company: live, through the worker ---- */
   function stamp(feats){
-    var need=feats.some(function(f){return !f.c;}); if(!need)return Promise.resolve(feats);
+    var need=feats.some(function(f){return !f.c||!f.pl;}); if(!need)return Promise.resolve(feats);
     var p=NE?Promise.resolve(NE):fetch('/world/ne110.json').then(function(r){return r.json();}).then(function(j){ NE=j.countries; NE.forEach(function(c){ var W=180,E=-180,S=90,N=-90; c.polys.forEach(function(poly){ poly[0].forEach(function(pt){ if(pt[0]<W)W=pt[0]; if(pt[0]>E)E=pt[0]; if(pt[1]<S)S=pt[1]; if(pt[1]>N)N=pt[1]; }); }); c.box=[W,S,E,N]; }); return NE; });
-    return p.then(function(){ feats.forEach(function(f){ if(!f.c){ var cc=countryOf(f.lo,f.la); if(cc)f.c=cc; } }); return feats; }).catch(function(){ return feats; });
+    return Promise.all([p,loadPlaces()]).then(function(){ feats.forEach(function(f){ if(!f.c){ var cc=countryOf(f.lo,f.la); if(cc)f.c=cc; } if(!f.pl){ var pl=placeOf(f.la,f.lo,f.c); if(pl)f.pl=pl; } }); return feats; }).catch(function(){ return feats; });
   }
   function inRing(ring,x,y){ var inside=false; for(var i=0,j=ring.length-1;i<ring.length;j=i++){ var xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1]; if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)inside=!inside; } return inside; }
   function countryOf(lon,lat){ for(var i=0;i<NE.length;i++){ var b=NE[i].box; if(lon<b[0]||lon>b[2]||lat<b[1]||lat>b[3])continue; var polys=NE[i].polys; for(var k=0;k<polys.length;k++){ if(!inRing(polys[k][0],lon,lat))continue; var hole=false; for(var m=1;m<polys[k].length;m++)if(inRing(polys[k][m],lon,lat)){hole=true;break;} if(!hole)return NE[i].cc; } } return ''; }
@@ -15818,11 +15801,23 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
   }
   /* The bundle's 25,000 plants as one compact table, fetched once: a holding's short name is
      matched here first, as a whole word in the plant's name or operator, before Nominatim is asked. */
+  /* Natural Earth's populated places, fetched once, so a live result with no place from the geocoder
+     still reads "near Mesa, Arizona" rather than a pair of numbers. */
+  var PLACES=null, REGION_CC={US:1,CA:1,AU:1,BR:1,MX:1,IN:1};
+  function loadPlaces(){ if(PLACES)return Promise.resolve(PLACES); return fetch('/world/places.json').then(function(r){ return r.ok?r.json():null; }).then(function(j){ PLACES=(j&&j.rows)||[]; return PLACES; }).catch(function(){ PLACES=[]; return PLACES; }); }
+  function placeOf(lat,lon,cc){
+    if(!PLACES||!PLACES.length)return '';
+    var cl=Math.cos(lat*Math.PI/180), best=null, bd=Infinity;
+    for(var i=0;i<PLACES.length;i++){ var p=PLACES[i]; var dy=p[3]-lat; if(dy>0.75||dy<-0.75)continue; var dx=(p[4]-lon)*cl; if(dx>0.75||dx<-0.75)continue; var d=dx*dx+dy*dy; if(cc&&p[2]&&p[2]!==cc)d*=4; if(d<bd){bd=d;best=p;} }
+    if(!best)return ''; var km=Math.sqrt(bd)*111; if(km>80)return '';
+    var tail=REGION_CC[best[2]]&&best[1]?best[1]:(names()[best[2]]||best[2]);
+    return (km>15?'near ':'')+(tail&&tail!==best[0]?best[0]+', '+tail:best[0]);
+  }
   var ALL=null;
   function loadAll(){ if(ALL)return Promise.resolve(ALL); return fetch(DATA+'all.json').then(function(r){ if(!r.ok)throw new Error('all'); return r.json(); }).then(function(j){ ALL=j.rows||[]; return ALL; }).catch(function(){ ALL=[]; return ALL; }); }
   function localMatches(name){
     var rx=new RegExp('(^|[^A-Za-z])('+String(name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')([^A-Za-z]|$)','i'), out=[];
-    for(var i=0;i<ALL.length&&out.length<400;i++){ var r=ALL[i]; if(rx.test(r[0])||(r[1]&&rx.test(r[1]))){ var f={i:'b'+i,n:r[0],la:r[2],lo:r[3],s:'o'}; if(r[1])f.o=r[1]; if(r[4])f.c=r[4]; if(r[5])f.p=r[5].replace(/_/g,' '); if(r[6])f.q=r[6]; out.push(f); } }
+    for(var i=0;i<ALL.length&&out.length<400;i++){ var r=ALL[i]; if(rx.test(r[0])||(r[1]&&rx.test(r[1]))){ var f={i:'b'+i,n:r[0],la:r[2],lo:r[3],s:'o'}; if(r[1])f.o=r[1]; if(r[4])f.c=r[4]; if(r[5])f.p=r[5].replace(/_/g,' '); if(r[6])f.q=r[6]; if(r[7])f.pl=r[7]; out.push(f); } }
     return out;
   }
   function mergeNear(base,extra){
@@ -15876,6 +15871,9 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
 #pfHeat .ht-tile span{font:500 11.5px/1 var(--mono);opacity:.92}
 #pfHeat .ht-tile.sm b{font-size:11px}
 #pfHeat .ht-tile.xs b,#pfHeat .ht-tile.sm span,#pfHeat .ht-tile.xs span{display:none}
+#pfHeat .ht-map.ht-market{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));grid-auto-rows:44px;gap:3px;padding:3px;height:auto;min-height:260px;align-content:start}
+#pfHeat .ht-tile.ht-cell{position:static;border-radius:6px;border:none}
+#pfHeat .btn.on{background:var(--panel2);border-color:var(--text)}
 #pfHeat .ht-sectors{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:60px;gap:4px}
 #pfHeat .ht-sec{border-radius:8px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;cursor:pointer;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);transition:filter .12s;padding:4px}
 #pfHeat .ht-sec:hover{filter:brightness(1.12)}
@@ -15895,6 +15893,7 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
    (eleven quotes, fetched when the tab opens, held for five minutes). Bloomberg's heatmaps, on
    free quotes. Colour is the day's percentage on a scale that saturates at three percent. */
 (function(){
+  var MODE='holdings';   /* 'holdings' or 'market': the Dow 30 and twelve mega-caps, equal tiles */
   var SECTORS=[['XLK','Technology'],['XLF','Financials'],['XLV','Health care'],['XLY','Discretionary'],['XLP','Staples'],['XLE','Energy'],['XLI','Industrials'],['XLC','Communication'],['XLU','Utilities'],['XLRE','Real estate'],['XLB','Materials']];
   var cache={at:0,quotes:{}};
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
@@ -15916,7 +15915,7 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
   function card(){
     var host=document.getElementById('tab-market'); if(!host)return null;
     var c=document.getElementById('pfHeat');
-    if(!c){ c=document.createElement('div'); c.id='pfHeat'; c.className='card'; c.style.marginTop='16px'; var first=host.querySelector('.card'); if(first&&first.nextSibling)host.insertBefore(c,first.nextSibling); else host.appendChild(c); }
+    if(!c){ c=document.createElement('div'); c.id='pfHeat'; c.className='card'; c.style.marginTop='16px'; var cards=host.querySelectorAll('.card'); var after=cards[1]||cards[0]; /* after Calendar effects, which follows The Move */ if(after&&after.nextSibling)host.insertBefore(c,after.nextSibling); else host.appendChild(c); }
     return c;
   }
   function pctText(p){ return p==null||!isFinite(p)?'–':(p>0?'+':'')+p.toFixed(2)+'%'; }
@@ -15924,12 +15923,16 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
     var c=card(); if(!c)return;
     var hold=((typeof D!=='undefined'&&D&&D.holdings)||[]).filter(function(h){ return h&&h.sym&&isFinite(h.shares)&&h.shares>0&&isFinite(h.price)&&h.price>0; }).map(function(h){ return {sym:h.sym,v:h.shares*h.price,pct:isFinite(h.dayPct)?h.dayPct:null}; }).sort(function(a,b){return b.v-a.v;});
     var hasKey=typeof hasMarketData==='function'&&hasMarketData();
-    c.innerHTML='<div class="ht-head"><h3 style="margin:0">Today’s heat</h3><span class="ht-scale">−3%<i></i>+3%</span></div>'+
-      '<div class="ht-grid"><div><div class="muted" style="margin-bottom:6px">Your holdings, sized by value, coloured by the day’s move</div><div class="ht-map" id="htMap"></div></div>'+
+    c.innerHTML='<div class="ht-head"><h3 style="margin:0">Today’s heat</h3><span class="row" style="gap:6px"><button type="button" class="btn btn-ghost btn-sm'+(MODE==='holdings'?' on':'')+'" onclick="heatMode(\'holdings\')">My holdings</button><button type="button" class="btn btn-ghost btn-sm'+(MODE==='market'?' on':'')+'" onclick="heatMode(\'market\')">Market</button><span class="ht-scale">−3%<i></i>+3%</span></span></div>'+
+      '<div class="ht-grid"><div><div class="muted" style="margin-bottom:6px">'+(MODE==='market'?'The Dow 30 and twelve mega-caps, coloured by the day’s move':'Your holdings, sized by value, coloured by the day’s move')+'</div><div class="ht-map'+(MODE==='market'?' ht-market':'')+'" id="htMap"></div></div>'+
       '<div><div class="muted" style="margin-bottom:6px">Sectors</div><div class="ht-sectors" id="htSec"></div></div></div>'+
       '<div class="ht-note" id="htNote"></div>';
     var map=document.getElementById('htMap'), note=document.getElementById('htNote');
-    if(!hold.length){ map.innerHTML='<div class="empty" style="padding:24px 12px">'+(hasKey?'Nothing priced yet. Add holdings, then Refresh data.':'Connect your data key, then Refresh data, and the holdings colour in.')+'</div>'; }
+    if(MODE==='market'){
+      var list=marketList(); if(!list.length){ map.innerHTML='<div class="empty" style="padding:24px 12px">No market list on this build.</div>'; }
+      else list.forEach(function(sym){ var q=cache.quotes[sym]; var d=document.createElement('div'); d.className='ht-tile ht-cell'; d.style.background=colour(q?q.dp:null); d.title=sym+' · '+pctText(q?q.dp:null); d.innerHTML='<b>'+esc(sym)+'</b><span>'+pctText(q?q.dp:null)+'</span>'; d.onclick=function(){ if(typeof analyzeStock==='function')analyzeStock(sym); }; map.appendChild(d); });
+    }
+    else if(!hold.length){ map.innerHTML='<div class="empty" style="padding:24px 12px">'+(hasKey?'Nothing priced yet. Add holdings, then Refresh data.':'Connect your data key, then Refresh data, and the holdings colour in.')+'</div>'; }
     else {
       var W=map.clientWidth||600, H=map.clientHeight||260;
       treemap(hold,W,H).forEach(function(r){
@@ -15941,17 +15944,23 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
     }
     var sec=document.getElementById('htSec');
     SECTORS.forEach(function(s){ var q=cache.quotes[s[0]]; var d=document.createElement('div'); d.className='ht-sec'; d.style.background=colour(q?q.dp:null); d.title=s[1]+' ('+s[0]+') · '+pctText(q?q.dp:null); d.innerHTML='<b>'+s[0]+'</b><span>'+pctText(q?q.dp:null)+'</span><small>'+esc(s[1])+'</small>'; d.onclick=function(){ if(typeof analyzeStock==='function')analyzeStock(s[0]); }; sec.appendChild(d); });
-    var unpriced=hold.filter(function(h){return h.pct==null;}).length;
-    note.textContent=(hasKey?'Sector tiles are the SPDR sector ETFs, quoted when this tab opens and held for five minutes.':'Sectors need the data key.')+(unpriced?' '+unpriced+' holding'+(unpriced>1?'s have':' has')+' a price but no day change yet; Refresh data fills it in.':'')+' Colour saturates at three percent either way; click a tile to analyze it.';
+    var unpriced=MODE==='market'?0:hold.filter(function(h){return h.pct==null;}).length;
+    note.textContent=(hasKey?(MODE==='market'?'The market tiles and the sector tiles are quoted when this tab opens and held for five minutes.':'Sector tiles are the SPDR sector ETFs, quoted when this tab opens and held for five minutes.'):(MODE==='market'?'The market tiles need the data key.':'Sectors need the data key.'))+(unpriced?' '+unpriced+' holding'+(unpriced>1?'s have':' has')+' a price but no day change yet; Refresh data fills it in.':'')+' Colour saturates at three percent either way; click a tile to analyze it.';
   }
-  function load(){
+  function marketList(){ var P=(typeof PRESET_LISTS!=='undefined'&&PRESET_LISTS)||{}; var a=((P.dow30||{}).tickers||[]).concat(((P.megatech||{}).tickers||[])); var seen={}; return a.filter(function(s){ if(seen[s])return false; seen[s]=true; return true; }); }
+  window.heatMode=function(m){ MODE=m==='market'?'market':'holdings'; try{ localStorage.setItem('pf_heat_mode',MODE); }catch(e){} load(true); };
+  try{ MODE=localStorage.getItem('pf_heat_mode')==='market'?'market':'holdings'; }catch(e){}
+  function load(force){
     render();
     if(!(typeof hasMarketData==='function'&&hasMarketData()))return;
-    if(Date.now()-cache.at<5*60*1000)return;
+    var want=SECTORS.map(function(s){return s[0];}).concat(MODE==='market'?marketList():[]);
+    var missing=want.filter(function(s){ return !cache.quotes[s]; });
+    if(!force&&Date.now()-cache.at<5*60*1000&&!missing.length)return;
+    if(Date.now()-cache.at>=5*60*1000){ cache.quotes={}; missing=want; }
     cache.at=Date.now();
-    /* Eleven quotes, one after another, well inside the free tier's sixty a minute. */
-    (function next(i){ if(i>=SECTORS.length){ render(); return; } var sym=SECTORS[i][0];
-      (typeof getQuote==='function'?getQuote(sym):Promise.reject()).then(function(q){ cache.quotes[sym]=q; }).catch(function(){}).then(function(){ next(i+1); }); })(0);
+    /* Quotes one after another (eleven sectors, up to forty market names), inside the free tier's sixty a minute. */
+    (function next(i){ if(i>=missing.length){ render(); return; } var sym=missing[i];
+      (typeof getQuote==='function'?getQuote(sym):Promise.reject()).then(function(q){ cache.quotes[sym]=q; }).catch(function(){}).then(function(){ if(i%6===5)render(); next(i+1); }); })(0);
   }
   var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='market')setTimeout(load,30); return r; }; }
   window.addEventListener('resize',function(){ if(document.getElementById('pfHeat')&&document.getElementById('tab-market')&&!document.getElementById('tab-market').classList.contains('tabs-hidden'))render(); });
@@ -16030,6 +16039,35 @@ details.aside.about summary{font-size:12px;color:var(--muted)}
   };
   /* warm the listing once the app is up, quietly, so the search box knows names on the first keystroke */
   document.addEventListener('DOMContentLoaded',function(){ setTimeout(function(){ loadU(); },4000); });
+})();
+</script>
+<script>
+/* The Map opens pre-filled. No free feed publishes supply chains, so the Worker asks the model the
+   terminal already uses for the six lenses about the well-documented ones, once per symbol, and
+   the answer lands on the map labelled "model", weights rough, every row editable and deletable.
+   A map the person has already touched is never overwritten. */
+(function(){
+  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||''; }catch(e){ return ''; } }
+  var asked={};
+  window.prefillMap=function(sym){
+    if(!sym||asked[sym])return; asked[sym]=true;
+    var rel=(typeof relationsFor==='function')?relationsFor(sym):null; if(!rel)return;
+    if(rel.suppliers.length||rel.customers.length||rel.prefilledAt)return;
+    var st=document.getElementById('mapStatus');
+    fetch(INVITE_WORKER+'/map/prefill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym})})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(r){
+        if(!r.ok||!r.j){ if(st&&r.j&&r.j.error&&/access code/.test(r.j.error))st.textContent='Pre-fill needs a live access code.'; return; }
+        var cur=relationsFor(sym); if(cur.suppliers.length||cur.customers.length)return;   /* the person got there first */
+        (r.j.suppliers||[]).forEach(function(x){ cur.suppliers.push({name:x.name,ticker:x.ticker||'',weight:x.weight||10,note:x.note||'',prefilled:true}); });
+        (r.j.customers||[]).forEach(function(x){ cur.customers.push({name:x.name,ticker:x.ticker||'',weight:x.weight||10,note:x.note||'',prefilled:true}); });
+        cur.prefilledAt=Date.now();
+        if(typeof saveDB==='function')saveDB();
+        if(typeof mapSym!=='undefined'&&mapSym===sym){ if(typeof drawMap==='function')drawMap(); if(typeof renderRelList==='function')renderRelList(); }
+        var n=cur.suppliers.length+cur.customers.length;
+        if(st)st.textContent=n?n+' relationships pre-filled by the model; edit anything wrong.':'Nothing publicly documented for '+sym+'; add relationships by hand.';
+      }).catch(function(){});
+  };
 })();
 </script>
 </body>
