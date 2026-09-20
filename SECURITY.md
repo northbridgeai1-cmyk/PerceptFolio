@@ -174,3 +174,16 @@ inbox on the first submission; nothing is delivered until it is clicked.
   site's `Referrer-Policy: no-referrer`.
 - Found and fixed: the Pages build was missing `vendor/` entirely (Chart.js requests returned the SPA
   index page). `scripts/assemble.mjs` now copies it; a test pins it.
+
+## Satellite imagery and the market listing (2026-09-20, later)
+
+- The World view fades Esri World Imagery in below 4,000 km. Both CSPs gained exactly two hosts,
+  `services.arcgisonline.com` and `server.arcgisonline.com`, in `img-src` (tiles) and `connect-src`
+  (the service description); no script, no frame. Tiles are requested only once the layer is
+  visible, so a look at the world sends nothing to Esri. Attribution is on the globe's credit line.
+- `GET /universe` serves the US common-stock listing (symbol, name, venue) from Finnhub through the
+  Worker's own key, cached in KV for the day, rate-limited at 30/min; it is public reference data
+  and carries nothing about a subscriber. `GET /history` now returns five years.
+- A String.replace with a string replacement once swallowed `$&` into the matched text and shipped
+  a regex-escape helper that was wrong for names with a dot; a test now pins every escape helper
+  and both insertion scripts use function replacements.

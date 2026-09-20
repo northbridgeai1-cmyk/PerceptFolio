@@ -400,6 +400,15 @@ held, one request, bundle first and Nominatim on top, a colour per holding); the
 (twelve monthly stacked bars in the company panel); a **monthly refresh workflow** that re-runs the
 extractor and opens a pull request; the layer cap raised to 5,000.
 
+Later still, 2026-09-20: **satellite on the way down** (Esri World Imagery faded in below
+4,000 km over Natural Earth II; a plant becomes a roof); the seventeen intro paragraphs **folded
+into one-line asides**; **five years of history** (the Worker's `/history` serves 5y; the device
+keeps it outside the synced log; charts and hindsight windows read it); **the whole listing built
+in** (`/universe`: every US common stock daily; a company name resolves to its ticker in the
+search box; the Screener scans the whole market at about fifteen tickers a minute, hours for a
+full pass, resumable). What "checks everything" cannot mean on a free data key: a live score of
+six thousand stocks at once; the scan is a pass, not a snapshot.
+
 Coverage is what the community has drawn. Fabs on Wikidata skew to the former Soviet Union; OSM
 carries TSMC, Samsung and Intel because people drew them. The page says "community-mapped,
 incomplete by nature" and shows the count and date, and that is the honest product.

@@ -74,6 +74,7 @@ window.PF_ES = {
   'Chemicals and fertilisers': 'Química y fertilizantes', 'Pharmaceuticals and biologics': 'Farmacéutica y biológicos', 'Shipyards': 'Astilleros', 'Solar and wind manufacturing': 'Fabricación solar y eólica',
   'Data centres': 'Centros de datos', 'Nuclear power plants': 'Centrales nucleares', 'Cement and building materials': 'Cemento y materiales de construcción',
   'Operator': 'Operador', 'Makes': 'Produce', 'Country': 'País', 'Where': 'Dónde', 'Unplaced': 'Sin país', 'Website': 'Sitio web', 'On OpenStreetMap': 'En OpenStreetMap',
+  'About this': 'Sobre esto', 'Scan the market': 'Escanear el mercado', 'Whole market': 'Todo el mercado', 'Presets are a fixed snapshot. Whole market is every US-listed common stock, refreshed daily.': 'Los preajustes son una instantánea fija. Todo el mercado es cada acción ordinaria cotizada en EE. UU., actualizada a diario.',
   'Your holdings': 'Tus posiciones', 'Holding': 'Posición', 'none drawn': 'ninguna dibujada', 'no name (needs the data key)': 'sin nombre (necesita la clave de datos)',
   'Each holding was looked up by its short name, in the bundle and live; a company with nothing drawn on OpenStreetMap under that name shows none. Click a holding to fly to its plants.': 'Cada posición se buscó por su nombre corto, en el paquete y en vivo; una empresa sin nada dibujado en OpenStreetMap con ese nombre no muestra ninguna. Haz clic en una posición para volar a sus plantas.',
   'No holdings yet. Add some in Portfolio and come back.': 'Aún no hay posiciones. Añade algunas en Cartera y vuelve.',

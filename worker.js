@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-20.2';
+const WORKER_VERSION = '2026-09-20.3';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -464,7 +464,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -1619,11 +1619,11 @@ async function handleBilling(request, env, url) {
     if (await tooMany(env, request, '/history', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
     const sym = clean(url.searchParams.get('symbol'), 12).toUpperCase();
     if (!/^[A-Z.\-^=]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
-    const day = new Date().toISOString().slice(0, 10), ck = 'hist:' + sym + ':' + day;
+    const day = new Date().toISOString().slice(0, 10), ck = 'hist:' + sym + ':5y:' + day;
     const cached = await env.PF_SYNC.get(ck); if (cached) return new Response(cached, { status: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, corsHeaders(env)) });
     let dates = [], closes = [];
     try {
-      const y = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=2y&interval=1d', { headers: { 'User-Agent': 'Mozilla/5.0 PerceptFolio' } });
+      const y = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=5y&interval=1d', { headers: { 'User-Agent': 'Mozilla/5.0 PerceptFolio' } });
       const j = await y.json(); const r0 = j && j.chart && j.chart.result && j.chart.result[0]; const q = r0 && r0.indicators && r0.indicators.quote && r0.indicators.quote[0];
       if (r0 && q) for (let i = 0; i < r0.timestamp.length; i++) if (isFinite(q.close[i]) && q.close[i] > 0) { dates.push(new Date(r0.timestamp[i] * 1000).toISOString().slice(0, 10)); closes.push(Math.round(q.close[i] * 10000) / 10000); }
     } catch (e) { /* fall through */ }
@@ -1743,6 +1743,31 @@ async function handleBilling(request, env, url) {
       results[q] = { count: features.length, features, cached: false };
     }
     return json({ asOf: new Date().toISOString().slice(0, 10), source: 'OpenStreetMap contributors, ODbL 1.0, via Nominatim. Community-mapped; incomplete by nature.', results }, 200, env);
+  }
+
+  /* ---- GET /universe : every US-listed common stock, symbol and name, refreshed daily ----
+     So the terminal has the whole market built in rather than only what a person typed: the
+     search box resolves a company name to its ticker, the Screener can scan the whole listing,
+     and nothing waits for a list to be pasted. Finnhub's symbol list through the Worker's own key
+     (the listing is public data), filtered to common stock on the primary US venues, cached in KV
+     for the day. About 6,000 rows, symbol, name, venue. */
+  if (url.pathname === '/universe' && request.method === 'GET') {
+    if (await tooMany(env, request, '/universe', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const day = new Date().toISOString().slice(0, 10), ck = 'universe:' + day;
+    const cached = await env.PF_SYNC.get(ck); if (cached) return new Response(cached, { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600', ...corsHeaders(env) } });
+    if (!env.FINNHUB_API_KEY) return json({ error: 'The listing needs the data key on the worker.' }, 503, env);
+    let rows;
+    try {
+      const r = await fetch('https://finnhub.io/api/v1/stock/symbol?exchange=US&token=' + env.FINNHUB_API_KEY);
+      if (!r.ok) return json({ error: 'The listing did not answer (' + r.status + ').' }, 502, env);
+      const list = await r.json();
+      const venues = { XNYS: 'NYSE', XNAS: 'Nasdaq', XASE: 'NYSE American', ARCX: 'NYSE Arca', BATS: 'Cboe' };
+      rows = (Array.isArray(list) ? list : []).filter(s => s && s.type === 'Common Stock' && venues[s.mic] && /^[A-Z]{1,5}$/.test(s.symbol) && s.description).map(s => [s.symbol, clean(s.description, 60), venues[s.mic]]).sort((a, b) => a[0].localeCompare(b[0]));
+    } catch (e) { return json({ error: 'The listing did not answer.' }, 502, env); }
+    if (rows.length < 1000) return json({ error: 'The listing came back too short to trust (' + rows.length + ').' }, 502, env);
+    const body = JSON.stringify({ asOf: day, count: rows.length, source: 'Finnhub symbol list, US common stock on NYSE, Nasdaq, NYSE American, NYSE Arca and Cboe.', columns: ['symbol', 'name', 'venue'], rows });
+    await env.PF_SYNC.put(ck, body, { expirationTtl: 2 * 86400 });
+    return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600', ...corsHeaders(env) } });
   }
 
   /* ---- GET /quote?plan=&seats= : the suggested price, for admin's Send quote draft ---- */

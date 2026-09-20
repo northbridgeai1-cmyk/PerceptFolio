@@ -14,7 +14,7 @@
          this origin, the worker and Finnhub, so an injected script cannot exfiltrate a portfolio
          to an arbitrary host; object-src and frame-src are closed; base-uri cannot be rewritten
          to redirect every relative URL. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://services.arcgisonline.com https://server.arcgisonline.com; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover,interactive-widget=resizes-content">
 <title>PerceptFolio | Your Portfolio Quant</title>
@@ -1387,7 +1387,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   <!-- TRADE IMPACT — the sizing step the app never had -->
   <div class="card" style="margin-top:16px">
     <h3>Before You Trade: What this does to the portfolio</h3>
-    <p class="muted" style="margin-bottom:12px">Every BUY verdict in this app tells you <b>what</b> and never <b>how much</b>, and size decides the outcome more than selection does, you can be right about the company and ruined by the position. Nothing here is a forecast. It is arithmetic on the portfolio you already have.</p>
+    <details class="aside about"><summary>About this</summary><div>Every BUY verdict in this app tells you <b>what</b> and never <b>how much</b>, and size decides the outcome more than selection does, you can be right about the company and ruined by the position. Nothing here is a forecast. It is arithmetic on the portfolio you already have.</div></details>
     <div class="row">
       <input id="tiTicker" placeholder="Ticker" style="max-width:130px" oninput="renderTradeImpact()">
       <select id="tiSide" style="max-width:110px" onchange="renderTradeImpact()">
@@ -1413,7 +1413,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Investment Thesis</h3>
-    <p class="muted" style="margin-bottom:12px">Write down why you bought something and what would make you sell it, <b>while you still remember</b>. Six months from now the price will have moved and you'll be tempted to invent a reason for whatever it did. A thesis written in advance is the only thing that stops that.</p>
+    <details class="aside about"><summary>About this</summary><div>Write down why you bought something and what would make you sell it, <b>while you still remember</b>. Six months from now the price will have moved and you'll be tempted to invent a reason for whatever it did. A thesis written in advance is the only thing that stops that.</div></details>
     <div class="row" style="margin-bottom:10px">
       <select id="thesisSym" style="max-width:200px" onchange="loadThesis()"></select>
       <span class="muted" id="thesisStatus" style="font-size:12.5px"></span>
@@ -1661,7 +1661,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 <div id="tab-map" class="tabs-hidden">
   <div class="card">
     <h3>Layer Deep: Who a company depends on</h3>
-    <p class="muted" style="margin-bottom:12px">Put a company in the middle and map what it depends on. Suppliers to the left, customers to the right, similar companies below. Bubble size reflects how much of its business each relationship represents.</p>
+    <details class="aside about"><summary>About this</summary><div>Put a company in the middle and map what it depends on. Suppliers to the left, customers to the right, similar companies below. Bubble size reflects how much of its business each relationship represents.</div></details>
     <div class="row">
       <input id="mapTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')loadMap()">
       <button class="btn" onclick="loadMap()">Map it</button>
@@ -1707,7 +1707,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 <div id="tab-world" class="tabs-hidden">
   <div class="card wd-intro">
     <h3>Where the plants are</h3>
-    <p class="muted" style="margin-bottom:12px;max-width:72ch">An industry or a company, and the globe shows every plant OpenStreetMap knows: fabs, cell plants, refineries, shipyards, mines. Community-mapped, so incomplete by nature; the count and the date say how much is known.</p>
     <div class="wd-form">
       <input id="wdQ" placeholder="smart chip factories, or a company: TSMC" autocomplete="off" onkeydown="if(event.key==='Enter')wdSearch()">
       <button class="btn" onclick="wdSearch()">Show</button>
@@ -1726,7 +1725,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
       <div id="wdDetail"></div>
     </div>
   </div>
-  <details class="aside"><summary>What's automatic and what isn't</summary><div>Plants come from OpenStreetMap contributors (Open Database License 1.0): the industry layers were extracted from it and ship with the terminal, and a company search asks it live through the worker, cached for a week. It is community-mapped, so a plant nobody has drawn is not here, and a plant drawn without a name is skipped. The globe is CesiumJS (Apache 2.0) with Natural Earth II imagery (public domain), served from this site, not from a map company, so nothing here is metered or watched. The approach follows God's Eye View by Bilawal Sidhu (MIT). Nothing on this page is a recommendation.</div></details>
+  <details class="aside"><summary>What's automatic and what isn't</summary><div>An industry or a company, and the globe shows every plant OpenStreetMap knows: fabs, cell plants, refineries, shipyards, mines. Community-mapped, so incomplete by nature; the count and the date say how much is known. Plants come from OpenStreetMap contributors (Open Database License 1.0): the industry layers were extracted from it and ship with the terminal, and a company search asks it live through the worker, cached for a week. It is community-mapped, so a plant nobody has drawn is not here, and a plant drawn without a name is skipped. The globe is CesiumJS (Apache 2.0) with Natural Earth II imagery (public domain), served from this site, not from a map company, so nothing here is metered or watched. The approach follows God's Eye View by Bilawal Sidhu (MIT). Nothing on this page is a recommendation.</div></details>
 </div>
 
 <!-- MARKET -->
@@ -1784,7 +1783,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="margin-top:14px">
     <h3>Figures With No Free Feed</h3>
-    <p class="muted" style="margin-bottom:12px">CAPE comes from Robert Shiller's spreadsheet and margin debt from FINRA. Neither publishes a free API, so these are typed in. Update them monthly; the cards show how stale they are.</p>
+    <details class="aside about"><summary>About this</summary><div>CAPE comes from Robert Shiller's spreadsheet and margin debt from FINRA. Neither publishes a free API, so these are typed in. Update them monthly; the cards show how stale they are.</div></details>
     <div class="grid grid-3">
       <div>
         <div class="field"><label>CAPE (Shiller P/E), <a href="https://www.multpl.com/shiller-pe" target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroCape" type="number" step="0.01" placeholder="e.g. 34.2"></div>
@@ -1868,12 +1867,13 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 <!-- SCREENER -->
 <div id="tab-screener" class="tabs-hidden">
   <div class="card">
-    <h3>Scan a list of tickers</h3>
-    <p class="muted" style="margin-bottom:12px">PerceptFolio doesn't browse the market on its own. Give it a list and it scores each ticker against your checklist. Scoring takes a few seconds per ticker to stay within Finnhub's free-tier rate limit, so this runs in the background; you can leave the tab and come back.</p>
+    <h3>Scan the market</h3>
+    <details class="aside about"><summary>About this</summary><div>Every US-listed common stock is built in (about six thousand, refreshed daily), so a scan can cover the whole market; at the free tier's pace that is about fifteen tickers a minute, so a full pass runs for hours in the background and picks up where it left off, and scores under twelve hours old are reused. Give it a list and it scores each ticker against your checklist. Scoring takes a few seconds per ticker to stay within Finnhub's free-tier rate limit, so this runs in the background; you can leave the tab and come back.</div></details>
     <div class="row" style="margin-bottom:10px">
       <button class="btn btn-ghost btn-sm" onclick="loadPreset('dow30')">Dow 30</button>
       <button class="btn btn-ghost btn-sm" onclick="loadPreset('megatech')">Mega-cap tech (12)</button>
-      <span class="muted" style="font-size:12px">Presets are a fixed snapshot, not a live index feed. Membership can drift over time.</span>
+      <button class="btn btn-ghost btn-sm" onclick="scanUniverse()" id="scanAllBtn">Whole market</button>
+      <span class="muted" style="font-size:12px" id="scanAllNote">Presets are a fixed snapshot. Whole market is every US-listed common stock, refreshed daily.</span>
     </div>
     <div class="field">
       <label>Or discover by sector/theme. Companies you may not have heard of yet</label>
@@ -1965,7 +1965,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="card">
     <h3>Portfolio Risk</h3>
-    <p class="muted" style="margin-bottom:12px">Your single-stock scores can't see this: how concentrated you are in one sector, and how correlated your holdings are with each other (owning 5 stocks that all move together isn't 5 bets. It's 1). This uses extra API calls per stock, so it's calculated on demand rather than on every refresh.</p>
+    <details class="aside about"><summary>About this</summary><div>Your single-stock scores can't see this: how concentrated you are in one sector, and how correlated your holdings are with each other (owning 5 stocks that all move together isn't 5 bets. It's 1). This uses extra API calls per stock, so it's calculated on demand rather than on every refresh.</div></details>
     <div class="row">
       <button class="btn" id="riskCalcBtn" onclick="calculateRisk()">Calculate risk</button>
       <span class="muted" id="riskStatus"></span>
@@ -1975,7 +1975,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="section-title">Where your risk actually sits</div>
   <div class="card">
-    <p class="muted" style="margin-bottom:12px">Every holding's share of the portfolio's <b>variance</b>, against its share of the <b>money</b>. A 6% position in a violent name can own 20% of your risk, and no position-size percentage will ever show you that.</p>
+    <details class="aside about"><summary>About this</summary><div>Every holding's share of the portfolio's <b>variance</b>, against its share of the <b>money</b>. A 6% position in a violent name can own 20% of your risk, and no position-size percentage will ever show you that.</div></details>
     <div id="riskContribBody"><div class="empty" style="text-align:left;line-height:1.7"><b>Risk needs at least two holdings.</b><br><span style="font-size:12.5px">This panel splits your risk by where it actually sits rather than by position size, which needs at least two positions with enough price history to estimate volatility. Add holdings in Portfolio and refresh once; it fills in on its own.</span></div></div>
   </div>
 
@@ -1997,7 +1997,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="section-title">Check any stock's risk</div>
   <div class="card">
-    <p class="muted" style="margin-bottom:12px">Doesn't need to be in your Portfolio or Watchlist. Just check the risk/volatility profile of any ticker before you decide whether to add it.</p>
+    <details class="aside about"><summary>About this</summary><div>Doesn't need to be in your Portfolio or Watchlist. Just check the risk/volatility profile of any ticker before you decide whether to add it.</div></details>
     <div class="row">
       <input id="soloRiskTicker" placeholder="e.g. NVDA" style="max-width:160px" onkeydown="if(event.key==='Enter')calcSoloRisk()">
       <button class="btn" id="soloRiskBtn" onclick="calcSoloRisk()">Calculate</button>
@@ -2018,7 +2018,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="section-title">Loss severity. VaR and Expected Shortfall</div>
   <div class="card">
-    <p class="muted" style="margin-bottom:12px">How bad a bad day gets, measured from your own daily history. <b>These do not predict returns.</b> They describe severity, which is what risk machinery is for, surviving being wrong, not being right more often.</p>
+    <details class="aside about"><summary>About this</summary><div>How bad a bad day gets, measured from your own daily history. <b>These do not predict returns.</b> They describe severity, which is what risk machinery is for, surviving being wrong, not being right more often.</div></details>
     <div id="varBody"></div>
   </div>
 
@@ -2040,7 +2040,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="section-title">Monte Carlo projection</div>
   <div class="card">
-    <p class="muted" style="margin-bottom:12px">Simulates thousands of random possible futures based on estimated return and volatility, to show a realistic range of outcomes instead of a single guess. The return/volatility inputs below are assumptions you're setting. Adjust them to match your own view, they're not guaranteed numbers.</p>
+    <details class="aside about"><summary>About this</summary><div>Simulates thousands of random possible futures based on estimated return and volatility, to show a realistic range of outcomes instead of a single guess. The return/volatility inputs below are assumptions you're setting. Adjust them to match your own view, they're not guaranteed numbers.</div></details>
     <div class="field">
       <label>What to simulate</label>
       <input id="mcTickers" placeholder="Leave blank to simulate your whole portfolio, or list tickers e.g. AAPL, NVDA" oninput="toggleMcHypo()">
@@ -2149,13 +2149,13 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="card" id="installCard" style="display:none">
     <h3>Install PerceptFolio</h3>
-    <p class="muted" style="margin-bottom:12px">Install it and PerceptFolio gets its own icon, opens without browser chrome, and keeps working offline. On iPhone this also matters for your data: Safari clears storage for sites you haven't opened in 7 days, but installed apps are exempt.</p>
+    <details class="aside about"><summary>About this</summary><div>Install it and PerceptFolio gets its own icon, opens without browser chrome, and keeps working offline. On iPhone this also matters for your data: Safari clears storage for sites you haven't opened in 7 days, but installed apps are exempt.</div></details>
     <button class="btn" id="installBtn" onclick="promptInstall()">Install app</button>
     <p class="muted" id="installHint" style="margin-top:10px;font-size:12.5px;line-height:1.55"></p>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Getting Started</h3>
-    <p class="muted" style="margin-bottom:12px">A short pass over what each screen is for and the three things to do first. Shown automatically on a new account; replay it any time.</p>
+    <details class="aside about"><summary>About this</summary><div>A short pass over what each screen is for and the three things to do first. Shown automatically on a new account; replay it any time.</div></details>
     <button class="btn btn-ghost" onclick="replayTour()">Run the walkthrough</button>
   </div>
 
@@ -2201,7 +2201,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Investment Policy</h3>
-    <p class="muted" style="margin-bottom:12px">The limits this portfolio is run to. Command checks every holding against these and flags breaches. Set per account, so a client with a three-year horizon can run different limits from your own book, the same stock can be a buy in one portfolio and a hold in another.</p>
+    <details class="aside about"><summary>About this</summary><div>The limits this portfolio is run to. Command checks every holding against these and flags breaches. Set per account, so a client with a three-year horizon can run different limits from your own book, the same stock can be a buy in one portfolio and a hold in another.</div></details>
     <div class="grid grid-2">
       <div class="field"><label>Risk profile</label><select id="polRisk">
         <option value="conservative">Conservative. Capital preservation</option>
@@ -2231,12 +2231,12 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 
   <div class="card" style="margin-top:16px">
     <h3>Rule Change Log</h3>
-    <p class="muted" style="margin-bottom:12px">Every change to the buy or sell bars, with the prediction you made at the time. Read it back when a change is a few months old and check whether what you expected is what happened.</p>
+    <details class="aside about"><summary>About this</summary><div>Every change to the buy or sell bars, with the prediction you made at the time. Read it back when a change is a few months old and check whether what you expected is what happened.</div></details>
     <div id="ruleLog"></div>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Copy Holdings / Watchlist to Another Account</h3>
-    <p class="muted" style="margin-bottom:12px">Copies from the account you're in right now into another one on this browser. Useful for setting a new client up with a starting book, or cloning your own list into a second account. It copies the positions and tickers only; cash, transaction history, dividends, alerts, and settings are left alone.</p>
+    <details class="aside about"><summary>About this</summary><div>Copies from the account you're in right now into another one on this browser. Useful for setting a new client up with a starting book, or cloning your own list into a second account. It copies the positions and tickers only; cash, transaction history, dividends, alerts, and settings are left alone.</div></details>
     <div class="row" style="margin-bottom:10px">
       <select id="copyTarget" style="max-width:280px"></select>
       <select id="copyWhat" style="max-width:190px">
@@ -2254,7 +2254,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Sync Across Your Devices</h3>
-    <p class="muted" style="margin-bottom:12px">Keeps this account's holdings, watchlist, history and settings the same on your phone and your computer. Paste the same two values on every device. Setup instructions are in <b>SYNC-SETUP.md</b>.</p>
+    <details class="aside about"><summary>About this</summary><div>Keeps this account's holdings, watchlist, history and settings the same on your phone and your computer. Paste the same two values on every device. Setup instructions are in <b>SYNC-SETUP.md</b>.</div></details>
     <div class="field"><label>Sync URL</label><input id="syncUrlInput" placeholder="https://perceptfolio-sync.yourname.workers.dev" autocomplete="off"></div>
     <div class="field"><label>Sync key</label><input id="syncKeyInput" type="password" placeholder="The SYNC_SECRET you set in Cloudflare" autocomplete="off"></div>
     <div class="row">
@@ -3774,9 +3774,20 @@ function closePalette(){
 function renderTickerPalette(){
   const el=document.getElementById('globalSearch'),p=document.getElementById('gsPanel');
   if(!el||!p||!D)return;
-  const sym=(el.value||'').trim().toUpperCase().replace(/[^A-Z.\-]/g,'');
+  const raw=(el.value||'').trim();
+  const sym=raw.toUpperCase().replace(/[^A-Z.\-]/g,'');
   if(!sym){closePalette();return;}
+  /* The whole listing is built in: a name resolves to its ticker, and a ticker shows its name. */
+  const uni=typeof universeMatches==='function'?universeMatches(raw,6):[];
+  const exact=uni.find(u=>u[0]===sym);
+  if(!exact&&uni.length&&(/[a-z\s]/.test(raw)||uni[0][0]!==sym)){
+    palActs=uni.map(u=>({icon:'i-analyzer',label:u[0]+' · '+u[1],note:u[2],run:()=>{el.value=u[0];renderTickerPalette();el.focus();}}));palSel=0;
+    p.innerHTML='<div class="gs-head"><span class="gs-sym">'+esc(raw)+'</span><span class="gs-meta">'+uni.length+' in the listing</span></div>'+
+      palActs.map((a,i)=>'<button class="gs-act'+(i===palSel?' sel':'')+'" onclick="runPalette('+i+')"><svg class="gi" viewBox="0 0 24 24"><use href="#'+a.icon+'"/></svg><span>'+esc(a.label)+'</span><small>'+esc(a.note||'')+'</small></button>').join('');
+    p.classList.add('on');return;
+  }
   const c=symbolContext(sym);
+  if(exact)c.name=exact[1];
   palActs=paletteActions(sym);palSel=0;
   const tags=[];
   if(c.held)tags.push('<span class="pill pill-buy" style="font-size:10px">held</span>');
@@ -3785,7 +3796,7 @@ function renderTickerPalette(){
   if(c.thesis)tags.push('<span class="pill pill-hold" style="font-size:10px">thesis</span>');
   p.innerHTML=
     '<div class="gs-head"><span class="gs-sym">'+esc(sym)+'</span>'+tags.join('')+
-      '<span class="gs-meta">'+(c.price!=null?fmt$(c.price):'not scored yet')+
+      '<span class="gs-meta">'+(c.name?esc(c.name)+'<br>':'')+(c.price!=null?fmt$(c.price):'not scored yet')+
       (c.priced?'<br>'+c.priced+' days logged':'')+'</span></div>'+
     palActs.map((a,i)=>
       '<button class="gs-act'+(i===palSel?' sel':'')+'" onclick="runPalette('+i+')">'+
@@ -3796,6 +3807,7 @@ function renderTickerPalette(){
 function runPalette(i){
   const a=palActs[i];
   const el=document.getElementById('globalSearch');
+  if(a&&a.label&&a.note&&/^[A-Z]{1,5} · /.test(a.label)&&/^(NYSE|Nasdaq|NYSE American|NYSE Arca|Cboe)$/.test(a.note)){ a.run(); return; }   /* a listing pick fills the box instead of closing it */
   closePalette();
   if(el){el.value='';el.blur();}
   if(a&&a.run)a.run();
@@ -4954,10 +4966,11 @@ function hindsightRows(){
        twenty sessions in it put a 59-session return under a "five years" heading, which is the
        overclaim this panel exists to argue against, merely relocated from the vendor path to this
        one. A logged series is used only when it covers most of the requested window; short of
-       that the ticker is omitted for that window rather than shown under the wrong label. Since
-       the log is capped at 300 sessions, this means the longest windows are vendor-only, which is
-       the truth about what this app can measure on its own. */
-    const rows=(D.priceLog||{})[sym];
+       that the ticker is omitted for that window rather than shown under the wrong label. The
+       synced log is capped at 300 sessions; the device's own five-year history (filled from the
+       worker's /history on first sight of a ticker) is what lets the long windows be measured
+       here rather than taken from the vendor. */
+    const rows=(typeof longSeries==='function'&&longSeries(sym))||(D.priceLog||{})[sym];
     const need=Math.max(20,Math.floor(w.days*0.8));
     if(!Array.isArray(rows)||rows.length<need+1)return;
     const slice=rows.slice(-(w.days+1));
@@ -4987,7 +5000,7 @@ function renderHindsight(){
     el.innerHTML='<div class="empty" style="text-align:left;line-height:1.7">'+
       '<b>Nothing to rank over a '+esc(w.label)+' yet.</b><br><span style="font-size:var(--fs-sm)">'+
       'These figures come from the scoring call, so a ticker appears here once it has been scored at least once. '+
-      (w.days>300?'This app\'s own price log is capped at 300 sessions, so a window this long can only come from the vendor; it is never stitched together from a shorter log. ':'')+
+      (w.days>1300?'This app\'s own history holds five years, so a window this long can only come from the vendor; it is never stitched together from a shorter log. ':'')+
       'Run a refresh, or analyse a ticker, and it fills in immediately rather than accumulating over time. '+
       (w.k==='y5'?'A five-year figure also depends on the vendor publishing that window for a given ticker; where it does not, nothing is shown rather than a shorter span dressed up as five years. ':'')+
       'It deliberately does not rank the whole market: that needs about four thousand quotes per window against a sixty-per-minute limit.</span></div>';
@@ -5574,10 +5587,12 @@ function loadRecommendations(){
     toast('Loaded this week\'s '+filtered.length+' picks. Same batch until it rotates again next week. Hit Run screen to score them.');
   }
 }
-async function startScreener(){
+async function startScreener(givenList){
   if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
   if(screenerRunning)return;
-  const list=parseTickerList(document.getElementById('screenerInput').value);
+  const typed=document.getElementById('screenerInput').value;
+  if(!Array.isArray(givenList)&&/^\(whole market/.test(typed.trim())){ return scanUniverse(); }
+  const list=Array.isArray(givenList)?givenList:parseTickerList(typed);
   if(!list.length)return toast('Paste some tickers or pick a preset first.');
   screenerRunning=true;screenerCancelFlag=false;screenerResults=[];
   document.getElementById('screenerStartBtn').style.display='none';
@@ -8735,6 +8750,7 @@ function logPrice(sym,price){
 }
 async function backfillPrices(sym){
   if(!D.priceLog)D.priceLog={};
+  if(typeof histFill==='function')histFill(sym);   /* five years for this device; the synced log below stays at 300 sessions */
   const have=(D.priceLog[sym]||[]).length;
   if(have>=50)return;                       // already deep enough for the longest segment
   try{
@@ -8779,7 +8795,10 @@ function drawPriceChart(canvasId,sym,opts){
   if(typeof Chart==='undefined')return false;
   const el=document.getElementById(canvasId);
   if(!el)return false;
-  const arr=(D.priceLog||{})[sym];
+  /* The local five-year history when it exists, the synced log otherwise; a missing history is
+     fetched and the chart redrawn once it lands. */
+  const arr=(typeof longSeries==='function'&&longSeries(sym))||(D.priceLog||{})[sym];
+  if(typeof histFill==='function'&&!(typeof histHas==='function'&&histHas(sym))&&hasMarketData!==undefined){ histFill(sym).then(function(ok){ if(ok)drawPriceChart(canvasId,sym,opts); }); }
   if(!arr||arr.length<3)return false;
   opts=opts||{};
   const days=opts.days||0;
@@ -15540,6 +15559,8 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 <style id="v2-world">
 /* World: the globe of plants. Scoped to the tab so the Cesium widget CSS cannot leak into the rest
    of the terminal, and the terminal's tokens cannot fight the canvas. */
+.card>h3+details.aside.about,.card>.row+details.aside.about{margin:-2px 0 12px}
+details.aside.about summary{font-size:12px;color:var(--muted)}
 #tab-world .wd-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 #tab-world .wd-form input{flex:1 1 300px;min-width:220px;height:40px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 12px;color:var(--text);font:inherit}
 #tab-world .wd-form input:focus{outline:none;border-color:var(--brand2);box-shadow:0 0 0 3px var(--glow)}
@@ -15591,8 +15612,6 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
    that pushes the globe off the screen; the explanation moves under the chips; the panel follows
    the globe. Chips grow to a thumb's height on a coarse pointer. */
 @media (max-width:768px){
-  #tab-world .wd-intro{display:flex;flex-direction:column}
-  #tab-world .wd-intro>p.muted{order:9;margin:12px 0 0!important;font-size:12.5px}
   #tab-world .wd-form input{flex:1 1 0;min-width:0}
   #tab-world .wd-form .btn{flex:none}
   #tab-world .wd-form #wdStatus{flex-basis:100%}
@@ -15634,7 +15653,8 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
    Cesium (5.7 MB) loads the first time this tab opens and never before. */
 (function(){
   var BASE='/vendor/cesium/', DATA='/world/data/';
-  var IDX=null, SET=null, viewer=null, points=null, NE=null, loadP=null;
+  var IDX=null, SET=null, viewer=null, points=null, NE=null, loadP=null, sat=null;
+  function satFade(){ if(!viewer||!sat)return; var hgt=viewer.camera.positionCartographic.height, a=hgt>4e6?0:hgt<1.2e6?1:(4e6-hgt)/(4e6-1.2e6); if(Math.abs((sat.alpha||0)-a)<0.01&&sat.show===(a>0))return; sat.alpha=a; sat.show=a>0; viewer.scene.requestRender(); }
   function $(id){return document.getElementById(id);}
   function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||''; }catch(e){ return ''; } }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
@@ -15686,7 +15706,15 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       sc.backgroundColor=C.Color.fromCssColorString('#07090f'); sc.globe.baseColor=C.Color.fromCssColorString('#101827');
       sc.globe.showGroundAtmosphere=true; sc.globe.depthTestAgainstTerrain=true; sc.fog.enabled=false; sc.highDynamicRange=false;
       if(sc.sun)sc.sun.show=false; if(sc.moon)sc.moon.show=false;
-      var ctl=sc.screenSpaceCameraController; ctl.minimumZoomDistance=350000; ctl.maximumZoomDistance=32000000; ctl.enableTilt=false;   /* Natural Earth II is a world map, not street imagery: below ~350 km it is only blur */
+      var ctl=sc.screenSpaceCameraController; ctl.minimumZoomDistance=600; ctl.maximumZoomDistance=32000000; ctl.enableTilt=false;
+      /* Satellite on the way down. Natural Earth II is a world map and blurs below a few hundred
+         kilometres, so Esri World Imagery is layered above it and faded in between 4,000 km and
+         1,200 km of altitude: the globe stays a globe, and a plant becomes a roof. The tiles are
+         only requested once the layer is visible, so a look at the world costs no tile at all. */
+      C.ArcGisMapServerImageryProvider.fromUrl('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer',{credit:new C.Credit('Satellite imagery: Esri, Maxar, Earthstar Geographics, and the GIS User Community'),enablePickFeatures:false})
+        .then(function(p){ sat=viewer.imageryLayers.addImageryProvider(p); sat.alpha=0; sat.show=false; satFade(); })
+        .catch(function(){ sat=null; });
+      viewer.camera.percentageChanged=0.03; viewer.camera.changed.addEventListener(satFade);
       /* Open on the whole planet, Atlantic-centred, so the first look is the world and not a hemisphere. */
       viewer.camera.setView({destination:C.Cartesian3.fromDegrees(10,22,1.75e7)});
       points=sc.primitives.add(new C.PointPrimitiveCollection());
@@ -15750,7 +15778,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       (f.t&&typeof analyzeStock==='function'?'<button class="btn btn-ghost btn-sm" type="button" onclick="analyzeStock('+JSON.stringify(String(f.t).replace(/[^A-Z0-9.\-]/gi,''))+')">Analyze '+esc(f.t)+'</button>':'')+
       (f.w?'<a class="btn btn-ghost btn-sm" href="'+esc(f.w)+'" target="_blank" rel="noopener noreferrer">Website</a>':'')+
       (/^Q\d+$/.test(f.i)?'<a class="btn btn-ghost btn-sm" href="https://www.wikidata.org/wiki/'+esc(f.i)+'" target="_blank" rel="noopener noreferrer">On Wikidata</a>':'<a class="btn btn-ghost btn-sm" href="https://www.openstreetmap.org/'+esc(osm)+'" target="_blank" rel="noopener noreferrer">On OpenStreetMap</a>')+'</div></div>';
-    var C=window.Cesium; viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(f.lo,f.la,1200000),duration:.9}); viewer.scene.requestRender();
+    var C=window.Cesium; viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(f.lo,f.la,30000),duration:1.4}); viewer.scene.requestRender();
   }
 
   /* ---- an industry: a bundled layer ---- */
@@ -15793,7 +15821,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   var ALL=null;
   function loadAll(){ if(ALL)return Promise.resolve(ALL); return fetch(DATA+'all.json').then(function(r){ if(!r.ok)throw new Error('all'); return r.json(); }).then(function(j){ ALL=j.rows||[]; return ALL; }).catch(function(){ ALL=[]; return ALL; }); }
   function localMatches(name){
-    var rx=new RegExp('(^|[^A-Za-z])('+String(name).replace(/[.*+?^${}()|[\]\\]/g,'\\  window.wdHoldings=function(){')+')([^A-Za-z]|$)','i'), out=[];
+    var rx=new RegExp('(^|[^A-Za-z])('+String(name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')([^A-Za-z]|$)','i'), out=[];
     for(var i=0;i<ALL.length&&out.length<400;i++){ var r=ALL[i]; if(rx.test(r[0])||(r[1]&&rx.test(r[1]))){ var f={i:'b'+i,n:r[0],la:r[2],lo:r[3],s:'o'}; if(r[1])f.o=r[1]; if(r[4])f.c=r[4]; if(r[5])f.p=r[5].replace(/_/g,' '); if(r[6])f.q=r[6]; out.push(f); } }
     return out;
   }
@@ -15928,6 +15956,78 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='market')setTimeout(load,30); return r; }; }
   window.addEventListener('resize',function(){ if(document.getElementById('pfHeat')&&document.getElementById('tab-market')&&!document.getElementById('tab-market').classList.contains('tabs-hidden'))render(); });
   window.renderHeat=load;
+})();
+</script>
+<script>
+/* The market, built in.
+   HIST: five years of daily closes per ticker, on this device only (localStorage, not the synced
+   profile, whose 300-session log stays small enough to sync). Filled from the worker's /history
+   the first time a ticker is charted or scored, kept for the day, the least recently used symbols
+   dropped past 120 so the store stays under the browser's ceiling.
+   UNIVERSE: every US-listed common stock, symbol, name and venue, from the worker's /universe,
+   refreshed daily, so a company name resolves to its ticker and the Screener can scan the whole
+   listing rather than only what was pasted. */
+(function(){
+  var HKEY='pf_hist_v1', UKEY='pf_universe_v1', HMAX=120;
+  var H=null, U=null, filling={};
+  function loadH(){ if(H)return H; try{ H=JSON.parse(localStorage.getItem(HKEY)||'{}'); }catch(e){ H={}; } if(!H||typeof H!=='object')H={}; return H; }
+  function saveH(){ try{ localStorage.setItem(HKEY,JSON.stringify(H)); }catch(e){ /* full: drop the oldest half and try once more */ try{ var keys=Object.keys(H).sort(function(a,b){return (H[a].used||0)-(H[b].used||0);}); keys.slice(0,Math.ceil(keys.length/2)).forEach(function(k){delete H[k];}); localStorage.setItem(HKEY,JSON.stringify(H)); }catch(e2){} } }
+  window.histHas=function(sym){ var h=loadH()[sym]; return !!(h&&h.d&&h.d.length>20&&h.asOf===new Date().toISOString().slice(0,10)); };
+  window.histFill=function(sym){
+    sym=String(sym||'').toUpperCase(); if(!/^[A-Z.\-]{1,10}$/.test(sym))return Promise.resolve(false);
+    if(histHas(sym)){ loadH()[sym].used=Date.now(); return Promise.resolve(true); }
+    if(filling[sym])return filling[sym];
+    if(typeof INVITE_WORKER!=='string')return Promise.resolve(false);
+    filling[sym]=fetch(INVITE_WORKER+'/history?symbol='+encodeURIComponent(sym),{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+      if(!(j&&Array.isArray(j.closes)&&j.closes.length>=20))return false;
+      var d=[],p=[]; j.dates.forEach(function(dt,i){ var v=j.closes[i]; if(isFinite(v)&&v>0){ d.push(dt); p.push(Math.round(v*10000)/10000); } });
+      loadH(); H[sym]={asOf:j.asOf||new Date().toISOString().slice(0,10),d:d,p:p,used:Date.now()};
+      var keys=Object.keys(H); if(keys.length>HMAX){ keys.sort(function(a,b){return (H[a].used||0)-(H[b].used||0);}).slice(0,keys.length-HMAX).forEach(function(k){delete H[k];}); }
+      saveH(); return true;
+    }).catch(function(){ return false; }).then(function(ok){ delete filling[sym]; return ok; });
+    return filling[sym];
+  };
+  /* The long series for a ticker: the five-year history with the synced log laid over it, so the
+     most recent sessions (which the log has and the daily history may not yet) are always present. */
+  window.longSeries=function(sym){
+    var h=loadH()[sym]; var log=(typeof D!=='undefined'&&D&&D.priceLog&&D.priceLog[sym])||[];
+    if(!(h&&h.d&&h.d.length>20))return null;
+    h.used=Date.now();
+    var m={}; for(var i=0;i<h.d.length;i++)m[h.d[i]]=h.p[i]; log.forEach(function(r){ if(r&&r.d&&isFinite(r.p)&&r.p>0)m[r.d]=r.p; });
+    return Object.keys(m).sort().map(function(d){return {d:d,p:m[d]};});
+  };
+  /* the listing */
+  function loadU(){
+    if(U)return Promise.resolve(U);
+    var today=new Date().toISOString().slice(0,10);
+    try{ var c=JSON.parse(localStorage.getItem(UKEY)||'null'); if(c&&c.asOf===today&&Array.isArray(c.rows)){ U=c.rows; return Promise.resolve(U); } }catch(e){}
+    if(typeof INVITE_WORKER!=='string')return Promise.resolve([]);
+    return fetch(INVITE_WORKER+'/universe',{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(j){ if(!(j&&Array.isArray(j.rows)&&j.rows.length>1000)){ U=U||[]; return U; } U=j.rows; try{ localStorage.setItem(UKEY,JSON.stringify({asOf:today,rows:U})); }catch(e){} return U; }).catch(function(){ U=U||[]; return U; });
+  }
+  window.loadUniverse=loadU;
+  window.universeMatches=function(text,limit){
+    if(!U)return [];
+    var t=String(text||'').trim().toLowerCase(); if(!t)return [];
+    var sym=t.toUpperCase(), out=[], rx=new RegExp('(^|[\\s\\-&.])'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i');
+    for(var i=0;i<U.length;i++){ var r=U[i]; if(r[0]===sym){ out.unshift(r); continue; } if(r[0].indexOf(sym)===0||rx.test(r[1]))out.push(r); if(out.length>=(limit||6)*3)break; }
+    /* exact symbol first, then symbol prefixes, then names */
+    out.sort(function(a,b){ var sa=a[0]===sym?0:a[0].indexOf(sym)===0?1:2, sb=b[0]===sym?0:b[0].indexOf(sym)===0?1:2; return sa-sb||a[0].localeCompare(b[0]); });
+    return out.slice(0,limit||6);
+  };
+  window.universeSize=function(){ return U?U.length:0; };
+  /* the Screener over the whole listing, in the background, resumable through the 12-hour cache */
+  window.scanUniverse=function(){
+    if(typeof hasMarketData==='function'&&!hasMarketData()){ if(typeof toast==='function')toast('Market data needs the data key first.'); return; }
+    loadU().then(function(rows){
+      if(!rows.length){ if(typeof toast==='function')toast('The listing did not load; try again in a minute.'); return; }
+      var hours=Math.round(rows.length*4/3600*10)/10;
+      var note=document.getElementById('scanAllNote'); if(note)note.textContent=rows.length+' stocks, about '+hours+' hours at the free tier’s pace; keep the tab open, stop any time, scores under twelve hours old are reused.';
+      var ta=document.getElementById('screenerInput'); if(ta)ta.value='(whole market: '+rows.length+' stocks)';
+      if(typeof startScreener==='function')startScreener(rows.map(function(r){return r[0];}));
+    });
+  };
+  /* warm the listing once the app is up, quietly, so the search box knows names on the first keystroke */
+  document.addEventListener('DOMContentLoaded',function(){ setTimeout(function(){ loadU(); },4000); });
 })();
 </script>
 </body>

@@ -40,7 +40,9 @@ const HEADERS = {
 /* The terminal and admin are single files with inline script and style by design, so their CSP
    keeps 'unsafe-inline'; the meta CSP inside each file says why. worker-src 'self' is for
    the World view's globe (CesiumJS, vendored), whose geometry workers are same-origin module
-   workers under /vendor/cesium/Workers; nothing else on the site makes a worker. 'wasm-unsafe-eval'
+   workers under /vendor/cesium/Workers; nothing else on the site makes a worker. The two arcgisonline hosts are Esri's World Imagery, the
+   satellite layer the World view fades in as the camera descends; img-src for the tiles,
+   connect-src for the service description. 'wasm-unsafe-eval'
    lets Cesium compile the mesh decoders it instantiates at load (unused here, noisy if refused);
    it permits WebAssembly compilation only, never string evaluation, which stays forbidden. The public site, built by Vite,
    gets the strict policy: no inline script, no inline style, nothing from anywhere but here and
@@ -49,7 +51,7 @@ function csp(path, env) {
   const worker = (env.WORKER_URL || '').replace(/\/+$/, '');
   const connect = ["'self'", worker, 'https://*.workers.dev', 'https://finnhub.io', 'https://formsubmit.co'].filter(Boolean).join(' ');
   if (GATED.some(re => re.test(path))) {
-    return `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src ${connect}; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
+    return `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://services.arcgisonline.com https://server.arcgisonline.com; font-src 'self' data:; connect-src ${connect} https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
   }
   return `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect}; form-action 'self' https://checkout.stripe.com; base-uri 'self'; object-src 'none'; frame-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests`;
 }
