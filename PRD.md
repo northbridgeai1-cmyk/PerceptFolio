@@ -252,7 +252,7 @@ On every push and pull request: the existing suite (extended); `site/` lint, typ
 | M4 | Guided Finnhub-key onboarding; **Business mode** in the terminal (org rulebook, attribution, seats, export); admin shows subscribers, orgs, applications, employees; **the request-notification email** (added 2026-09-14 at Pierce's instruction) | **Built 2026-09-14.** Worker `2026-09-14.1` live: `/org`, `/org/rulebook`, `/pause/code`, Email Routing sender. Terminal: firm line, rulebook applied and locked for members, Publish for the admin seat, calls stamped `by`, first-run key card. Admin: per-seat pause. `test/billing.mjs` 43/43 including a 3-seat firm round-trip. **Remaining operator step: enable Email Routing on perceptfolio.com and verify the destination address** (§20). |
 | M5 | Security items 1–20 + P1–P3 closed with evidence; Strix run; `SECURITY.md` updated | **Built 2026-09-14.** Every row in `SECURITY.md` names its test or record. Closed today: PBKDF2 passwords with migration, per-minute limits and a body cap on the Worker, react-router 7 (two advisories), the automated audit's three findings (one HIGH). Open: rate-limit binding not verified live (WAF rule at M7); Strix needs a key. Access requests now deliver by FormSubmit; activation email sent. |
 | M6 | Kronos service deployed; Model view; forecasts recorded and marked | **Built 2026-09-14; one operator command left (`bash kronos/deploy.sh`, needs a Modal sign-in).** `kronos/app.py` (Modal, T4, Kronos-small, token-checked); worker `/kronos` (code-gated, Yahoo daily OHLCV, day cache, 503 until configured); terminal Projections gains a Model view whose direction records onto the `kronos` track and is marked like any call. Contract-tested. **Not yet running: needs your Modal account and two secrets (kronos/README.md).** |
-| M7 | CI/CD complete; DNS cut to Pages; GitHub Pages retired; Stripe account connected, test mode verified, then live | **Built 2026-09-14; the domain move is dashboard-only, runbook and smoke test in §21.** Pages project live at perceptfolio.pages.dev with the gate, real headers, SPA routing, the operator sign-in verified against the Worker (no second copy of the secret). CI workflow runs the suites, build, audit, gitleaks, and deploys on main once `CLOUDFLARE_API_TOKEN` exists. **Remaining, dashboard only: add the custom domain to the Pages project (retires GitHub Pages), add WAF rate-limiting rules, add the CI token (§21).** Stripe stays dormant by decision D15. |
+| M7 | CI/CD complete; DNS cut to Pages; GitHub Pages retired; Stripe account connected, test mode verified, then live | **Done 2026-09-20.** perceptfolio.com and www on Cloudflare Pages (both Active), 21/21 smoke checks on the live domain, GitHub Pages retired and the CNAME file removed. Stripe stays dormant by decision; the CI deploy token and the WAF rules remain optional (§21). Pages project live at perceptfolio.pages.dev with the gate, real headers, SPA routing, the operator sign-in verified against the Worker (no second copy of the secret). CI workflow runs the suites, build, audit, gitleaks, and deploys on main once `CLOUDFLARE_API_TOKEN` exists. **Remaining, dashboard only: add the custom domain to the Pages project (retires GitHub Pages), add WAF rate-limiting rules, add the CI token (§21).** Stripe stays dormant by decision D15. |
 | M8 | History on the first visit; company, analysts and six lenses; Kelly | **Built 2026-09-14.** Worker `/history` and `/council`; the panel beneath every analysis; Kelly in Risk. §22. |
 | M9 | The world map of factories on a globe, built on God's Eye View | **Built 2026-09-20.** World tab (CesiumJS vendored, Natural Earth II from this origin); fifteen bundled layers from Wikidata and OpenStreetMap; live company search through Nominatim; both CSPs kept without `'unsafe-eval'`. §23. |
 
@@ -302,12 +302,12 @@ Why no email arrived: the Worker was the 6 September build until the evening of 
 
 For emails **to customers** (codes, quotes) a general sender is still required: Resend (`RESEND_API_KEY`, `MAIL_FROM`), or keep sending admin's drafts by hand. Firms of eight or more see the 15% in the suggested quote and the quote draft.
 
-## 21. Cut-over: what only the dashboard can do (updated 2026-09-20)
+## 21. Cut-over: done 2026-09-20 (the runbook, kept for the record)
 
-The gated site is live at https://perceptfolio.pages.dev and passes the production smoke test in
-full (`node test/smoke.mjs https://perceptfolio.pages.dev`: 21 checks). Production
-(`perceptfolio.com`) still points at GitHub Pages, which fails exactly the six checks that need the
-gate and the headers. The account's Cloudflare login used here holds `pages (write)` and
+**Done on 2026-09-20:** the operator key was reset with `wrangler secret put`, both domains were
+attached to the Pages project through the API, the DNS was rewritten in the dashboard, and
+`node test/smoke.mjs https://perceptfolio.com` passed all 21 checks; GitHub Pages was then
+retired and the CNAME file removed. The steps below are how it was done. The account's Cloudflare login used here holds `pages (write)` and
 `zone (read)` but no DNS write, so the move itself is a dashboard step. Before, during and after:
 
 0. **Before you move anything: make sure you can get in.** After the move, `/terminal/` needs an
