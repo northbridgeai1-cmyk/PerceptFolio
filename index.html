@@ -562,9 +562,8 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 calc(var(--s-32) +
     <div class="nav-links">
       <a href="#record">Record</a>
       <a href="#who">Who it's for</a>
-      <a href="/terminal/" id="navOpen" hidden>Resume session</a>
       <div class="lang-toggle" role="group" aria-label="Language"><button type="button" data-lang-toggle="en" aria-pressed="true">EN</button><button type="button" data-lang-toggle="es" aria-pressed="false">ES</button></div>
-      <a class="btn btn-p" href="#request">Request a demo</a>
+      <a class="btn btn-p" id="navPrimary" href="#request">Request a demo</a>
     </div>
   </div>
 </nav>
@@ -1103,14 +1102,16 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
   const w=document.getElementById('seatsWrap'); if(!w)return;
   document.querySelectorAll('input[name=plan]').forEach(r=>r.addEventListener('change',()=>{ w.hidden=r.value!=='business'||!r.checked; if(!w.hidden)document.getElementById('rqSeats').focus(); }));
 })();
-(function nudge(){
+/* Someone who has entered before does not need to be sold to: the one primary action in the nav
+   becomes "Resume session" and opens the terminal. "Entered before" is either a terminal profile
+   in this browser or the door's pf_seen cookie on the gated host. */
+(function resume(){
   try{
-    const db=localStorage.getItem('quantfolio_v1');
-    if(!db)return;
-    const p=JSON.parse(db);
-    if(!(p&&p.profiles&&Object.keys(p.profiles).length))return;
-    const b=document.getElementById('navOpen');
-    if(b)b.hidden=false;
+    let entered=/(^|; )pf_seen=1(;|$)/.test(document.cookie);
+    if(!entered){ const db=localStorage.getItem('quantfolio_v1'); if(db){ const p=JSON.parse(db); entered=!!(p&&p.profiles&&Object.keys(p.profiles).length); } }
+    if(!entered)return;
+    const b=document.getElementById('navPrimary');
+    if(b){ b.textContent='Resume session'; b.setAttribute('href','/terminal/'); }
   }catch(e){}
 })();
 </script>

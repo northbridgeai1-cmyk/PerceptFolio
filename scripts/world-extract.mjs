@@ -74,7 +74,14 @@ function countryOf(lon, lat) {
     const [W, S, E, N] = NE_BOX[i]; if (lon < W || lon > E || lat < S || lat > N) continue;
     for (const poly of NE[i].polys) { if (!inRing(poly[0], lon, lat)) continue; let hole = false; for (let k = 1; k < poly.length; k++) if (inRing(poly[k], lon, lat)) { hole = true; break; } if (!hole) return NE[i].cc; }
   }
-  return '';
+  /* Coasts at 1:110m are coarse: a shipyard on a quay lands in the sea. The nearest coastline
+     within ~60 km names the country; further than that stays unplaced rather than guessed. */
+  let best = '', bestD = 0.6 * 0.6; const cl = Math.cos(lat * Math.PI / 180);
+  for (let i = 0; i < NE.length; i++) {
+    const [W, S, E, N] = NE_BOX[i]; if (lon < W - 0.6 || lon > E + 0.6 || lat < S - 0.6 || lat > N + 0.6) continue;
+    for (const poly of NE[i].polys) for (const [x, y] of poly[0]) { const dx = (x - lon) * cl, dy = y - lat, d = dx * dx + dy * dy; if (d < bestD) { bestD = d; best = NE[i].cc; } }
+  }
+  return best;
 }
 
 /* ------------------------------------------------------------------ Wikidata */
@@ -202,7 +209,8 @@ async function baseRows(mirrors) {
   const rows = []; const missing = [];
   for (const [name, stmt, budget] of BASE_SETS) {
     const r = await cachedCsv(mirrors, 'base-' + name, stmt, BASE_TTL_DAYS, budget);
-    if (r) { if (name.startsWith('works')) for (const o of r) o.man_made = 'works'; if (name.startsWith('landuse')) for (const o of r) o.landuse = o.landuse || 'industrial'; rows.push(...r); } else missing.push(name);
+    /* A loop, not push(...r): the industrial-land set is 350k rows and a spread that size overflows the call stack. */
+    if (r) { for (const o of r) { if (name.startsWith('works')) o.man_made = 'works'; if (name.startsWith('landuse')) o.landuse = o.landuse || 'industrial'; rows.push(o); } } else missing.push(name);
   }
   log(`base sets: ${rows.length} named objects${missing.length ? ', missing ' + missing.join(' ') : ''}`);
   return { rows, missing };
