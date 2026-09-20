@@ -20,8 +20,14 @@ import { sign, setCookie, LIFETIME } from '../_lib/session.js';
 
 const CODE = /^[A-Z0-9]{5}-[A-Z0-9]{5}$/;
 const json = (obj, status = 200, cookie) => {
-  const h = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
-  if (cookie) h['Set-Cookie'] = cookie;
+  const h = new Headers({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  if (cookie) {
+    h.append('Set-Cookie', cookie);
+    /* A second cookie, readable by the page and carrying nothing: the landing page uses it to say
+       "Resume session" instead of "Request a demo" to someone who has entered before. The session
+       itself stays in the HttpOnly cookie above. A year, because the point is to remember. */
+    h.append('Set-Cookie', 'pf_seen=1; Path=/; Max-Age=31536000; Secure; SameSite=Lax');
+  }
   return new Response(JSON.stringify(obj), { status, headers: h });
 };
 

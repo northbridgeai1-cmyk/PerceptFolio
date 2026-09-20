@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-09-20T16:41:06.935Z",
+ "generatedAt": "2026-09-20T17:39:27.001Z",
  "source": "OpenStreetMap contributors (ODbL 1.0) and Wikidata (CC0). Community-mapped; incomplete by nature.",
  "countries": {
   "FJ": "Fiji",
@@ -199,10 +199,10 @@
     "lithography",
     "memory"
    ],
-   "count": 143,
+   "count": 234,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "semiconductors.json"
   },
   {
@@ -221,10 +221,10 @@
     "lcd",
     "ems"
    ],
-   "count": 781,
+   "count": 943,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "electronics.json"
   },
   {
@@ -241,10 +241,10 @@
     "cathode",
     "anode"
    ],
-   "count": 106,
+   "count": 170,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "batteries.json"
   },
   {
@@ -266,10 +266,10 @@
     "motor",
     "motors"
    ],
-   "count": 1200,
+   "count": 2195,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "autos.json"
   },
   {
@@ -290,10 +290,10 @@
     "defence",
     "missiles"
    ],
-   "count": 296,
+   "count": 583,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "aerospace.json"
   },
   {
@@ -319,7 +319,7 @@
    "count": 3000,
    "asOf": "2026-09-20",
    "saturated": true,
-   "partial": true,
+   "partial": false,
    "file": "steel.json"
   },
   {
@@ -341,10 +341,10 @@
     "bauxite",
     "quarry"
    ],
-   "count": 2237,
+   "count": 2710,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "mining.json"
   },
   {
@@ -365,10 +365,10 @@
     "ethylene",
     "cracker"
    ],
-   "count": 1879,
+   "count": 3000,
    "asOf": "2026-09-20",
-   "saturated": false,
-   "partial": true,
+   "saturated": true,
+   "partial": false,
    "file": "refineries.json"
   },
   {
@@ -391,10 +391,10 @@
     "paint",
     "gases"
    ],
-   "count": 2406,
+   "count": 3000,
    "asOf": "2026-09-20",
-   "saturated": false,
-   "partial": true,
+   "saturated": true,
+   "partial": false,
    "file": "chemicals.json"
   },
   {
@@ -417,10 +417,10 @@
     "glp-1",
     "api"
    ],
-   "count": 630,
+   "count": 1003,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "pharma.json"
   },
   {
@@ -438,10 +438,10 @@
     "dockyard",
     "dry dock"
    ],
-   "count": 1800,
+   "count": 1930,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "shipyards.json"
   },
   {
@@ -460,10 +460,10 @@
     "inverters",
     "renewables"
    ],
-   "count": 106,
+   "count": 169,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "solar_wind.json"
   },
   {
@@ -486,7 +486,7 @@
    "count": 3000,
    "asOf": "2026-09-20",
    "saturated": true,
-   "partial": true,
+   "partial": false,
    "file": "datacenters.json"
   },
   {
@@ -503,7 +503,7 @@
    "count": 471,
    "asOf": "2026-09-20",
    "saturated": false,
-   "partial": true,
+   "partial": false,
    "file": "nuclear.json"
   },
   {
@@ -520,10 +520,10 @@
     "lime",
     "bricks"
    ],
-   "count": 2520,
+   "count": 3000,
    "asOf": "2026-09-20",
-   "saturated": false,
-   "partial": true,
+   "saturated": true,
+   "partial": false,
    "file": "cement.json"
   }
  ]
