@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-20.5';
+const WORKER_VERSION = '2026-09-20.7';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -1443,6 +1443,38 @@ function worldFeatures(results) {
   for (const f of out) { delete f._tags; delete f._works; }
   return out;
 }
+/* The model behind the six lenses, the Map's pre-fill and the news summary. Anthropic when
+   AI_API_KEY is set and the account has credit; otherwise Cloudflare's own Workers AI (the AI
+   binding, a free daily allowance, no other account), so the features work on a bare deployment.
+   Same contract either way: a system prompt, a user message, plain text back; the callers parse
+   the JSON they asked for. Failure is an Error with the provider's sentence, never a silent
+   empty answer. */
+const CF_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+async function aiText(env, system, user, maxTokens) {
+  let lastErr = null;
+  if (env.AI_API_KEY) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': env.AI_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: env.AI_MODEL || 'claude-haiku-4-5-20251001', max_tokens: maxTokens, temperature: 0, system, messages: [{ role: 'user', content: user }] }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error('model ' + res.status + (j && j.error && j.error.message ? ': ' + String(j.error.message).slice(0, 160) : ''));
+      const text = j && j.content && j.content[0] && j.content[0].text || '';
+      if (!text.trim()) throw new Error('model answered nothing');
+      return { text, model: 'anthropic' };
+    } catch (e) { lastErr = e; }
+  }
+  if (env.AI && typeof env.AI.run === 'function') {
+    try {
+      const r = await env.AI.run(env.AI_MODEL_CF || CF_MODEL, { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], max_tokens: maxTokens, temperature: 0 });
+      /* Workers AI returns the reply as parsed JSON when the model produced JSON; the callers expect text. */
+      let text = r && (r.response !== undefined ? r.response : (r.result && r.result.response));
+      if (text && typeof text === 'object') text = JSON.stringify(text);
+      if (!String(text || '').trim()) throw new Error('workers ai answered nothing');
+      return { text: String(text), model: 'workers-ai' };
+    } catch (e) { lastErr = lastErr ? new Error(lastErr.message + '; then workers ai: ' + (e.message || e)) : e; }
+  }
+  throw lastErr || new Error('no model configured');
+}
 const MAX_BODY = 16 * 1024;
 function bodyTooLarge(request) { const n = parseInt(request.headers.get('Content-Length') || '0', 10); return isFinite(n) && n > MAX_BODY; }
 
@@ -1676,22 +1708,19 @@ async function handleBilling(request, env, url) {
       analystsHistory: history,
       targetMean: target, recommendationMean: recMean,
     };
-    let lenses = null, note = null;
-    if (env.AI_API_KEY) {
+    let lenses = null, note = null, modelUsed = null;
+    if (env.AI_API_KEY || env.AI) {
       const system = 'You write six short readings of a listed business, each applying the PUBLISHED investment framework of a named investor. You are not those people and you must never claim to be; the reader sees a label saying these are AI applications of published frameworks. Use only the facts given. Each reading: 3 to 4 plain sentences, no jargon, no hedging padding, one concrete number from the facts where possible, and a one-word stance from {favourable, cautious, unfavourable, insufficient}. Argue honestly: two of the lenses are meant to disagree with the others when the facts warrant. End with "whatWouldChangeMyMind" per lens, one sentence. Never say buy, sell, hold, or recommend; describe how the framework reads the business. Output strict JSON: {"lenses":[{"id":"value","name":"Value (after Buffett)","stance":"","reading":"","whatWouldChangeMyMind":""},{"id":"growth","name":"Growth (after Lynch)",...},{"id":"macro","name":"Macro (after Dalio)",...},{"id":"innovation","name":"Innovation (after Wood)",...},{"id":"contrarian","name":"Contrarian (after Burry)",...},{"id":"risk","name":"Downside (after Marks)",...}]}';
       try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': env.AI_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-          body: JSON.stringify({ model: env.AI_MODEL || 'claude-haiku-4-5-20251001', max_tokens: 1800, temperature: 0, system, messages: [{ role: 'user', content: 'Facts (null means unavailable):\n' + JSON.stringify(facts) }] }) });
-        const j = await res.json(); const text = j && j.content && j.content[0] && j.content[0].text || '';
-        if (!res.ok) throw new Error('model ' + res.status + (j && j.error && j.error.message ? ': ' + String(j.error.message).slice(0, 160) : ''));
-        const start = text.indexOf('{'), end = text.lastIndexOf('}');
+        const a = await aiText(env, system, 'Facts (null means unavailable):\n' + JSON.stringify(facts), 1800);
+        const text = a.text, start = text.indexOf('{'), end = text.lastIndexOf('}');
         if (start < 0) throw new Error('model answered without JSON');
-        lenses = JSON.parse(text.slice(start, end + 1)).lenses || null;
+        lenses = JSON.parse(text.slice(start, end + 1)).lenses || null; modelUsed = a.model;
       } catch (e) { note = 'The six readings could not be produced right now (' + String(e.message || e).slice(0, 200) + '); the facts stand.'; }
-    } else note = 'The six readings need the AI key on the worker; the facts stand.';
-    const result = { facts, lenses, note, asOf: day, disclaimer: 'The six readings are AI applications of each investor’s published framework to the facts above. They are not those people’s views, and nothing here is a recommendation.', cached: false };
+    } else note = 'The six readings need a model on the worker; the facts stand.';
+    const result = { facts, lenses, note, model: modelUsed, asOf: day, disclaimer: 'The six readings are AI applications of each investor’s published framework to the facts above. They are not those people’s views, and nothing here is a recommendation.', cached: false };
     /* A day of nothing is never cached: a failed model call gets retried on the next look. */
-    if (lenses || !env.AI_API_KEY) await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 86400 });
+    if (lenses || !(env.AI_API_KEY || env.AI)) await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 86400 });
     return json(result, 200, env);
   }
 
@@ -1793,24 +1822,22 @@ async function handleBilling(request, env, url) {
     if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
     const ck = 'mapfill:' + sym;
     const cached = await env.PF_SYNC.get(ck); if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
-    if (!env.AI_API_KEY) return json({ error: 'The pre-fill needs the AI key on the worker.', configured: false }, 503, env);
+    if (!(env.AI_API_KEY || env.AI)) return json({ error: 'The pre-fill needs a model on the worker.', configured: false }, 503, env);
     let name = sym, industry = '';
     if (env.FINNHUB_API_KEY) { try { const r = await fetch('https://finnhub.io/api/v1/stock/profile2?symbol=' + sym + '&token=' + env.FINNHUB_API_KEY); const p = r.ok ? await r.json() : null; if (p && p.name) { name = p.name; industry = p.finnhubIndustry || ''; } } catch (e) { /* the symbol alone will do */ } }
     const system = 'You map the supply chain of a listed company from public, well-documented knowledge (annual reports, investor materials, widely reported sourcing). Output strict JSON only: {"suppliers":[{"name":"","ticker":"","weight":0,"note":""}],"customers":[{"name":"","ticker":"","weight":0,"note":""}]}. Up to eight of each, most important first. "ticker": the US-listed symbol only when certain, else "". "weight": a rough integer share, 1 to 100, of the company\'s cost base (suppliers) or revenue (customers); when unknown use 10. "note": one plain clause on what flows between them. If the company is small or its chain is not publicly documented, return empty arrays. Never invent a company, a ticker or a number. No prose outside the JSON.';
-    let suppliers = [], customers = [], note = null;
+    let suppliers = [], customers = [], note = null, modelUsed = null;
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': env.AI_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: env.AI_MODEL || 'claude-haiku-4-5-20251001', max_tokens: 1400, temperature: 0, system, messages: [{ role: 'user', content: 'Company: ' + name + ' (' + sym + ')' + (industry ? ', industry: ' + industry : '') }] }) });
-      const j = await res.json(); const text = j && j.content && j.content[0] && j.content[0].text || '';
-      if (!res.ok) throw new Error('model ' + res.status + (j && j.error && j.error.message ? ': ' + String(j.error.message).slice(0, 160) : ''));
-      const start = text.indexOf('{'), end = text.lastIndexOf('}');
+      const a = await aiText(env, system, 'Company: ' + name + ' (' + sym + ')' + (industry ? ', industry: ' + industry : ''), 1400);
+      const text = a.text, start = text.indexOf('{'), end = text.lastIndexOf('}');
       if (start < 0) throw new Error('model answered without JSON');
-      const parsed = JSON.parse(text.slice(start, end + 1));
+      const parsed = JSON.parse(text.slice(start, end + 1)); modelUsed = a.model;
       const tidy = (arr) => (Array.isArray(arr) ? arr : []).slice(0, 8).map(x => ({ name: clean(x && x.name, 60), ticker: /^[A-Z.\-]{1,10}$/.test(String(x && x.ticker || '')) ? String(x.ticker) : '', weight: Math.max(1, Math.min(100, Math.round(Number(x && x.weight) || 10))), note: clean(x && x.note, 140) })).filter(x => x.name && x.ticker !== sym);
       suppliers = tidy(parsed.suppliers); customers = tidy(parsed.customers);
     } catch (e) { note = 'The pre-fill could not be produced right now (' + String(e.message || e).slice(0, 200) + ').'; }
-    const result = { symbol: sym, name, suppliers, customers, note, asOf: new Date().toISOString().slice(0, 10), disclaimer: 'Pre-filled from the model’s general knowledge of publicly documented supply chains, not from filings or a data feed. Weights are rough shares. Edit anything that is wrong; your edits win.', cached: false };
-    if (!note) await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 30 * 86400 });
+    const result = { symbol: sym, name, suppliers, customers, note, model: modelUsed, asOf: new Date().toISOString().slice(0, 10), disclaimer: 'Pre-filled from the model’s general knowledge of publicly documented supply chains, not from filings or a data feed. Weights are rough shares. Edit anything that is wrong; your edits win.', cached: false };
+    /* A real answer keeps for a month; an empty one (a small company, or a model having a bad day) for a day. */
+    if (!note) await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: (suppliers.length || customers.length) ? 30 * 86400 : 86400 });
     return json(result, 200, env);
   }
 
