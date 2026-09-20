@@ -209,3 +209,11 @@ no other account, no card). The same prompts, the same JSON parsing, the same "n
 instruction; each answer records which model produced it. Workers AI hands JSON back already
 parsed, which the helper stringifies. Verified live: NVDA's map and six lenses through Workers AI
 while the Anthropic account is out of credit. Evidence: three checks in `test/billing.mjs`.
+
+## Cut-over complete (2026-09-20)
+
+perceptfolio.com and www.perceptfolio.com serve from Cloudflare Pages: the gate, the HSTS/CSP/frame
+headers and the SPA routes are live on the production domain (`node test/smoke.mjs
+https://perceptfolio.com`: 21/21). GitHub Pages is retired, so no copy of the terminal is served
+ungated anywhere. The operator key was rotated the same day; `.dev.vars` still needs the new value
+for the gate suite's three operator checks.
