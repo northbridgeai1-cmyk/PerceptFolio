@@ -395,6 +395,11 @@ AISStream are fair-use feeds a sold product should not lean on), its TeleGeograp
 (1.5 million objects, more than the public mirrors can hand over); the live company search does
 reach them, because Nominatim indexes every named object.
 
+Added 2026-09-20, later the same day: **Your holdings** on World (every plant of every company
+held, one request, bundle first and Nominatim on top, a colour per holding); the **analyst trend**
+(twelve monthly stacked bars in the company panel); a **monthly refresh workflow** that re-runs the
+extractor and opens a pull request; the layer cap raised to 5,000.
+
 Coverage is what the community has drawn. Fabs on Wikidata skew to the former Soviet Union; OSM
 carries TSMC, Samsung and Intel because people drew them. The page says "community-mapped,
 incomplete by nature" and shows the count and date, and that is the honest product.

@@ -1,0 +1,74 @@
+# The World layers age: plants get drawn on OpenStreetMap every day and Wikidata gains owners and
+# tickers. Once a month this re-runs the extractor and opens a pull request with the refreshed
+# world/data, so a person looks at the counts before they ship. The base sets (about forty minutes
+# of pulls from the public Overpass mirrors) are cached for the month, so a re-run in the same
+# month costs only the Wikidata and tag-selector queries. Nothing here needs a secret: both sources
+# are public, and the pull request uses the workflow's own token. A layer whose source could not
+# answer is marked partial and the extractor keeps the previous file's features for that source;
+# the pull request body shows every count and every partial flag, which is the review.
+name: world-refresh
+on:
+  schedule:
+    - cron: '17 6 1 * *'      # 06:17 UTC on the first of the month, off the hour to be kind to the mirrors
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Comma-separated industry ids to refresh (blank = all)'
+        required: false
+        default: ''
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Month stamp
+        id: month
+        run: echo "ym=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+      - name: Base sets from the previous run this month
+        uses: actions/cache@v4
+        with:
+          path: world/.cache
+          key: world-base-${{ steps.month.outputs.ym }}
+      - name: Extract
+        run: node scripts/world-extract.mjs --force ${{ inputs.only != '' && format('--only={0}', inputs.only) || '' }} 2>&1 | tee extract.log
+      - name: Summary for the pull request
+        id: sum
+        run: |
+          {
+            echo 'body<<EOF'
+            echo 'Monthly refresh of the World layers from OpenStreetMap and Wikidata.'
+            echo
+            echo '| Layer | Plants | Countries | Partial |'
+            echo '|---|---|---|---|'
+            node -e '
+              const fs=require("fs");const idx=JSON.parse(fs.readFileSync("world/data/index.json"));
+              for(const i of idx.industries){const j=JSON.parse(fs.readFileSync("world/data/"+i.file));console.log(`| ${i.label} | ${i.count} | ${Object.keys(j.byCountry||{}).filter(k=>k!=="?").length} | ${i.partial?"**yes**":"no"} |`);}
+              console.log();console.log("Generated "+idx.generatedAt+". A partial layer kept the previous run'"'"'s features for the source that did not answer; re-run the workflow to try again.");'
+            echo
+            echo '<details><summary>Extractor log (tail)</summary>'
+            echo
+            echo '```'
+            grep -v 'unreachable right now' extract.log | tail -60
+            echo '```'
+            echo '</details>'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+      - name: Open the pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: world-refresh/${{ steps.month.outputs.ym }}
+          title: 'World layers: refresh ${{ steps.month.outputs.ym }}'
+          commit-message: |
+            World layers: refresh ${{ steps.month.outputs.ym }}
+
+            Re-extracted by .github/workflows/world-refresh.yml from OpenStreetMap and Wikidata.
+          body: ${{ steps.sum.outputs.body }}
+          labels: data
+          add-paths: world/data
+          delete-branch: true
