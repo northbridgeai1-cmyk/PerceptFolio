@@ -277,6 +277,15 @@ function writeIndex() {
     industries,
   };
   fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 1));
+  /* all.json: every plant across the layers as compact rows [name, operator, lat, lon, country,
+     industry, wikidata], one plant once, so the terminal can match a holding's name locally and
+     instantly (Nominatim adds what the bundle lacks). About 70 bytes a plant. */
+  const seen = new Set(), rows = [];
+  for (const ind of INDUSTRIES) {
+    const file = path.join(OUT, ind.id + '.json'); if (!fs.existsSync(file)) continue;
+    for (const f of JSON.parse(fs.readFileSync(file, 'utf8')).features) { const k = f.i.replace(/^[a-z]+:/, ''); if (seen.has(k)) continue; seen.add(k); rows.push([f.n, f.o || '', f.la, f.lo, f.c || '', ind.id, f.q || '']); }
+  }
+  fs.writeFileSync(path.join(OUT, 'all.json'), JSON.stringify({ asOf: new Date().toISOString().slice(0, 10), columns: ['name', 'operator', 'lat', 'lon', 'country', 'industry', 'wikidata'], rows }));
   return index;
 }
 

@@ -15485,7 +15485,19 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       .then(function(x){
         var j=x.j; if(!x.ok){ box.innerHTML='<div class="mv-kicker">Company, analysts and six lenses</div><div class="mv-empty" style="margin-top:10px"><span class="dot"></span><div><b>Not available</b><p>'+esc((j&&j.error)||'No answer.')+'</p></div></div>'; return; }
         var f=j.facts, a=f.analysts, total=a?(a.strongBuy+a.buy+a.hold+a.sell+a.strongSell):0;
-        var bar=a&&total?'<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-top:8px"><i style="flex:'+(a.strongBuy+a.buy)+';background:var(--green)"></i><i style="flex:'+a.hold+';background:var(--yellow)"></i><i style="flex:'+(a.sell+a.strongSell)+';background:var(--red)"></i></div><div class="muted" style="font-size:12px;margin-top:6px;font-family:var(--mono)">'+(a.strongBuy+a.buy)+' buy · '+a.hold+' hold · '+(a.sell+a.strongSell)+' sell, '+total+' analysts, '+esc(a.period||'')+(f.targetMean?' · consensus target '+fmt(f.targetMean):'')+'</div>':'<div class="muted" style="font-size:12px;margin-top:8px">No analyst coverage in the free feed.</div>';
+        /* The trend: one stacked bar a month, oldest on the left, buy over hold over sell as shares of
+           the analysts counted that month, so a house that is quietly downgrading shows as a bar
+           turning from green to yellow before the latest count says anything. */
+        var hist=Array.isArray(f.analystsHistory)?f.analystsHistory.slice().reverse().filter(function(r){return (r.strongBuy+r.buy+r.hold+r.sell+r.strongSell)>0;}):[];
+        var trend='';
+        if(hist.length>=2){
+          var W=hist.length*14, H=44, first=hist[0], last=hist[hist.length-1];
+          var buyShare=function(r){ var n=r.strongBuy+r.buy+r.hold+r.sell+r.strongSell; return n?(r.strongBuy+r.buy)/n:0; };
+          var delta=Math.round((buyShare(last)-buyShare(first))*100);
+          trend='<div style="display:flex;align-items:flex-end;gap:12px;margin-top:10px;flex-wrap:wrap"><svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" role="img" aria-label="Analyst counts by month">'+hist.map(function(r,i){ var n=r.strongBuy+r.buy+r.hold+r.sell+r.strongSell, b=(r.strongBuy+r.buy)/n*H, hd=r.hold/n*H, s=(r.sell+r.strongSell)/n*H, x=i*14; return '<rect x="'+x+'" y="'+(H-b).toFixed(1)+'" width="11" height="'+b.toFixed(1)+'" fill="var(--green)"><title>'+esc(r.period)+': '+(r.strongBuy+r.buy)+' buy · '+r.hold+' hold · '+(r.sell+r.strongSell)+' sell</title></rect><rect x="'+x+'" y="'+(H-b-hd).toFixed(1)+'" width="11" height="'+hd.toFixed(1)+'" fill="var(--yellow)"></rect><rect x="'+x+'" y="'+(H-b-hd-s).toFixed(1)+'" width="11" height="'+s.toFixed(1)+'" fill="var(--red)"></rect>'; }).join('')+'</svg>'+
+            '<div class="muted" style="font-size:12px;line-height:1.5;font-family:var(--mono)">'+esc(first.period.slice(0,7))+' to '+esc(last.period.slice(0,7))+'<br>buy share '+(buyShare(first)*100).toFixed(0)+'% → '+(buyShare(last)*100).toFixed(0)+'% <b class="'+(delta>0?'pos':delta<0?'neg':'muted')+'">('+(delta>0?'+':'')+delta+' pts)</b></div></div>';
+        }
+        var bar=a&&total?'<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-top:8px"><i style="flex:'+(a.strongBuy+a.buy)+';background:var(--green)"></i><i style="flex:'+a.hold+';background:var(--yellow)"></i><i style="flex:'+(a.sell+a.strongSell)+';background:var(--red)"></i></div><div class="muted" style="font-size:12px;margin-top:6px;font-family:var(--mono)">'+(a.strongBuy+a.buy)+' buy · '+a.hold+' hold · '+(a.sell+a.strongSell)+' sell, '+total+' analysts, '+esc(a.period||'')+(f.targetMean?' · consensus target '+fmt(f.targetMean):'')+'</div>'+trend:'<div class="muted" style="font-size:12px;margin-top:8px">No analyst coverage in the free feed.</div>';
         var rows=[['Market cap',fmt(f.marketCap,'cap')],['P/E (TTM)',fmt(f.pe,'x')],['Forward P/E',fmt(f.forwardPe,'x')],['EV/EBITDA',fmt(f.evEbitda,'x')],['P/S',fmt(f.ps,'x')],['P/B',fmt(f.pb,'x')],['Gross margin',fmt(f.grossMargin,'pct')],['Operating margin',fmt(f.opMargin,'pct')],['Net margin',fmt(f.netMargin,'pct')],['ROE',fmt(f.roe,'pct')],['Revenue growth',fmt(f.revGrowth,'pct')],['EPS growth',fmt(f.epsGrowth,'pct')],['EPS (TTM)',fmt(f.eps)],['Debt/equity',fmt(f.debtEquity)],['Current ratio',fmt(f.currentRatio)],['Dividend yield',fmt(f.divYield,'pct')],['Beta',fmt(f.beta)],['52-week',fmt(f.low52)+' to '+fmt(f.high52)]];
         var grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;margin-top:12px">'+rows.map(function(r){return '<div style="border-top:1px solid var(--border);padding-top:6px"><div class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase">'+r[0]+'</div><div style="font-family:var(--mono);font-size:14px;margin-top:2px">'+r[1]+'</div></div>';}).join('')+'</div>';
         var lens=j.lenses?'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:16px">'+j.lenses.map(function(l){return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b style="font-size:13px">'+esc(l.name)+'</b><span class="'+(STANCE[l.stance]||'muted')+'" style="font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase">'+esc(l.stance||'')+'</span></div><p style="font-size:13px;line-height:1.55;margin:8px 0 0">'+esc(l.reading||'')+'</p><p class="muted" style="font-size:12px;line-height:1.5;margin:8px 0 0"><b>What would change this reading:</b> '+esc(l.whatWouldChangeMyMind||'')+'</p></div>';}).join('')+'</div>':'<p class="muted" style="font-size:13px;margin-top:12px">'+esc(j.note||'')+'</p>';
@@ -15537,6 +15549,16 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 #tab-world .wd-chip small{font-family:var(--mono);font-size:11px;color:var(--muted)}
 #tab-world .wd-chip:hover{color:var(--text);border-color:var(--muted)}
 #tab-world .wd-chip.on{color:var(--text);background:var(--panel2);border-color:var(--c)}
+#tab-world .wd-chip-mine{--c:var(--brand2);color:var(--text);border-color:var(--brand2)}
+#tab-world .wd-chip-mine i{background:conic-gradient(#3b82f6,#22c55e,#f59e0b,#ec4899,#a78bfa,#3b82f6)}
+#tab-world .wd-holds{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+#tab-world .wd-holds li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:13px;padding:4px 6px;margin:0 -6px;border-radius:6px}
+#tab-world .wd-holds li.on{cursor:pointer}
+#tab-world .wd-holds li.on:hover{background:var(--panel2)}
+#tab-world .wd-holds li:not(.on){color:var(--muted)}
+#tab-world .wd-holds i{width:10px;height:10px;border-radius:50%;display:inline-block}
+#tab-world .wd-holds b{font-family:var(--mono);font-weight:600;margin-right:4px}
+#tab-world .wd-holds em{font:12px var(--mono);color:var(--muted);font-style:normal}
 #tab-world .wd-stage{display:grid;grid-template-columns:minmax(0,1fr) 272px;gap:16px}
 #tab-world .wd-globe-wrap{position:relative;min-height:540px;border-radius:10px;overflow:hidden;background:#07090f;border:1px solid var(--border)}
 #wdGlobe{position:absolute;inset:0}
@@ -15626,6 +15648,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   }
   function renderChips(){
     var box=$('wdChips'); if(!box)return; box.innerHTML='';
+    var mine=document.createElement('button'); mine.type='button'; mine.className='wd-chip wd-chip-mine'; mine.dataset.id='mine'; mine.innerHTML='<i></i>Your holdings'; mine.onclick=function(){ $('wdQ').value=''; wdHoldings(); }; box.appendChild(mine);
     (IDX.industries||[]).forEach(function(ind){
       var b=document.createElement('button'); b.type='button'; b.className='wd-chip'; b.style.setProperty('--c',ind.color); b.dataset.id=ind.id;
       b.innerHTML='<i></i>'+esc(ind.label)+(ind.count?' <small>'+ind.count+'</small>':'');
@@ -15671,7 +15694,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       h.setInputAction(function(m){
         var now=Date.now(); if(now-last<40)return; last=now;
         var p=sc.pick(m.endPosition), tip=$('wdTip'), f=p&&p.id&&p.id.n?p.id:null;
-        if(f){ tip.textContent=f.n+(f.o&&f.o!==f.n?' · '+f.o:'')+(names()[f.c]?' · '+names()[f.c]:''); tip.style.left=m.endPosition.x+'px'; tip.style.top=m.endPosition.y+'px'; tip.hidden=false; sc.canvas.style.cursor='pointer'; }
+        if(f){ tip.textContent=(f.sym?f.sym+' · ':'')+f.n+(f.o&&f.o!==f.n?' · '+f.o:'')+(names()[f.c]?' · '+names()[f.c]:''); tip.style.left=m.endPosition.x+'px'; tip.style.top=m.endPosition.y+'px'; tip.hidden=false; sc.canvas.style.cursor='pointer'; }
         else { tip.hidden=true; sc.canvas.style.cursor=''; }
       },C.ScreenSpaceEventType.MOUSE_MOVE);
       h.setInputAction(function(m){ var p=sc.pick(m.position); if(p&&p.id&&p.id.n)showDetail(p.id); },C.ScreenSpaceEventType.LEFT_CLICK);
@@ -15683,7 +15706,8 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   function draw(set){
     var C=window.Cesium; points.removeAll();
     var color=C.Color.fromCssColorString(set.color||'#3b82f6'), outline=C.Color.BLACK.withAlpha(.7), pos=[];
-    set.features.forEach(function(f){ var c3=C.Cartesian3.fromDegrees(f.lo,f.la,1500); pos.push(c3); points.add({position:c3,pixelSize:6.5,color:color,outlineColor:outline,outlineWidth:1,id:f}); });
+    var cols={};
+    set.features.forEach(function(f){ var c3=C.Cartesian3.fromDegrees(f.lo,f.la,1500); pos.push(c3); var col=f.col?(cols[f.col]||(cols[f.col]=C.Color.fromCssColorString(f.col))):color; points.add({position:c3,pixelSize:6.5,color:col,outlineColor:outline,outlineWidth:1,id:f}); });
     if(pos.length){
       /* A set spread around the planet has a bounding sphere centred near the Earth's core, which no
          cartographic conversion survives; the circular mean of the longitudes is what the camera wants. */
@@ -15695,7 +15719,22 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     }
     $('wdIdle').hidden=true; viewer.resize(); viewer.scene.requestRender();
   }
+  /* Fly the camera to one group of plants (a holding's), or to the whole set. */
+  function flyTo(feats){
+    var C=window.Cesium; if(!viewer||!feats.length)return;
+    var pos=feats.map(function(f){return C.Cartesian3.fromDegrees(f.lo,f.la,1500);}), sph=C.BoundingSphere.fromPoints(pos);
+    if(sph.radius>2.6e6){ var sx=0,sy=0,sl=0; feats.forEach(function(f){ var r=f.lo*Math.PI/180; sx+=Math.cos(r); sy+=Math.sin(r); sl+=f.la; }); viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(Math.atan2(sy,sx)*180/Math.PI,Math.max(-40,Math.min(50,sl/feats.length)),1.75e7),duration:1.1}); }
+    else viewer.camera.flyToBoundingSphere(sph,{duration:1.1,offset:new C.HeadingPitchRange(0,-C.Math.PI_OVER_TWO,Math.max(sph.radius*3.4,1200000))});
+    viewer.scene.requestRender();
+  }
   function legend(set){
+    if(set.groups){
+      $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+set.features.length+' plants · '+set.groups.length+' holdings · OpenStreetMap as of '+esc(set.asOf||'')+'</div>'+
+        '<ul class="wd-holds">'+set.groups.map(function(g,i){ return '<li'+(g.count?' class="on" data-i="'+i+'"':'')+'><i style="background:'+esc(g.col)+'"></i><span><b>'+esc(g.sym)+'</b> '+esc(g.name)+'</span><em>'+(g.count?g.count:(g.unknown?'no name (needs the data key)':'none drawn'))+'</em></li>'; }).join('')+'</ul>'+
+        (set.note?'<p class="muted" style="font-size:12.5px;margin:10px 0 0">'+esc(set.note)+'</p>':'')+'<p class="muted" style="font-size:12.5px;margin:10px 0 0">Each holding was looked up by its short name, in the bundle and live; a company with nothing drawn on OpenStreetMap under that name shows none. Click a holding to fly to its plants.</p></div>';
+      $('wdLegend').querySelectorAll('li.on').forEach(function(li){ li.onclick=function(){ var g=set.groups[+li.dataset.i]; flyTo(set.features.filter(function(f){return f.sym===g.sym;})); }; });
+      return;
+    }
     var by={}; set.features.forEach(function(f){ var k=f.c||'?'; by[k]=(by[k]||0)+1; });
     var top=Object.keys(by).sort(function(a,b){return by[b]-by[a];}).slice(0,8), max=by[top[0]]||1, nm=names();
     var countries=Object.keys(by).filter(function(k){return k!=='?';}).length;
@@ -15706,7 +15745,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   }
   function showDetail(f){
     var nm=names(), osm={n:'node',w:'way',r:'relation'}[f.i[0]]+'/'+f.i.slice(1);
-    $('wdDetail').innerHTML='<div class="wd-detail"><h4>'+esc(f.n)+'</h4><div class="wd-kv">'+(f.o?'<span>Operator</span><span>'+esc(f.o)+'</span>':'')+(f.p?'<span>Makes</span><span>'+esc(f.p)+'</span>':'')+
+    $('wdDetail').innerHTML='<div class="wd-detail"><h4>'+esc(f.n)+'</h4><div class="wd-kv">'+(f.sym?'<span>Holding</span><span class="mono">'+esc(f.sym)+'</span>':'')+(f.o?'<span>Operator</span><span>'+esc(f.o)+'</span>':'')+(f.p?'<span>Makes</span><span>'+esc(f.p)+'</span>':'')+
       '<span>Country</span><span>'+esc(nm[f.c]||f.c||'Unplaced')+'</span>'+(f.t?'<span>Owner listed as</span><span class="mono">'+esc(f.t)+'</span>':'')+'<span>Where</span><span class="mono">'+f.la.toFixed(3)+', '+f.lo.toFixed(3)+'</span></div><div class="wd-links">'+
       (f.t&&typeof analyzeStock==='function'?'<button class="btn btn-ghost btn-sm" type="button" onclick="analyzeStock('+JSON.stringify(String(f.t).replace(/[^A-Z0-9.\-]/gi,''))+')">Analyze '+esc(f.t)+'</button>':'')+
       (f.w?'<a class="btn btn-ghost btn-sm" href="'+esc(f.w)+'" target="_blank" rel="noopener noreferrer">Website</a>':'')+
@@ -15740,6 +15779,45 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     }).catch(function(e){ status('Could not search: '+e.message+'.'); });
   }
 
+  /* ---- every plant of every company you hold, in one request ---- */
+  var PALETTE=['#3b82f6','#22c55e','#f59e0b','#ec4899','#a78bfa','#06b6d4','#f97316','#84cc16','#e879f9','#14b8a6','#ef4444','#fbbf24','#0ea5e9','#b45309','#9ca3af','#1f9e8c','#c98a3f','#d9a441','#2ea043','#e5534b'];
+  var NAMES={}, UNKNOWN={};   /* a symbol whose company name the data key could not supply: looked up live only, never matched on the bare ticker */
+  function shortName(name){ var w=String(name||'').replace(/[,.()]/g,' ').split(/\s+/).filter(function(x){ return x&&!/^(inc|corp|corporation|co|company|ltd|limited|plc|ag|sa|nv|se|spa|holdings?|group|the|lp|llc|adr|class|[abc]|com)$/i.test(x); }); return w.slice(0,2).join(' ')||String(name||''); }
+  function nameOf(sym){
+    if(NAMES[sym])return Promise.resolve(NAMES[sym]);
+    var p=typeof getProfile==='function'?getProfile(sym):Promise.reject();
+    return Promise.resolve(p).then(function(pr){ if(!(pr&&pr.name))throw new Error('no name'); var n=shortName(pr.name); NAMES[sym]=n; return n; }).catch(function(){ UNKNOWN[sym]=true; return sym; });
+  }
+  /* The bundle's 25,000 plants as one compact table, fetched once: a holding's short name is
+     matched here first, as a whole word in the plant's name or operator, before Nominatim is asked. */
+  var ALL=null;
+  function loadAll(){ if(ALL)return Promise.resolve(ALL); return fetch(DATA+'all.json').then(function(r){ if(!r.ok)throw new Error('all'); return r.json(); }).then(function(j){ ALL=j.rows||[]; return ALL; }).catch(function(){ ALL=[]; return ALL; }); }
+  function localMatches(name){
+    var rx=new RegExp('(^|[^A-Za-z])('+String(name).replace(/[.*+?^${}()|[\]\\]/g,'\\  window.wdHoldings=function(){')+')([^A-Za-z]|$)','i'), out=[];
+    for(var i=0;i<ALL.length&&out.length<400;i++){ var r=ALL[i]; if(rx.test(r[0])||(r[1]&&rx.test(r[1]))){ var f={i:'b'+i,n:r[0],la:r[2],lo:r[3],s:'o'}; if(r[1])f.o=r[1]; if(r[4])f.c=r[4]; if(r[5])f.p=r[5].replace(/_/g,' '); if(r[6])f.q=r[6]; out.push(f); } }
+    return out;
+  }
+  function mergeNear(base,extra){
+    var out=base.slice();
+    extra.forEach(function(f){ var dup=out.some(function(g){ return g.n.toLowerCase()===f.n.toLowerCase()&&Math.abs(g.la-f.la)<0.02&&Math.abs((g.lo-f.lo)*Math.cos(f.la*Math.PI/180))<0.02; }); if(!dup)out.push(f); });
+    return out;
+  }
+  window.wdHoldings=function(){
+    var syms=[]; ((typeof D!=='undefined'&&D&&D.holdings)||[]).forEach(function(x){ if(x&&x.sym&&isFinite(x.shares)&&x.shares>0&&syms.indexOf(x.sym)<0)syms.push(x.sym); });
+    syms=syms.slice(0,20);
+    if(!syms.length){ status('No holdings yet. Add some in Portfolio and come back.'); return; }
+    markChip('mine'); status('Looking up '+syms.length+' holdings…'); $('wdDetail').innerHTML='';
+    Promise.all([ensureViewer(),loadIndex(),Promise.all(syms.map(nameOf)),loadAll()]).then(function(res){
+      var namesBy=res[2], qs=namesBy.slice();
+      return fetch(INVITE_WORKER+'/world/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),qs:qs})}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); }).catch(function(){ return {ok:false,j:{error:'the worker could not be reached'}}; }).then(function(r){
+        var liveErr=null;
+        if(!r.ok){ liveErr=(r.j&&r.j.error)||'No answer from the worker.'; r={ok:true,j:{results:{},asOf:(IDX&&IDX.generatedAt||'').slice(0,10)}}; }
+        var feats=[], groups=[];
+        syms.forEach(function(sym,i){ var q=namesBy[i], got=(r.j.results&&r.j.results[q])||{features:[]}, col=PALETTE[i%PALETTE.length]; var fs=mergeNear(UNKNOWN[sym]?[]:localMatches(q),got.features||[]).map(function(f){ var g=Object.assign({},f); g.sym=sym; g.col=col; g.i=sym+':'+f.i; return g; }); feats=feats.concat(fs); groups.push({sym:sym,name:UNKNOWN[sym]?'':q,col:col,count:fs.length,unknown:!!UNKNOWN[sym]}); });
+        return stamp(feats).then(function(all){ SET={label:'Your holdings',color:'#1f9e8c',features:all,asOf:r.j.asOf,groups:groups,note:liveErr?'The live lookup did not run ('+liveErr.replace(/\.$/,'')+'); these are the bundle’s matches only.':null}; draw(SET); legend(SET); status(''); });
+      });
+    }).catch(function(e){ status('Could not look up the holdings: '+e.message+'.'); });
+  };
   /* ---- the box: a phrase with an industry word in it opens that layer; anything else is a company ---- */
   function route(phrase){
     var p=' '+String(phrase).toLowerCase().replace(/[^a-z0-9\-\s]/g,' ').replace(/\s+/g,' ').trim()+' ', best=null, len=0;
@@ -15748,10 +15826,10 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   }
   window.wdSearch=function(){
     var q=($('wdQ').value||'').replace(/\s+/g,' ').trim(); if(!q)return;
+    if(/^(my |your |our )?(holdings|portfolio|positions)$/i.test(q)){ wdHoldings(); return; }
     loadIndex().then(function(){ var id=route(q); if(id)showIndustry(id); else searchCompany(q); }).catch(function(){ status('The industry list did not load.'); });
   };
   /* From a ticker: the company's short name, legal suffixes dropped. "Taiwan Semiconductor Manufacturing Co Ltd" → "Taiwan Semiconductor". */
-  function shortName(name){ var w=String(name||'').replace(/[,.()]/g,' ').split(/\s+/).filter(function(x){ return x&&!/^(inc|corp|corporation|co|company|ltd|limited|plc|ag|sa|nv|se|spa|holdings?|group|the|lp|llc|adr|class|[abc]|com)$/i.test(x); }); return w.slice(0,2).join(' ')||String(name||''); }
   window.wdFromTicker=function(sym){
     loadIndex().then(function(){ return typeof getProfile==='function'?getProfile(sym):null; }).then(function(p){ $('wdQ').value=shortName((p&&p.name)||sym); wdSearch(); }).catch(function(){ $('wdQ').value=sym; wdSearch(); });
   };

@@ -201,7 +201,7 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
     if (u.includes('query1.finance.yahoo.com/v8')) { const n = 500; const ts = [...Array(n)].map((_, i) => 1690000000 + i * 86400); const px = ts.map((_, i) => 400 + i * 0.1); return new Response(JSON.stringify({ chart: { result: [{ timestamp: ts, indicators: { quote: [{ open: px, high: px, low: px, close: px, volume: px }] } }] } }), { status: 200 }); }
     if (u.includes('finnhub.io/api/v1/stock/profile2')) return new Response(JSON.stringify({ name: 'NVIDIA Corp', finnhubIndustry: 'Semiconductors', marketCapitalization: 4500000, ipo: '1999-01-22', weburl: 'https://nvidia.com' }), { status: 200 });
     if (u.includes('finnhub.io/api/v1/stock/metric')) return new Response(JSON.stringify({ metric: { peTTM: 52.1, grossMarginTTM: 74.6, roeTTM: 91.9, beta: 1.7 } }), { status: 200 });
-    if (u.includes('finnhub.io/api/v1/stock/recommendation')) return new Response(JSON.stringify([{ period: '2026-09-01', strongBuy: 20, buy: 30, hold: 6, sell: 1, strongSell: 0 }]), { status: 200 });
+    if (u.includes('finnhub.io/api/v1/stock/recommendation')) return new Response(JSON.stringify([...Array(14)].map((_, i) => ({ period: '2026-' + String(9 - (i % 9)).padStart(2, '0') + '-01', strongBuy: 20 - i, buy: 30, hold: 6 + i, sell: 1, strongSell: 0 }))), { status: 200 });
     if (u.includes('quoteSummary')) return new Response(JSON.stringify({ quoteSummary: { result: [{ financialData: { targetMeanPrice: { raw: 210 }, recommendationMean: { raw: 1.6 } } }] } }), { status: 200 });
     if (u.includes('api.anthropic.com')) return new Response(JSON.stringify({ content: [{ text: JSON.stringify({ lenses: [{ id: 'value', name: 'Value (after Buffett)', stance: 'cautious', reading: 'A wonderful business at a price that leaves no margin of safety at 52 times earnings.', whatWouldChangeMyMind: 'A multiple below 25.' }] }) }] }), { status: 200 });
     return prev(url, opts);
@@ -217,6 +217,7 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
   t('council: refused without a live code', rr.status === 401);
   rr = await worker.fetch(new Request(W + '/council', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA' }) }), e3); const cj = await rr.json();
   t('council: profile, ratios, analyst counts and target from the free feeds', rr.status === 200 && cj.facts.name === 'NVIDIA Corp' && cj.facts.pe === 52.1 && cj.facts.analysts.buy === 30 && cj.facts.targetMean === 210);
+  t('council: the analyst counts carry a twelve-month history, newest first', Array.isArray(cj.facts.analystsHistory) && cj.facts.analystsHistory.length === 12 && cj.facts.analystsHistory[0].strongBuy === 20 && cj.facts.analystsHistory[11].hold === 17 && cj.facts.analysts.buy === 30);
   t('council: six-lens readings arrive as structured JSON with a stance and a what-would-change line', Array.isArray(cj.lenses) && cj.lenses[0].stance === 'cautious' && /margin of safety/.test(cj.lenses[0].reading) && !!cj.lenses[0].whatWouldChangeMyMind);
   t('council: labelled as AI applications of published frameworks, never the people’s views, never a recommendation', /published framework/.test(cj.disclaimer) && /not those people/.test(cj.disclaimer) && /never say buy, sell, hold, or recommend/i.test(read('worker.js')));
   globalThis.fetch = prev;
@@ -262,6 +263,16 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
   t('world: an unreachable geocoder is a 503, not a crash', rr.status === 503 && /did not answer/.test(wj.error));
   mode = 'ok'; rr = await ask({ code: live.code, q: 'Foxconn' }); wj = await rr.json();
   t('world: a failure is never cached; the next try asks again', rr.status === 200 && wj.cached === false);
+  /* the holdings, one request */
+  const askB = (body) => worker.fetch(new Request(W + '/world/batch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), env);
+  rr = await askB({ code: 'ZZZZZ-ZZZZZ', qs: ['TSMC'] }); t('batch: refused without a live code', rr.status === 401);
+  rr = await askB({ code: live.code, qs: ['x', 'bad"]'] }); t('batch: nothing valid to ask is a 400', rr.status === 400);
+  const before = hits.filter(h => h.u.includes('nominatim')).length;
+  rr = await askB({ code: live.code, qs: ['TSMC fab', 'Foxconn', 'Foxconn', 'Micron'] }); let bj = await rr.json();
+  t('batch: one request answers several names, de-duplicated, from the cache when it can', rr.status === 200 && Object.keys(bj.results).length === 3 && bj.results['TSMC fab'].cached === true && bj.results['Foxconn'].cached === true && bj.results['Micron'].cached === false && hits.filter(h => h.u.includes('nominatim')).length === before + 1);
+  t('batch: the same compact features and the same source line', bj.results['TSMC fab'].features[0].n === 'TSMC Fab 12' && /Nominatim/.test(bj.source));
+  rr = await askB({ code: live.code, qs: [...Array(25)].map((_, i) => 'Company ' + i) }); bj = await rr.json();
+  t('batch: capped at twenty names', rr.status === 200 && Object.keys(bj.results).length === 20);
   globalThis.fetch = prev;
 }
 console.log(failed ? `\n${failed} FAILED` : '\nALL BILLING CHECKS PASSED');

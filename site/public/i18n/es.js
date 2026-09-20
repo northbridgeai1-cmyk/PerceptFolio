@@ -74,12 +74,16 @@ window.PF_ES = {
   'Chemicals and fertilisers': 'Química y fertilizantes', 'Pharmaceuticals and biologics': 'Farmacéutica y biológicos', 'Shipyards': 'Astilleros', 'Solar and wind manufacturing': 'Fabricación solar y eólica',
   'Data centres': 'Centros de datos', 'Nuclear power plants': 'Centrales nucleares', 'Cement and building materials': 'Cemento y materiales de construcción',
   'Operator': 'Operador', 'Makes': 'Produce', 'Country': 'País', 'Where': 'Dónde', 'Unplaced': 'Sin país', 'Website': 'Sitio web', 'On OpenStreetMap': 'En OpenStreetMap',
+  'Your holdings': 'Tus posiciones', 'Holding': 'Posición', 'none drawn': 'ninguna dibujada', 'no name (needs the data key)': 'sin nombre (necesita la clave de datos)',
+  'Each holding was looked up by its short name, in the bundle and live; a company with nothing drawn on OpenStreetMap under that name shows none. Click a holding to fly to its plants.': 'Cada posición se buscó por su nombre corto, en el paquete y en vivo; una empresa sin nada dibujado en OpenStreetMap con ese nombre no muestra ninguna. Haz clic en una posición para volar a sus plantas.',
+  'No holdings yet. Add some in Portfolio and come back.': 'Aún no hay posiciones. Añade algunas en Cartera y vuelve.',
   'Plants worldwide': 'Plantas en el mundo', 'from OpenStreetMap': 'de OpenStreetMap', 'Globe': 'Globo', 'On Wikidata': 'En Wikidata', 'Owner listed as': 'Propietario cotiza como',
   'The source capped this answer, so the map is a sample rather than the whole set.': 'La fuente limitó esta respuesta, así que el mapa es una muestra y no el conjunto completo.',
   'Part of the source could not be reached when this layer was built, so the count is a floor.': 'Parte de la fuente no respondió cuando se construyó esta capa, así que el recuento es un mínimo.',
   'Nothing drawn on OpenStreetMap under that name. Try the company’s short name, or an industry above.': 'No hay nada dibujado en OpenStreetMap con ese nombre. Prueba el nombre corto de la empresa o una industria arriba.',
 };
 window.PF_ES_RX = [
+  [/^(\d+) plants · (\d+) holdings · OpenStreetMap as of (.+)$/, '$1 plantas · $2 posiciones · OpenStreetMap al $3'], [/^Looking up (\d+) holdings…$/, 'Buscando $1 posiciones…'], [/^The live lookup did not run \((.+)\); these are the bundle’s matches only\.$/, 'La búsqueda en vivo no se ejecutó ($1); estas son solo las coincidencias del paquete.'], [/^buy share (\d+)% → (\d+)%/, 'cuota de compra $1% → $2%'],
   [/^Sector tiles are the SPDR sector ETFs, quoted when this tab opens and held for five minutes\.(.*)$/, 'Las casillas de sectores son los ETF sectoriales SPDR, cotizados al abrir esta pestaña y guardados cinco minutos.$1'], [/^Sectors need the data key\.(.*)$/, 'Los sectores necesitan la clave de datos.$1'],
   [/^(\d+) plants · (\d+) countries · OpenStreetMap as of (.+)$/, '$1 plantas · $2 países · OpenStreetMap al $3'], [/^Loading (.+)…$/, 'Cargando $1…'], [/^Asking OpenStreetMap about (.+)…$/, 'Preguntando a OpenStreetMap por $1…'],
   [/^Good morning\b/, 'Buenos días'], [/^Good afternoon\b/, 'Buenas tardes'], [/^Good evening\b/, 'Buenas noches'],
