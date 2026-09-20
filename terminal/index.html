@@ -15786,7 +15786,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   function nameOf(sym){
     if(NAMES[sym])return Promise.resolve(NAMES[sym]);
     var p=typeof getProfile==='function'?getProfile(sym):Promise.reject();
-    return Promise.resolve(p).then(function(pr){ if(!(pr&&pr.name))throw new Error('no name'); var n=shortName(pr.name); NAMES[sym]=n; return n; }).catch(function(){ UNKNOWN[sym]=true; return sym; });
+    return Promise.resolve(p).then(function(pr){ if(!(pr&&pr.name))throw new Error('no name'); var n=shortName(pr.name); NAMES[sym]=n; delete UNKNOWN[sym]; return n; }).catch(function(){ UNKNOWN[sym]=true; return sym; });
   }
   /* The bundle's 25,000 plants as one compact table, fetched once: a holding's short name is
      matched here first, as a whole word in the plant's name or operator, before Nominatim is asked. */
