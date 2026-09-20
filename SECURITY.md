@@ -199,3 +199,13 @@ inbox on the first submission; nothing is delivered until it is clicked.
 - The Anthropic account behind `AI_API_KEY` has no credit (the API answers 400 "credit balance is
   too low"). Both model routes now surface that sentence in their note instead of an empty answer,
   and the council no longer caches a day of nothing. No key material is ever echoed.
+
+## The model, without Anthropic credit (2026-09-20, night)
+
+One helper, `aiText`, serves the six lenses, the Map's pre-fill and the news summary: Anthropic when
+`AI_API_KEY` is set and the account has credit, otherwise Cloudflare's own Workers AI through the
+`AI` binding (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`; a free daily allowance on this account,
+no other account, no card). The same prompts, the same JSON parsing, the same "never invent"
+instruction; each answer records which model produced it. Workers AI hands JSON back already
+parsed, which the helper stringifies. Verified live: NVDA's map and six lenses through Workers AI
+while the Anthropic account is out of credit. Evidence: three checks in `test/billing.mjs`.

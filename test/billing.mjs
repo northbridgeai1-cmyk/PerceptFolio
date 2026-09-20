@@ -233,7 +233,22 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
     t('map prefill: suppliers and customers from the model, tidied: no self-links, no nameless rows, weights clamped, tickers only when plausible', rr.status === 200 && mj.suppliers.length === 2 && mj.suppliers[0].ticker === 'TSM' && mj.suppliers[1].ticker === '' && !mj.suppliers.some(x => x.ticker === 'NVDA') && mj.customers[0].weight === 100 && mj.name === 'NVIDIA Corp');
     t('map prefill: labelled as the model’s knowledge, not filings, and editable', /general knowledge/.test(mj.disclaimer) && /not from filings/.test(mj.disclaimer) && /Edit anything/.test(mj.disclaimer) && /Never invent a company, a ticker or a number/.test(read('worker.js')));
     const n = asked.filter(u => u.includes('anthropic')).length; rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA' }) }), e3); const mj2 = await rr.json();
-    t('map prefill: cached thirty days per symbol', asked.filter(u => u.includes('anthropic')).length === n && mj2.cached === true && /expirationTtl: 30 \* 86400/.test(read('worker.js')));
+    t('map prefill: a real answer is cached thirty days, an empty one a day', asked.filter(u => u.includes('anthropic')).length === n && mj2.cached === true && /\(suppliers\.length \|\| customers\.length\) \? 30 \* 86400 : 86400/.test(read('worker.js')));
+    /* no Anthropic credit: Workers AI answers instead */
+    {
+      const calls = []; const e4 = { ...e3, AI_API_KEY: 'ai', AI: { run: async (model, opts) => { calls.push(model); return { response: { suppliers: [{ name: 'Foxconn', ticker: 'HNHPF', weight: 30, note: 'assembly' }], customers: [] } }; } } };   /* Workers AI hands JSON back parsed */
+      const noCredit = globalThis.fetch;
+      globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('api.anthropic.com')) return new Response(JSON.stringify({ error: { message: 'Your credit balance is too low' } }), { status: 400 }); return noCredit(url, opts); };
+      rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'AAPL' }) }), e4); const fj = await rr.json();
+      t('map prefill: when Anthropic refuses (no credit), Cloudflare Workers AI answers and the result says which model it was', rr.status === 200 && fj.suppliers.length === 1 && fj.suppliers[0].name === 'Foxconn' && fj.model === 'workers-ai' && calls[0] === '@cf/meta/llama-3.3-70b-instruct-fp8-fast' && fj.note === null);
+      const e5 = { ...e3 }; delete e5.AI_API_KEY; e5.AI = e4.AI;
+      rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'MSFT' }) }), e5); const gj = await rr.json();
+      t('map prefill: with no Anthropic key at all, Workers AI is the model', rr.status === 200 && gj.model === 'workers-ai');
+      store.delete('council:MSFT:' + new Date().toISOString().slice(0, 10));
+      rr = await worker.fetch(new Request(W + '/council', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'MSFT' }) }), { ...e5, AI: { run: async () => ({ response: JSON.stringify({ lenses: [{ id: 'value', name: 'Value (after Buffett)', stance: 'favourable', reading: 'r', whatWouldChangeMyMind: 'w' }] }) }) } }); const hj = await rr.json();
+      t('council: the six lenses come through Workers AI too', rr.status === 200 && Array.isArray(hj.lenses) && hj.lenses[0].stance === 'favourable' && hj.model === 'workers-ai');
+      globalThis.fetch = noCredit;
+    }
     globalThis.fetch = inner;
   }
   t('council: labelled as AI applications of published frameworks, never the people’s views, never a recommendation', /published framework/.test(cj.disclaimer) && /not those people/.test(cj.disclaimer) && /never say buy, sell, hold, or recommend/i.test(read('worker.js')));

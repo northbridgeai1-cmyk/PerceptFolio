@@ -28,3 +28,8 @@ simple = { limit = 10, period = 60 }
 name = "RL_LOOSE"
 namespace_id = "1002"
 simple = { limit = 30, period = 60 }
+
+# Cloudflare's own model, the fallback for the six lenses, the Map's pre-fill and the news summary
+# when no Anthropic key is set or its account has no credit. Free daily allowance; no other account.
+[ai]
+binding = "AI"
