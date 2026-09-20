@@ -19,7 +19,7 @@ copy('enter');                                 // the door
 copy('functions');                             // the gate, /api/enter, /api/leave, /api/portal
 copy('fonts'); copy('demo'); copy('preview'); copy('favicon.svg'); copy('manifest.json'); copy('sw.js'); copy('robots.txt'); copy('sitemap.xml');
 copy('vendor');                                // Chart.js and Cesium, served from this origin (see vendor/README.md)
-copy('world/data'); copy('world/ne110.json');  // the World view's bundled plant layers and the country polygons; catalog.mjs and the extract script are source, not product
+copy('world/data'); copy('world/ne110.json'); copy('world/places.json');  // the World view's bundled plant layers and the country polygons; catalog.mjs and the extract script are source, not product
 /* No 404.html on Pages: its absence is what makes Pages serve index.html for unknown paths, which
    is how /pricing, /apply and the rest reach the React router. The app has its own not-found page. */
 for (const f of ['icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.svg', 'icon-maskable-512.png', 'apple-touch-icon.png', 'thanks.html']) copy(f);

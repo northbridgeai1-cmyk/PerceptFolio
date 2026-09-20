@@ -343,7 +343,7 @@ Built and live:
 - **Kelly criterion**, in Risk: full and half Kelly from the thesis's price, target and stop, with the win probability taken from the marked record once it holds thirty marks (assumed 50% and said so until then), capped by the concentration limit, and framed as arithmetic on the user's own inputs.
 
 Needs data that must be bought, so specified but not built:
-- **Pre-filled buyer and supplier maps** (Bloomberg SPLC): Finnhub's supply-chain endpoint is paid-tier; no free source exists. The Map tab stays user-entered until a licence is bought.
+- **Pre-filled buyer and supplier maps** (Bloomberg SPLC): Finnhub's supply-chain endpoint is paid-tier and no free feed exists; since 2026-09-20 the Map opens pre-filled from the model's knowledge of publicly documented supply chains, labelled as such and editable (§23). A licensed feed would replace the model's answer with a filed one.
 - **ESG** scores: paid on every provider.
 - **A world map of facilities** ("smart chip factories"): this line was wrong. OpenStreetMap and Wikidata carry plants with coordinates, and God's Eye View shows how to use them properly. Built as M9, §23.
 - **Heatmaps**: built 2026-09-20, in Market: the holdings as a squarified treemap (size = value, colour = the day's move from the last refresh) and the eleven S&P sectors through their SPDR ETFs (eleven quotes when the tab opens, held five minutes). Colour saturates at three percent; a tile opens the analysis.
@@ -408,6 +408,17 @@ in** (`/universe`: every US common stock daily; a company name resolves to its t
 search box; the Screener scans the whole market at about fifteen tickers a minute, hours for a
 full pass, resumable). What "checks everything" cannot mean on a free data key: a live score of
 six thousand stocks at once; the scan is a pass, not a snapshot.
+
+And the same evening: **places, not coordinates** (every plant carries "Miami, Florida" from
+Natural Earth's populated places, "near" when more than 15 km out; the geocoder's own address for
+live results); **the explanatory text is gone** (every "About this", the World aside, the Kelly
+essay, the Kronos note: numbers stand on their own); **the Map opens pre-filled** from the model
+the Worker already uses, labelled "model", weights rough, editable, never over a map the person
+touched (`/map/prefill`, cached thirty days); **Today's heat switches** between the holdings and
+the market (the Dow 30 and twelve mega-caps); Calendar effects sits under The Move; the Top
+button is round with an arrow. Found on the way: the Anthropic account behind `AI_API_KEY` has no
+credit, so the six lenses had never produced a reading live; both routes now say so in the panel
+and no longer cache an empty day. Adding credit switches both on.
 
 Coverage is what the community has drawn. Fabs on Wikidata skew to the former Soviet Union; OSM
 carries TSMC, Samsung and Intel because people drew them. The page says "community-mapped,
