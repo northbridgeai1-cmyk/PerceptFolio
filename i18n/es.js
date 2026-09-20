@@ -51,11 +51,11 @@ window.PF_ES = {
   /* terminal chrome */
   'Dashboard': 'Panel', 'Command': 'Comando', 'Portfolio': 'Cartera', 'Lists': 'Listas', 'History': 'Historial', 'Market': 'Mercado', 'News': 'Noticias', 'Map': 'Mapa', 'Screener': 'Filtro', 'Analyzer': 'Analizador', 'Risk': 'Riesgo', 'Projections': 'Proyecciones', 'Alerts': 'Alertas', 'Clients': 'Clientes', 'More': 'Más', 'Less': 'Menos', 'Settings': 'Ajustes',
   'Search a ticker… /': 'Buscar un ticker… /', 'Search a ticker…': 'Buscar un ticker…',
-  'Good morning': 'Buenos días', 'Good afternoon': 'Buenas tardes', 'Good evening': 'Buenas noches', 'Good afternoon.': 'Buenas tardes.', "Here's where things stand today.": 'Así están las cosas hoy.',
+  'Good morning': 'Buenos días', 'Good afternoon': 'Buenas tardes', 'Good evening': 'Buenas noches', 'Good afternoon.': 'Buenas tardes.', "Here's where things stand today.": 'Así están las cosas hoy.', 'No change recorded today.': 'Sin cambios registrados hoy.',
   'Portfolio value': 'Valor de la cartera', 'Cash to invest': 'Efectivo para invertir', "Today's gain / loss": 'Ganancia / pérdida de hoy', 'Total gain / loss': 'Ganancia / pérdida total', 'Track record': 'Historial de aciertos', 'Track record · 90-day marks': 'Historial · calificaciones a 90 días',
   'Refresh data': 'Actualizar datos', 'No live prices yet. Hit Refresh data': 'Aún sin precios en vivo. Pulsa Actualizar datos', 'refresh for live prices': 'actualiza para precios en vivo', 'Add holding': 'Añadir posición', 'Add your first holding': 'Añade tu primera posición', 'every call': 'cada decisión', 'nothing logged yet': 'nada registrado aún',
   'Stocks, ETFs & cash': 'Acciones, ETFs y efectivo', 'By holding': 'Por posición', 'Total value': 'Valor total', 'Growth': 'Crecimiento', 'vs S&P 500': 'vs S&P 500', 'Dividends': 'Dividendos',
-  'Analyze a stock': 'Analizar una acción', 'Run Quality + Price Check': 'Comprobar calidad y precio', 'Compare two stocks': 'Comparar dos acciones', 'Compare': 'Comparar', 'Nothing analysed yet.': 'Nada analizado todavía.',
+  'Analyze a stock': 'Analizar una acción', 'Run quality + price check': 'Comprobar calidad y precio', 'Compare two stocks': 'Comparar dos acciones', 'Compare': 'Comparar', 'Nothing analysed yet.': 'Nada analizado todavía.',
   'Sign out': 'Cerrar sesión', 'Sign in': 'Iniciar sesión', 'Create account': 'Crear cuenta', 'Password': 'Contraseña', 'Show': 'Mostrar', 'Hide': 'Ocultar', 'Cancel': 'Cancelar', 'Save': 'Guardar', 'Delete': 'Eliminar', 'Close': 'Cerrar', 'Export': 'Exportar', 'Import': 'Importar',
   'Today': 'Hoy', 'Yesterday': 'Ayer', 'Tomorrow': 'Mañana',
   /* Today's heat (Market) */

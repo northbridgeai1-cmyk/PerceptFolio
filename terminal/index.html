@@ -928,35 +928,11 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 .lang-toggle button{background:transparent;border:0;color:var(--faint,#949aa6);padding:8px 10px;cursor:pointer}
 .lang-toggle button[aria-pressed="true"]{background:var(--panel2,#1a1d23);color:var(--text,#eef0f3)}
 .lang-toggle button:hover{color:var(--text,#eef0f3)}
-/* ===== Surface pass, 2026-09-13. Additive; remove this block to revert. =====
-   From the research in PRD §5 and DESIGN.md: on a dark ground, depth is a scale of lighter
-   surfaces, not shadows; a faint ambient gradient keeps the page from reading as a void; a
-   1px top highlight inside a card is what makes it look lit rather than drawn; glow belongs on
-   the one active thing. Green and red stay reserved for P&L, so the stat tiles keep their
-   semantic colour as a dot with a halo instead of a 3px bar. */
-:root{--panel:#14171d;--panel2:#1b1f27;--panel3:#222731;--border:#2a2f39;--radius:12px;--glow:rgba(31,158,140,.38)}
-body{background:
-  radial-gradient(1100px 520px at 18% -8%,rgba(59,130,246,.09),transparent 62%),
-  radial-gradient(900px 480px at 92% 0%,rgba(31,158,140,.06),transparent 60%),
-  var(--bg)}
-.card{box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 10px 30px -18px rgba(0,0,0,.7);border-color:var(--border)}
-.card:hover{border-color:#343a46}
-nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px var(--glow)}
-.greeting{font-size:26px;letter-spacing:-.02em}
+/* ===== Surface pass, 2026-09-13, cut back 2026-09-20. =====
+   The skin this block carried (an ambient gradient, lit card edges, a glow on the active tab, a
+   halo on every stat dot) is gone; the ledger block at the end of the document sets the surface
+   now. What remains here is layout: the compact sidebar and the Model view's control row. */
 .big{font-size:30px;letter-spacing:-.025em}
-.stat{border:1px solid var(--border);border-radius:10px;padding:12px 14px 12px 28px;position:relative;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);transition:border-color .16s,transform .16s}
-.stat:hover{border-color:#343a46;transform:translateY(-1px)}
-.stat::before{content:"";position:absolute;left:13px;top:16px;width:6px;height:6px;border-radius:50%;
-  background:var(--dot,var(--muted));box-shadow:0 0 0 3px color-mix(in srgb,var(--dot,var(--muted)) 18%,transparent)}
-.stat.s-in{--dot:var(--c-in);border-left-color:var(--border)}
-.stat.s-out{--dot:var(--c-out);border-left-color:var(--border)}
-.stat.s-profit{--dot:var(--c-profit);border-left-color:var(--border)}
-.stat.s-income{--dot:var(--c-income);border-left-color:var(--border)}
-.stat.s-count{--dot:var(--muted);border-left-color:var(--border)}
-.research-card{border-left-width:1px;border-left-color:var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
-.research-card::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--research);margin-right:8px;vertical-align:middle;box-shadow:0 0 0 3px rgba(201,138,63,.18)}
-@media (prefers-reduced-motion:reduce){.stat,.stat:hover{transition:none;transform:none}}
 /* Hick's law in the sidebar. Four tabs are the work; the rest are tools you reach for. Compact is
    the default and remembered per device; opening an advanced tab expands the list on its own.
    Hiding is done by a class on <nav>, so removing it restores the original rules untouched. */
@@ -983,8 +959,8 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 #pfModel .mv-form select{width:auto;min-width:130px;flex:0 0 auto;padding-right:32px}
 #pfModel .mv-form input{flex:0 0 auto}
 #pfModel .mv-form .btn{white-space:nowrap;height:40px;padding:0 16px}
-#pfModel .mv-empty{margin-top:14px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:16px 18px;border:1px dashed var(--border);border-radius:10px;background:var(--bg)}
-#pfModel .mv-empty .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);margin-top:6px;box-shadow:0 0 0 4px rgba(148,154,166,.15)}
+#pfModel .mv-empty{margin-top:14px;padding:14px 0 0;border-top:1px solid var(--border)}
+#pfModel .mv-empty .dot{display:none}
 #pfModel .mv-empty b{display:block;font-size:14px;margin-bottom:4px}
 #pfModel .mv-empty p{margin:0;font-size:13px;line-height:1.55;color:var(--muted);max-width:60ch}
 #pfModel .mv-empty code{font-family:var(--mono);font-size:12px;background:var(--panel2);padding:2px 6px;border-radius:5px}
@@ -1279,7 +1255,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
       <div class="stat s-count"><span class="stat-label"># Clients</span><span class="stat-value" id="bizClientCount">0</span></div>
       <div class="stat s-in"><span class="stat-label">Combined client AUM</span><span class="stat-value" id="bizTotalAUM">$0</span></div>
     </div>
-    <div class="section-title">Your Clients</div>
+    <div class="section-title">Your clients</div>
     <div class="card" style="overflow-x:auto">
       <table>
         <thead><tr><th>Client</th><th>Login email</th><th>Portfolio value</th><th>Unrealized gain</th><th>Your fee</th><th>Est. fee owed</th><th></th></tr></thead>
@@ -1318,7 +1294,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     <div class="card">
       <div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:12px">
         <div class="row" style="gap:6px">
-          <button class="btn btn-ghost btn-sm" id="gvBtn_valuegain" onclick="setGraphView('valuegain')">Total Value</button>
+          <button class="btn btn-ghost btn-sm" id="gvBtn_valuegain" onclick="setGraphView('valuegain')">Total value</button>
           <button class="btn btn-ghost btn-sm" id="gvBtn_growth" onclick="setGraphView('growth')">Growth</button>
           <button class="btn btn-ghost btn-sm" id="gvBtn_vsspy" onclick="setGraphView('vsspy')">vs S&amp;P 500</button>
           <button class="btn btn-ghost btn-sm" id="gvBtn_dividends" onclick="setGraphView('dividends')">Dividends</button>
@@ -1355,7 +1331,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   <div class="addwrap" id="add-holding">
   <div class="card" style="position:relative">
     <button class="add-close" onclick="closeAddModal()" title="Close">✕</button>
-    <h3>Add Holding</h3>
+    <h3>Add holding</h3>
     <div class="row">
       <input id="hTicker" placeholder="Ticker (e.g. AAPL, VOO)" style="max-width:150px">
       <select id="hType" style="max-width:130px"><option value="Stock">Stock</option><option value="ETF">ETF</option><option value="Fund">Mutual Fund</option></select>
@@ -1387,7 +1363,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <!-- TRADE IMPACT — the sizing step the app never had -->
   <div class="card" style="margin-top:16px">
-    <h3>Before You Trade: What this does to the portfolio</h3>
+    <h3>Before you trade: what this does to the portfolio</h3>
     <div class="row">
       <input id="tiTicker" placeholder="Ticker" style="max-width:130px" oninput="renderTradeImpact()">
       <select id="tiSide" style="max-width:110px" onchange="renderTradeImpact()">
@@ -1405,14 +1381,14 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
 
   <div class="card" style="margin-top:16px">
-    <h3>Cash Available to Invest</h3>
+    <h3>Cash available to invest</h3>
     <div class="row">
       <input id="cashInput" type="number" step="any" placeholder="$ amount" style="max-width:180px">
-      <button class="btn btn-ghost" onclick="setCash()">Update Cash</button>
+      <button class="btn btn-ghost" onclick="setCash()">Update cash</button>
     </div>
   </div>
   <div class="card" style="margin-top:16px">
-    <h3>Investment Thesis</h3>
+    <h3>Investment thesis</h3>
     <div class="row" style="margin-bottom:10px">
       <select id="thesisSym" style="max-width:200px" onchange="loadThesis()"></select>
       <span class="muted" id="thesisStatus" style="font-size:12.5px"></span>
@@ -1471,7 +1447,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     <details class="aside"><summary>Four of these the app can act on</summary><div>the target, the stop, the deadline and the quality threshold. The free text it can store but never read. The stop is what actually limits a loss, it turns "how often am I right" into "how much do I make when I'm right versus lose when I'm wrong", which is the number that decides whether the account grows. The deadline handles the third outcome nobody plans for: the thesis was neither right nor wrong, it just never happened, and the money sat there.</div></details>
   </div>
 
-  <div class="section-title">Your Holdings</div>
+  <div class="section-title">Your holdings</div>
   <div class="card" style="margin-bottom:14px">
     <div class="row">
       <input id="pfFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderAll()">
@@ -1500,12 +1476,12 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
         <th class="sortable" id="pfTh_type" onclick="sortPortfolio('type')">Type</th>
         <th class="sortable" id="pfTh_broker" onclick="sortPortfolio('broker')">Broker</th>
         <th class="sortable" id="pfTh_shares" onclick="sortPortfolio('shares')">Shares</th>
-        <th class="sortable" id="pfTh_cost" onclick="sortPortfolio('cost')">Avg Cost</th>
-        <th class="sortable" id="pfTh_price" onclick="sortPortfolio('price')">Price Now</th>
-        <th class="sortable" id="pfTh_value" onclick="sortPortfolio('value')">Market Value</th>
+        <th class="sortable" id="pfTh_cost" onclick="sortPortfolio('cost')">Avg cost</th>
+        <th class="sortable" id="pfTh_price" onclick="sortPortfolio('price')">Price now</th>
+        <th class="sortable" id="pfTh_value" onclick="sortPortfolio('value')">Market value</th>
         <th class="sortable th-profit" id="pfTh_gl" onclick="sortPortfolio('gl')">Gain/Loss</th>
         <th class="sortable th-ai" id="pfTh_signal" onclick="sortPortfolio('signal')">Verdict</th>
-        <th class="th-mine">My Call</th>
+        <th class="th-mine">My call</th>
         <th></th>
       </tr></thead>
       <tbody id="holdingsBody"></tbody>
@@ -1515,7 +1491,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
 
   <!-- QUALITY DRIFT -->
-  <div class="section-title">Quality Drift, which businesses are getting better or worse</div>
+  <div class="section-title">Quality drift, which businesses are getting better or worse</div>
   <div class="card">
     <div class="row" style="margin-bottom:12px">
       <select id="driftWindow" style="max-width:190px" onchange="renderDrift()">
@@ -1594,13 +1570,13 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     <table>
       <thead><tr>
         <th class="sortable" id="wlTh_sym" onclick="sortWatchlist('sym')">Ticker</th>
-        <th class="sortable" id="wlTh_price" onclick="sortWatchlist('price')">Share Price</th>
+        <th class="sortable" id="wlTh_price" onclick="sortWatchlist('price')">Share price</th>
         <th class="sortable th-quality sortable" id="wlTh_quality" onclick="sortWatchlist('quality')">Quality <span class="th-den">/12</span></th>
         <th class="sortable th-value" id="wlTh_pricescore" onclick="sortWatchlist('pricescore')">Value <span class="th-den">/6</span></th>
         <th class="sortable th-momentum" id="wlTh_momentum" onclick="sortWatchlist('momentum')">Momentum <span class="th-den">/4</span></th>
         <th class="sortable th-ai" id="wlTh_signal" onclick="sortWatchlist('signal')">Verdict</th>
         <th>Lists</th>
-        <th class="th-mine">My Call</th>
+        <th class="th-mine">My call</th>
         <th></th>
       </tr></thead>
       <tbody id="watchBody"></tbody>
@@ -1625,11 +1601,11 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <details class="aside"><summary>Bought</summary><div>and <b>Sold</b> add up the rows in the ledger below, nothing else. They only count trades you recorded <i>inside PerceptFolio</i>, so a position you typed in before the ledger existed won't appear, and Bought never goes down when you sell. They're a record of activity, not a statement of what you currently have in. For that, use <b>Portfolio value</b> and <b>Unrealized gain / loss</b> on the dashboard.</div></details>
   <div class="card">
-    <h3>Dividend Income</h3>
+    <h3>Dividend income</h3>
     <details class="aside"><summary>How this is worked out</summary><div>Worked out from your holdings automatically, nothing to log. The <b>Dividends accrued</b> figure above is a <b>projection, not income</b>, it accrues day by day from the rates below, so it grows the longer you hold, whether or not a payment ever lands. Finnhub's free tier doesn't expose actual payment dates or amounts, so this is an estimate at each company's current declared rate; it can't see a cut, a raise, or tax withheld.</div></details>
     <div id="divBreakdown"></div>
   </div>
-  <div class="section-title">Transaction History</div>
+  <div class="section-title">Transaction history</div>
   <div class="card" style="margin-bottom:14px">
     <div class="row">
       <input id="histFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderAll()">
@@ -1649,7 +1625,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
 
   <!-- HOW YOU BEHAVE -->
-  <div class="section-title">How You Behave, the pattern in your own trading</div>
+  <div class="section-title">How you behave, the pattern in your own trading</div>
   <div class="card">
     <details class="aside"><summary>Why this one analyses you</summary><div>Everything else in PerceptFolio analyses companies. This analyses <b>you</b>. Anyone can get price history; nobody else has yours. These are the four questions the ledger can answer about your habits. How long you actually hold, whether you sell too early, whether you keep to your own cash rule, and whether you trade more when things get loud.</div></details>
     <div id="behaviourBody"></div>
@@ -1659,7 +1635,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 <!-- MAP (Layer Deep) -->
 <div id="tab-map" class="tabs-hidden">
   <div class="card">
-    <h3>Layer Deep: Who a company depends on</h3>
+    <h3>Layer deep: who a company depends on</h3>
     <div class="row">
       <input id="mapTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')loadMap()">
       <button class="btn" onclick="loadMap()">Map it</button>
@@ -1731,7 +1707,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   <!-- 1. Today's move, in context -->
   <div class="card">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-      <h3 style="margin:0">The Move, In Context</h3>
+      <h3 style="margin:0">The move, in context</h3>
       <div class="row" style="gap:6px">
         <button class="btn btn-ghost btn-sm" id="mvBtn_today" onclick="setMoveDay('today')">Today</button>
         <button class="btn btn-ghost btn-sm" id="mvBtn_yesterday" onclick="setMoveDay('yesterday')">Yesterday</button>
@@ -1773,13 +1749,13 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   <!-- 2. Market weather -->
   <div id="regimeBanner" style="margin-top:16px"></div>
 
-  <div class="section-title">Market Weather. Long-run valuation</div>
+  <div class="section-title">Market weather. Long-run valuation</div>
   <div id="weatherVerdict" style="margin-bottom:14px"></div>
   <div class="grid grid-3" id="weatherCards">
     <div class="card" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w4"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
   </div>
   <div class="card" style="margin-top:14px">
-    <h3>Figures With No Free Feed</h3>
+    <h3>Figures with no free feed</h3>
     <div class="grid grid-3">
       <div>
         <div class="field"><label>CAPE (Shiller P/E), <a href="https://www.multpl.com/shiller-pe" target="_blank" rel="noopener" style="color:var(--accent)">look it up</a></label><input id="macroCape" type="number" step="0.01" placeholder="e.g. 34.2"></div>
@@ -1800,7 +1776,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   <details class="aside"><summary>Read these as long-run expectations, not crash warnings</summary><div>All three describe what returns over the next ten to fifteen years are likely to look like from today's prices. They have almost no power to time the next twelve months. The Buffett indicator has read "expensive" since roughly 2013 and CAPE has been above 30 since 2017, through years of large gains. Use them to decide how much to put in, not when to get out.</div></details>
 
   <!-- 3. Call scorecard -->
-  <div class="section-title">Your Call Scorecard. Is the checklist actually working?</div>
+  <div class="section-title">Your call scorecard. Is the checklist actually working?</div>
   <div class="card">
     <div class="row" style="margin-bottom:12px;flex-wrap:wrap">
       <select id="scoreWindow" style="max-width:200px" onchange="renderScorecard()">
@@ -1915,7 +1891,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="overflow-x:auto">
     <table>
-      <thead><tr><th>Ticker</th><th>Share Price</th><th class="th-quality">Quality <span class="th-den">/12</span></th><th class="th-value">Value <span class="th-den">/6</span></th><th class="th-momentum">Momentum <span class="th-den">/4</span></th><th class="th-ai">Verdict</th><th class="th-mine">My Call</th><th></th></tr></thead>
+      <thead><tr><th>Ticker</th><th>Share price</th><th class="th-quality">Quality <span class="th-den">/12</span></th><th class="th-value">Value <span class="th-den">/6</span></th><th class="th-momentum">Momentum <span class="th-den">/4</span></th><th class="th-ai">Verdict</th><th class="th-mine">My call</th><th></th></tr></thead>
       <tbody id="screenerBody"></tbody>
     </table>
     <div id="screenerEmpty" class="empty">Run a screen to see results here. Anything scoring at or above your buy bar (Settings) will sort to the top.</div>
@@ -1925,16 +1901,16 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 <!-- ANALYZER -->
 <div id="tab-analyzer" class="tabs-hidden">
   <div class="card">
-    <h3>Analyze a Stock</h3>
+    <h3>Analyze a stock</h3>
     <div class="row">
       <input id="aTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:170px" onkeydown="if(event.key==='Enter')analyzeStock()">
-      <button class="btn" onclick="analyzeStock()">Run Quality + Price Check</button>
+      <button class="btn" onclick="analyzeStock()">Run quality + price check</button>
       <span class="muted">ETFs: quality checks apply to companies, not ETFs. Use this for individual stocks.</span>
     </div>
   </div>
   <div id="analyzerResult"><div class="empty" style="text-align:left;line-height:1.7"><b>Nothing analysed yet.</b><br><span style="font-size:12.5px">Enter a US ticker above. The Analyzer runs the 22 checks, shows what each one measured and whether it passed, and records the verdict as a call so it can be graded later. It is deliberately not a recommendation.</span></div></div>
   <div class="card" style="margin-top:16px">
-    <h3>Compare Two Stocks</h3>
+    <h3>Compare two stocks</h3>
     <div class="row">
       <input id="cmpTicker1" placeholder="Ticker A (e.g. AAPL)" style="max-width:170px" onkeydown="if(event.key==='Enter')compareStocks()">
       <input id="cmpTicker2" placeholder="Ticker B (e.g. MSFT)" style="max-width:170px" onkeydown="if(event.key==='Enter')compareStocks()">
@@ -1959,7 +1935,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
 
   <div class="card">
-    <h3>Portfolio Risk</h3>
+    <h3>Portfolio risk</h3>
     <div class="row">
       <button class="btn" id="riskCalcBtn" onclick="calculateRisk()">Calculate risk</button>
       <span class="muted" id="riskStatus"></span>
@@ -2113,17 +2089,17 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
 <div id="tab-clients" class="tabs-hidden">
   <p class="muted" style="margin-bottom:14px">A business account doesn't hold its own investments in PerceptFolio. Portfolio, Watchlist, and Alerts are hidden here for that reason. Manage client portfolios below, or click <b>Switch</b> on a client to work inside their account.</p>
   <div class="card">
-    <h3>Create Client</h3>
+    <h3>Create client</h3>
     <details class="aside"><summary>What a client account is, and is not</summary><div>This isn't a real brokerage account for your client. Their actual money stays wherever it's actually held (their own broker/custodian). This just gives you, the quant, a separate, walled-off place to track and score that client's holdings by hand, same as any other portfolio in this app. Most people never give the client login access at all. It's for your own recordkeeping. The email below is just an internal ID (it doesn't need to be real, and doesn't need to reach them) unless you specifically want them to log in themselves; if you do, set a password and hand them both. Either way, you can also work in their portfolio anytime via Switch, and export a snapshot for them via Settings → Export if you ever want to hand off a copy.</div></details>
     <div class="row">
       <input id="clientName" placeholder="Client name (e.g. Jane Smith)" style="max-width:200px">
       <input id="clientEmail" placeholder="ID (email format. Doesn't need to be real)" style="max-width:260px">
       <input id="clientPassword" type="password" placeholder="Password (only if they'll log in)" style="max-width:220px">
       <input id="clientFeePct" type="number" min="0" max="100" step="0.1" placeholder="Fee % of gains (optional)" style="max-width:190px">
-      <button class="btn" onclick="createClientProfile()">Create Client</button>
+      <button class="btn" onclick="createClientProfile()">Create client</button>
     </div>
   </div>
-  <div class="section-title">Your Clients</div>
+  <div class="section-title">Your clients</div>
   <div class="card" style="overflow-x:auto">
     <table>
       <thead><tr><th>Client</th><th>Login email</th><th>Portfolio value</th><th>Unrealized gain</th><th>Your fee</th><th>Est. fee owed</th><th></th></tr></thead>
@@ -2143,7 +2119,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     <p class="muted" id="installHint" style="margin-top:10px;font-size:12.5px;line-height:1.55"></p>
   </div>
   <div class="card" style="margin-top:16px">
-    <h3>Getting Started</h3>
+    <h3>Getting started</h3>
     <button class="btn btn-ghost" onclick="replayTour()">Run the walkthrough</button>
   </div>
 
@@ -2188,7 +2164,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     </details>
   </div>
   <div class="card" style="margin-top:16px">
-    <h3>Investment Policy</h3>
+    <h3>Investment policy</h3>
     <div class="grid grid-2">
       <div class="field"><label>Risk profile</label><select id="polRisk">
         <option value="conservative">Conservative. Capital preservation</option>
@@ -2217,11 +2193,11 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
 
   <div class="card" style="margin-top:16px">
-    <h3>Rule Change Log</h3>
+    <h3>Rule change log</h3>
     <div id="ruleLog"></div>
   </div>
   <div class="card" style="margin-top:16px">
-    <h3>Copy Holdings / Watchlist to Another Account</h3>
+    <h3>Copy holdings / watchlist to another account</h3>
     <div class="row" style="margin-bottom:10px">
       <select id="copyTarget" style="max-width:280px"></select>
       <select id="copyWhat" style="max-width:190px">
@@ -2238,7 +2214,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     <p class="muted" style="font-size:12px"><b>Merge</b> adds anything they don't already have and leaves their existing positions untouched. <b>Replace</b> wipes the selected lists on the target account first; that can't be undone, so it asks first.</p>
   </div>
   <div class="card" style="margin-top:16px">
-    <h3>Sync Across Your Devices</h3>
+    <h3>Sync across your devices</h3>
     <div class="field"><label>Sync URL</label><input id="syncUrlInput" placeholder="https://perceptfolio-sync.yourname.workers.dev" autocomplete="off"></div>
     <div class="field"><label>Sync key</label><input id="syncKeyInput" type="password" placeholder="The SYNC_SECRET you set in Cloudflare" autocomplete="off"></div>
     <div class="row">
@@ -2283,7 +2259,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     <p class="muted" style="margin-top:10px">Your data lives in this browser only. Export regularly, and import on a new device to move everything over.</p>
   </div>
   <div class="card" style="margin-top:16px">
-    <h3>Danger Zone</h3>
+    <h3>Danger zone</h3>
     <button class="btn-danger btn" onclick="deleteProfile()">Delete This Profile</button>
   </div>
   <!-- P2. The terminal grades itself and publishes its own breaches. A product that argues numbers
@@ -3540,6 +3516,12 @@ function removeClient(email){
   toast('Client removed.');
 }
 function logout(){saveDB();USER=null;D=null;bizContext=null;sessionStorage.removeItem('qf_user');location.reload();}
+/* The headline of a statement is its date. Localised by the language switch (<html lang>). */
+function dateLine(){
+  const lang=document.documentElement.lang==='es'?'es':'en';
+  const d=new Date().toLocaleDateString(lang,{weekday:'long',month:'long',day:'numeric'});
+  return d.charAt(0).toUpperCase()+d.slice(1);
+}
 function updateGreeting(){
   if(!USER)return;
   const hour=new Date().getHours();
@@ -3553,7 +3535,7 @@ function updateGreeting(){
     display=name.charAt(0).toUpperCase()+name.slice(1);
   }
   const gt=document.getElementById('greetingText');
-  if(gt)gt.textContent='Good '+period+', '+display;
+  if(gt)gt.textContent=dateLine();
   // Both the header avatar and the larger one inside the dropdown render from the same source.
   [document.getElementById('avatarInitial'),document.getElementById('menuAvatar')].forEach(av=>{
     if(!av)return;
@@ -9463,8 +9445,8 @@ async function calcSoloRisk(){
       (outlook.sharpe!=null?'<p class="muted" style="margin-bottom:10px">Sharpe ratio '+outlook.sharpe.toFixed(2)+', expected excess return per unit of volatility. Above 1.0 is strong, 0–0.5 is fair, below 0 means the expected return doesn\'t clear the risk-free rate given how much this stock swings.</p>':'')+
       '<div class="grid grid-3" style="margin-bottom:10px">'+
       '<div class="card"><h3>Beta</h3><div class="big">'+outlook.beta.toFixed(2)+'</div></div>'+
-      '<div class="card"><h3>Annual Volatility</h3><div class="big">'+(outlook.sigma*100).toFixed(1)+'%</div><div class="muted" style="font-size:11px">'+esc(outlook.sigmaSource)+'</div></div>'+
-      '<div class="card"><h3>Expected Return (CAPM)</h3><div class="big">'+(outlook.mu*100).toFixed(1)+'%</div></div>'+
+      '<div class="card"><h3>Annual volatility</h3><div class="big">'+(outlook.sigma*100).toFixed(1)+'%</div><div class="muted" style="font-size:11px">'+esc(outlook.sigmaSource)+'</div></div>'+
+      '<div class="card"><h3>Expected return (CAPM)</h3><div class="big">'+(outlook.mu*100).toFixed(1)+'%</div></div>'+
       '</div>'+
       '<div class="grid grid-3" style="margin-bottom:10px">'+
       '<div class="card"><h3>Worst case (5th pct)</h3><div class="big neg">'+(outlook.range.p5>=0?'+':'')+outlook.range.p5.toFixed(1)+'%</div></div>'+
@@ -10086,7 +10068,7 @@ function renderAll(){
        read noise as skill — the precise habit this app exists to break. State the number, then say
        what it is worth, which is nothing on its own. */
     else if(dayBase>0&&dayChange!==0)gs.textContent=(dayChange>=0?'Up ':'Down ')+pmask(fmt$(Math.abs(dayChange)))+' today. One day is noise, not evidence.';
-    else gs.textContent='Here\'s where things stand today.';
+    else gs.textContent='No change recorded today.';
   }
 
   /* pie charts */
@@ -10158,7 +10140,7 @@ function renderAll(){
     const priceCell='<input type="number" step="any" style="width:100px" value="'+(p!=null?p:'')+'" placeholder="set price" '+
       'onchange="setHoldingPrice('+i+',this.value)">'+priceNote;
     const tr=document.createElement('tr');
-    tr.innerHTML='<td><b>'+esc(h.sym)+'</b></td><td>'+typePill+'</td><td class="muted">'+esc(h.broker)+'</td><td>'+pmask(h.shares)+'</td>'+
+    tr.innerHTML='<td><b>'+esc(h.sym)+'</b></td><td>'+typePill+'</td><td class="muted">'+(h.broker?esc(h.broker):'\u2014')+'</td><td>'+pmask(h.shares)+'</td>'+
       '<td>'+pmask(fmt$(h.cost))+'</td><td>'+priceCell+'</td><td>'+pmask(fmt$(val))+'</td>'+
       '<td class="'+(gl==null?'':gl>=0?'pos':'neg')+'">'+(gl==null
           ?'<span class="muted" title="'+(glMode()==='today'?'No live quote today. Manually priced, a mutual fund, or not refreshed yet.':'Set a price to see this.')+'">-</span>'
@@ -12191,7 +12173,7 @@ function renderCommand(){
   const hour=new Date().getHours();
   const period=hour<5?'evening':hour<12?'morning':hour<17?'afternoon':'evening';
   const name=(D.displayName&&D.displayName.trim().split(' ')[0])||(USER?USER.split('@')[0]:'');
-  if(g)g.textContent='Good '+period+(name?', '+name.charAt(0).toUpperCase()+name.slice(1):'');
+  if(g)g.textContent=dateLine();
 
   renderRecordStrip();
   renderMarksDue();
@@ -12228,7 +12210,7 @@ function renderCommand(){
     const open=cmdOpen===i;
     return '<div class="cmd-row'+(open?' open':'')+'" onclick="toggleCmdRow('+i+')">'+
         '<span class="cmd-dot" style="background:'+colour(a.kind)+'"></span>'+
-        '<span class="cmd-kind '+kindCls(a.kind)+'">'+esc(a.kind)+'</span>'+
+        '<span class="cmd-kind '+kindCls(a.kind)+'">'+esc(a.kind.charAt(0)+a.kind.slice(1).toLowerCase())+'</span>'+
         '<span class="cmd-sym">'+esc(a.sym||'-')+'</span>'+
         '<span class="cmd-why">'+esc(a.summary||a.headline)+'</span>'+
         (a.evidence?'<span class="cmd-score">'+esc(a.evidence)+'</span>':'')+
@@ -15572,9 +15554,9 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 #tab-world .wd-tip{position:absolute;z-index:3;pointer-events:none;transform:translate(14px,14px);max-width:260px;padding:6px 10px;border-radius:8px;background:var(--panel);color:var(--text);border:1px solid var(--border);box-shadow:var(--el-3);font-size:12.5px;line-height:1.4}
 #tab-world .wd-idle{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:24px;pointer-events:none}
 #tab-world .wd-idle[hidden],#tab-world .wd-tip[hidden]{display:none}
-#tab-world .mv-empty{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:16px 18px;border:1px dashed var(--border);border-radius:10px;background:var(--bg);max-width:440px;pointer-events:auto}
+#tab-world .mv-empty{display:block;padding:14px 16px;border:1px solid var(--border);border-radius:4px;background:var(--bg);max-width:440px;pointer-events:auto}
 #tab-world .wd-idle .mv-empty{background:rgba(14,15,18,.88);backdrop-filter:blur(6px);color:#f2f3f5}
-#tab-world .mv-empty .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);margin-top:6px;box-shadow:0 0 0 4px rgba(148,154,166,.15)}
+#tab-world .mv-empty .dot{display:none}
 #tab-world .mv-empty b{display:block;font-size:14px;margin-bottom:4px}
 #tab-world .mv-empty p{margin:0;font-size:13px;line-height:1.55;color:var(--muted);max-width:60ch}
 #tab-world .wd-side{display:flex;flex-direction:column;gap:12px;min-width:0}
@@ -15886,6 +15868,114 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 #pfHeat .ht-note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
 @media (max-width:768px){#pfHeat .ht-grid{grid-template-columns:1fr}#pfHeat .ht-map{height:220px}#pfHeat .ht-sectors{grid-template-columns:repeat(3,1fr);grid-auto-rows:56px}}
 @media (max-width:960px) and (min-width:781px){#pfHeat .ht-grid{grid-template-columns:1fr 1fr;gap:60px}}
+</style>
+<style id="v3-ledger">
+/* ===== Ledger pass, 2026-09-20. Additive; remove this block to revert. =====
+   The operator's word for the previous surface was "AI": a gradient behind everything, a glow on
+   the active tab, a halo on every dot, a box inside every box, and thirty-six labels shouting in
+   uppercase monospace. None of it carried information. This sets the terminal like a statement
+   instead. One display face (Archivo, the same as the front door) for headings and the figures
+   that matter; labels in sentence case in the body face; monospace kept for tickers, tables and
+   code, where alignment is the point; hairlines where there were boxes; colour on the primary
+   action, on the active tab and on numbers that moved, and nowhere else. */
+@font-face{font-family:"Archivo";src:url("/fonts/Archivo.woff2") format("woff2");font-weight:500 900;font-display:swap}
+:root{--display:"Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --bg:#0b0c0f;--panel:#111317;--panel2:#181b21;--panel3:#1f232a;--border:#252932;--line:#1e2129;--radius:4px}
+body.theme-light{--bg:#f7f7f5;--panel:#ffffff;--panel2:#f0f0ee;--panel3:#e6e6e3;--border:#d6d6d2;--line:#e8e8e4}
+body{background:var(--bg)}
+
+/* Type. Headings and the figures that matter in the display face; everything else on the system
+   stack, so paragraphs read the same as the door. */
+h1,h2,.greeting,.auth-h1,.auth-title,.section-title,.list-head-name,.welcome-card h2,.hero-value,.big,.rec-val,
+.stat-value,.prob-v,.list-card-n,.research-stat,#pfModel .mv-title{font-family:var(--display)}
+.hero-value{font-weight:700;letter-spacing:-.03em;font-size:44px}
+.big{font-weight:700}
+.rec-val{font-weight:700;letter-spacing:-.03em}
+.stat-value{font-weight:700;letter-spacing:-.02em;font-size:20px}
+.prob-v,.list-card-n,.research-stat{font-weight:700;letter-spacing:-.02em}
+.greeting{font-weight:700;font-size:24px;letter-spacing:-.02em}
+.greeting-sub{font-size:13px;margin-bottom:22px}
+
+/* Labels. Sentence case in the body face, 12px, muted. Monospace stays where alignment matters. */
+.card h3,.section-title,.hero-label,.stat-label,.prob-head,.prob-k,.rec-head,.md-head,.research-stat-label,
+th,.list-row-tag,.list-card-tag,#pfModel .mv-kicker,.auth-eyebrow,.auth-foot,.tour-eyebrow,.tour-tag,
+.auth-switch button,.hd-where,#sidebar nav button,.side-foot,.btn-ghost,.btn-danger,.logo,.rec-unit
+  {font-family:inherit;text-transform:none;letter-spacing:0}
+.card h3{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px}
+.section-title{font-family:var(--display);font-size:17px;font-weight:700;color:var(--text);margin:36px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);letter-spacing:-.01em}
+.hero-label,.stat-label,.prob-head,.prob-k,.rec-head,.md-head,.research-stat-label,#pfModel .mv-kicker{font-size:12px;font-weight:500;color:var(--muted)}
+th{font-size:12px;font-weight:500}
+.list-row-tag,.list-card-tag,.tour-tag{font-size:11px;font-weight:500;border-radius:3px}
+.auth-eyebrow,.tour-eyebrow{font-size:13px;font-weight:500;color:var(--muted)}
+.auth-foot{font-size:12px}
+.rec-head:before,.stat::before,.research-card::before{content:none}
+.rec-foot,.rec-ci{font-family:inherit;font-size:12px;letter-spacing:0}
+.md-when,.md-meta,.rec-unit{letter-spacing:0}
+
+/* Chrome. The wordmark in the display face, as on the door; the sidebar in sentence case with a
+   rule beside the active tab and no fill behind it. */
+.logo{font-family:var(--display);font-weight:800;letter-spacing:-.01em;font-size:16px}
+.hd-where{font-size:13px;font-weight:500}
+#sidebar nav button{font-size:13px;font-weight:500;padding:8px 10px;border-radius:4px;gap:11px}
+#sidebar nav button:hover{background:var(--panel2)}
+#sidebar nav button.active{font-weight:600;background:transparent;box-shadow:none}
+#sidebar nav button.active:before{width:2px;top:9px;bottom:9px;border-radius:0}
+.side-foot{font-size:11px}
+
+/* Controls. One radius, one weight, no monospace on a button. */
+input,select,textarea,.btn,.btn-add,.icon-btn,.btn-ghost,.btn-danger,.auth-switch,.list-pick,.ovf-menu,.ovf-item,#tab-world .wd-chip,.nw-win{border-radius:4px}
+.auth-switch button{border-radius:3px;font-size:13px;font-weight:500}
+.btn-ghost,.btn-danger{font-size:13px;font-weight:500}
+.btn-add .plus{color:var(--text)}
+/* The chart's view and range pickers are tabs, not eight outlined buttons in a row. The active
+   one is still marked inline by updateGraphButtons(), which now colours only the underline. */
+[id^="gvBtn_"],[id^="grBtn_"]{border-width:0 0 2px;border-color:transparent;border-radius:0;background:transparent;padding:6px 2px;color:var(--muted)}
+[id^="gvBtn_"]:hover,[id^="grBtn_"]:hover{color:var(--text)}
+
+/* Surfaces. A panel is a hairline, not a lit slab; a panel inside a panel is a row. */
+.card{border-radius:var(--radius);box-shadow:none;background:var(--panel);transition:none}
+.card:hover{border-color:var(--border)}
+.card .card,.card .alert-item,.card .prob-box{border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;box-shadow:none;margin:0;padding:12px 0}
+.card .card:first-child,.card .alert-item:first-child{border-top:0;padding-top:0}
+.card .alert-item:last-child{padding-bottom:0}
+.card .list-rows{border:0;border-radius:0;background:transparent}
+.alert-item,.list-rows,.list-card,.list-head,.welcome-card,.research-card,.prob-box{border-radius:var(--radius);box-shadow:none}
+.research-card{border-left-width:1px;border-left-color:var(--border)}
+.rec,.md{border:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0;background:transparent;padding:14px 0;margin-bottom:22px}
+.rec+.md,.md+.rec{border-top:0;margin-top:-22px}
+.rec-bar{border-radius:2px;border:0}
+.rec-bar i{border-radius:2px}
+.stat-row{gap:0;padding:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.stat{border:0;border-radius:0;background:transparent;box-shadow:none;padding:14px 18px 14px 0;margin-right:18px;border-right:1px solid var(--border);transform:none;transition:none}
+.stat:last-child{border-right:0;margin-right:0}
+.stat:hover{border-color:var(--border);transform:none}
+.stat .stat-label,.stat.s-in .stat-label,.stat.s-out .stat-label,.stat.s-profit .stat-label,.stat.s-income .stat-label{color:var(--muted)}
+.hero{padding:6px 0 22px}
+.hero-change{background:transparent;padding:0;border-radius:0;font-family:inherit;font-size:13px;font-weight:500;margin-top:6px}
+.hero-change.flat{background:transparent}
+.pill,.pill-buy,.pill-sell,.pill-hold,.pill-watch,.pill-na{background:transparent;padding:0;border-radius:0;font-family:inherit;font-size:12px;font-weight:700;text-transform:none;letter-spacing:0}
+.research-badge{background:transparent;padding:0;font-family:inherit;font-size:12px}
+.empty{text-align:left;padding:12px 0;font-size:13px}
+.disclaimer{text-align:left;font-size:11.5px;padding:16px 0;margin-top:32px}
+/* The morning queue: the kind of item is a coloured word, not a coloured word and a dot. */
+.cmd-list{border-radius:var(--radius)}
+.cmd-dot{display:none}
+.cmd-kind{font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;width:60px}
+.cmd-score{font-family:inherit;font-size:12px}
+
+/* The door. The wordmark, the sentence and the form; the feature list belongs to the landing page. */
+.auth-brand{background:var(--bg)}
+.auth-grid,.auth-points{display:none}
+.auth-h1{font-size:36px;letter-spacing:-.025em}
+.auth-sub{max-width:42ch;margin-bottom:0}
+
+@media(max-width:600px){
+  .stat{border-right:0;border-top:1px solid var(--border);margin-right:0;padding:12px 0}
+  .stat:first-child{border-top:0}
+  .hero-value{font-size:36px}
+  .section-title{font-size:16px}
+  [id^="gvBtn_"],[id^="grBtn_"]{font-size:12px;padding:6px 0}
+}
 </style>
 <script>
 /* Today's heat, in Market: the holdings as a treemap (size = value, colour = day change, from the

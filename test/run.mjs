@@ -1290,7 +1290,8 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('Market: the heat card sits after Calendar effects; Today’s heat switches between the holdings and the market (Dow 30 and twelve mega-caps)', /var after=cards\[1\]\|\|cards\[0\]/.test(term) && /window\.heatMode=function\(m\)/.test(term) && /function marketList\(\)/.test(term) && /P\.dow30/.test(term) && /P\.megatech/.test(term) && /ht-market/.test(term));
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v115/.test(sw));
+  t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v116/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
@@ -1455,8 +1456,35 @@ t('every sitemap URL exists and is indexable', (() => {
 t('the private surfaces are all noindex',
   ['terminal/index.html','admin.html','404.html','thanks.html']
     .every(f => /<meta name="robots" content="noindex/.test(read(f))));
-/* The custom domain only works while this file exists. */
-t('CNAME is present and correct', read('CNAME').trim() === 'perceptfolio.com');
+/* The domain lives on Cloudflare Pages now (PRD §21); a CNAME file would only re-attach GitHub Pages. */
+t('no CNAME file remains from GitHub Pages', !exists('CNAME'));
+t('the assembled site redirects www to the bare domain', /https:\/\/www\.perceptfolio\.com\/\* https:\/\/perceptfolio\.com\/:splat 301/.test(read('scripts/assemble.mjs')));
+t('the gate redirects www before it does anything else', /url\.hostname === 'www\.perceptfolio\.com'/.test(read('functions/_middleware.js')));
+
+/* ==================== LEDGER SURFACE ==================== */
+G('Set like a statement, not a dashboard template');
+
+/* One block, last in the document, so it wins every tie without !important. */
+t('the ledger block is the last stylesheet in the terminal',
+  term.lastIndexOf('<style id="v3-ledger">') > term.lastIndexOf('<style id="v2-heat">'));
+t('the terminal loads the same display face as the landing page', /@font-face\{font-family:"Archivo";src:url\("\/fonts\/Archivo\.woff2"\)/.test(term));
+/* The tells the operator called "AI", each pinned absent. */
+t('no ambient gradient behind the page', !/body\{background:\s*radial-gradient/.test(term));
+t('no glow on the active tab', !/nav button\.active\{box-shadow:inset 0 0 0 1px rgba\(31,158,140/.test(term));
+t('no halo dots on the stat tiles', !/\.stat::before\{content:"";/.test(term));
+t('no dashed empty states', !/border:1px dashed var\(--border\)/.test(term));
+t('section titles and card headings are not uppercase monospace',
+  /\.card h3,\.section-title,[^{]*\{font-family:inherit;text-transform:none;letter-spacing:0\}/.test(term));
+t('the sidebar labels are in sentence case', /#sidebar nav button\{font-size:13px;font-weight:500/.test(term));
+t('a pill is a coloured word, not a chip', /\.pill,\.pill-buy,\.pill-sell,\.pill-hold,\.pill-watch,\.pill-na\{background:transparent;padding:0/.test(term));
+t('a card inside a card is a row', /\.card \.card,\.card \.alert-item,\.card \.prob-box\{border:0;border-top:1px solid var\(--border\)/.test(term));
+/* The greeting was chatbot furniture; a statement is headed by its date. */
+t('the dashboard and command screens are headed by the date', /function dateLine\(\)/.test(term) && !/'Good '\+period/.test(term));
+t('no headings are typed in Title Case',
+  ['Analyze a Stock','Compare Two Stocks','Market Weather','Your Call Scorecard','Total Value<','Update Cash','Danger Zone']
+    .every(x => !term.includes('>' + x)));
+/* The sign-in screen is a door, not a second landing page. */
+t('the feature list is off the sign-in screen', /\.auth-grid,\.auth-points\{display:none\}/.test(term));
 
 /* ==================== QUIET NOTES ==================== */
 G('State the number, do not lecture');

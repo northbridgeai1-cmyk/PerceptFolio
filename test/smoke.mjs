@@ -34,6 +34,7 @@ r = await get('/preview/dashboard.html', { redirect: 'follow' });
 t('the dashboard snapshot is frameable by the landing page only', r.status === 200 && r.headers.get('x-frame-options') === 'SAMEORIGIN' && /frame-ancestors 'self'/.test(r.headers.get('content-security-policy') || ''), r.status + ' ' + (r.headers.get('x-frame-options') || ''));
 r = await get('/nope-' + Date.now());
 t('an unknown path is not a 500', r.status !== 500);
+if (/^https:\/\/perceptfolio\.com$/.test(origin)) { r = await fetch('https://www.perceptfolio.com/terminal/', { redirect: 'manual' }); t('www lands on the bare domain (one origin, one account store)', r.status === 301 && /^https:\/\/perceptfolio\.com\/terminal\//.test(r.headers.get('location') || ''), r.status + ' ' + (r.headers.get('location') || '')); }
 const worker = 'https://crimson-hat-6ad9.northbridgeai1.workers.dev';
 r = await fetch(worker + '/version'); const v = await r.json().catch(() => ({}));
 t('the Worker answers with its version and the World route', r.status === 200 && /^\d{4}-\d{2}-\d{2}/.test(v.version || '') && (v.routes || []).includes('/world'), v.version || '');

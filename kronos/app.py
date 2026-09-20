@@ -1,10 +1,11 @@
 """Kronos inference service for PerceptFolio, on Modal.
 
 Loads the open Kronos K-line foundation model (shiyu-coder/Kronos) once per container and answers
-POST /forecast with a predicted daily path. The worker calls it with a service token; the terminal
+POST / on the "web" endpoint (…-perceptfolio-kronos-web.modal.run) with a predicted daily path. The worker calls it with a service token; the terminal
 never calls it directly. Deploy:
 
-    pip install modal && modal setup
+    bash kronos/deploy.sh                 # does all of the below, then proves the round trip
+
     modal deploy kronos/app.py            # prints the endpoint URL
     npx wrangler secret put KRONOS_URL -c worker.wrangler.toml     # paste that URL
     npx wrangler secret put KRONOS_TOKEN -c worker.wrangler.toml   # any long random string
@@ -78,16 +79,28 @@ class Forecaster:
         }
 
 
-@app.function(secrets=[modal.Secret.from_name("kronos-token")])
-@modal.fastapi_endpoint(method="POST")
-def forecast(body: dict, request: "fastapi.Request" = None):  # noqa: F821
+@app.function(secrets=[modal.Secret.from_name("kronos-token")], timeout=600)
+@modal.asgi_app()
+def web():
+    """POST / with {"candles": [...], "horizon": n} and Authorization: Bearer <KRONOS_TOKEN>.
+    A FastAPI app built inside the container, so the request object and its headers are real;
+    a bare endpoint with a string-annotated Request parameter received None and refused everyone."""
     import os
-    from fastapi import HTTPException
-    token = (request.headers.get("authorization") or "").replace("Bearer ", "") if request else ""
-    if not os.environ.get("KRONOS_TOKEN") or token != os.environ["KRONOS_TOKEN"]:
-        raise HTTPException(status_code=401, detail="bad token")
-    candles = body.get("candles") or []
-    horizon = int(body.get("horizon") or 30)
-    if len(candles) < 60 or horizon < 5 or horizon > 180:
-        raise HTTPException(status_code=400, detail="need at least 60 candles and a horizon of 5 to 180 days")
-    return Forecaster().forecast.remote(candles, horizon)
+    from fastapi import FastAPI, HTTPException, Request
+
+    api = FastAPI()
+
+    @api.post("/")
+    async def forecast(request: Request):
+        token = (request.headers.get("authorization") or "").replace("Bearer ", "").strip()
+        expected = os.environ.get("KRONOS_TOKEN", "")
+        if not expected or token != expected:
+            raise HTTPException(status_code=401, detail="bad token")
+        body = await request.json()
+        candles = body.get("candles") or []
+        horizon = int(body.get("horizon") or 30)
+        if len(candles) < 60 or horizon < 5 or horizon > 180:
+            raise HTTPException(status_code=400, detail="need at least 60 candles and a horizon of 5 to 180 days")
+        return Forecaster().forecast.remote(candles, horizon)
+
+    return api
