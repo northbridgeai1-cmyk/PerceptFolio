@@ -12,7 +12,13 @@ never calls it directly. Deploy:
 
 Output is a model's continuation of a price series. It is recorded and marked like every other
 call; it is never a recommendation.
+
+CPU by default. Modal asks for a payment method before it will run a GPU function, even inside
+the free credit, and Kronos-small (25M parameters) forecasts a month in well under a minute on a
+few CPU cores; the worker caches each answer for a day, so nobody waits twice. To use a T4 once a
+card is on file, deploy with KRONOS_GPU=T4 in the environment.
 """
+import os
 import modal
 
 image = (
@@ -27,19 +33,28 @@ MODEL = "NeoQuasar/Kronos-small"
 TOKENIZER = "NeoQuasar/Kronos-Tokenizer-base"
 
 
-@app.cls(gpu="T4", scaledown_window=300, secrets=[modal.Secret.from_name("kronos-token")])
+GPU = os.environ.get("KRONOS_GPU") or None          # read at deploy time on your machine
+
+
+@app.cls(gpu=GPU, cpu=4.0, memory=8192, timeout=600, scaledown_window=300, secrets=[modal.Secret.from_name("kronos-token")])
 class Forecaster:
     @modal.enter()
     def load(self):
+        import torch
         from model import Kronos, KronosTokenizer, KronosPredictor  # from the cloned repo
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        torch.set_num_threads(4)
         self.tok = KronosTokenizer.from_pretrained(TOKENIZER)
         self.model = Kronos.from_pretrained(MODEL)
-        self.pred = KronosPredictor(self.model, self.tok, device="cuda:0", max_context=512)
+        self.pred = KronosPredictor(self.model, self.tok, device=device, max_context=512)
+        self.device = device
 
     @modal.method()
     def forecast(self, candles: list, horizon: int, samples: int = 8) -> dict:
         import pandas as pd
         import numpy as np
+        if self.device == "cpu":
+            samples = min(samples, 4)
         df = pd.DataFrame(candles)[["open", "high", "low", "close", "volume"]].astype(float)
         df["amount"] = df["close"] * df["volume"]
         ts = pd.to_datetime([c["t"] for c in candles], unit="s")
@@ -59,7 +74,7 @@ class Forecaster:
             "path": np.median(arr, axis=0).round(4).tolist(),
             "lo": np.percentile(arr, 10, axis=0).round(4).tolist(),
             "hi": np.percentile(arr, 90, axis=0).round(4).tolist(),
-            "samples": samples, "model": MODEL,
+            "samples": samples, "model": MODEL, "device": self.device,
         }
 
 
