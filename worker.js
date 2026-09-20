@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-14.5';
+const WORKER_VERSION = '2026-09-20.1';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -464,7 +464,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -1388,6 +1388,56 @@ async function grantIsLive(env, code) {
   const inv = JSON.parse(c);
   return !inv.paused && !(inv.expiresAt && Date.now() > inv.expiresAt);
 }
+/* Nominatim, OSM's geocoder, the way God's Eye View uses it for keyless lookups: an honest
+   User-Agent, and never more than one request a second across everyone who opens the terminal
+   (a KV timestamp; eventually consistent, so a best effort, and the per-IP limit sits above it). */
+const WORLD_CAP = 50;
+const NOMINATIM_KEEP = { man_made: /^(works|wastewater_plant|water_works|mineshaft|adit|offshore_platform)$/, landuse: /^(industrial|quarry|construction|port)$/, industrial: /./, power: /^(plant|substation)$/, telecom: /^data_center$/, building: /^(industrial|factory|warehouse|manufacture|data_center)$/, craft: /./ };
+async function nominatim(env, q) {
+  try {
+    const last = parseInt(await env.PF_SYNC.get('nominatim:last') || '0', 10), gap = Date.now() - last;
+    if (gap < 1100) await new Promise(res => setTimeout(res, 1100 - gap));
+    await env.PF_SYNC.put('nominatim:last', String(Date.now()), { expirationTtl: 60 });
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=' + WORLD_CAP + '&extratags=1&addressdetails=1&dedupe=1&q=' + encodeURIComponent(q), { headers: { 'User-Agent': 'PerceptFolio-world/1.0 (+https://perceptfolio.com)', 'Accept-Language': 'en', 'Accept': 'application/json' }, signal: AbortSignal.timeout(15000) });
+    if (r.status === 429 || r.status === 509) return { ok: false, error: 'OpenStreetMap’s search is rate-limiting right now. Try again in a minute.' };
+    if (!r.ok) return { ok: false, error: 'OpenStreetMap’s search is busy right now. Try again in a minute.' };
+    const j = await r.json(); if (!Array.isArray(j)) return { ok: false, error: 'OpenStreetMap’s search gave no answer. Try again in a minute.' };
+    return { ok: true, results: j };
+  } catch (e) { return { ok: false, error: 'OpenStreetMap’s search did not answer. Try again in a minute.' }; }
+}
+/* The same compact shape the bundled layers use, so the terminal draws both with one code path.
+   Only industrial objects are kept: a company's offices, shops and bus stops are not plants. */
+function worldFeatures(results) {
+  const feats = [];
+  for (const x of results) {
+    const keep = NOMINATIM_KEEP[x.category]; if (!keep || !keep.test(String(x.type || ''))) continue;
+    const lat = parseFloat(x.lat), lon = parseFloat(x.lon); if (!isFinite(lat) || !isFinite(lon)) continue;
+    const t = x.extratags || {}, a = x.address || {};
+    const name = x.name || t['name:en'] || String(x.display_name || '').split(',')[0] || ''; if (!name) continue;
+    const f = { i: String(x.osm_type || 'n')[0] + x.osm_id, n: clean(name, 80), la: Math.round(lat * 1e4) / 1e4, lo: Math.round(lon * 1e4) / 1e4, s: 'o' };
+    if (t.operator && t.operator !== name) f.o = clean(t.operator, 60);
+    const k = t.product || t.industrial || t['plant:source'] || t.resource || (x.category === 'telecom' ? 'data centre' : '') || (x.type === 'works' ? 'works' : '') || (x.type === 'quarry' ? 'mine' : '') || (x.category === 'landuse' ? x.type + ' land' : x.type) || '';
+    if (k) f.p = clean(String(k).replace(/_/g, ' '), 40);
+    const cc = String(a.country_code || t['addr:country'] || '').toUpperCase().slice(0, 2); if (/^[A-Z]{2}$/.test(cc)) f.c = cc;
+    const wsite = t.website || t['contact:website'] || t.url; if (wsite && /^https?:\/\//i.test(wsite)) f.w = clean(wsite, 120);
+    const qid = t.wikidata || t['operator:wikidata']; if (qid && /^Q\d+$/.test(qid)) f.q = qid;
+    f._tags = Object.keys(t).length; f._works = x.type === 'works' ? 1 : 0;
+    feats.push(f);
+  }
+  /* Same name within ~2 km is one plant, whatever else is tagged; keep the better-tagged copy. */
+  const near = (a, b) => Math.abs(a.la - b.la) < 0.02 && Math.abs((a.lo - b.lo) * Math.cos(a.la * Math.PI / 180)) < 0.02;
+  const better = (a, b) => a._works > b._works || (a._works === b._works && a._tags > b._tags);
+  const groups = new Map();
+  for (const f of feats) {
+    const g = groups.get(f.n.toLowerCase()) || []; groups.set(f.n.toLowerCase(), g);
+    const i = g.findIndex(x => near(x, f));
+    if (i < 0) g.push(f);
+    else { const keep = better(f, g[i]) ? f : g[i], drop = keep === f ? g[i] : f; for (const k of ['o', 'c', 'w', 'q']) if (!keep[k] && drop[k]) keep[k] = drop[k]; if (drop.p && (!keep.p || /^(works|factory|industrial( land)?)$/.test(keep.p))) keep.p = drop.p; keep._tags += drop._tags; g[i] = keep; }
+  }
+  const out = [...groups.values()].flat().sort((a, b) => (b._tags - a._tags) || a.n.localeCompare(b.n)).slice(0, WORLD_CAP);
+  for (const f of out) { delete f._tags; delete f._works; }
+  return out;
+}
 const MAX_BODY = 16 * 1024;
 function bodyTooLarge(request) { const n = parseInt(request.headers.get('Content-Length') || '0', 10); return isFinite(n) && n > MAX_BODY; }
 
@@ -1631,6 +1681,35 @@ async function handleBilling(request, env, url) {
     } else note = 'The six readings need the AI key on the worker; the facts stand.';
     const result = { facts, lenses, note, asOf: day, disclaimer: 'The six readings are AI applications of each investor’s published framework to the facts above. They are not those people’s views, and nothing here is a recommendation.', cached: false };
     await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 86400 });
+    return json(result, 200, env);
+  }
+
+  /* ---- POST /world {code, q} : where a company's plants are, from OpenStreetMap ----
+     The World view's bundled layers (world/data/*.json) answer the industry questions instantly.
+     This route is the other half: a company name typed into the search box, answered live from
+     OpenStreetMap. Not through Overpass: a name regex over the planet is more than the public
+     mirrors can finish (measured 2026-09-20), and God's Eye View's keyless name lookup is Nominatim,
+     OSM's own geocoder, which is indexed for exactly this and answers in a second or two. Nominatim's
+     policy: identify the application, one request a second at most, cache, show attribution. So: a
+     live code is required (an anonymous caller cannot make us hammer it), the phrase is plain
+     characters, one call at a time across everyone, answers cached a week, and only industrial
+     objects (works, industrial land, plants, data centres, quarries) come back. A busy geocoder is
+     a 503 with a plain sentence, never a cached failure. Country stamping happens in the terminal
+     for anything Nominatim did not place. */
+  if (url.pathname === '/world' && request.method === 'POST') {
+    if (await tooMany(env, request, '/world', 10)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    if (!(await grantIsLive(env, code))) return json({ error: 'A live access code is required.' }, 401, env);
+    const q = clean(body.q, 40).replace(/\s+/g, ' ');
+    if (q.length < 2 || !/^[A-Za-z0-9&'.\- ]{2,40}$/.test(q)) return json({ error: 'Search for a company name: letters, digits, spaces, & . - and apostrophes, 2 to 40 characters.' }, 400, env);
+    const key = 'world:q:' + q.toLowerCase();
+    const cached = await env.PF_SYNC.get(key); if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
+    const r = await nominatim(env, q);
+    if (!r.ok) return json({ error: r.error }, 503, env);
+    const features = worldFeatures(r.results);
+    const result = { q, count: features.length, saturated: r.results.length >= WORLD_CAP, asOf: new Date().toISOString().slice(0, 10), source: 'OpenStreetMap contributors, ODbL 1.0, via Nominatim. Community-mapped; incomplete by nature.', features, cached: false };
+    await env.PF_SYNC.put(key, JSON.stringify(result), { expirationTtl: 7 * 86400 });
     return json(result, 200, env);
   }
 

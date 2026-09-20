@@ -253,6 +253,8 @@ On every push and pull request: the existing suite (extended); `site/` lint, typ
 | M5 | Security items 1–20 + P1–P3 closed with evidence; Strix run; `SECURITY.md` updated | **Built 2026-09-14.** Every row in `SECURITY.md` names its test or record. Closed today: PBKDF2 passwords with migration, per-minute limits and a body cap on the Worker, react-router 7 (two advisories), the automated audit's three findings (one HIGH). Open: rate-limit binding not verified live (WAF rule at M7); Strix needs a key. Access requests now deliver by FormSubmit; activation email sent. |
 | M6 | Kronos service deployed; Model view; forecasts recorded and marked | **Built 2026-09-14.** `kronos/app.py` (Modal, T4, Kronos-small, token-checked); worker `/kronos` (code-gated, Yahoo daily OHLCV, day cache, 503 until configured); terminal Projections gains a Model view whose direction records onto the `kronos` track and is marked like any call. Contract-tested. **Not yet running: needs your Modal account and two secrets (kronos/README.md).** |
 | M7 | CI/CD complete; DNS cut to Pages; GitHub Pages retired; Stripe account connected, test mode verified, then live | **Built 2026-09-14.** Pages project live at perceptfolio.pages.dev with the gate, real headers, SPA routing, the operator sign-in verified against the Worker (no second copy of the secret). CI workflow runs the suites, build, audit, gitleaks, and deploys on main once `CLOUDFLARE_API_TOKEN` exists. **Remaining, dashboard only: add the custom domain to the Pages project (retires GitHub Pages), add WAF rate-limiting rules, add the CI token (§21).** Stripe stays dormant by decision D15. |
+| M8 | History on the first visit; company, analysts and six lenses; Kelly | **Built 2026-09-14.** Worker `/history` and `/council`; the panel beneath every analysis; Kelly in Risk. §22. |
+| M9 | The world map of factories on a globe, built on God's Eye View | **Built 2026-09-20.** World tab (CesiumJS vendored, Natural Earth II from this origin); fifteen bundled layers from Wikidata and OpenStreetMap; live company search through Nominatim; both CSPs kept without `'unsafe-eval'`. §23. |
 
 ## 17. Acceptance criteria
 
@@ -318,5 +320,56 @@ Built and live:
 Needs data that must be bought, so specified but not built:
 - **Pre-filled buyer and supplier maps** (Bloomberg SPLC): Finnhub's supply-chain endpoint is paid-tier; no free source exists. The Map tab stays user-entered until a licence is bought.
 - **ESG** scores: paid on every provider.
-- **A world map of facilities** ("smart chip factories"): no free geospatial dataset of plants exists; a curated dataset or a paid one is the prerequisite.
+- **A world map of facilities** ("smart chip factories"): this line was wrong. OpenStreetMap and Wikidata carry plants with coordinates, and God's Eye View shows how to use them properly. Built as M9, §23.
 - **Heatmaps**: buildable from free quotes (holdings and sector ETFs by day change); scheduled next, no data cost.
+
+## 23. M9 (2026-09-20): the world map of factories, built on God's Eye View
+
+The request: install https://github.com/bilawalsidhu/gods-eye-view and use it for the world map of
+factories. What it is: a CesiumJS globe (MIT source, vanilla JS, 1,100 files, its own Node server)
+over public feeds, with infrastructure layers extracted from OpenStreetMap through an Overpass proxy.
+It has no factories dataset. What it has is the approach, and a working demonstration that OSM's
+`man_made=works`, `industrial=*`, `power=plant` and `telecom=data_center` objects can be extracted,
+bundled and drawn honestly. §22's "no free geospatial dataset of plants exists" is withdrawn.
+
+What shipped (`world/README.md` is the full provenance):
+- **The World tab** in the terminal, behind More with the other advanced tabs. One box: an industry
+  phrase ("smart chip factories") opens a bundled layer; anything else is a company, answered live.
+  Fifteen industry chips with counts. A globe with a dot per plant; click for name, operator, what it
+  makes, country, website and the OpenStreetMap or Wikidata record. A side panel with the count, the
+  extract date, the top countries, and a plain sentence when the source capped the answer.
+- **Bundled layers** (`world/data/*.json`), the union of two free sources: Wikidata's typed classes
+  (fab, refinery, nuclear plant, shipyard, steel mill, car factory, chemical plant, data centre,
+  cement plant, smelters, foundries; CC0, with the owner's ticker where Wikidata has it) and
+  OpenStreetMap through the public Overpass mirrors (ODbL): every named `man_made=works` and
+  `industrial=*` object pulled once as CSV and cached a month, the industry's operators matched
+  locally as whole words on name and operator, plus the small tag selectors asked live. Extracted by
+  `scripts/world-extract.mjs`, which marks a layer `partial` when a source could not answer, so a
+  subscriber never mistakes an outage for the whole world.
+- **The Worker's `/world` route**: a company name, plain characters only, goes to Nominatim, OSM's
+  own geocoder, the way GEV does keyless name lookups (a name regex over the planet is more than the
+  Overpass mirrors can finish; measured, see `world/README.md`). Only industrial objects come back
+  (works, industrial land, plants, data centres, quarries). Live-code gated, never more than one
+  geocoder call a second across everyone, capped at 50, cached a week; a busy geocoder is a plain
+  503 and is never cached.
+- **The globe is CesiumJS, vendored** (`vendor/cesium`, Apache 2.0, integrity-checked), with Natural
+  Earth II imagery served from this origin. No Cesium ion token, no Google tiles, no Esri or OSM tile
+  server: nothing on the page is metered, non-commercial, or watching who opens it. The CSPs still forbid
+  `'unsafe-eval'`: two one-token patches to the vendored bundle (documented, pinned by a test) and
+  `CesiumWidget` instead of `Viewer` make that possible; what they gained is `worker-src 'self'` and
+  `'wasm-unsafe-eval'`.
+- **From a ticker**: the command palette and the WORLD verb open the tab with the company's short
+  name (legal suffixes dropped), so "NVDA" becomes a search for NVIDIA's plants.
+- Found and fixed on the way: `scripts/assemble.mjs` never copied `vendor/`, so the Pages build
+  served the React index page where Chart.js should be; perceptfolio.com is still on GitHub Pages so
+  no subscriber saw it, but the cut-over would have shipped it. A test now pins it.
+
+Not taken from God's Eye View, and why: its live movers (OpenSky is non-commercial; adsb.lol and
+AISStream are fair-use feeds a sold product should not lean on), its TeleGeography cables
+(CC BY-NC-SA), and the ion/Google 3D tiers. Not in the bundle: `landuse=industrial` sites
+(1.5 million objects, more than the public mirrors can hand over); the live company search does
+reach them, because Nominatim indexes every named object.
+
+Coverage is what the community has drawn. Fabs on Wikidata skew to the former Soviet Union; OSM
+carries TSMC, Samsung and Intel because people drew them. The page says "community-mapped,
+incomplete by nature" and shows the count and date, and that is the honest product.

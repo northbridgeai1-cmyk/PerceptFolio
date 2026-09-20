@@ -14,7 +14,7 @@
          this origin, the worker and Finnhub, so an injected script cannot exfiltrate a portfolio
          to an arbitrary host; object-src and frame-src are closed; base-uri cannot be rewritten
          to redirect every relative URL. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover,interactive-widget=resizes-content">
 <title>PerceptFolio | Your Portfolio Quant</title>
@@ -1120,6 +1120,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   <symbol id="i-market" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
   <symbol id="i-news" viewBox="0 0 24 24"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1z"/><path d="M18 8h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2"/><line x1="7" y1="8.5" x2="14" y2="8.5"/><line x1="7" y1="12" x2="14" y2="12"/><line x1="7" y1="15.5" x2="11" y2="15.5"/></symbol>
   <symbol id="i-map" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><line x1="8.5" y1="10.6" x2="15.5" y2="6.4"/><line x1="8.5" y1="13.4" x2="15.5" y2="17.6"/></symbol>
+  <symbol id="i-world" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="3.6" ry="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M4.6 7.5h14.8M4.6 16.5h14.8"/></symbol>
   <symbol id="i-screener" viewBox="0 0 24 24"><polygon points="21.5 3.5 2.5 3.5 10 12.4 10 19 14 21 14 12.4 21.5 3.5"/></symbol>
   <symbol id="i-analyzer" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></symbol>
   <symbol id="i-risk" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9.5" x2="12" y2="13.5"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
@@ -1226,6 +1227,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="Market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">Market</span></button>
     <button data-tab="news" id="navNews" onclick="showTab('news')" data-tip="News"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-news"/></svg></span><span class="lbl">News</span></button>
     <button data-tab="map" id="navMap" onclick="showTab('map')" data-tip="Map"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg></span><span class="lbl">Map</span></button>
+    <button data-tab="world" id="navWorld" onclick="showTab('world')" data-tip="World"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-world"/></svg></span><span class="lbl">World</span></button>
     <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Screener"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Screener</span></button>
     <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Analyzer"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Analyzer</span></button>
     <div class="nav-sep"></div>
@@ -1697,6 +1699,34 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
 
   <details class="aside"><summary>What's automatic and what isn't</summary><div>The centre company's profile and the "similar companies" row come from Finnhub and fill in on their own. Suppliers and customers are yours to enter. Institutional holders were deliberately left out: the free source for that is quarterly 13F filings, which are up to four months stale, exclude short positions entirely, and would list Vanguard, BlackRock and State Street at the top of nearly every company you could look up. A list that says the same thing about everything isn't worth the screen space.</div></details>
+</div>
+
+<!-- WORLD: where the plants are, on a globe. Data from OpenStreetMap through world/data (bundled
+     industry layers) and the worker's /world route (company search). Cesium is loaded the first time
+     the tab opens, from /vendor/cesium, so nobody who never opens it pays for it. -->
+<div id="tab-world" class="tabs-hidden">
+  <div class="card">
+    <h3>Where the plants are</h3>
+    <p class="muted" style="margin-bottom:12px;max-width:72ch">An industry or a company, and the globe shows every plant OpenStreetMap knows: fabs, cell plants, refineries, shipyards, mines. Community-mapped, so incomplete by nature; the count and the date say how much is known.</p>
+    <div class="wd-form">
+      <input id="wdQ" placeholder="smart chip factories, or a company: TSMC" autocomplete="off" onkeydown="if(event.key==='Enter')wdSearch()">
+      <button class="btn" onclick="wdSearch()">Show</button>
+      <span class="muted" id="wdStatus" aria-live="polite"></span>
+    </div>
+    <div class="wd-chips" id="wdChips" role="group" aria-label="Industries"></div>
+  </div>
+  <div class="card wd-stage" style="margin-top:16px">
+    <div class="wd-globe-wrap">
+      <div id="wdGlobe" aria-label="Globe"></div>
+      <div class="wd-tip" id="wdTip" hidden></div>
+      <div class="wd-idle" id="wdIdle"><div class="mv-empty"><span class="dot"></span><div><b>Pick an industry above, or type a company</b><p>Every dot is a plant someone has drawn on OpenStreetMap. Click one for its name, operator and country.</p></div></div></div>
+    </div>
+    <div class="wd-side">
+      <div id="wdLegend"></div>
+      <div id="wdDetail"></div>
+    </div>
+  </div>
+  <details class="aside"><summary>What's automatic and what isn't</summary><div>Plants come from OpenStreetMap contributors (Open Database License 1.0): the industry layers were extracted from it and ship with the terminal, and a company search asks it live through the worker, cached for a week. It is community-mapped, so a plant nobody has drawn is not here, and a plant drawn without a name is skipped. The globe is CesiumJS (Apache 2.0) with Natural Earth II imagery (public domain), served from this site, not from a map company, so nothing here is metered or watched. The approach follows God's Eye View by Bilawal Sidhu (MIT). Nothing on this page is a recommendation.</div></details>
 </div>
 
 <!-- MARKET -->
@@ -3726,6 +3756,7 @@ function paletteActions(sym){
   A.push({icon:'i-analyzer',label:'Analyze '+sym,note:c.scored?'re-score':'22 checks',run:()=>analyzeStock(sym)});
   A.push({icon:'i-map',label:'Map '+sym,note:c.mapped?'already mapped':'suppliers & customers',
     run:()=>{showTab('map');const t=document.getElementById('mapTicker');if(t){t.value=sym;loadMap();}}});
+  A.push({icon:'i-world',label:'Plants worldwide',note:'from OpenStreetMap',run:()=>{showTab('world');if(window.wdFromTicker)wdFromTicker(sym);}});
   A.push({icon:'i-projections',label:'Momentum score',note:c.priced>7?c.priced+'d logged':'needs history',
     run:()=>{showTab('projections');const t=document.getElementById('hzTicker');if(t){t.value=sym;renderHerizen();}}});
   A.push({icon:'i-risk',label:'Check its risk',note:'volatility & beta',
@@ -4782,6 +4813,7 @@ const CMD_VERBS={
   SCORE:{tab:'analyzer',needsSym:true,run:sym=>{showTab('analyzer');analyzeStock(sym);}},
   THESIS:{tab:'portfolio',needsSym:true,run:sym=>{showTab('portfolio');const el=document.getElementById('thesisSym');if(el){el.value=sym;el.focus();}}},
   MAP:{tab:'map',needsSym:true,run:sym=>{showTab('map');}},
+  WORLD:{tab:'world',needsSym:true,run:sym=>{showTab('world');if(window.wdFromTicker)wdFromTicker(sym);}},
   NEWS:{tab:'news',needsSym:true,run:sym=>{showTab('news');}},
   RISK:{tab:'risk',run:()=>showTab('risk')},
   EFFBETS:{tab:'risk',run:()=>showTab('risk')},
@@ -15292,7 +15324,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 /* Sidebar disclosure (see the v2-surface styles). */
 (function(){
   var nav=document.querySelector('nav'); if(!nav) return;
-  var ADV=['command','watchlist','market','news','map','screener','risk','projections','alerts','clients'];
+  var ADV=['command','watchlist','market','news','map','world','screener','risk','projections','alerts','clients'];
   ADV.forEach(function(t){ var b=nav.querySelector('button[data-tab="'+t+'"]'); if(b) b.classList.add('pf-adv'); });
   var more=document.createElement('button'); more.type='button'; more.className='pf-more'; more.setAttribute('data-tip','More');
   more.innerHTML='<span class="ico"><svg viewBox="0 0 24 24"><use href="#i-chev"/></svg></span><span class="lbl">More</span>';
@@ -15491,6 +15523,201 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     });
   }
   var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='risk')setTimeout(kelly,50); return r; }; }
+})();
+</script>
+<style id="v2-world">
+/* World: the globe of plants. Scoped to the tab so the Cesium widget CSS cannot leak into the rest
+   of the terminal, and the terminal's tokens cannot fight the canvas. */
+#tab-world .wd-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#tab-world .wd-form input{flex:1 1 300px;min-width:220px;height:40px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 12px;color:var(--text);font:inherit}
+#tab-world .wd-form input:focus{outline:none;border-color:var(--brand2);box-shadow:0 0 0 3px var(--glow)}
+#tab-world .wd-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+#tab-world .wd-chip{display:inline-flex;align-items:center;gap:7px;padding:6px 11px 6px 9px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--muted);font:500 12.5px/1 inherit;cursor:pointer;transition:border-color .12s,color .12s,background .12s}
+#tab-world .wd-chip i{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+#tab-world .wd-chip small{font-family:var(--mono);font-size:11px;color:var(--muted)}
+#tab-world .wd-chip:hover{color:var(--text);border-color:var(--muted)}
+#tab-world .wd-chip.on{color:var(--text);background:var(--panel2);border-color:var(--c)}
+#tab-world .wd-stage{display:grid;grid-template-columns:minmax(0,1fr) 272px;gap:16px}
+#tab-world .wd-globe-wrap{position:relative;min-height:540px;border-radius:10px;overflow:hidden;background:#07090f;border:1px solid var(--border)}
+#wdGlobe{position:absolute;inset:0}
+#wdGlobe .cesium-widget,#wdGlobe .cesium-widget canvas{width:100%;height:100%;touch-action:none}
+#wdGlobe .cesium-widget-credits{font:11px/1.4 var(--mono);color:#9aa3b2;padding:5px 8px;background:rgba(7,9,15,.6);border-top-right-radius:6px}
+#wdGlobe .cesium-widget-credits a{color:#c3c9d4}
+#tab-world .wd-tip{position:absolute;z-index:3;pointer-events:none;transform:translate(14px,14px);max-width:260px;padding:6px 10px;border-radius:8px;background:var(--panel);color:var(--text);border:1px solid var(--border);box-shadow:var(--el-3);font-size:12.5px;line-height:1.4}
+#tab-world .wd-idle{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:24px;pointer-events:none}
+#tab-world .wd-idle[hidden],#tab-world .wd-tip[hidden]{display:none}
+#tab-world .mv-empty{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:16px 18px;border:1px dashed var(--border);border-radius:10px;background:var(--bg);max-width:440px;pointer-events:auto}
+#tab-world .wd-idle .mv-empty{background:rgba(14,15,18,.88);backdrop-filter:blur(6px);color:#f2f3f5}
+#tab-world .mv-empty .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);margin-top:6px;box-shadow:0 0 0 4px rgba(148,154,166,.15)}
+#tab-world .mv-empty b{display:block;font-size:14px;margin-bottom:4px}
+#tab-world .mv-empty p{margin:0;font-size:13px;line-height:1.55;color:var(--muted);max-width:60ch}
+#tab-world .wd-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+#tab-world .wd-legend h4,#tab-world .wd-detail h4{margin:0 0 4px;font-size:15px;line-height:1.3}
+#tab-world .wd-meta{font:12px/1.5 var(--mono);color:var(--muted)}
+#tab-world .wd-countries{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+#tab-world .wd-countries li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:13px;align-items:center}
+#tab-world .wd-countries li b{font-family:var(--mono);font-weight:600}
+#tab-world .wd-countries .bar{grid-column:1/-1;height:3px;border-radius:2px;background:var(--c);opacity:.6}
+#tab-world .wd-detail{border-top:1px solid var(--border);padding-top:12px}
+#tab-world .wd-kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13px;margin-top:8px;line-height:1.45}
+#tab-world .wd-kv span:first-child{color:var(--muted)}
+#tab-world .wd-kv .mono{font-family:var(--mono);font-size:12px}
+#tab-world .wd-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+#tab-world .wd-links a{text-decoration:none;display:inline-flex;align-items:center;padding:8px 12px}
+@media (max-width:960px){#tab-world .wd-stage{grid-template-columns:1fr}#tab-world .wd-globe-wrap{min-height:440px}}
+@media (max-width:600px){#tab-world .wd-globe-wrap{min-height:340px}#tab-world .wd-form input{flex-basis:100%}}
+</style>
+<script>
+/* World: every plant OpenStreetMap knows for an industry or a company, on a CesiumJS globe.
+   The pattern is God's Eye View's: bundled OSM extracts for the standing layers, a proxied,
+   bounded, cached Overpass query for the live question, and honest labels about coverage.
+   Cesium (5.7 MB) loads the first time this tab opens and never before. */
+(function(){
+  var BASE='/vendor/cesium/', DATA='/world/data/';
+  var IDX=null, SET=null, viewer=null, points=null, NE=null, loadP=null;
+  function $(id){return document.getElementById(id);}
+  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||''; }catch(e){ return ''; } }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function status(msg){ var s=$('wdStatus'); if(s)s.textContent=msg||''; }
+  function names(){ return (IDX&&IDX.countries)||{}; }
+
+  /* ---- the manifest and the industry chips ---- */
+  function loadIndex(){
+    if(IDX)return Promise.resolve(IDX);
+    return fetch(DATA+'index.json',{cache:'no-cache'}).then(function(r){ if(!r.ok)throw new Error('index'); return r.json(); }).then(function(j){ IDX=j; renderChips(); return j; });
+  }
+  function renderChips(){
+    var box=$('wdChips'); if(!box)return; box.innerHTML='';
+    (IDX.industries||[]).forEach(function(ind){
+      var b=document.createElement('button'); b.type='button'; b.className='wd-chip'; b.style.setProperty('--c',ind.color); b.dataset.id=ind.id;
+      b.innerHTML='<i></i>'+esc(ind.label)+(ind.count?' <small>'+ind.count+'</small>':'');
+      b.onclick=function(){ $('wdQ').value=''; showIndustry(ind.id); };
+      box.appendChild(b);
+    });
+  }
+  function markChip(id){ document.querySelectorAll('#wdChips .wd-chip').forEach(function(b){ b.classList.toggle('on',b.dataset.id===id); }); }
+
+  /* ---- Cesium, on first use ---- */
+  function loadCesium(){
+    if(window.Cesium)return Promise.resolve();
+    if(loadP)return loadP;
+    window.CESIUM_BASE_URL=BASE;
+    var link=document.createElement('link'); link.rel='stylesheet'; link.href=BASE+'Widgets/widgets.css'; document.head.appendChild(link);
+    loadP=new Promise(function(res,rej){ var s=document.createElement('script'); s.src=BASE+'Cesium.js'; s.onload=function(){res();}; s.onerror=function(){ loadP=null; rej(new Error('the globe did not load')); }; document.head.appendChild(s); });
+    return loadP;
+  }
+  function ensureViewer(){
+    if(viewer)return Promise.resolve(viewer);
+    return loadCesium().then(function(){
+      var C=window.Cesium;
+      C.Ion.defaultAccessToken='';   /* nothing here comes from Cesium ion; the imagery is served from this site */
+      /* The library's own credit, as text: the npm package ships no logo image, and a broken icon is worse than a word. */
+      C.CreditDisplay.cesiumCredit=new C.Credit('<a href="https://cesium.com/" target="_blank" rel="noopener noreferrer">CesiumJS</a>',true);
+      var imagery=C.TileMapServiceImageryProvider.fromUrl(C.buildModuleUrl('Assets/Textures/NaturalEarthII'),{credit:new C.Credit('Natural Earth II · OpenStreetMap contributors (ODbL)')});
+      /* CesiumWidget, not Viewer: the Viewer layer is toolbar widgets bound with Knockout, none of
+         which this page wants, and Knockout parses bindings with new Function, which the CSP forbids. */
+      viewer=new C.CesiumWidget('wdGlobe',{
+        baseLayer:C.ImageryLayer.fromProviderAsync(imagery), terrainProvider:new C.EllipsoidTerrainProvider(),
+        skyBox:false,skyAtmosphere:new C.SkyAtmosphere(),requestRenderMode:true,maximumRenderTimeChange:Infinity,
+        contextOptions:{webgl:{alpha:false,antialias:true,powerPreference:'low-power'}}
+      });
+      var sc=viewer.scene;
+      sc.backgroundColor=C.Color.fromCssColorString('#07090f'); sc.globe.baseColor=C.Color.fromCssColorString('#101827');
+      sc.globe.showGroundAtmosphere=true; sc.globe.depthTestAgainstTerrain=true; sc.fog.enabled=false; sc.highDynamicRange=false;
+      if(sc.sun)sc.sun.show=false; if(sc.moon)sc.moon.show=false;
+      var ctl=sc.screenSpaceCameraController; ctl.minimumZoomDistance=350000; ctl.maximumZoomDistance=32000000; ctl.enableTilt=false;   /* Natural Earth II is a world map, not street imagery: below ~350 km it is only blur */
+      /* Open on the whole planet, Atlantic-centred, so the first look is the world and not a hemisphere. */
+      viewer.camera.setView({destination:C.Cartesian3.fromDegrees(10,22,1.75e7)});
+      points=sc.primitives.add(new C.PointPrimitiveCollection());
+      var h=new C.ScreenSpaceEventHandler(sc.canvas), last=0;
+      h.setInputAction(function(m){
+        var now=Date.now(); if(now-last<40)return; last=now;
+        var p=sc.pick(m.endPosition), tip=$('wdTip'), f=p&&p.id&&p.id.n?p.id:null;
+        if(f){ tip.textContent=f.n+(f.o&&f.o!==f.n?' · '+f.o:'')+(names()[f.c]?' · '+names()[f.c]:''); tip.style.left=m.endPosition.x+'px'; tip.style.top=m.endPosition.y+'px'; tip.hidden=false; sc.canvas.style.cursor='pointer'; }
+        else { tip.hidden=true; sc.canvas.style.cursor=''; }
+      },C.ScreenSpaceEventType.MOUSE_MOVE);
+      h.setInputAction(function(m){ var p=sc.pick(m.position); if(p&&p.id&&p.id.n)showDetail(p.id); },C.ScreenSpaceEventType.LEFT_CLICK);
+      return viewer;
+    });
+  }
+
+  /* ---- drawing a set ---- */
+  function draw(set){
+    var C=window.Cesium; points.removeAll();
+    var color=C.Color.fromCssColorString(set.color||'#3b82f6'), outline=C.Color.BLACK.withAlpha(.7), pos=[];
+    set.features.forEach(function(f){ var c3=C.Cartesian3.fromDegrees(f.lo,f.la,1500); pos.push(c3); points.add({position:c3,pixelSize:6.5,color:color,outlineColor:outline,outlineWidth:1,id:f}); });
+    if(pos.length){
+      /* A set spread around the planet has a bounding sphere centred near the Earth's core, which no
+         cartographic conversion survives; the circular mean of the longitudes is what the camera wants. */
+      var sph=C.BoundingSphere.fromPoints(pos), sx=0, sy=0, sl=0;
+      set.features.forEach(function(f){ var r=f.lo*Math.PI/180; sx+=Math.cos(r); sy+=Math.sin(r); sl+=f.la; });
+      var mlon=Math.atan2(sy,sx)*180/Math.PI, mlat=sl/set.features.length;
+      if(sph.radius>2.6e6){ viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(mlon,Math.max(-40,Math.min(50,mlat)),1.75e7),duration:1.1}); }
+      else { viewer.camera.flyToBoundingSphere(sph,{duration:1.1,offset:new C.HeadingPitchRange(0,-C.Math.PI_OVER_TWO,Math.max(sph.radius*3.4,1200000))}); }
+    }
+    $('wdIdle').hidden=true; viewer.resize(); viewer.scene.requestRender();
+  }
+  function legend(set){
+    var by={}; set.features.forEach(function(f){ var k=f.c||'?'; by[k]=(by[k]||0)+1; });
+    var top=Object.keys(by).sort(function(a,b){return by[b]-by[a];}).slice(0,8), max=by[top[0]]||1, nm=names();
+    var countries=Object.keys(by).filter(function(k){return k!=='?';}).length;
+    $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+set.features.length+' plants · '+countries+' countries · OpenStreetMap as of '+esc(set.asOf||'')+'</div>'+
+      (set.saturated?'<p class="muted" style="font-size:12.5px;margin:8px 0 0">The source capped this answer, so the map is a sample rather than the whole set.</p>':'')+
+      (set.partial?'<p class="muted" style="font-size:12.5px;margin:8px 0 0">Part of the source could not be reached when this layer was built, so the count is a floor.</p>':'')+
+      (set.features.length?'<ul class="wd-countries" style="--c:'+esc(set.color)+'">'+top.map(function(k){ return '<li><span>'+esc(k==='?'?'Unplaced':(nm[k]||k))+'</span><b>'+by[k]+'</b><span class="bar" style="width:'+Math.max(4,Math.round(by[k]/max*100))+'%"></span></li>'; }).join('')+'</ul>':'<p class="muted" style="font-size:13px;margin:10px 0 0">Nothing drawn on OpenStreetMap under that name. Try the company’s short name, or an industry above.</p>')+'</div>';
+  }
+  function showDetail(f){
+    var nm=names(), osm={n:'node',w:'way',r:'relation'}[f.i[0]]+'/'+f.i.slice(1);
+    $('wdDetail').innerHTML='<div class="wd-detail"><h4>'+esc(f.n)+'</h4><div class="wd-kv">'+(f.o?'<span>Operator</span><span>'+esc(f.o)+'</span>':'')+(f.p?'<span>Makes</span><span>'+esc(f.p)+'</span>':'')+
+      '<span>Country</span><span>'+esc(nm[f.c]||f.c||'Unplaced')+'</span>'+(f.t?'<span>Owner listed as</span><span class="mono">'+esc(f.t)+'</span>':'')+'<span>Where</span><span class="mono">'+f.la.toFixed(3)+', '+f.lo.toFixed(3)+'</span></div><div class="wd-links">'+
+      (f.t&&typeof analyzeStock==='function'?'<button class="btn btn-ghost btn-sm" type="button" onclick="analyzeStock('+JSON.stringify(String(f.t).replace(/[^A-Z0-9.\-]/gi,''))+')">Analyze '+esc(f.t)+'</button>':'')+
+      (f.w?'<a class="btn btn-ghost btn-sm" href="'+esc(f.w)+'" target="_blank" rel="noopener noreferrer">Website</a>':'')+
+      (/^Q\d+$/.test(f.i)?'<a class="btn btn-ghost btn-sm" href="https://www.wikidata.org/wiki/'+esc(f.i)+'" target="_blank" rel="noopener noreferrer">On Wikidata</a>':'<a class="btn btn-ghost btn-sm" href="https://www.openstreetmap.org/'+esc(osm)+'" target="_blank" rel="noopener noreferrer">On OpenStreetMap</a>')+'</div></div>';
+    var C=window.Cesium; viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(f.lo,f.la,1200000),duration:.9}); viewer.scene.requestRender();
+  }
+
+  /* ---- an industry: a bundled layer ---- */
+  function showIndustry(id){
+    var ind=IDX&&(IDX.industries||[]).filter(function(i){return i.id===id;})[0]; if(!ind)return;
+    markChip(id); status('Loading '+ind.label+'…'); $('wdDetail').innerHTML='';
+    Promise.all([ensureViewer(),fetch(DATA+ind.file).then(function(r){ if(!r.ok)throw new Error('this layer has not been extracted yet'); return r.json(); })])
+      .then(function(res){ var j=res[1]; SET={label:ind.label,color:ind.color,features:j.features||[],asOf:j.asOf,saturated:!!j.saturated,partial:!!j.partial}; draw(SET); legend(SET); status(''); })
+      .catch(function(e){ status('Could not show '+ind.label+': '+e.message+'.'); });
+  }
+
+  /* ---- a company: live, through the worker ---- */
+  function stamp(feats){
+    var need=feats.some(function(f){return !f.c;}); if(!need)return Promise.resolve(feats);
+    var p=NE?Promise.resolve(NE):fetch('/world/ne110.json').then(function(r){return r.json();}).then(function(j){ NE=j.countries; NE.forEach(function(c){ var W=180,E=-180,S=90,N=-90; c.polys.forEach(function(poly){ poly[0].forEach(function(pt){ if(pt[0]<W)W=pt[0]; if(pt[0]>E)E=pt[0]; if(pt[1]<S)S=pt[1]; if(pt[1]>N)N=pt[1]; }); }); c.box=[W,S,E,N]; }); return NE; });
+    return p.then(function(){ feats.forEach(function(f){ if(!f.c){ var cc=countryOf(f.lo,f.la); if(cc)f.c=cc; } }); return feats; }).catch(function(){ return feats; });
+  }
+  function inRing(ring,x,y){ var inside=false; for(var i=0,j=ring.length-1;i<ring.length;j=i++){ var xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1]; if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)inside=!inside; } return inside; }
+  function countryOf(lon,lat){ for(var i=0;i<NE.length;i++){ var b=NE[i].box; if(lon<b[0]||lon>b[2]||lat<b[1]||lat>b[3])continue; var polys=NE[i].polys; for(var k=0;k<polys.length;k++){ if(!inRing(polys[k][0],lon,lat))continue; var hole=false; for(var m=1;m<polys[k].length;m++)if(inRing(polys[k][m],lon,lat)){hole=true;break;} if(!hole)return NE[i].cc; } } return ''; }
+  function searchCompany(q){
+    markChip(null); status('Asking OpenStreetMap about '+q+'…'); $('wdDetail').innerHTML='';
+    var ask=fetch(INVITE_WORKER+'/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),q:q})}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); });
+    Promise.all([ensureViewer(),ask]).then(function(res){
+      var r=res[1]; if(!r.ok){ status((r.j&&r.j.error)||'No answer from the worker.'); return; }
+      return stamp(r.j.features||[]).then(function(feats){ SET={label:q,color:'#1f9e8c',features:feats,asOf:r.j.asOf,saturated:!!r.j.saturated}; draw(SET); legend(SET); status(''); });
+    }).catch(function(e){ status('Could not search: '+e.message+'.'); });
+  }
+
+  /* ---- the box: a phrase with an industry word in it opens that layer; anything else is a company ---- */
+  function route(phrase){
+    var p=' '+String(phrase).toLowerCase().replace(/[^a-z0-9\-\s]/g,' ').replace(/\s+/g,' ').trim()+' ', best=null, len=0;
+    (IDX.industries||[]).forEach(function(ind){ (ind.keywords||[]).forEach(function(k){ if(k.length>len&&p.indexOf(' '+k+' ')>=0){ best=ind.id; len=k.length; } }); });
+    return best;
+  }
+  window.wdSearch=function(){
+    var q=($('wdQ').value||'').replace(/\s+/g,' ').trim(); if(!q)return;
+    loadIndex().then(function(){ var id=route(q); if(id)showIndustry(id); else searchCompany(q); }).catch(function(){ status('The industry list did not load.'); });
+  };
+  /* From a ticker: the company's short name, legal suffixes dropped. "Taiwan Semiconductor Manufacturing Co Ltd" → "Taiwan Semiconductor". */
+  function shortName(name){ var w=String(name||'').replace(/[,.()]/g,' ').split(/\s+/).filter(function(x){ return x&&!/^(inc|corp|corporation|co|company|ltd|limited|plc|ag|sa|nv|se|spa|holdings?|group|the|lp|llc|adr|class|[abc]|com)$/i.test(x); }); return w.slice(0,2).join(' ')||String(name||''); }
+  window.wdFromTicker=function(sym){
+    loadIndex().then(function(){ return typeof getProfile==='function'?getProfile(sym):null; }).then(function(p){ $('wdQ').value=shortName((p&&p.name)||sym); wdSearch(); }).catch(function(){ $('wdQ').value=sym; wdSearch(); });
+  };
+  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='world'){ loadIndex().catch(function(){ status('The industry list did not load.'); }); if(viewer){ viewer.resize(); viewer.scene.requestRender(); } } return r; }; }
 })();
 </script>
 </body>

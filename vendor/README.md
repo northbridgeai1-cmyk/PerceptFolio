@@ -40,3 +40,39 @@ Do it deliberately, not automatically:
 Then update the <script src> in terminal/index.html, delete the old file, and bump
 CACHE_VERSION in sw.js. The version is in the filename so an upgrade cannot be
 served from a stale cache.
+
+## cesium/  (CesiumJS 1.145.0, Apache 2.0)
+
+The globe behind the terminal's World view. A pruned copy of the `Build/Cesium` tree from the npm
+package `cesium@1.145.0`, verified against the registry's integrity hash before copying:
+
+    sha512-6Azix8b5LPpoVSx8XQ6zPztpluJVmq+CEO3W2rOWxtc6bri6Nc9MvCYhKmTW1LAEwfisV7yzNgfulCXw9842+g==
+
+Kept: `Cesium.js`, `Workers/` (geometry workers, started from blob: URLs that import these files,
+which is why both CSPs carry `worker-src 'self' blob:`), `Widgets/` (the credit line's CSS),
+`Assets/Textures/NaturalEarthII/` (the public-domain basemap, served from here so no map company
+is in the loop) and `Assets/approximateTerrainHeights.json`. The npm package ships no credit logo, so
+the terminal sets `CreditDisplay.cesiumCredit` to a text link before building the widget. Dropped: `ThirdParty/` (draco, basis,
+splats, zip: only 3D Tiles and glTF need them), the sky box, moon and water textures, and the IAU
+tables (only ICRF lighting needs them). cdnjs was not an option: it 403s Cesium's XML tile
+manifests, and vendor/README.md above says why a CDN is the wrong place for this anyway.
+
+Cesium ion is never used: `Ion.defaultAccessToken` is set to an empty string before the viewer is
+built, and the base layer and terrain are given explicitly, so nothing is requested from
+api.cesium.com.
+
+Two one-token patches are applied to `Cesium.js` after copying, and a test pins both:
+
+  - Knockout's global lookup `this||(0,eval)("this")` becomes `this||globalThis`. Under the CSP
+    (no `'unsafe-eval'`) the original throws at load and the whole bundle aborts.
+  - The worker bootstrap's `typeof CESIUM_WORKERS<"u"` branch is disabled (`!1&&...`), so workers
+    are started from `Workers/*.js` as same-origin module workers instead of a blob that
+    `importScripts` another blob, which `script-src` forbids. `worker-src 'self'` is then enough.
+
+### Upgrading
+
+    cd /tmp && npm pack cesium@<VER>
+    # compare `openssl dgst -sha512 -binary cesium-<VER>.tgz | openssl base64 -A` with
+    # `npm view cesium@<VER> dist.integrity` before extracting
+    tar -xzf cesium-<VER>.tgz
+    # copy the same subset into vendor/cesium/, update the hash above, bump CACHE_VERSION in sw.js
