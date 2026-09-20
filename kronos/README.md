@@ -11,4 +11,6 @@ Modal CLI, opens Modal's sign-in for you to complete, mints the shared token, de
 URL and token on the Worker, redeploys it, and proves the route with `scripts/kronos-check.mjs`).
 The individual commands are in the docstring at the top of `app.py`. Until `KRONOS_URL` and
 `KRONOS_TOKEN` exist on the worker, `/kronos` answers 503 and the panel says the model is not
-configured. Cost: a T4 for a few seconds per forecast, scaled to zero between calls.
+configured. Runs on CPU by default (Modal wants a payment method on file before any GPU function, even inside
+the free credit); a forecast takes well under a minute and is cached for a day. With a card on
+file, `KRONOS_GPU=T4 bash kronos/deploy.sh` moves it to a T4 for a few seconds per forecast.

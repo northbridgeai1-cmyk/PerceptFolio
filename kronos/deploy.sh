@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Kronos, end to end, in one command. Run from the repo root:
 #
-#     bash kronos/deploy.sh
+#     bash kronos/deploy.sh                 CPU (no payment method needed on Modal)
+#     KRONOS_GPU=T4 bash kronos/deploy.sh   a T4 GPU, once a card is on file at modal.com
 #
 # What it does, in order, stopping at the first failure:
 #   1. installs the Modal CLI for your user if it is missing
