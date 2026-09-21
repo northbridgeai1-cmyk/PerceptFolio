@@ -12790,7 +12790,7 @@ async function loadMarketData(force){
       return;
     }
     if(force)macroCache={};
-    const need=['VIXCLS','SP500','WILL5000PR','GDP','DFF','DGS2','DGS10'];
+    const need=['VIXCLS','SP500','GDP','DFF','DGS2','DGS10'];   /* WILL5000PR is gone from FRED (Wilshire withdrew it); the Buffett figure is typed in */
     const out={};
     for(const s of need){
       if(macroCache[s]&&!force){out[s]=macroCache[s];continue;}
@@ -13357,7 +13357,7 @@ function renderWeather(data){
   }else{
     cards.push(weatherCard('Buffett Indicator','-','not entered','','',
       '',
-      (w&&w.error)?esc(w.error):(g&&g.error?esc(g.error):'')));
+      (w&&w.error&&!/does not exist/.test(w.error))?esc(w.error):(g&&g.error?esc(g.error):'')));
   }
 
   /* --- CAPE: manual --- */

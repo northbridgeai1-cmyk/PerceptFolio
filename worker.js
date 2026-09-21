@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-21.1';
+const WORKER_VERSION = '2026-09-21.2';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -596,7 +596,7 @@ async function handle(request, env) {
   if (url.pathname === '/fred') {
     /* Four market statistics, and three rates: the Fed funds effective rate, the two-year and the
        ten-year Treasury yields, so the Market tab can print the curve beside the valuation figures. */
-    const FRED_ALLOWED = new Set(['VIXCLS', 'SP500', 'WILL5000PR', 'GDP', 'DFF', 'DGS2', 'DGS10']);
+    const FRED_ALLOWED = new Set(['VIXCLS', 'SP500', 'GDP', 'DFF', 'DGS2', 'DGS10']);   /* WILL5000PR was withdrawn from FRED in 2024 */
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
     let allowed = safeEqual(tok0, env.SYNC_SECRET);
