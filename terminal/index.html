@@ -2922,6 +2922,8 @@ async function createProfile(){
    Being a private window, the profile evaporates when the window closes. That is the point: every
    check starts from the same known state. */
 const DEMO_ID='test1212', DEMO_PW='testishard';
+const OWNER_EMAILS=['pie18read@gmail.com','northbridgeai1@gmail.com'];
+function isOwnerEmail(e){ return OWNER_EMAILS.indexOf(String(e||'').trim().toLowerCase())>=0; }
 function isDemoUser(){return USER===DEMO_ID;}
 
 /* Seeded with prices already set, so every screen renders with no API key and no worker. That is
@@ -2991,6 +2993,13 @@ async function doLogin(){
      state cannot poison the next check. A test account you have to remember to reset is not one. */
   if(email===DEMO_ID&&pw===DEMO_PW)return enterDemo();
   if(!email)return toast('Enter your email.');
+  if(!DB.profiles[email]&&isOwnerEmail(email)){
+    if(!pw||pw.length<4)return toast('Choose a password of four characters or more.');
+    DB.profiles[email]={pinHash:await pwHash(pw),data:defaultData(),accountType:'personal',userId:makeUserId(),owner:true,createdAt:Date.now()};
+    persistDB(); rememberDevice(email);
+    toast('Owner account set up on this device.');
+    return finishLogin(email);
+  }
   if(!DB.profiles[email]){
     const box=document.getElementById('authBring'); if(box){ box.style.display='block'; const c=document.getElementById('loginCode'); if(c&&!c.value){ try{ c.value=localStorage.getItem('pf_door_code')||''; }catch(e){} } if(c)c.focus(); }
     return;
@@ -3161,7 +3170,7 @@ async function finishLogin(email){
   /* A profile with an access code keeps its book under that code from the first sign-in, so the
      same account can be brought to another device. Said once, in the words the setting uses: kept
      on the worker under your code, readable by anyone holding it. Settings turns it off. */
-  if(email!==DEMO_ID&&!syncActive()&&!syncBlockedReason()&&!p.codeSyncDeclined){
+  if(email!==DEMO_ID&&!isOwnerEmail(email)&&!p.owner&&!syncActive()&&!syncBlockedReason()&&!p.codeSyncDeclined){
     const c=(typeof accessCodeFor==='function')?accessCodeFor(email):'';
     if(c){
       syncCfg={url:INVITE_WORKER,code:c};
