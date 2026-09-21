@@ -1320,7 +1320,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v125/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v126/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
@@ -1516,7 +1516,7 @@ t('the sign-in toggle is an underline, not a box', /\.auth-switch button\.on\{ba
 t('no rounded frame is drawn around a table', !/border:1px solid var\(--border\);border-radius:(9|10)px;overflow:hidden/.test(term));
 /* The door keeps the code it was opened with, for a profile that has none of its own. */
 t('the door keeps the code for the terminal', /localStorage\.setItem\('pf_door_code', payload\.code\)/.test(read('enter/enter.js')));
-t('every model helper, the settings status and the macro helpers read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 7);
+t('every model helper, the settings status, the macro helpers and the door read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 8);
 /* The greeting was chatbot furniture; a statement is headed by its date. */
 t('the dashboard and command screens are headed by the date', /function dateLine\(\)/.test(term) && !/'Good '\+period/.test(term));
 t('no headings are typed in Title Case',
@@ -1552,6 +1552,16 @@ G('Settings in groups; the news read without a model');
 t('Settings has a menu and shows one group at a time', /window\.showSettings=function\(name\)/.test(term) && /\.set-hidden\{display:none!important\}/.test(term));
 t('when no model answers, the plain read is shown instead of an error', /function plainNewsRead\(sym\)/.test(term) && /if\(a\.error\)return plainNewsRead\(sym\)\+/.test(term));
 t('the summary route falls back to Workers AI like every other model route', /const r = await aiText\(env, system, user, 700\)/.test(worker) && !/'x-api-key': env\.AI_API_KEY,\n        'anthropic-version': '2023-06-01',\n        'content-type': 'application\/json'\n      \},\n      body: JSON\.stringify\(\{\n        model: env\.AI_MODEL/.test(worker));
+
+/* ==================== ONE ACCOUNT, TWO DEVICES ==================== */
+G('An account is brought to a second device with its code; no password leaves a device');
+
+t('an unknown email opens the bring-my-account path instead of a dead end', /const box=document\.getElementById\('authBring'\); if\(box\)\{ box\.style\.display='block';/.test(term) && !/No account with that email\. Create one below\./.test(term));
+t('the code fetches the synced copy and the email on it must match', /INVITE_WORKER\+'\/usync\?code='\+encodeURIComponent\(code\)/.test(term) && /String\(copy\.user\)\.toLowerCase\(\)!==email\)return say/.test(term));
+t('the local profile takes the password typed here; nothing is sent', /pinHash:await pwHash\(pw\),data:Object\.assign\(defaultData\(\),copy\.data\|\|\{\}\)/.test(term) && !/fetch\([^)]*pinHash/.test(term));
+t('a profile with a code keeps its book under it from the first sign-in, said once, and off is remembered', /if\(!p\.codeSyncTold\)\{ p\.codeSyncTold=Date\.now\(\);/.test(term) && /p\.codeSyncDeclined=Date\.now\(\)/.test(term) && /!p\.codeSyncDeclined\)\{/.test(term));
+/* The phone: a holding is a stack, not eleven columns. */
+t('on a phone the holdings and the watchlist are stacked rows', /#holdingsTable tr,#watchTable tr\{display:grid;grid-template-columns:1fr auto 40px;grid-template-areas:"sym value menu" "verdict gain menu" "mine mine mine"/.test(term));
 
 /* ==================== THE SCORECARD IS FROZEN ==================== */
 G('Scorecard v1.0, frozen 2026-09-21: the record is attributable to it');
