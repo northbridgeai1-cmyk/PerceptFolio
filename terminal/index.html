@@ -1785,7 +1785,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <details class="aside"><summary>Read these as long-run expectations, not crash warnings</summary><div>All three describe what returns over the next ten to fifteen years are likely to look like from today's prices. They have almost no power to time the next twelve months. The Buffett indicator has read "expensive" since roughly 2013 and CAPE has been above 30 since 2017, through years of large gains. Use them to decide how much to put in, not when to get out.</div></details>
 
   <!-- 3. Call scorecard -->
-  <div class="section-title">Your call scorecard. Is the checklist actually working?</div>
+  <div class="section-title">Your call scorecard. Is the checklist actually working? <span class="muted" style="font-family:var(--mono);font-size:12px;font-weight:400;margin-left:8px" id="scorecardVersion"></span></div>
   <div class="card">
     <div class="row" style="margin-bottom:12px;flex-wrap:wrap">
       <select id="scoreWindow" style="max-width:200px" onchange="renderScorecard()">
@@ -4735,7 +4735,7 @@ function initPasswordToggles(){
 /* The login and sign-up fields are on screen before any session exists, so this cannot wait for
    enterSession. Those are the password fields people actually type into most. */
 if(document.readyState==='loading')
-  document.addEventListener('DOMContentLoaded',()=>{try{applyTheme();initPasswordToggles();initToTop();}catch(e){}});
+  document.addEventListener('DOMContentLoaded',()=>{try{applyTheme();initPasswordToggles();initToTop();const sv=document.getElementById('scorecardVersion');if(sv)sv.textContent='scorecard v'+SCORECARD_VERSION;}catch(e){}});
 else{try{initPasswordToggles();initToTop();}catch(e){}}
 
 
@@ -5863,7 +5863,8 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
       /* The next earnings date known when the call was made, if inside the calendar's window. A
          call logged the week before a print is a different bet from one logged the week after,
          and the record should be able to say which it was. */
-      earningsAt:(typeof nextEarnings==='function'&&nextEarnings(sym))?nextEarnings(sym).d:null
+      earningsAt:(typeof nextEarnings==='function'&&nextEarnings(sym))?nextEarnings(sym).d:null,
+      scorecard:SCORECARD_VERSION
     });
     if(D.calls.length>2000)D.calls=D.calls.slice(D.calls.length-2000);
   };
@@ -5943,6 +5944,12 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
    across the checks, reduced by the same eigenvalue-entropy used for effective bets, says how many
    independent checks there actually are. Counting a company's margin three times and calling it
    three points of quality is how an equal-weighted score quietly triple-weights one idea. */
+/* THE SCORECARD IS FROZEN. Version 1.0, 2026-09-21. The graded record is the product, and a
+   record is only attributable to the scorecard that made its calls; an edit to any of the 22
+   checks without a new version here would turn every call before it into the track record of a
+   scorecard nobody can use any more. The test suite hashes scoreStock() and CHECK_ORDER against
+   this version: change either, bump the version, and say why in PRD §26. */
+const SCORECARD_VERSION='1.0 (2026-09-21)';
 const CHECK_ORDER=[
   'Revenue Growth (YoY)','Gross Margin','Operating Margin','Free Cash Flow','Cash vs Debt',
   'Current Ratio','ROE','EPS Beats','Revenue Guidance','Insider Buying','Clear Growth Runway',
@@ -7152,7 +7159,7 @@ async function summariseNews(sym){
     .filter(n=>n.datetime&&n.datetime*1000>=Date.now()-newsWindow*86400000)
     .sort((a,b)=>b.datetime-a.datetime);
   if(!items.length)return;
-  const _sumInvite=(DB.profiles[USER]||{}).invite;
+  const _sumInvite=accessCodeFor(USER);
   if(!syncConfigured()&&!_sumInvite){
     aiSummaries[key]={error:'Written summaries need the Cloudflare Worker. Set it up under Settings → Sync Across Your Devices, then add an AI_API_KEY secret to it.'};
     renderNews();return;
@@ -7197,17 +7204,40 @@ async function summariseNews(sym){
   }catch(e){ aiSummaries[key]={error:e.message,url:target}; }
   renderNews();
 }
+/* The plain read: what the coverage is, without a model. How many headlines over the window,
+   from which sources, the price move, and the words that recur across the titles. Every part of
+   it is a count of the list on screen, so it can be checked by eye. */
+function plainNewsRead(sym){
+  const items=((newsCache[sym+':'+newsWindow]||{}).items||[])
+    .filter(n=>n.datetime&&n.datetime*1000>=Date.now()-newsWindow*86400000)
+    .sort((a,b)=>b.datetime-a.datetime);
+  if(!items.length)return '<p class="muted" style="font-size:13px;margin-top:10px">No headlines in the window.</p>';
+  const srcs={}; items.forEach(n=>{ const s=(n.source||'').trim(); if(s)srcs[s]=(srcs[s]||0)+1; });
+  const topSrc=Object.keys(srcs).sort((a,b)=>srcs[b]-srcs[a]).slice(0,3);
+  const STOP=new Set(['the','a','an','and','or','of','to','in','on','for','with','at','by','from','as','is','are','was','were','be','its','it','this','that','after','before','over','into','up','down','out','new','says','say','said','will','can','could','may','has','have','had','than','more','most','about','amid','what','why','how','who','stock','stocks','shares','share','inc','corp','co','ltd','plc','vs','per','year','week','today','report','reports',sym.toLowerCase()]);
+  const words={}; items.forEach(n=>{ String(n.headline||'').toLowerCase().replace(/[^a-z0-9\s$%-]/g,' ').split(/\s+/).forEach(w=>{ if(w.length<4||STOP.has(w)||/^\d+$/.test(w))return; words[w]=(words[w]||0)+1; }); });
+  const top=Object.keys(words).filter(w=>words[w]>=2).sort((a,b)=>words[b]-words[a]).slice(0,6);
+  const mv=moveOver(sym,newsWindow);
+  const first=items.slice(0,3);
+  return '<div style="margin-top:12px;padding:4px 0 4px 14px;border-left:2px solid var(--border)">'+
+    '<div style="font-size:14px;line-height:1.75">'+items.length+' headline'+(items.length===1?'':'s')+' in '+newsWindow+' day'+(newsWindow===1?'':'s')+
+      (topSrc.length?', mostly from '+esc(topSrc.join(', ')):'')+'.'+
+      (mv&&isFinite(mv.pct)?' The stock moved '+(mv.pct>=0?'+':'\u2212')+Math.abs(mv.pct).toFixed(1)+'% over the window.':'')+
+      (top.length?' Recurring words: '+esc(top.join(', '))+'.':'')+'</div>'+
+    '<ol style="margin:9px 0 0 18px;padding:0;font-size:12.5px;line-height:1.6;color:var(--muted)">'+first.map(n=>'<li>'+esc(n.headline||'')+'<span style="opacity:.7">, '+esc(n.source||'unknown')+'</span></li>').join('')+'</ol>'+
+    '</div>';
+}
 function aiSummaryHtml(sym){
   const a=aiSummaries[sym+':'+newsWindow];
   if(!a){
     return '<button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="summariseNews(\''+esc(sym)+'\')">Write me a summary</button>';
   }
   if(a.loading)return '<p class="muted" style="font-size:13px;margin-top:10px">Reading the coverage…</p>';
-  if(a.error)return '<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.6"><span class="warn">Couldn\'t write a summary:</span> '+esc(a.error)+'</p>'+
-    /* Print the exact URL that was called. Every wrong guess in this area came from not knowing
-       whether the request was even pointed at the right place. */
-    (a.url?'<p class="muted" style="font-size:11.5px;margin-top:6px;font-family:var(--mono);word-break:break-all">Called: '+esc(a.url)+'</p>':'')+
-    '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="summariseNews(\''+esc(sym)+'\')">Try again</button>';
+  /* No model could write it (no credit, a cap, a worker down): the plain read instead, built from
+     the headlines themselves with no model at all, and the reason in one muted line. */
+  if(a.error)return plainNewsRead(sym)+
+    '<p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.5">Plain read; the written summary was not available ('+esc(String(a.error).replace(/\s*\[HTTP \d+\]$/,'').slice(0,140))+'). '+
+    '<a href="#" onclick="summariseNews(\''+esc(sym)+'\');return false">Try again</a></p>';
   /* ---- ATTRIBUTED RENDERING ----
      The old card asserted "written from N headlines only" and nothing checked it — the model could
      name an institution appearing in none of them and this footer would vouch for it in the
@@ -13018,13 +13048,24 @@ function loadEarnings(){
   const today=new Date().toISOString().slice(0,10);
   try{ const c=JSON.parse(localStorage.getItem('pf_earn_v1')||'null'); if(c&&c.asOf===today&&c.next){ EARN=c; return Promise.resolve(EARN); } }catch(e){}
   if(earnLoading)return earnLoading;
-  const code=accessCodeFor(USER);
-  if(!syncConfigured()&&!code)return Promise.resolve(null);
-  const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
-  const auth=syncConfigured()?{headers:{'Authorization':'Bearer '+syncCfg.key}}:{};
-  earnLoading=fetch(base+'/earnings'+(syncConfigured()?'':'?code='+encodeURIComponent(code)),auth).then(r=>r.ok?r.json():null).then(j=>{
-    earnLoading=null; if(!j||!j.next)return null; EARN=j; try{ localStorage.setItem('pf_earn_v1',JSON.stringify(j)); }catch(e){} return EARN;
-  }).catch(()=>{ earnLoading=null; return null; });
+  const keep=j=>{ earnLoading=null; if(!j||!j.next)return null; EARN=j; try{ localStorage.setItem('pf_earn_v1',JSON.stringify(j)); }catch(e){} return EARN; };
+  /* This device's own Finnhub key: its own symbols, one calendar call each, personal use under
+     the key's own plan. Holdings and watchlist, forty at most a day. */
+  if(D&&D.apiKey){
+    const syms=[]; (D.holdings||[]).forEach(h=>{ if(h&&h.sym&&syms.indexOf(h.sym)<0)syms.push(h.sym); }); (D.watchlist||[]).forEach(w=>{ const s=typeof w==='string'?w:(w&&w.sym); if(s&&syms.indexOf(s)<0)syms.push(s); });
+    const to=new Date(Date.now()+60*86400000).toISOString().slice(0,10), next={};
+    earnLoading=(async()=>{
+      for(const s of syms.slice(0,40)){
+        try{ const j=await fh('/calendar/earnings?symbol='+encodeURIComponent(s)+'&from='+today+'&to='+to); const rows=(j&&j.earningsCalendar)||[]; rows.forEach(r=>{ const d=String(r.date||''); if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return; if(!next[s]||d<next[s].d)next[s]={d,h:r.hour||''}; }); }catch(e){ if(/RATE_LIMIT|BAD_KEY|NO_KEY/.test(e.message))break; }
+      }
+      return keep({asOf:today,next,source:'your own Finnhub key'});
+    })();
+    return earnLoading;
+  }
+  /* The operator's devices: the worker's calendar, behind the sync key. Nobody else. */
+  if(!syncConfigured())return Promise.resolve(null);
+  const base=syncCfg.url.replace(/\/+$/,'');
+  earnLoading=fetch(base+'/earnings',{headers:{'Authorization':'Bearer '+syncCfg.key}}).then(r=>r.ok?r.json():null).then(keep).catch(()=>{ earnLoading=null; return null; });
   return earnLoading;
 }
 function nextEarnings(sym){ const n=EARN&&EARN.next&&EARN.next[String(sym||'').toUpperCase()]; return n||null; }
@@ -15701,7 +15742,13 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     if(!host||!sym)return;
     var box=document.getElementById('pfCouncil'); if(!box){ box=document.createElement('div'); box.id='pfCouncil'; box.className='card'; box.style.marginTop='14px'; host.appendChild(box); }
     box.innerHTML='<div class="mv-kicker">Company, analysts and six lenses</div><div class="mv-empty" style="margin-top:10px"><span class="dot" style="background:var(--accent);box-shadow:0 0 0 4px rgba(59,130,246,.18)"></span><div><b>Reading '+esc(sym)+'</b><p>Profile, ratios and analyst counts first; the six readings take a few seconds.</p></div></div>';
-    fetch(INVITE_WORKER+'/council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym})})
+    /* The facts travel with the request, fetched here with this device's own key (personal use
+       under its own plan); the worker's key serves only the operator's devices. */
+    var factsP=(typeof fh==='function'&&typeof D!=='undefined'&&D&&D.apiKey)
+      ? Promise.all([fh('/stock/profile2?symbol='+sym).catch(function(){return null;}),fh('/stock/metric?symbol='+sym+'&metric=all').catch(function(){return null;}),fh('/stock/recommendation?symbol='+sym).catch(function(){return null;}),fh('/stock/price-target?symbol='+sym).catch(function(){return null;})]).then(function(r){ return {profile:r[0],metric:r[1],recs:r[2],target:r[3]}; })
+      : Promise.resolve(null);
+    var opHead=(typeof syncConfigured==='function'&&syncConfigured())?{'Authorization':'Bearer '+syncCfg.key}:{};
+    factsP.then(function(facts){ return fetch(INVITE_WORKER+'/council',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},opHead),body:JSON.stringify({code:code(),symbol:sym,facts:facts||undefined})}); })
       .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
       .then(function(x){
         var j=x.j; if(!x.ok){ box.innerHTML='<div class="mv-kicker">Company, analysts and six lenses</div><div class="mv-empty" style="margin-top:10px"><span class="dot"></span><div><b>Not available</b><p>'+esc((j&&j.error)||'No answer.')+'</p></div></div>'; return; }
@@ -16368,6 +16415,12 @@ main .card .list-rows,.list-rows{border:0;border-top:1px solid var(--border);bor
    was every paragraph and anything that says what a thing is for; the reasoning stays in the
    source, where the tests still read it, and comes back by deleting this one line. */
 .aside{display:none}
+/* Settings has a menu: one group of cards at a time. */
+.set-menu{display:flex;flex-wrap:wrap;gap:4px 22px;margin:0 0 22px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.set-menu button{background:transparent;border:0;padding:8px 0;font:inherit;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;border-radius:0}
+.set-menu button:hover{color:var(--text)}
+.set-menu button.on{color:var(--text);font-weight:600;border-bottom-color:var(--text)}
+.set-hidden{display:none!important}
 /* The door. The wordmark, the sentence and the form; the feature list belongs to the landing page. */
 .auth-brand{background:var(--bg)}
 .auth-grid,.auth-points{display:none}
@@ -16508,6 +16561,67 @@ header{border-bottom-color:var(--line)}
   .btn{padding:10px 18px}
 }
 </style>
+<script>
+/* The statements behind the 22 checks: ten fiscal years from SEC EDGAR (public domain, no key),
+   as a table under an analysis. Display only; nothing here is a check, and every figure is the
+   filer's own 10-K value. Margins and free cash flow are arithmetic on the rows above them. */
+(function(){
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function money(v){ if(v==null||!isFinite(v))return '–'; var a=Math.abs(v); var s=a>=1e9?(v/1e9).toFixed(1)+'bn':a>=1e6?(v/1e6).toFixed(0)+'m':(v/1e3).toFixed(0)+'k'; return (v<0?'−':'')+s.replace(/^-/,''); }
+  function pct(v){ return (v==null||!isFinite(v))?'–':(v*100).toFixed(1)+'%'; }
+  function cell(txt,cls){ return '<td style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding:6px 8px"'+(cls?' class="'+cls+'"':'')+'>'+txt+'</td>'; }
+  var ORDER=[['revenue','Revenue',money],['grossProfit','Gross profit',money],['_gm','Gross margin',pct],['operatingIncome','Operating income',money],['netIncome','Net income',money],['_nm','Net margin',pct],['eps','EPS, diluted',function(v){return (v==null||!isFinite(v))?'–':(+v).toFixed(2);}],
+    ['ocf','Operating cash flow',money],['capex','Capital expenditure',money],['_fcf','Free cash flow',money],['dividends','Dividends paid',money],['buybacks','Buybacks',money],
+    ['cash','Cash',money],['debt','Long-term debt',money],['assets','Total assets',money],['liabilities','Total liabilities',money],['equity','Shareholders’ equity',money],['shares','Diluted shares',function(v){return (v==null||!isFinite(v))?'–':(v>=1e9?(v/1e9).toFixed(2)+'bn':(v/1e6).toFixed(0)+'m');}]];
+  function derived(l,y){ var g=function(k){ return l[k]&&l[k].years[y]; }; return {_gm:(g('grossProfit')!=null&&g('revenue'))?g('grossProfit')/g('revenue'):null,_nm:(g('netIncome')!=null&&g('revenue'))?g('netIncome')/g('revenue'):null,_fcf:(g('ocf')!=null&&g('capex')!=null)?g('ocf')-Math.abs(g('capex')):null}; }
+  function statements(sym,host){
+    if(!host||!sym||typeof INVITE_WORKER!=='string')return;
+    var box=document.getElementById('pfStatements'); if(!box){ box=document.createElement('div'); box.id='pfStatements'; box.className='card'; box.style.marginTop='14px'; host.appendChild(box); }
+    box.innerHTML='<h3>Statements</h3><div class="muted" style="font-size:13px">Reading the filings…</div>';
+    fetch(INVITE_WORKER+'/edgar?symbol='+encodeURIComponent(sym)).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); }).then(function(x){
+      var j=x.j; if(!x.ok||!j||!j.years||!j.lines){ box.innerHTML='<h3>Statements</h3><div class="muted" style="font-size:13px">'+esc((j&&j.error)||'No statements.')+'</div>'; return; }
+      var ys=j.years, L=j.lines, d={}; ys.forEach(function(y){ d[y]=derived(L,y); });
+      var rows=ORDER.filter(function(o){ return o[0].charAt(0)==='_'?ys.some(function(y){return d[y][o[0]]!=null;}):!!L[o[0]]; }).map(function(o){
+        var k=o[0], f=o[2], sub=k.charAt(0)==='_';
+        return '<tr'+(sub?' style="color:var(--muted)"':'')+'><td style="padding:6px 8px;white-space:nowrap'+(sub?';padding-left:18px':'')+'">'+esc(o[1])+'</td>'+ys.map(function(y){ var v=sub?d[y][k]:L[k].years[y]; var cls=(!sub&&['netIncome','ocf','_fcf','operatingIncome'].indexOf(k)>=0&&v<0)?'neg':''; return cell(f(v),cls); }).join('')+'</tr>';
+      }).join('');
+      box.innerHTML='<h3>Statements <span class="muted" style="font-weight:400;font-size:12px;margin-left:6px">'+esc(j.entity||sym)+'</span></h3>'+
+        '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:auto;min-width:100%;font-size:13px"><thead><tr><th style="padding:6px 8px;text-align:left">Fiscal year</th>'+ys.map(function(y){ return '<th style="text-align:right;padding:6px 8px">'+y+'</th>'; }).join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'+
+        '<div class="muted" style="font-size:11.5px;margin-top:8px">SEC EDGAR, 10-K filings, US dollars; a year is the fiscal year ending in it, as originally filed (per-share figures are not restated for later splits). Free cash flow and margins are arithmetic on the rows above.</div>';
+    }).catch(function(){ box.innerHTML='<h3>Statements</h3><div class="muted" style="font-size:13px">EDGAR did not answer.</div>'; });
+  }
+  window.pfStatements=statements;
+  var host=document.getElementById('analyzerResult');
+  if(host){ var last=''; new MutationObserver(function(){ var tt=(host.querySelector('h2,h3,.sym,[data-sym]')||{}).textContent||''; var m=(host.getAttribute('data-sym')||tt).match(/\b[A-Z]{1,6}\b/); var sym=m?m[0]:''; if(sym&&sym!==last&&!/Nothing analysed/.test(host.textContent)){ last=sym; setTimeout(function(){ statements(sym,host); },500); } }).observe(host,{childList:true}); }
+})();
+</script>
+<script>
+/* Settings, grouped. The tab was one long stack of cards; this puts a menu above it and shows
+   one group at a time. Cards are assigned by their heading, so a new card lands in a group
+   without touching this code (unknown headings go to Advanced). The group is remembered on the
+   device. A card another script hides for its own reason (the install card) keeps that. */
+(function(){
+  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|Rule change log)/i],['Accounts',/^(Copy holdings)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
+  function groupOf(card){ var h=card.querySelector('h3'); var txt=h?h.textContent.trim():''; for(var i=0;i<GROUPS.length;i++)if(GROUPS[i][1].test(txt))return GROUPS[i][0]; return 'Advanced'; }
+  function cards(){ var tab=document.getElementById('tab-settings'); return tab?Array.prototype.slice.call(tab.children).filter(function(el){ return el.classList&&(el.classList.contains('card')||el.classList.contains('addwrap')); }):[]; }
+  window.showSettings=function(name){
+    try{ localStorage.setItem('pf_settings_sec',name); }catch(e){}
+    cards().forEach(function(c){ c.classList.toggle('set-hidden',groupOf(c)!==name); });
+    document.querySelectorAll('.set-menu button').forEach(function(b){ b.classList.toggle('on',b.dataset.sec===name); });
+  };
+  function build(){
+    var tab=document.getElementById('tab-settings'); if(!tab||tab.querySelector('.set-menu'))return;
+    var present={}; cards().forEach(function(c){ present[groupOf(c)]=true; });
+    var menu=document.createElement('div'); menu.className='set-menu';
+    GROUPS.forEach(function(g){ if(!present[g[0]])return; var b=document.createElement('button'); b.type='button'; b.dataset.sec=g[0]; b.textContent=g[0]; b.onclick=function(){ showSettings(g[0]); }; menu.appendChild(b); });
+    tab.insertBefore(menu,tab.firstChild);
+    var want=null; try{ want=localStorage.getItem('pf_settings_sec'); }catch(e){}
+    showSettings(want&&present[want]?want:'General');
+  }
+  document.addEventListener('DOMContentLoaded',build);
+  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='settings')build(); return r; }; }
+})();
+</script>
 <script>
 /* Today's heat, in Market: the holdings as a treemap (size = value, colour = day change, from the
    prices the last refresh already fetched) and the eleven S&P sectors through their SPDR ETFs
@@ -16677,7 +16791,8 @@ header{border-bottom-color:var(--line)}
     if(rel.suppliers.length||rel.customers.length||rel.prefilledAt)return;
     var st=document.getElementById('mapStatus');
     if(st)st.textContent='Mapping '+sym+'\u2026';
-    fetch(INVITE_WORKER+'/map/prefill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym})})
+    var profP=(typeof getProfile==='function'&&typeof D!=='undefined'&&D&&D.apiKey)?getProfile(sym).catch(function(){return null;}):Promise.resolve(null);
+    profP.then(function(p){ return fetch(INVITE_WORKER+'/map/prefill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym,name:p&&p.name||undefined,industry:p&&p.finnhubIndustry||undefined})}); })
       .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
       .then(function(r){
         if(!r.ok||!r.j){ if(st&&r.j&&r.j.error&&/access code/.test(r.j.error))st.textContent='Pre-fill needs an access code: Settings \u2192 Access code.'; return; }
