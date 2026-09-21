@@ -37,6 +37,8 @@ jobs:
           key: world-base-${{ steps.month.outputs.ym }}
       - name: Extract
         run: node scripts/world-extract.mjs --force ${{ inputs.only != '' && format('--only={0}', inputs.only) || '' }} 2>&1 | tee extract.log
+      - name: Drop the food, drink and farm plants a name regex let in
+        run: node scripts/world-clean.mjs 2>&1 | tee -a extract.log
       - name: Summary for the pull request
         id: sum
         run: |

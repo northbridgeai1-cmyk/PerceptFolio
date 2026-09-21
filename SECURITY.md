@@ -217,3 +217,16 @@ headers and the SPA routes are live on the production domain (`node test/smoke.m
 https://perceptfolio.com`: 21/21). GitHub Pages is retired, so no copy of the terminal is served
 ungated anywhere. The operator key was rotated the same day; `.dev.vars` still needs the new value
 for the gate suite's three operator checks.
+
+## Earnings dates and the country filter (2026-09-21)
+
+- `GET /earnings?code=` on the worker: one Finnhub call a day for everybody, reduced to symbol →
+  next date before it is cached (KV `earn:<day>`, a day), behind the same door as `/fred`: the
+  operator's sync key as a bearer, or a live invite code. Nothing user-specific is fetched or
+  stored; the answer is the same for every caller.
+- The FRED allowlist grows by three public series (DFF, DGS2, DGS10). The route's door is unchanged.
+- The World tab's atlas is static data already on the site (Natural Earth borders and places);
+  the country filter is client-side and sends nothing anywhere.
+- Settings → Access code stores a code on the profile record (`p.code`) and beside the door's own
+  copy in localStorage; sign-in still reads only `p.invite`, so a code saved here can never lock
+  a profile out.

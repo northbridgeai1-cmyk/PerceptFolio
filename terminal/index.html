@@ -1745,6 +1745,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 
   <div class="section-title">Market weather. Long-run valuation</div>
   <div id="weatherVerdict" style="margin-bottom:14px"></div>
+  <div id="ratesLine" style="margin:0 0 16px"></div>
   <div class="grid grid-3" id="weatherCards">
     <div class="card" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w4"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
   </div>
@@ -3228,6 +3229,7 @@ function enterSession(){
   checkPendingRequests();                                   // operator devices only; silent otherwise
   const acctEl=document.getElementById('acctEmail');if(acctEl)acctEl.textContent=USER;
   updateGreeting();
+  loadEarnings().then(j=>{ if(j&&typeof renderAll==='function')renderAll(); });
   refreshMarketDataCard();
   document.getElementById('cashInput').value=D.cash||'';
   document.getElementById('setQBuy').value=D.rules.qBuy;
@@ -5832,7 +5834,11 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
          recomputed later, for the same reason as myCall: today's fundamentals are not the ones the
          call was made on, and I11 forbids reconstructing them. One character per check keeps 2000
          calls to about 44KB. */
-      checks:(typeof checkBitmap==='function')?checkBitmap(sc):null
+      checks:(typeof checkBitmap==='function')?checkBitmap(sc):null,
+      /* The next earnings date known when the call was made, if inside the calendar's window. A
+         call logged the week before a print is a different bet from one logged the week after,
+         and the record should be able to say which it was. */
+      earningsAt:(typeof nextEarnings==='function'&&nextEarnings(sym))?nextEarnings(sym).d:null
     });
     if(D.calls.length>2000)D.calls=D.calls.slice(D.calls.length-2000);
   };
@@ -6261,6 +6267,15 @@ function missedMarks(){
   return out;
 }
 
+/* Holdings and watchlist names reporting in the next fourteen days, soonest first. */
+function earningsFortnight(){
+  if(!EARN||!EARN.next)return '';
+  const syms=[]; (D.holdings||[]).forEach(h=>{ if(h&&h.sym&&syms.indexOf(h.sym)<0)syms.push(h.sym); }); (D.watchlist||[]).forEach(w=>{ const s=typeof w==='string'?w:(w&&w.sym); if(s&&syms.indexOf(s)<0)syms.push(s); });
+  const today=Date.parse(new Date().toISOString().slice(0,10));
+  const rows=syms.map(s=>{ const n=nextEarnings(s); if(!n)return null; const days=Math.round((Date.parse(n.d)-today)/86400000); return (days>=0&&days<=14)?{s,d:n.d,days,h:n.h}:null; }).filter(Boolean).sort((a,b)=>a.days-b.days);
+  if(!rows.length)return '';
+  return '<div class="md-head" style="margin-top:12px">Earnings this fortnight</div>'+rows.map(r=>'<div class="md-row"><span class="md-when">'+(r.days===0?'today':r.days===1?'tomorrow':new Date(r.d+'T12:00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'}))+'</span><span class="md-sym">'+esc(r.s)+'</span><span class="md-meta">'+(r.h==='bmo'?'before open':r.h==='amc'?'after close':'')+'</span></div>').join('');
+}
 function renderMarksDue(){
   const el=document.getElementById('marksDue');
   if(!el||!D)return;
@@ -6268,7 +6283,7 @@ function renderMarksDue(){
   const marked=CALL_HORIZONS.reduce((n,h)=>n+(D.calls||[]).filter(c=>(c.marks||{})[h]&&!(c.marks||{})[h].missed).length,0);
 
   if(!soon.length&&!missed.length){
-    el.innerHTML='<div class="md-head">Marks</div><p class="muted" style="font-size:13px;line-height:1.6">Nothing due in the next fortnight.</p>';
+    el.innerHTML='<div class="md-head">Marks</div><p class="muted" style="font-size:13px;line-height:1.6">Nothing due in the next fortnight.</p>'+earningsFortnight();
     return;
   }
 
@@ -10150,7 +10165,7 @@ function renderAll(){
     const priceCell='<input type="number" step="any" style="width:100px" value="'+(p!=null?p:'')+'" placeholder="set price" '+
       'onchange="setHoldingPrice('+i+',this.value)">'+priceNote;
     const tr=document.createElement('tr');
-    tr.innerHTML='<td><b>'+esc(h.sym)+'</b></td><td>'+typePill+'</td><td class="muted">'+(h.broker?esc(h.broker):'\u2014')+'</td><td>'+pmask(h.shares)+'</td>'+
+    tr.innerHTML='<td><b>'+esc(h.sym)+'</b>'+earningsCell(h.sym)+'</td><td>'+typePill+'</td><td class="muted">'+(h.broker?esc(h.broker):'\u2014')+'</td><td>'+pmask(h.shares)+'</td>'+
       '<td>'+pmask(fmt$(h.cost))+'</td><td>'+priceCell+'</td><td>'+pmask(fmt$(val))+'</td>'+
       '<td class="'+(gl==null?'':gl>=0?'pos':'neg')+'">'+(gl==null
           ?'<span class="muted" title="'+(glMode()==='today'?'No live quote today. Manually priced, a mutual fund, or not refreshed yet.':'Set a price to see this.')+'">-</span>'
@@ -10234,7 +10249,7 @@ function renderAll(){
     g.rows.forEach(({s,i})=>{
     const sc=D.analyses[s];const v=sc?verdictOf(sc,false):null;
     const tr=document.createElement('tr');
-    tr.innerHTML='<td><b>'+esc(s)+'</b></td><td>'+(sc&&sc.price?fmt$(sc.price):'-')+'</td>'+
+    tr.innerHTML='<td><b>'+esc(s)+'</b>'+earningsCell(s)+'</td><td>'+(sc&&sc.price?fmt$(sc.price):'-')+'</td>'+
       '<td>'+(sc&&!sc.error?sc.qScore+'/12':'-')+'</td><td>'+(sc&&!sc.error?sc.pScore+'/6':'-')+'</td><td>'+(sc&&!sc.error?sc.mScore+'/4':'-')+'</td>'+
       '<td>'+(v?'<span class="pill '+v.cls+'">'+v.label+'</span>':'<span class="muted">refresh to score</span>')+'</td>'+
       /* Lists BEFORE My Call, matching the header order. They were the other way round, which
@@ -12708,7 +12723,8 @@ let macroLoading=false;
    The worker accepts either, restricts the series to four public national statistics, and refuses a
    code whose grant has been paused — so suspending someone takes their macro data with it. */
 async function fredSeries(series,limit){
-  const invite=(DB.profiles[USER]||{}).invite;
+  const pr=DB.profiles[USER]||{}; let invite=pr.invite||pr.inviteCode||pr.code||'';
+  if(!invite){ try{ invite=localStorage.getItem('pf_door_code')||''; }catch(e){} }
   if(!syncConfigured()&&!invite)throw new Error('NEEDS_WORKER');
   const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
   const auth=syncConfigured()
@@ -12747,7 +12763,7 @@ async function loadMarketData(force){
        move panel does not, so it now gets whatever can actually be fetched. */
     /* An invite code is now enough for macro data, so the worker-less path is only taken when there
        is neither a sync key nor a code to present. */
-    if(!syncConfigured()&&!(DB.profiles[USER]||{}).invite){
+    if(!syncConfigured()&&!accessCodeFor(USER)){
       const solo={};
       if(hasMarketData()){
         try{
@@ -12774,14 +12790,15 @@ async function loadMarketData(force){
       return;
     }
     if(force)macroCache={};
-    const need=['VIXCLS','SP500','WILL5000PR','GDP'];
+    const need=['VIXCLS','SP500','WILL5000PR','GDP','DFF','DGS2','DGS10'];
     const out={};
     for(const s of need){
       if(macroCache[s]&&!force){out[s]=macroCache[s];continue;}
       try{
         /* SP500 needs enough history for the regime detector (20 recent + 60 prior + 1); 120 gives
-           headroom for holidays and gaps. VIX only needs a few readings for the day toggle. */
-        const limit=s==='SP500'?120:(s==='VIXCLS'?5:2);
+           headroom for holidays and gaps. VIX only needs a few readings for the day toggle. The
+           three rates want a recent row and one from roughly three months back, for the change. */
+        const limit=s==='SP500'?120:(s==='VIXCLS'?5:(/^D(FF|GS2|GS10)$/.test(s)?70:2));
         out[s]=await fredSeries(s,limit);
         macroCache[s]=out[s];
       }catch(e){out[s]={error:e.message};}
@@ -12815,8 +12832,65 @@ async function loadMarketData(force){
     renderTodaysMove(out);
     renderRegimeBanner(out);
     renderWeather(out);
+    renderRates(out);
   }finally{macroLoading=false;}
 }
+/* The code a profile presents to the worker for macro data and earnings dates: its own invite,
+   a code saved under Settings, or the one the door was opened with. */
+function accessCodeFor(user){
+  const p=(DB&&DB.profiles&&DB.profiles[user])||{};
+  let c=p.invite||p.inviteCode||p.code||'';
+  if(!c){ try{ c=localStorage.getItem('pf_door_code')||''; }catch(e){} }
+  return c;
+}
+/* ---- Rates: Fed funds, the two-year and the ten-year, with the three-month change ----
+   Context beside the valuation figures, never an input to a verdict. FRED's DFF is daily; DGS2
+   and DGS10 skip holidays, so "three months ago" is the nearest row at or before that date. */
+function renderRates(data){
+  const el=document.getElementById('ratesLine'); if(!el)return;
+  const pick=(s)=>{ const o=(data&&data[s])||null; if(!o||o.error||!Array.isArray(o)||!o.length)return null;
+    const rows=o.filter(r=>r&&r.value!=='.'&&isFinite(parseFloat(r.value))).map(r=>({d:r.date,v:parseFloat(r.value)})).sort((a,b)=>a.d<b.d?1:-1);
+    if(!rows.length)return null; const last=rows[0]; const ago=new Date(Date.parse(last.d)-91*86400000).toISOString().slice(0,10);
+    const prev=rows.find(r=>r.d<=ago)||null; return {v:last.v,d:last.d,chg:prev?last.v-prev.v:null}; };
+  const ff=pick('DFF'), y2=pick('DGS2'), y10=pick('DGS10');
+  if(!ff&&!y2&&!y10){ const err=data&&data.DFF&&data.DFF.error; el.innerHTML=err&&/FRED|key/i.test(err)?'<span class="muted">Rates need the FRED key on the worker.</span>':''; return; }
+  const bp=(x)=>x==null?'':' <span class="muted">('+(x>=0?'+':'\u2212')+Math.abs(Math.round(x*100))+'bp in 3 months)</span>';
+  const cell=(label,r)=>r?'<span><span class="muted">'+label+'</span> <b>'+r.v.toFixed(2)+'%</b>'+bp(r.chg)+'</span>':'';
+  const curve=(y2&&y10)?'<span><span class="muted">2s10s</span> <b>'+((y10.v-y2.v)>=0?'+':'\u2212')+Math.abs(Math.round((y10.v-y2.v)*100))+'bp</b></span>':'';
+  const asOf=(y10||y2||ff).d;
+  el.innerHTML='<div class="rates">'+[cell('Fed funds',ff),cell('2-year',y2),cell('10-year',y10),curve].filter(Boolean).join('<i></i>')+'</div><div class="muted" style="font-size:11.5px;margin-top:4px">FRED, as of '+esc(asOf)+'</div>';
+}
+
+/* ---- Earnings dates: one calendar for the whole market, a day at a time ----
+   From the worker (Finnhub's calendar, reduced to symbol -> next date, cached there a day).
+   Kept for the day in this browser. A date is context on a row and a stamp on a call; it is
+   never a signal and never moves a verdict. */
+let EARN=null, earnLoading=null;
+function loadEarnings(){
+  if(EARN)return Promise.resolve(EARN);
+  const today=new Date().toISOString().slice(0,10);
+  try{ const c=JSON.parse(localStorage.getItem('pf_earn_v1')||'null'); if(c&&c.asOf===today&&c.next){ EARN=c; return Promise.resolve(EARN); } }catch(e){}
+  if(earnLoading)return earnLoading;
+  const code=accessCodeFor(USER);
+  if(!syncConfigured()&&!code)return Promise.resolve(null);
+  const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
+  const auth=syncConfigured()?{headers:{'Authorization':'Bearer '+syncCfg.key}}:{};
+  earnLoading=fetch(base+'/earnings'+(syncConfigured()?'':'?code='+encodeURIComponent(code)),auth).then(r=>r.ok?r.json():null).then(j=>{
+    earnLoading=null; if(!j||!j.next)return null; EARN=j; try{ localStorage.setItem('pf_earn_v1',JSON.stringify(j)); }catch(e){} return EARN;
+  }).catch(()=>{ earnLoading=null; return null; });
+  return earnLoading;
+}
+function nextEarnings(sym){ const n=EARN&&EARN.next&&EARN.next[String(sym||'').toUpperCase()]; return n||null; }
+/* "Earnings 17 Nov" within the calendar's window; "Earnings today" / "tomorrow" when it is. */
+function earningsLabel(sym){
+  const n=nextEarnings(sym); if(!n)return '';
+  const days=Math.round((Date.parse(n.d)-Date.parse(new Date().toISOString().slice(0,10)))/86400000);
+  if(days<0)return '';
+  const when=days===0?'today':days===1?'tomorrow':new Date(n.d+'T12:00:00').toLocaleDateString(document.documentElement.lang==='es'?'es':'en',{day:'numeric',month:'short'});
+  const hour=n.h==='bmo'?' (before open)':n.h==='amc'?' (after close)':'';
+  return 'Earnings '+when+hour;
+}
+function earningsCell(sym){ const l=earningsLabel(sym); return l?'<div class="muted" style="font-size:11px;margin-top:2px">'+esc(l)+'</div>':''; }
 /* VIX / sqrt(252) = the size of an ordinary day at the current level of implied volatility.
    sqrt(252) is 15.8745; the familiar "divide by 16" is that rounded. */
 const TRADING_DAYS=252;
@@ -15446,7 +15520,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
         if(!x.ok){
           out.innerHTML=(j&&j.configured===false)
             ? '<div class="mv-empty"><span class="dot"></span><div><b>Not connected yet</b></div></div>'
-            : '<div class="mv-empty"><span class="dot"></span><div><b>No answer</b><p>'+esc((j&&j.error&&/access code/.test(j.error))?'This profile has no access code. Open perceptfolio.com/enter/ and enter with your code once; the terminal keeps it.':((j&&j.error)||'The model did not answer.'))+'</p></div></div>';
+            : '<div class="mv-empty"><span class="dot"></span><div><b>No answer</b><p>'+esc((j&&j.error&&/access code/.test(j.error))?'This profile has no access code: Settings \u2192 Access code.':((j&&j.error)||'The model did not answer.'))+'</p></div></div>';
           return;
         }
         var end=j.path[j.path.length-1], pct=(end-j.last)/j.last*100, dir=pct>=0?'up':'down';
@@ -15578,6 +15652,14 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 #tab-world .wd-meta{font:12px/1.5 var(--mono);color:var(--muted)}
 #tab-world .wd-countries{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
 #tab-world .wd-countries li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:13px;align-items:center}
+#tab-world .wd-countries li.pick{cursor:pointer}
+#tab-world .wd-countries li.pick:hover span:first-child{text-decoration:underline;text-underline-offset:.2em}
+#tab-world .wd-countries li.on span:first-child{font-weight:700;color:var(--brand2)}
+#tab-world .wd-meta a{color:var(--accent)}
+.rates{display:flex;flex-wrap:wrap;gap:6px 0;font-size:13.5px;align-items:baseline}
+.rates i{display:inline-block;width:1px;height:14px;background:var(--border);margin:0 14px;vertical-align:middle}
+.rates b{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums}
+@media(max-width:600px){.rates i{display:none}.rates>span{flex:1 1 45%}}
 #tab-world .wd-countries li b{font-family:var(--mono);font-weight:600}
 #tab-world .wd-countries .bar{grid-column:1/-1;height:3px;border-radius:2px;background:var(--c);opacity:.6}
 #tab-world .wd-detail{border-top:1px solid var(--border);padding-top:12px}
@@ -15633,6 +15715,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 (function(){
   var BASE='/vendor/cesium/', DATA='/world/data/';
   var IDX=null, SET=null, viewer=null, points=null, NE=null, loadP=null, sat=null;
+  var borders=null, hl=null, labels=null, atlasDone=false, FILTER=null;   /* the atlas: borders and names; FILTER is a country code or null */
   function satFade(){ if(!viewer||!sat)return; var hgt=viewer.camera.positionCartographic.height, a=hgt>4e6?0:hgt<1.2e6?1:(4e6-hgt)/(4e6-1.2e6); if(Math.abs((sat.alpha||0)-a)<0.01&&sat.show===(a>0))return; sat.alpha=a; sat.show=a>0; viewer.scene.requestRender(); }
   function $(id){return document.getElementById(id);}
   function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||localStorage.getItem('pf_door_code')||''; }catch(e){ return ''; } }
@@ -15696,7 +15779,11 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       viewer.camera.percentageChanged=0.03; viewer.camera.changed.addEventListener(satFade);
       /* Open on the whole planet, Atlantic-centred, so the first look is the world and not a hemisphere. */
       viewer.camera.setView({destination:C.Cartesian3.fromDegrees(10,22,1.75e7)});
+      borders=sc.primitives.add(new C.PolylineCollection());
+      hl=sc.primitives.add(new C.PolylineCollection());
+      labels=sc.primitives.add(new C.LabelCollection());
       points=sc.primitives.add(new C.PointPrimitiveCollection());
+      drawAtlas();
       var h=new C.ScreenSpaceEventHandler(sc.canvas), last=0;
       h.setInputAction(function(m){
         var now=Date.now(); if(now-last<40)return; last=now;
@@ -15704,14 +15791,68 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
         if(f){ tip.textContent=(f.sym?f.sym+' · ':'')+f.n+(f.o&&f.o!==f.n?' · '+f.o:'')+(f.pl?' · '+f.pl:(names()[f.c]?' · '+names()[f.c]:'')); tip.style.left=m.endPosition.x+'px'; tip.style.top=m.endPosition.y+'px'; tip.hidden=false; sc.canvas.style.cursor='pointer'; }
         else { tip.hidden=true; sc.canvas.style.cursor=''; }
       },C.ScreenSpaceEventType.MOUSE_MOVE);
-      h.setInputAction(function(m){ var p=sc.pick(m.position); if(p&&p.id&&p.id.n)showDetail(p.id); },C.ScreenSpaceEventType.LEFT_CLICK);
+      /* A click on a plant opens it; a click on the ground picks that country, and the set
+         narrows to what it has there. The same click on the same country widens it again. */
+      h.setInputAction(function(m){
+        var p=sc.pick(m.position); if(p&&p.id&&p.id.n){ showDetail(p.id); return; }
+        if(!SET||!NE)return;
+        var cart=viewer.camera.pickEllipsoid(m.position,sc.globe.ellipsoid); if(!cart)return;
+        var cg=C.Cartographic.fromCartesian(cart), cc=countryOf(C.Math.toDegrees(cg.longitude),C.Math.toDegrees(cg.latitude));
+        if(cc)toggleCountry(cc);
+      },C.ScreenSpaceEventType.LEFT_CLICK);
       return viewer;
     });
   }
 
+  /* ---- the atlas ---- */
+  function ringArea(r){ var a=0; for(var i=0,j=r.length-1;i<r.length;j=i++)a+=(r[j][0]+r[i][0])*(r[j][1]-r[i][1]); return a/2; }
+  function ringCentroid(r){ var a=0,cx=0,cy=0; for(var i=0,j=r.length-1;i<r.length;j=i++){ var f=r[j][0]*r[i][1]-r[i][0]*r[j][1]; a+=f; cx+=(r[j][0]+r[i][0])*f; cy+=(r[j][1]+r[i][1])*f; } if(Math.abs(a)<1e-9){ var sx=0,sy=0; r.forEach(function(p){sx+=p[0];sy+=p[1];}); return [sx/r.length,sy/r.length]; } a*=3; return [cx/a,cy/a]; }
+  var FONT='-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+  function drawAtlas(){
+    if(atlasDone||!viewer)return; atlasDone=true;
+    var C=window.Cesium, sc=viewer.scene;
+    loadNE().then(function(){
+      var line=C.Material.fromType('Color',{color:C.Color.fromCssColorString('#ffffff').withAlpha(0.26)});
+      NE.forEach(function(c){
+        c.polys.forEach(function(poly){ poly.forEach(function(ring){ if(ring.length<3)return; var arr=[]; ring.forEach(function(pt){ arr.push(pt[0],pt[1],120); }); borders.add({positions:C.Cartesian3.fromDegreesArrayHeights(arr),width:1,material:line}); }); });
+        /* The name sits on the largest piece of the country and appears at a height that suits its
+           size: continents from space, small countries once they fill the view. */
+        var big=null,ba=0; c.polys.forEach(function(poly){ var a=Math.abs(ringArea(poly[0])); if(a>ba){ba=a;big=poly[0];} }); if(!big)return;
+        var cen=ringCentroid(big), far=ba>60?1.8e7:ba>10?7e6:ba>1.5?3e6:1.3e6;
+        labels.add({position:C.Cartesian3.fromDegrees(cen[0],cen[1],300),text:String(c.name||'').toUpperCase(),font:'600 12px '+FONT,fillColor:C.Color.fromCssColorString('#eef1f6').withAlpha(.9),outlineColor:C.Color.fromCssColorString('#07090f').withAlpha(.95),outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,horizontalOrigin:C.HorizontalOrigin.CENTER,verticalOrigin:C.VerticalOrigin.CENTER,distanceDisplayCondition:new C.DistanceDisplayCondition(0,far)});
+      });
+      sc.requestRender();
+    }).catch(function(){});
+    loadPlaces().then(function(){
+      PLACES.forEach(function(p){
+        var pop=p[5]||0; if(pop<50000)return;
+        var far=pop>=3e6?1.1e7:pop>=1e6?4.5e6:pop>=5e5?2.2e6:pop>=2.5e5?1.1e6:pop>=1e5?5.5e5:2.6e5;
+        labels.add({position:C.Cartesian3.fromDegrees(p[4],p[3],150),text:p[0],font:(pop>=1e6?'500 12px ':'11px ')+FONT,fillColor:C.Color.fromCssColorString('#ffffff').withAlpha(.88),outlineColor:C.Color.fromCssColorString('#07090f').withAlpha(.9),outlineWidth:2,style:C.LabelStyle.FILL_AND_OUTLINE,horizontalOrigin:C.HorizontalOrigin.LEFT,verticalOrigin:C.VerticalOrigin.CENTER,pixelOffset:new C.Cartesian2(5,0),distanceDisplayCondition:new C.DistanceDisplayCondition(0,far)});
+      });
+      sc.requestRender();
+    }).catch(function(){});
+  }
+  function highlight(cc){
+    var C=window.Cesium; hl.removeAll(); if(!cc||!NE)return;
+    var c=NE.filter(function(x){return x.cc===cc;})[0]; if(!c)return;
+    var mat=C.Material.fromType('Color',{color:C.Color.fromCssColorString('#1f9e8c')});
+    c.polys.forEach(function(poly){ poly.forEach(function(ring){ if(ring.length<3)return; var arr=[]; ring.forEach(function(pt){ arr.push(pt[0],pt[1],160); }); hl.add({positions:C.Cartesian3.fromDegreesArrayHeights(arr),width:2.2,material:mat}); }); });
+  }
+  /* ---- the country filter ---- */
+  window.wdCountry=function(cc){ toggleCountry(cc); };
+  function toggleCountry(cc){
+    if(!SET)return;
+    if(FILTER===cc){ FILTER=null; highlight(null); draw(SET,true); legend(SET); status(''); return; }
+    var fs=SET.features.filter(function(f){return f.c===cc;});
+    if(!fs.length){ status('Nothing from '+esc(SET.label)+' in '+(names()[cc]||cc)+'.'); return; }
+    FILTER=cc; highlight(cc); status('');
+    draw(Object.assign({},SET,{features:fs}),true); legend(SET);
+  }
+
   /* ---- drawing a set ---- */
-  function draw(set){
+  function draw(set,keepFilter){
     var C=window.Cesium; points.removeAll();
+    if(!keepFilter){ FILTER=null; if(hl)hl.removeAll(); }
     var color=C.Color.fromCssColorString(set.color||'#3b82f6'), outline=C.Color.BLACK.withAlpha(.7), pos=[];
     var cols={};
     set.features.forEach(function(f){ var c3=C.Cartesian3.fromDegrees(f.lo,f.la,1500); pos.push(c3); var col=f.col?(cols[f.col]||(cols[f.col]=C.Color.fromCssColorString(f.col))):color; points.add({position:c3,pixelSize:6.5,color:col,outlineColor:outline,outlineWidth:1,id:f}); });
@@ -15735,6 +15876,13 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     viewer.scene.requestRender();
   }
   function legend(set){
+    if(set.groups&&FILTER){
+      var nmF=names(), inC=set.features.filter(function(f){return f.c===FILTER;}), cnt={}; inC.forEach(function(f){ cnt[f.sym]=(cnt[f.sym]||0)+1; });
+      $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+(nmF[FILTER]||FILTER)+' · '+inC.length+' of '+set.features.length+' plants · <a href="#" onclick="wdCountry(\''+esc(FILTER)+'\');return false">Show all</a></div>'+
+        '<ul class="wd-holds">'+set.groups.filter(function(g){return cnt[g.sym];}).map(function(g){ return '<li class="on" data-s="'+esc(g.sym)+'"><i style="background:'+esc(g.col)+'"></i><span><b>'+esc(g.sym)+'</b> '+esc(g.name)+'</span><em>'+cnt[g.sym]+'</em></li>'; }).join('')+'</ul></div>';
+      $('wdLegend').querySelectorAll('li.on').forEach(function(li){ li.onclick=function(){ flyTo(inC.filter(function(f){return f.sym===li.dataset.s;})); }; });
+      return;
+    }
     if(set.groups){
       $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+set.features.length+' plants · '+set.groups.length+' holdings · OpenStreetMap as of '+esc(set.asOf||'')+'</div>'+
         '<ul class="wd-holds">'+set.groups.map(function(g,i){ return '<li'+(g.count?' class="on" data-i="'+i+'"':'')+'><i style="background:'+esc(g.col)+'"></i><span><b>'+esc(g.sym)+'</b> '+esc(g.name)+'</span><em>'+(g.count?g.count:(g.unknown?'no name (needs the data key)':'none drawn'))+'</em></li>'; }).join('')+'</ul>'+
@@ -15743,12 +15891,14 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       return;
     }
     var by={}; set.features.forEach(function(f){ var k=f.c||'?'; by[k]=(by[k]||0)+1; });
-    var top=Object.keys(by).sort(function(a,b){return by[b]-by[a];}).slice(0,8), max=by[top[0]]||1, nm=names();
+    var top=Object.keys(by).sort(function(a,b){return by[b]-by[a];}).slice(0,FILTER?12:8), max=by[top[0]]||1, nm=names();
+    if(FILTER&&top.indexOf(FILTER)<0)top.push(FILTER);
     var countries=Object.keys(by).filter(function(k){return k!=='?';}).length;
-    $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+set.features.length+' plants · '+countries+' countries · OpenStreetMap as of '+esc(set.asOf||'')+'</div>'+
+    var head=FILTER?(nm[FILTER]||FILTER)+' · '+(by[FILTER]||0)+' of '+set.features.length+' plants · <a href="#" onclick="wdCountry(\''+esc(FILTER)+'\');return false">Show all</a>':set.features.length+' plants · '+countries+' countries';
+    $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+head+' · OpenStreetMap as of '+esc(set.asOf||'')+'</div>'+
       (set.saturated?'<p class="muted" style="font-size:12.5px;margin:8px 0 0">The source capped this answer, so the map is a sample rather than the whole set.</p>':'')+
       (set.partial?'<p class="muted" style="font-size:12.5px;margin:8px 0 0">Part of the source could not be reached when this layer was built, so the count is a floor.</p>':'')+
-      (set.features.length?'<ul class="wd-countries" style="--c:'+esc(set.color)+'">'+top.map(function(k){ return '<li><span>'+esc(k==='?'?'Unplaced':(nm[k]||k))+'</span><b>'+by[k]+'</b><span class="bar" style="width:'+Math.max(4,Math.round(by[k]/max*100))+'%"></span></li>'; }).join('')+'</ul>':'<p class="muted" style="font-size:13px;margin:10px 0 0">Nothing drawn on OpenStreetMap under that name. Try the company’s short name, or an industry above.</p>')+'</div>';
+      (set.features.length?'<ul class="wd-countries" style="--c:'+esc(set.color)+'">'+top.map(function(k){ return '<li'+(k==='?'?'':' class="pick'+(FILTER===k?' on':'')+'" onclick="wdCountry(\''+esc(k)+'\')"')+'><span>'+esc(k==='?'?'Unplaced':(nm[k]||k))+'</span><b>'+by[k]+'</b><span class="bar" style="width:'+Math.max(4,Math.round(by[k]/max*100))+'%"></span></li>'; }).join('')+'</ul>':'<p class="muted" style="font-size:13px;margin:10px 0 0">Nothing drawn on OpenStreetMap under that name. Try the company’s short name, or an industry above.</p>')+'</div>';
   }
   function showDetail(f){
     var nm=names(), osm={n:'node',w:'way',r:'relation'}[f.i[0]]+'/'+f.i.slice(1);
@@ -15772,8 +15922,13 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   /* ---- a company: live, through the worker ---- */
   function stamp(feats){
     var need=feats.some(function(f){return !f.c||!f.pl;}); if(!need)return Promise.resolve(feats);
-    var p=NE?Promise.resolve(NE):fetch('/world/ne110.json').then(function(r){return r.json();}).then(function(j){ NE=j.countries; NE.forEach(function(c){ var W=180,E=-180,S=90,N=-90; c.polys.forEach(function(poly){ poly[0].forEach(function(pt){ if(pt[0]<W)W=pt[0]; if(pt[0]>E)E=pt[0]; if(pt[1]<S)S=pt[1]; if(pt[1]>N)N=pt[1]; }); }); c.box=[W,S,E,N]; }); return NE; });
-    return Promise.all([p,loadPlaces()]).then(function(){ feats.forEach(function(f){ if(!f.c){ var cc=countryOf(f.lo,f.la); if(cc)f.c=cc; } if(!f.pl){ var pl=placeOf(f.la,f.lo,f.c); if(pl)f.pl=pl; } }); return feats; }).catch(function(){ return feats; });
+    return Promise.all([loadNE(),loadPlaces()]).then(function(){ feats.forEach(function(f){ if(!f.c){ var cc=countryOf(f.lo,f.la); if(cc)f.c=cc; } if(!f.pl){ var pl=placeOf(f.la,f.lo,f.c); if(pl)f.pl=pl; } }); return feats; }).catch(function(){ return feats; });
+  }
+  var neP=null;
+  function loadNE(){
+    if(NE)return Promise.resolve(NE); if(neP)return neP;
+    neP=fetch('/world/ne110.json').then(function(r){return r.json();}).then(function(j){ NE=j.countries; NE.forEach(function(c){ var W=180,E=-180,S=90,N=-90; c.polys.forEach(function(poly){ poly[0].forEach(function(pt){ if(pt[0]<W)W=pt[0]; if(pt[0]>E)E=pt[0]; if(pt[1]<S)S=pt[1]; if(pt[1]>N)N=pt[1]; }); }); c.box=[W,S,E,N]; }); return NE; }).catch(function(){ neP=null; NE=null; throw new Error('the country outlines did not load'); });
+    return neP;
   }
   function inRing(ring,x,y){ var inside=false; for(var i=0,j=ring.length-1;i<ring.length;j=i++){ var xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1]; if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)inside=!inside; } return inside; }
   function countryOf(lon,lat){ for(var i=0;i<NE.length;i++){ var b=NE[i].box; if(lon<b[0]||lon>b[2]||lat<b[1]||lat>b[3])continue; var polys=NE[i].polys; for(var k=0;k<polys.length;k++){ if(!inRing(polys[k][0],lon,lat))continue; var hole=false; for(var m=1;m<polys[k].length;m++)if(inRing(polys[k][m],lon,lat)){hole=true;break;} if(!hole)return NE[i].cc; } } return ''; }
@@ -16277,7 +16432,7 @@ header{background:var(--bg)}
     fetch(INVITE_WORKER+'/map/prefill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym})})
       .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
       .then(function(r){
-        if(!r.ok||!r.j){ if(st&&r.j&&r.j.error&&/access code/.test(r.j.error))st.textContent='Pre-fill needs an access code on this profile. Enter once through perceptfolio.com/enter/ and the terminal keeps it.'; return; }
+        if(!r.ok||!r.j){ if(st&&r.j&&r.j.error&&/access code/.test(r.j.error))st.textContent='Pre-fill needs an access code: Settings \u2192 Access code.'; return; }
         var cur=relationsFor(sym); if(cur.suppliers.length||cur.customers.length)return;   /* the person got there first */
         (r.j.suppliers||[]).forEach(function(x){ cur.suppliers.push({name:x.name,ticker:x.ticker||'',weight:x.weight||10,note:x.note||'',prefilled:true}); });
         (r.j.customers||[]).forEach(function(x){ cur.customers.push({name:x.name,ticker:x.ticker||'',weight:x.weight||10,note:x.note||'',prefilled:true}); });
