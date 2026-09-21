@@ -524,3 +524,22 @@ record arrive. Done and decided:
 Open, and for the operator before selling: the securities-attorney review of the terms (Q3), and
 an account-recovery path beyond "export a file" (today: sync for the operator, code sync for an
 invited profile).
+
+## 27. One account, two devices; the phone (2026-09-21, night)
+
+An account lives in the browser that made it, which is why a profile signed in on the phone was
+"no account with that email" on the computer. Now:
+
+- **A profile with an access code keeps its book under that code from its first sign-in** (code
+  sync on by default; the consent line is shown once; turning it off under Settings → Sync is
+  remembered). The operator's own devices keep using the sync key.
+- **Bring my account.** On a device that has no profile for the email, the sign-in form opens a
+  second step: enter the access code, and the terminal fetches the copy kept under it, checks the
+  email on that copy is the one typed, and makes the local profile with the password typed on
+  *this* device. No password ever leaves a device; the code is the proof of access, exactly as it
+  is at the door. Then code sync runs on this device too, so both stay in step (last write wins,
+  with the existing "newer copy on the other device" prompt).
+- **The phone (iPhone 13, 390 px).** Holdings and the watchlist are stacked rows (ticker and value,
+  verdict and gain, your call, the menu) instead of eleven columns that scrolled off the screen;
+  forms put two fields to a line; the filter row is a two-column grid; checkboxes stay small; the
+  Settings menu and the record footer wrap.
