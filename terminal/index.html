@@ -1019,6 +1019,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
           <label>Password</label>
           <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
         </div>
+        <label class="row" style="gap:8px;align-items:center;font-size:13px;color:var(--muted);margin:2px 0 12px"><input type="checkbox" id="stayIn" checked style="width:auto"> Stay signed in on this device</label>
         <button class="btn" style="width:100%" onclick="doLogin()">Sign in</button>
         <!-- Shown when the email has no profile on this device: the account is on another device
              and kept under its access code; the code brings it here and the password typed above
@@ -2895,6 +2896,7 @@ async function createProfile(){
     await fetch(base+'/invite?code='+encodeURIComponent(code),{method:'POST'});
   }catch(e){}
   toast('Account created. Logging in…');
+  try{ localStorage.setItem('pf_last_email',email); localStorage.setItem('pf_user',email); }catch(e){}
   await finishLogin(email);
 }
 /* ================= THE TEST ACCOUNT =================
@@ -2996,7 +2998,15 @@ async function doLogin(){
   const p=DB.profiles[email];
   if(p.pinHash&&!(await pwVerify(pw,p.pinHash)))return toast('Wrong password.');
   if(p.pinHash&&!p.pinHash.startsWith('pbkdf2$')){ p.pinHash=await pwHash(pw); persistDB(); }   // upgrade a legacy hash
+  rememberDevice(email);
   await finishLogin(email);
+}
+/* "Stay signed in on this device": the email is kept on the device and the next visit opens
+   straight into the account, the way a phone app does. Signing out forgets it. Unticked, the
+   sign-in lasts the tab. The password itself is never stored anywhere but as its hash. */
+function rememberDevice(email){
+  const box=document.getElementById('stayIn');
+  try{ localStorage.setItem('pf_last_email',email); if(!box||box.checked)localStorage.setItem('pf_user',email); else localStorage.removeItem('pf_user'); }catch(e){}
 }
 /* ================= ACCESS CHECK-IN =================
 
@@ -3127,6 +3137,7 @@ async function bringAccount(){
   syncCfg={url:INVITE_WORKER,code:code};
   try{ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); localStorage.setItem('pf_door_code',code); }catch(e){}
   say('');
+  rememberDevice(email);
   toast('Your account is on this device now, and kept in step under your code.');
   await finishLogin(email);
 }
@@ -3582,7 +3593,7 @@ function removeClient(email){
   renderClientsList();
   toast('Client removed.');
 }
-function logout(){saveDB();USER=null;D=null;bizContext=null;sessionStorage.removeItem('qf_user');location.reload();}
+function logout(){saveDB();USER=null;D=null;bizContext=null;sessionStorage.removeItem('qf_user');try{ localStorage.removeItem('pf_user'); }catch(e){}location.reload();}
 /* Settings > Access code. Saved on the profile record (p.code) and, for this device, beside the
    door's own copy; the four model helpers read either. Checked against the worker so the status
    says whether the code is live rather than merely well-formed. */
@@ -3756,7 +3767,7 @@ function deleteProfile(){
   /* Session state is cleared here rather than left to logout(), which saves on the way out and
      would try to write a profile that no longer exists. */
   USER=null; D=null; bizContext=null;
-  try{ sessionStorage.removeItem('qf_user'); }catch(e){}
+  try{ sessionStorage.removeItem('qf_user'); localStorage.removeItem('pf_user'); }catch(e){}
   location.reload();
 }
 
@@ -15631,9 +15642,11 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   });
 }
 (function(){
-  const u=sessionStorage.getItem('qf_user');
-  if(u&&DB.profiles[u]&&!DB.profiles[u].pinHash){
-    document.getElementById('loginEmail').value=u;
+  let remembered=null, last=null; try{ remembered=localStorage.getItem('pf_user'); last=localStorage.getItem('pf_last_email'); }catch(e){}
+  const u=sessionStorage.getItem('qf_user')||remembered;
+  const emailEl=document.getElementById('loginEmail');
+  if(emailEl&&!emailEl.value&&(u||last))emailEl.value=u||last;
+  if(u&&DB.profiles[u]&&(remembered===u||!DB.profiles[u].pinHash)){
     finishLogin(u);
   }
   setCalcMode('normal');calcRender();
