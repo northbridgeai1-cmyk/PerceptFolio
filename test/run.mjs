@@ -466,8 +466,17 @@ t('a paused code is refused on both lookup paths',
   /return rec\.paused \? null : rec/.test(worker));
 t('macro data is gated on a live grant, not the sync key',
   /Macro data needs a live invite code, or the sync key/.test(worker));
-t('the FRED series allowlist is closed',
-  /FRED_ALLOWED = new Set\(\['VIXCLS', 'SP500', 'WILL5000PR', 'GDP'\]\)/.test(worker));
+t('the FRED series allowlist is closed: four statistics and three rates',
+  /FRED_ALLOWED = new Set\(\['VIXCLS', 'SP500', 'WILL5000PR', 'GDP', 'DFF', 'DGS2', 'DGS10'\]\)/.test(worker));
+/* Earnings dates: one calendar for the whole market, a day at a time, behind the same door as
+   macro data; on the screen they are context, never a signal. */
+t('the earnings calendar is one call a day for everybody', /const ck = 'earn:' \+ today;/.test(worker) && /expirationTtl: 86400/.test(worker.slice(worker.indexOf("'/earnings'"))));
+t('it is reduced to symbol and date before it is stored', /next\[sym\] = \{ d, h: r\.hour \|\| '' \}/.test(worker));
+t('it needs a live code or the sync key', /Earnings dates need a live invite code, or the sync key\./.test(worker));
+t('the terminal keeps the calendar for the day', /localStorage\.setItem\('pf_earn_v1'/.test(term) && /c\.asOf===today&&c\.next/.test(term));
+t('a recorded call carries the next earnings date it knew about', /earningsAt:\(typeof nextEarnings==='function'&&nextEarnings\(sym\)\)\?nextEarnings\(sym\)\.d:null/.test(term));
+t('the date is printed on the holding and watchlist rows', /earningsCell\(h\.sym\)/.test(term) && /earningsCell\(s\)/.test(term));
+t('the rates line never feeds a verdict', /function renderRates\(data\)/.test(term) && !/renderRates\([^)]*\)[^\n]*levels\.push/.test(term));
 t('a paused grant loses macro data too', /return rec\.paused \? null : rec/.test(worker));
 t('the terminal presents its invite code when it has no sync key',
   /codeParam=syncConfigured\(\)\?'':'&code='/.test(term));
@@ -1291,7 +1300,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v118/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v119/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
@@ -1487,7 +1496,7 @@ t('the sign-in toggle is an underline, not a box', /\.auth-switch button\.on\{ba
 t('no rounded frame is drawn around a table', !/border:1px solid var\(--border\);border-radius:(9|10)px;overflow:hidden/.test(term));
 /* The door keeps the code it was opened with, for a profile that has none of its own. */
 t('the door keeps the code for the terminal', /localStorage\.setItem\('pf_door_code', payload\.code\)/.test(read('enter/enter.js')));
-t('every model helper, and the settings status, reads the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 5);
+t('every model helper, the settings status and the macro helpers read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 7);
 /* The greeting was chatbot furniture; a statement is headed by its date. */
 t('the dashboard and command screens are headed by the date', /function dateLine\(\)/.test(term) && !/'Good '\+period/.test(term));
 t('no headings are typed in Title Case',

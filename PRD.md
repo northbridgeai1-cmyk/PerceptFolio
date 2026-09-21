@@ -426,3 +426,29 @@ the moment its account has credit.
 Coverage is what the community has drawn. Fabs on Wikidata skew to the former Soviet Union; OSM
 carries TSMC, Samsung and Intel because people drew them. The page says "community-mapped,
 incomplete by nature" and shows the count and date, and that is the honest product.
+
+## 24. Earnings dates, rates, and the atlas (2026-09-21)
+
+A council (Architect, Skeptic, Pragmatist, Critic) reviewed a "build your own Bloomberg" checklist
+(real-time ticks, fundamentals and news APIs, a Streamlit/Electron front end, TradingView charts,
+mnemonic commands, a filings summariser). Verdict, four to nothing: decline it. The product is the
+graded record; nothing on that list creates a graded call, the free tiers forbid commercial
+redistribution, and intraday data would break the record's unit of account, the close. One item
+passed the scope gate and is built:
+
+- **Earnings dates.** The worker's `/earnings` asks Finnhub's calendar for the whole market once a
+  day (a sixty-day window, reduced to symbol → next date, cached in KV a day) behind the same door
+  as macro data. The terminal keeps it for the day. It prints on every holding and watchlist row
+  ("Earnings 17 Nov (after close)"), lists the fortnight's prints under Marks on the Command
+  screen, and stamps `earningsAt` on every recorded call. Context, never a signal.
+- **Rates.** DFF, DGS2 and DGS10 join the FRED allowlist; Market weather prints Fed funds, the
+  two-year, the ten-year, the three-month change in each and the 2s10s spread. Never an input to
+  a verdict. (The worker's FRED key was found invalid on 2026-09-21; the line says so until it is
+  replaced.)
+
+The World tab gained an atlas the same day: every border as a hairline, every country's name at
+the centre of its largest piece (continents from space, small countries as they fill the view),
+every town over fifty thousand people as it comes into range, and a country filter: click a
+country on the globe or in the legend and the set narrows to what it has there; click again to
+widen. `scripts/world-clean.mjs` drops the food, drink and farm plants a name regex let into the
+industry layers (280 of 29,535), and runs after every monthly extract.

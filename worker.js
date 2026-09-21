@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-20.7';
+const WORKER_VERSION = '2026-09-21.1';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -559,8 +559,44 @@ async function handle(request, env) {
      THE SAME REASONING DOES NOT EXTEND TO /finnhub, which is why that route was left alone: it is
      per-ticker and per-user against a 60-per-minute shared quota, so a handful of invited users
      calling it would exhaust the limit and break market data for everybody including the operator. */
+  /* ---- GET /earnings?code= -> the next earnings date for every US-listed symbol, cached a day ----
+     Finnhub's calendar answers one window for the whole market, so this costs one call a day for
+     everybody rather than one per holding per device. Reduced to {symbol: "YYYY-MM-DD"} before it
+     is stored (the raw answer carries estimates nobody here uses). The date is context on a row
+     and on a recorded call; it is never a signal. Same door as /fred: the operator's key, or a
+     live invite code. */
+  if (url.pathname === '/earnings') {
+    const authE = request.headers.get('Authorization') || '';
+    const tokE = authE.startsWith('Bearer ') ? authE.slice(7) : '';
+    let okE = !!(tokE && env.SYNC_SECRET && safeEqual(tokE, env.SYNC_SECRET));
+    if (!okE) okE = !!(await activeGrant(clean(url.searchParams.get('code'), 12).toUpperCase()));
+    if (!okE) return json({ error: 'Earnings dates need a live invite code, or the sync key.' }, 401, env);
+    if (!env.FINNHUB_API_KEY) return json({ error: 'Worker is missing FINNHUB_API_KEY.' }, 500, env);
+    const today = new Date().toISOString().slice(0, 10);
+    const ck = 'earn:' + today;
+    const hit = await env.PF_SYNC.get(ck);
+    if (hit) return json(Object.assign(JSON.parse(hit), { cached: true }), 200, env);
+    const to = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+    let res;
+    try { res = await fetch('https://finnhub.io/api/v1/calendar/earnings?from=' + today + '&to=' + to + '&token=' + env.FINNHUB_API_KEY); }
+    catch (e) { return json({ error: 'Could not reach Finnhub: ' + (e && e.message ? e.message : String(e)) }, 502, env); }
+    if (!res.ok) return json({ error: 'Finnhub answered ' + res.status + ' for the earnings calendar.' }, 502, env);
+    let body; try { body = await res.json(); } catch (e) { return json({ error: 'Finnhub sent something other than JSON.' }, 502, env); }
+    const next = {};
+    for (const r of (body && body.earningsCalendar) || []) {
+      const sym = String(r.symbol || '').toUpperCase(), d = String(r.date || '');
+      if (!/^[A-Z.\-]{1,10}$/.test(sym) || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+      if (!next[sym] || d < next[sym].d) next[sym] = { d, h: r.hour || '' };
+    }
+    const out = { asOf: today, from: today, to, count: Object.keys(next).length, next };
+    if (out.count) await env.PF_SYNC.put(ck, JSON.stringify(out), { expirationTtl: 86400 });
+    return json(out, 200, env);
+  }
+
   if (url.pathname === '/fred') {
-    const FRED_ALLOWED = new Set(['VIXCLS', 'SP500', 'WILL5000PR', 'GDP']);
+    /* Four market statistics, and three rates: the Fed funds effective rate, the two-year and the
+       ten-year Treasury yields, so the Market tab can print the curve beside the valuation figures. */
+    const FRED_ALLOWED = new Set(['VIXCLS', 'SP500', 'WILL5000PR', 'GDP', 'DFF', 'DGS2', 'DGS10']);
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
     let allowed = safeEqual(tok0, env.SYNC_SECRET);
