@@ -1751,10 +1751,10 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <div class="section-title">Market weather. Long-run valuation</div>
   <div id="weatherVerdict" style="margin-bottom:14px"></div>
   <div id="ratesLine" style="margin:0 0 16px"></div>
-  <div class="section-title">Business cycle</div>
+  <div class="section-title">Economic cycle</div>
   <div class="card">
     <div class="row" style="margin-bottom:8px">
-      <input id="cycleQ" list="cycleAreas" placeholder="Country or area" style="max-width:260px" autocomplete="off" onchange="setCycleArea()" onkeydown="if(event.key==='Enter')setCycleArea()">
+      <input id="cycleQ" list="cycleAreas" placeholder="Country: Ecuador, Japan, G7…" style="max-width:280px" autocomplete="off" onchange="setCycleArea()" onkeydown="if(event.key==='Enter')setCycleArea()">
       <datalist id="cycleAreas"></datalist>
     </div>
     <div id="cycleBox"></div>
@@ -12917,49 +12917,97 @@ function loadCycle(){
   }).catch(()=>{ cycleLoading=null; return null; });
   return cycleLoading;
 }
+/* The OECD's leading indicator: level against 100 and the three-month change give the phase it
+   points to, six to nine months out. Kept for the twenty-two areas it covers, as the "ahead" dot. */
 function cyclePhase(months){
   if(!months||months.length<4)return null;
   const last=months[months.length-1], prev=months[months.length-4];
   const dev=last[1]-100, slope=last[1]-prev[1];
-  const phase=dev>=0?(slope>=0?'Expansion':'Slowdown'):(slope>=0?'Recovery':'Contraction');
-  /* The point on the wave: a state (level, slope) is a phase angle; the wave is y=sin t with
-     recovery on the rise below the line, expansion above it, slowdown past the peak, contraction
-     below on the way down. A typical amplitude is a point or two, a typical quarter's move half a
-     point, so those are the units. */
-  const theta=Math.atan2(slope/0.5,dev/1.0); let tt=Math.PI/2-theta; while(tt<-Math.PI/2)tt+=2*Math.PI; while(tt>=3*Math.PI/2)tt-=2*Math.PI;
-  return {level:last[1],month:last[0],dev,slope,phase,t:tt};
+  return Object.assign({level:last[1],month:last[0],dev,slope},phaseOf(dev/1.0,slope/0.5));
+}
+/* A state (how far from trend, which way it is moving) is a point on the wave. Rising phases sit
+   on the climb from the trough to the second peak, falling phases on the descent from the first
+   peak to the trough, so every dot lands between the diagram's two peaks. */
+function phaseOf(devN,slopeN){
+  const phase=devN>=0?(slopeN>=0?'Expansion':'Past the peak'):(slopeN>=0?'Past the trough':'Contraction');
+  let tt=Math.PI/2-Math.atan2(slopeN,devN);
+  while(tt<-Math.PI/2)tt+=2*Math.PI; while(tt>=3*Math.PI/2)tt-=2*Math.PI;
+  if(tt<Math.PI/2)tt+=2*Math.PI;               /* rising: onto the second climb */
+  return {phase,t:tt};
+}
+/* Every country: the IMF's real GDP growth. This year's growth against the country's own trend
+   (the median of the past ten years, the pandemic swing left out), and the change from last year,
+   give where it sits; next year's projection gives where the Fund expects it to be. */
+function imfPhase(c,year){
+  if(!c||!c.g)return null;
+  const g=c.g, now=g[year]!=null?year:(g[year-1]!=null?year-1:null); if(now==null)return null;
+  const hist=[]; for(let y=now-10;y<now;y++){ if(y===2020||y===2021)continue; if(g[y]!=null)hist.push(g[y]); }
+  if(hist.length<4)return null;
+  const s=hist.slice().sort((a,b)=>a-b), trend=s[Math.floor(s.length/2)];
+  const mean=hist.reduce((a,b)=>a+b,0)/hist.length, sd=Math.max(0.8,Math.sqrt(hist.reduce((a,b)=>a+(b-mean)*(b-mean),0)/hist.length));
+  const cur=g[now], prev=g[now-1]!=null?g[now-1]:cur, next=g[now+1];
+  const here=phaseOf((cur-trend)/sd,(cur-prev)/sd);
+  const ahead=next!=null?Object.assign({g:next,year:now+1},phaseOf((next-trend)/sd,(next-cur)/sd)):null;
+  return {year:now,g:cur,prev,trend,sd,phase:here.phase,t:here.t,ahead};
+}
+function cycleCountries(){
+  const out={}; if(!CYCLE)return out;
+  Object.entries((CYCLE.imf&&CYCLE.imf.countries)||{}).forEach(([k,c])=>{ out[k]={name:c.name,imf:c,oecd:CYCLE.areas&&CYCLE.areas[k]||null}; });
+  Object.entries(CYCLE.areas||{}).forEach(([k,a])=>{ if(!out[k])out[k]={name:a.name,imf:null,oecd:a}; });
+  return out;
 }
 function cycleAreaFor(text){
-  if(!CYCLE)return null; const q=String(text||'').trim().toLowerCase(); if(!q)return null;
-  const keys=Object.keys(CYCLE.areas);
-  return keys.find(k=>k.toLowerCase()===q)||keys.find(k=>CYCLE.areas[k].name.toLowerCase()===q)||keys.find(k=>CYCLE.areas[k].name.toLowerCase().indexOf(q)===0)||keys.find(k=>CYCLE.areas[k].name.toLowerCase().indexOf(q)>=0)||null;
+  const all=cycleCountries(), q=String(text||'').trim().toLowerCase(); if(!q)return null;
+  const keys=Object.keys(all), nm=k=>all[k].name.toLowerCase();
+  return keys.find(k=>k.toLowerCase()===q)||keys.find(k=>nm(k)===q)||keys.find(k=>nm(k).indexOf(q)===0)||keys.find(k=>nm(k).indexOf(q)>=0)||null;
 }
-function setCycleArea(){ const el=document.getElementById('cycleQ'); if(!el)return; const k=cycleAreaFor(el.value); if(k){ try{ localStorage.setItem('pf_cycle_area',k); }catch(e){} renderCycle(); } else { const st=document.getElementById('cycleNote'); if(st)st.textContent='Not one of the '+(CYCLE?Object.keys(CYCLE.areas).length:22)+' areas the OECD covers.'; } }
+function setCycleArea(){ const el=document.getElementById('cycleQ'); if(!el)return; const k=cycleAreaFor(el.value); if(k){ try{ localStorage.setItem('pf_cycle_area',k); }catch(e){} renderCycle(); } else { const st=document.getElementById('cycleNote'); if(st)st.textContent='Not a country the IMF or the OECD covers.'; } }
 function renderCycle(){
   const box=document.getElementById('cycleBox'); if(!box)return;
   loadCycle().then(j=>{
     const note=document.getElementById('cycleNote'), list=document.getElementById('cycleAreas');
-    if(!j){ box.innerHTML=''; if(note)note.textContent=(!syncConfigured()&&!accessCodeFor(USER))?'Needs an access code: Settings \u2192 Access code.':'The OECD indicator did not load.'; return; }
-    if(list&&!list.children.length)Object.keys(j.areas).sort((a,b)=>j.areas[a].name.localeCompare(j.areas[b].name)).forEach(k=>{ const o=document.createElement('option'); o.value=j.areas[k].name; list.appendChild(o); });
+    if(!j){ box.innerHTML=''; if(note)note.textContent=(!syncConfigured()&&!accessCodeFor(USER))?'Needs an access code: Settings → Access code.':'The cycle data did not load.'; return; }
+    const all=cycleCountries(), year=(j.imf&&j.imf.year)||new Date().getUTCFullYear();
+    if(list&&!list.children.length)Object.keys(all).sort((a,b)=>all[a].name.localeCompare(all[b].name)).forEach(k=>{ const o=document.createElement('option'); o.value=all[k].name; list.appendChild(o); });
     let key=null; try{ key=localStorage.getItem('pf_cycle_area'); }catch(e){}
-    if(!key||!j.areas[key])key=j.areas.USA?'USA':Object.keys(j.areas)[0];
-    const q=document.getElementById('cycleQ'); if(q&&document.activeElement!==q)q.value=j.areas[key].name;
-    const me=cyclePhase(j.areas[key].months); if(!me){ box.innerHTML=''; if(note)note.textContent='Not enough months for '+j.areas[key].name+'.'; return; }
-    const W=640,H=200,L=36,R=604,MID=104,AMP=58;
-    const X=tt=>L+(tt+Math.PI/2)/(2*Math.PI)*(R-L), Y=tt=>MID-AMP*Math.sin(tt);
-    let path=''; for(let i=0;i<=120;i++){ const tt=-Math.PI/2+i/120*2*Math.PI; path+=(i?'L':'M')+X(tt).toFixed(1)+' '+Y(tt).toFixed(1); }
-    const others=Object.keys(j.areas).filter(k=>k!==key).map(k=>({k,p:cyclePhase(j.areas[k].months)})).filter(x=>x.p);
-    const lab=(tt,txt,above)=>'<text x="'+X(tt).toFixed(0)+'" y="'+(above?MID-AMP-14:MID+AMP+22)+'" text-anchor="middle" font-size="12" fill="var(--muted)">'+txt+'</text>';
-    box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="auto" role="img" aria-label="'+esc(j.areas[key].name)+' on the business cycle">'+
-      '<line x1="'+L+'" y1="'+MID+'" x2="'+R+'" y2="'+MID+'" stroke="var(--border)" stroke-width="1"/>'+
-      '<path d="'+path+'" fill="none" stroke="var(--text)" stroke-width="1.5" opacity=".55"/>'+
-      lab(-Math.PI/4,'Recovery',false)+lab(Math.PI/4,'Expansion',true)+lab(3*Math.PI/4,'Slowdown',true)+lab(5*Math.PI/4,'Contraction',false)+
-      others.map(x=>'<circle cx="'+X(x.p.t).toFixed(1)+'" cy="'+Y(x.p.t).toFixed(1)+'" r="3.5" fill="var(--muted)" opacity=".45"><title>'+esc(j.areas[x.k].name)+' · '+x.p.level.toFixed(2)+' · '+x.p.phase+'</title></circle>').join('')+
-      '<circle cx="'+X(me.t).toFixed(1)+'" cy="'+Y(me.t).toFixed(1)+'" r="7" fill="var(--brand2)" stroke="var(--bg)" stroke-width="2"/>'+
-      '<text x="'+X(me.t).toFixed(1)+'" y="'+(Y(me.t)+(Math.sin(me.t)>=0?22:-13)).toFixed(1)+'" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--text)">'+esc(j.areas[key].name)+'</text>'+
+    if(!key||!all[key])key=all.USA?'USA':Object.keys(all)[0];
+    const me=all[key], q=document.getElementById('cycleQ'); if(q&&document.activeElement!==q)q.value=me.name;
+    const now=me.imf?imfPhase(me.imf,year):null, lead=me.oecd?cyclePhase(me.oecd.months):null;
+    const here=now||lead; if(!here){ box.innerHTML=''; if(note)note.textContent='Not enough data for '+me.name+'.'; return; }
+    /* The diagram: real GDP over time, a dashed trend, one and a half cycles of the wave, the
+       textbook's labels. Dots sit on the wave between the two peaks. */
+    const W=680,H=300,X0=48,X1=650,Y0=22,Y1=262,A=52;
+    const trendY=x=>Y1-30-(x-X0)/(X1-X0)*120;
+    const XT=tt=>X0+14+(tt/(3*Math.PI))*(X1-X0-24), YT=tt=>trendY(XT(tt))-A*Math.sin(tt);
+    let d=''; for(let i=0;i<=180;i++){ const tt=i/180*3*Math.PI; d+=(i?'L':'M')+XT(tt).toFixed(1)+' '+YT(tt).toFixed(1); }
+    const others=Object.keys(all).filter(k=>k!==key).map(k=>{ const c=all[k]; const p=c.imf?imfPhase(c.imf,year):(c.oecd?cyclePhase(c.oecd.months):null); return p?{k,name:c.name,p}:null; }).filter(Boolean);
+    const dot=(tt,r,fill,stroke,title)=>'<circle cx="'+XT(tt).toFixed(1)+'" cy="'+YT(tt).toFixed(1)+'" r="'+r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1.5">'+(title?'<title>'+esc(title)+'</title>':'')+'</circle>';
+    const arrow=(tt,label,dx,dy)=>{ const x=XT(tt),y=YT(tt),lx=x+dx,ly=y+dy; return '<line x1="'+lx.toFixed(1)+'" y1="'+(ly-4).toFixed(1)+'" x2="'+(x+(dx>0?3:-3)).toFixed(1)+'" y2="'+(y+(dy>0?4:-4)).toFixed(1)+'" stroke="var(--text)" stroke-width="1" marker-end="url(#cyArrow)"/><text x="'+lx.toFixed(1)+'" y="'+(ly+(dy>0?12:-6)).toFixed(1)+'" text-anchor="middle" font-size="12.5" fill="var(--text)">'+label+'</text>'; };
+    const aheadT=lead?lead.t:(now&&now.ahead?now.ahead.t:null);
+    box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="auto" role="img" aria-label="'+esc(me.name)+' on the economic cycle">'+
+      '<defs><marker id="cyArrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--text)"/></marker></defs>'+
+      '<line x1="'+X0+'" y1="'+Y1+'" x2="'+X0+'" y2="'+Y0+'" stroke="var(--text)" stroke-width="1.2" marker-end="url(#cyArrow)"/>'+
+      '<line x1="'+X0+'" y1="'+Y1+'" x2="'+(X1+14)+'" y2="'+Y1+'" stroke="var(--text)" stroke-width="1.2" marker-end="url(#cyArrow)"/>'+
+      '<text transform="translate(16 '+((Y0+Y1)/2)+') rotate(-90)" text-anchor="middle" font-size="12.5" fill="var(--text)">Real GDP</text>'+
+      '<text x="'+(X1+8)+'" y="'+(Y1+18)+'" text-anchor="end" font-size="12.5" fill="var(--text)">Time</text>'+
+      '<line x1="'+(X0+8)+'" y1="'+trendY(X0+8).toFixed(1)+'" x2="'+(X1-4)+'" y2="'+trendY(X1-4).toFixed(1)+'" stroke="var(--text)" stroke-width="1.2" stroke-dasharray="5 4"/>'+
+      '<path d="'+d+'" fill="none" stroke="#3b7dd8" stroke-width="2.2"/>'+
+      '<text x="'+XT(Math.PI/2).toFixed(1)+'" y="'+(YT(Math.PI/2)-12).toFixed(1)+'" text-anchor="middle" font-size="13" fill="var(--text)">Peak</text>'+
+      '<text x="'+XT(5*Math.PI/2).toFixed(1)+'" y="'+(YT(5*Math.PI/2)-12).toFixed(1)+'" text-anchor="middle" font-size="13" fill="var(--text)">Peak</text>'+
+      '<text x="'+XT(3*Math.PI/2).toFixed(1)+'" y="'+(YT(3*Math.PI/2)+20).toFixed(1)+'" text-anchor="middle" font-size="13" fill="var(--text)">Trough</text>'+
+      arrow(Math.PI+0.35,'Contraction',-54,44)+arrow(2*Math.PI-0.3,'Expansion',58,44)+
+      others.map(x=>dot(x.p.t,3.2,'var(--muted)','none',x.name+' · '+x.p.phase)).join('')+
+      (aheadT!=null?'<line x1="'+XT(here.t).toFixed(1)+'" y1="'+YT(here.t).toFixed(1)+'" x2="'+XT(aheadT).toFixed(1)+'" y2="'+YT(aheadT).toFixed(1)+'" stroke="var(--brand2)" stroke-width="1" stroke-dasharray="2 3"/>'+dot(aheadT,6,'var(--bg)','var(--brand2)','ahead'):'')+
+      dot(here.t,7.5,'var(--brand2)','var(--bg)',me.name)+
+      '<text x="'+XT(here.t).toFixed(1)+'" y="'+(YT(here.t)+(Math.sin(here.t)>=0?24:-14)).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text)">'+esc(me.name)+'</text>'+
       '</svg>';
-    const when=new Date(me.month+'-15').toLocaleDateString(undefined,{month:'short',year:'numeric'});
-    if(note)note.innerHTML='<b>'+esc(j.areas[key].name)+'</b> \u00b7 indicator '+me.level.toFixed(2)+' ('+esc(when)+') \u00b7 '+(me.slope>=0?'+':'\u2212')+Math.abs(me.slope).toFixed(2)+' over three months \u00b7 <b class="'+(me.phase==='Expansion'||me.phase==='Recovery'?'pos':'warn')+'">'+me.phase+'</b><span class="muted"> \u00b7 OECD composite leading indicator, built to lead turning points by six to nine months; grey dots are the other areas</span>';
+    const pct=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(1)+'%';
+    let line='<b>'+esc(me.name)+'</b>';
+    if(now){ line+=' · growth '+pct(now.g)+' in '+now.year+', trend '+pct(now.trend)+', '+(now.g>=now.prev?'up':'down')+' from '+pct(now.prev)+' · <b class="'+(/Expansion|trough/.test(now.phase)?'pos':'warn')+'">'+now.phase+'</b>'; }
+    else if(lead){ line+=' · OECD indicator '+lead.level.toFixed(2)+' · <b>'+lead.phase+'</b>'; }
+    if(lead&&now)line+=' · ahead: OECD indicator '+lead.level.toFixed(2)+', '+(lead.slope>=0?'rising':'falling')+' → '+lead.phase.toLowerCase();
+    else if(now&&now.ahead)line+=' · ahead: IMF projects '+pct(now.ahead.g)+' in '+now.ahead.year+' → '+now.ahead.phase.toLowerCase();
+    if(note)note.innerHTML=line+'<span class="muted"> · IMF World Economic Outlook; the OECD leading indicator, where the area has one, is built to lead by six to nine months. Grey dots: every other country.</span>';
   });
 }
 

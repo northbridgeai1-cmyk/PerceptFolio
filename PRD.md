@@ -468,7 +468,14 @@ industry layers (280 of 29,535), and runs after every monthly extract.
   letters at least, on a word boundary, so "Chips" is never a ticker).
 - **Rates.** The line now carries the Fed's target range and its balance sheet (WALCL) with the
   three-month change, read as buying or selling bonds. It says why when it cannot show.
-- **Business cycle.** `/cycle` on the worker reads the OECD's composite leading indicator for
+- **Economic cycle (renamed and redrawn the same evening).** The card is the textbook diagram:
+  real GDP over time, a dashed trend, one and a half cycles with Peak, Trough, Contraction and
+  Expansion labelled. Every country the IMF covers (195, Ecuador included) is placed from the
+  World Economic Outlook: this year's real GDP growth against the country's own trend (the median
+  of its past ten years, the pandemic swing left out) and the change from last year; a hollow
+  "ahead" dot is the OECD leading indicator where the area has one, else the IMF's projection for
+  next year. The IMF answer is kept a week on the worker.
+- **Business cycle (first form).** `/cycle` on the worker reads the OECD's composite leading indicator for
   the twenty-two areas it covers (CSV; the SDMX-JSON answer for several areas comes back cut at
   about 24 KB), reduced to [month, value] and cached a day. The Market tab places a country on
   the cycle from its level against 100 and its three-month change (recovery, expansion, slowdown,
