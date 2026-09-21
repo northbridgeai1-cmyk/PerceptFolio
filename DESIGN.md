@@ -110,8 +110,11 @@ smooth scrolling. Hover transitions are 180ms on the same curve. Nothing else mo
 The terminal is set like a statement, not a dashboard template. One block, `<style id="v3-ledger">`,
 last in terminal/index.html, carries the whole decision and can be removed to revert it.
 
-- Ground: flat --bg, no ambient gradient. Panels are --panel with a 1px --border and a 4px radius;
-  no inset highlights, no drop shadows, no glow on the active tab.
+- Ground: flat --bg, no ambient gradient, and no boxes: a panel on the page is a 1px --border rule
+  above its content, on the page's own ground. Only what floats over the page (the add sheet, a
+  menu, the palette, a tooltip) keeps a background and an edge. No inset highlights, no drop
+  shadows, no glow on the active tab. Quiet buttons are a --panel2 fill, not an outline; the
+  sign-in toggle and the chart pickers are underlines.
 - Type: Archivo for the page heading (the date), section titles, the hero figure and the stat
   figures; the system stack for everything else; mono only for tickers, tables and code. Labels are
   sentence case, 12px, --muted. No uppercase monospace kickers anywhere.

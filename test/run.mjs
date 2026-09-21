@@ -1291,7 +1291,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v116/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v117/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
@@ -1477,7 +1477,17 @@ t('section titles and card headings are not uppercase monospace',
   /\.card h3,\.section-title,[^{]*\{font-family:inherit;text-transform:none;letter-spacing:0\}/.test(term));
 t('the sidebar labels are in sentence case', /#sidebar nav button\{font-size:13px;font-weight:500/.test(term));
 t('a pill is a coloured word, not a chip', /\.pill,\.pill-buy,\.pill-sell,\.pill-hold,\.pill-watch,\.pill-na\{background:transparent;padding:0/.test(term));
-t('a card inside a card is a row', /\.card \.card,\.card \.alert-item,\.card \.prob-box\{border:0;border-top:1px solid var\(--border\)/.test(term));
+t('a card inside a card is a row', /main \.card \.card,main \.card \.alert-item,main \.card \.prob-box\{border:0;border-top:1px solid var\(--border\)/.test(term));
+/* The second word from the operator was "squares". A panel on the page has no box at all; only
+   what floats over the page (a sheet, a menu) keeps an edge. */
+t('a panel is a rule, not a box', /main \.card\{background:transparent;border:0;border-top:1px solid var\(--border\);border-radius:0/.test(term));
+t('the sheet that floats over the page keeps its edge', /\.addwrap>\.card,\.addwrap\.open>\.card\{background:var\(--panel\);border:1px solid var\(--border\)/.test(term));
+t('the quiet button is a fill, not an outline', /\.btn-ghost,\.btn-danger\{border-color:transparent;background:var\(--panel2\)\}/.test(term));
+t('the sign-in toggle is an underline, not a box', /\.auth-switch button\.on\{background:transparent;color:var\(--text\);box-shadow:inset 0 -2px 0 var\(--text\)\}/.test(term));
+t('no rounded frame is drawn around a table', !/border:1px solid var\(--border\);border-radius:(9|10)px;overflow:hidden/.test(term));
+/* The door keeps the code it was opened with, for a profile that has none of its own. */
+t('the door keeps the code for the terminal', /localStorage\.setItem\('pf_door_code', payload\.code\)/.test(read('enter/enter.js')));
+t('every model helper falls back to the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 4);
 /* The greeting was chatbot furniture; a statement is headed by its date. */
 t('the dashboard and command screens are headed by the date', /function dateLine\(\)/.test(term) && !/'Good '\+period/.test(term));
 t('no headings are typed in Title Case',

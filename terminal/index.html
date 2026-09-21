@@ -4845,7 +4845,7 @@ function toggleCommandBar(show){
   bar.id='cmdBar';
   bar.style.cssText='position:fixed;inset:0;z-index:9995;background:rgba(6,7,9,.6);display:flex;align-items:flex-start;justify-content:center;padding:12vh 20px 20px';
   bar.addEventListener('click',e=>{if(e.target===bar)toggleCommandBar(false);});
-  bar.innerHTML='<div style="max-width:560px;width:100%;background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+  bar.innerHTML='<div style="max-width:560px;width:100%;background:var(--panel);border-top:1px solid var(--border);overflow:hidden">'+
     '<input id="cmdBarInput" autocomplete="off" spellcheck="false" placeholder="AAPL SCORE"'+
       ' style="width:100%;border:none;background:transparent;color:var(--text);font:15px/1.4 var(--mono);padding:15px 16px;outline:none">'+
     '<div style="border-top:1px solid var(--border);padding:11px 16px;font:11.5px/1.9 var(--mono);color:var(--muted)">'+
@@ -5084,7 +5084,7 @@ function renderMonthlyClose(){
       : 'What marked in '+label+' came in at <b class="neg">'+pts(c.st.expectancy)+'</b> per call across '+c.marked.length+'.';
   }
   el.style.display='block';
-  el.innerHTML='<div style="border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:16px 18px;margin-bottom:16px;background:var(--panel)">'+
+  el.innerHTML='<div style="border-left:3px solid var(--accent);padding:4px 0 4px 16px;margin-bottom:16px">'+
     '<div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">'+
       '<b style="font-size:15px">'+esc(label)+', closed</b>'+
       '<span style="flex:1"></span>'+
@@ -7182,7 +7182,7 @@ function aiSummaryHtml(sym){
         '</ol></details>'
     : '';
 
-  return '<div style="margin-top:12px;padding:13px 15px;background:var(--panel2);border:1px solid var(--border);border-radius:9px">'+
+  return '<div style="margin-top:12px;padding:4px 0 4px 14px;border-left:2px solid var(--border)">'+
     '<div style="font-size:14px;line-height:1.75">'+body+'</div>'+
     (readHtml?'<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
       '<span class="pill pill-na" style="font-size:10px">Read</span> '+
@@ -10125,8 +10125,8 @@ function renderAll(){
       return v?SIGNAL_RANK[v.key]:null;
     }
   };
-  updateSortHeaders('pfTh',pfSort,{sym:'Ticker',type:'Type',broker:'Broker',shares:'Shares',cost:'Avg Cost',price:'Price Now',value:'Market Value',
-    gl:(glMode()==='today'?'Today':'Total')+' Gain/Loss',signal:'Verdict'});
+  updateSortHeaders('pfTh',pfSort,{sym:'Ticker',type:'Type',broker:'Broker',shares:'Shares',cost:'Avg cost',price:'Price now',value:'Market value',
+    gl:(glMode()==='today'?'Today':'Total')+' gain/loss',signal:'Verdict'});
   applySort(filteredHoldings,pfSort,pfGetters).forEach(({h,i})=>{
     const p=h.price,val=(p??h.cost)*h.shares,gl=holdingGL(h);
     const glPct=holdingGLPct(h);
@@ -10199,7 +10199,7 @@ function renderAll(){
     momentum:x=>{const sc=D.analyses[x.s];return sc&&!sc.error?sc.mScore:null;},
     signal:x=>{const sc=D.analyses[x.s];const v=sc?verdictOf(sc,false):null;return v?SIGNAL_RANK[v.key]:null;}
   };
-  updateSortHeaders('wlTh',wlSort,{sym:'Ticker',price:'Share Price',quality:'Quality /12',pricescore:'Value /6',momentum:'Momentum /4',signal:'Verdict'});
+  updateSortHeaders('wlTh',wlSort,{sym:'Ticker',price:'Share price',quality:'Quality /12',pricescore:'Value /6',momentum:'Momentum /4',signal:'Verdict'});
   /* Grouping inserts a header row per list and repeats a ticker under every list it belongs to —
      a symbol in two lists genuinely appears twice, which is the honest rendering of "it is in
      both". Ungrouped is the flat view, one row per ticker. */
@@ -11826,7 +11826,7 @@ function sizingPanel(sym,fromCash,proposed){
       '<td class="muted" style="font-size:12px">'+note+'</td></tr>';
   };
   const over=isFinite(L.limit)&&proposed>L.limit+0.005;
-  return '<div style="margin-top:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+  return '<div style="margin-top:16px;border-top:1px solid var(--border);overflow:hidden">'+
     '<div style="padding:11px 16px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
       'How big should this be? <span class="muted" style="font-weight:400">Risk budget '+pol.riskPerTrade+'% of '+fmt$(L.total)+' = '+fmt$(L.budget)+'</span></div>'+
     '<div style="overflow-x:auto"><table><tbody>'+
@@ -14405,7 +14405,7 @@ function checkAuditHTML(winRaw){
   const extreme=withR.filter(p=>p.signal===null);
   const sorted=withR.slice().sort((a,b)=>Math.abs(b.r)-Math.abs(a.r));
   const fr=x=>(x>=0?'+':'')+x.toFixed(2);
-  return '<div style="margin-top:16px;border:1px solid var(--border);border-radius:9px;overflow:hidden">'+
+  return '<div style="margin-top:16px;border-top:1px solid var(--border);overflow:hidden">'+
     '<div style="padding:11px 15px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
       'Do the 22 checks predict anything · '+esc(winRaw)+'-day marks</div>'+
     '<div style="overflow-x:auto"><table><thead><tr>'+
@@ -14510,7 +14510,7 @@ function operatorMatrixHTML(winRaw){
         'which is evidence that the discretion is costing you.';
     }
   });
-  return '<div style="margin-top:16px;border:1px solid var(--border);border-radius:9px;overflow:hidden">'+
+  return '<div style="margin-top:16px;border-top:1px solid var(--border);overflow:hidden">'+
     '<div style="padding:11px 15px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
       'You against the checklist'+esc(winRaw==='since'?'':' \u00b7 '+winRaw+'-day marks')+'</div>'+
     '<div style="overflow-x:auto"><table><thead><tr>'+
@@ -14533,7 +14533,7 @@ function trackComparison(winRaw){
   const any=rows.filter(r=>r.s);
   if(any.length<2)return '';   // nothing to compare against yet
   const best=any.slice().sort((a,b)=>b.s.expectancy-a.s.expectancy)[0];
-  return '<div style="margin-top:16px;border:1px solid var(--border);border-radius:9px;overflow:hidden">'+
+  return '<div style="margin-top:16px;border-top:1px solid var(--border);overflow:hidden">'+
     '<div style="padding:11px 15px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
       'Three systems, same calls, same marks</div>'+
     '<div style="overflow-x:auto"><table><thead><tr>'+
@@ -15377,7 +15377,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       var card=document.getElementById('pfKeyCard');
       if(have){ if(card) card.remove(); return; }
       if(card) return;
-      card=document.createElement('div'); card.id='pfKeyCard'; card.className='card'; card.style.cssText='margin:14px 0 18px;padding:16px 18px';
+      card=document.createElement('div'); card.id='pfKeyCard'; card.className='card'; card.style.cssText='margin:14px 0 18px';
       card.innerHTML='<div style="font-weight:700;font-size:15px;margin-bottom:6px">Connect your free data key to see prices</div>'+
         '<div class="muted" style="font-size:13px;line-height:1.55">1. Create a free account at <b>finnhub.io/register</b> and copy the API key it shows.<br>2. Paste it here. It stays in this browser; nothing is sent to NorthBridge.</div>'+
         '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="pfKeyInput" placeholder="Finnhub API key" style="flex:1;min-width:220px;font-family:var(--mono)" autocomplete="off"><button type="button" class="btn btn-p btn-sm" id="pfKeySave">Save and refresh</button></div>';
@@ -15397,7 +15397,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
    panel says so; it is never a recommendation. */
 (function(){
   var HZ=[30,90,180];
-  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||''; }catch(e){ return ''; } }
+  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||localStorage.getItem('pf_door_code')||''; }catch(e){ return ''; } }
   function panel(){
     var host=document.getElementById('tab-projections'); if(!host||document.getElementById('pfModel'))return;
     var d=document.createElement('div'); d.id='pfModel'; d.className='card'; d.style.marginTop='16px';
@@ -15432,11 +15432,11 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
         if(!x.ok){
           out.innerHTML=(j&&j.configured===false)
             ? '<div class="mv-empty"><span class="dot"></span><div><b>Not connected yet</b></div></div>'
-            : '<div class="mv-empty"><span class="dot"></span><div><b>No answer</b><p>'+esc((j&&j.error)||'The model did not answer.')+'</p></div></div>';
+            : '<div class="mv-empty"><span class="dot"></span><div><b>No answer</b><p>'+esc((j&&j.error&&/access code/.test(j.error))?'This profile has no access code. Open perceptfolio.com/enter/ and enter with your code once; the terminal keeps it.':((j&&j.error)||'The model did not answer.'))+'</p></div></div>';
           return;
         }
         var end=j.path[j.path.length-1], pct=(end-j.last)/j.last*100, dir=pct>=0?'up':'down';
-        out.innerHTML='<canvas id="pfModelCv" style="width:100%;height:180px;display:block;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></canvas>'+
+        out.innerHTML='<canvas id="pfModelCv" style="width:100%;height:180px;display:block;border-bottom:1px solid var(--border);background:var(--bg)"></canvas>'+
           '<div class="mv-stats"><span>last <b>'+j.last.toFixed(2)+'</b></span><span>median at '+hz+'d <b class="'+(pct>=0?'pos':'neg')+'">'+end.toFixed(2)+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</b></span><span class="muted">band '+j.lo[j.lo.length-1].toFixed(2)+' to '+j.hi[j.hi.length-1].toFixed(2)+'</span><span class="muted">'+(j.cached?'cached today':'fresh')+'</span></div>'+
           '<div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-sm" id="pfModelRec" style="white-space:nowrap">Record as a '+hz+'-day '+(dir==='up'?'BUY':'SELL')+' call</button><span class="muted" style="font-size:12px">On the model track, marked against the index on its anniversary like every other call.</span></div>';
         draw(document.getElementById('pfModelCv'),j.last,j.path,j.lo,j.hi);
@@ -15459,7 +15459,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
    Finnhub's free profile, metrics and recommendation counts, a consensus target, and six short
    readings written by the model in the published frameworks of six investors, labelled as such. */
 (function(){
-  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||''; }catch(e){ return ''; } }
+  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||localStorage.getItem('pf_door_code')||''; }catch(e){ return ''; } }
   function fmt(v,kind){ if(v==null||!isFinite(v))return '–'; if(kind==='pct')return (v).toFixed(1)+'%'; if(kind==='x')return (+v).toFixed(1)+'×'; if(kind==='cap')return v>=1e6?'$'+(v/1e6).toFixed(2)+'T':v>=1e3?'$'+(v/1e3).toFixed(1)+'B':'$'+(+v).toFixed(0)+'M'; return (+v).toFixed(2); }
   var STANCE={favourable:'pos',cautious:'warn',unfavourable:'neg',insufficient:'muted'};
   function council(sym,host){
@@ -15486,7 +15486,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
         var bar=a&&total?'<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-top:8px"><i style="flex:'+(a.strongBuy+a.buy)+';background:var(--green)"></i><i style="flex:'+a.hold+';background:var(--yellow)"></i><i style="flex:'+(a.sell+a.strongSell)+';background:var(--red)"></i></div><div class="muted" style="font-size:12px;margin-top:6px;font-family:var(--mono)">'+(a.strongBuy+a.buy)+' buy · '+a.hold+' hold · '+(a.sell+a.strongSell)+' sell, '+total+' analysts, '+esc(a.period||'')+(f.targetMean?' · consensus target '+fmt(f.targetMean):'')+'</div>'+trend:'<div class="muted" style="font-size:12px;margin-top:8px">No analyst coverage in the free feed.</div>';
         var rows=[['Market cap',fmt(f.marketCap,'cap')],['P/E (TTM)',fmt(f.pe,'x')],['Forward P/E',fmt(f.forwardPe,'x')],['EV/EBITDA',fmt(f.evEbitda,'x')],['P/S',fmt(f.ps,'x')],['P/B',fmt(f.pb,'x')],['Gross margin',fmt(f.grossMargin,'pct')],['Operating margin',fmt(f.opMargin,'pct')],['Net margin',fmt(f.netMargin,'pct')],['ROE',fmt(f.roe,'pct')],['Revenue growth',fmt(f.revGrowth,'pct')],['EPS growth',fmt(f.epsGrowth,'pct')],['EPS (TTM)',fmt(f.eps)],['Debt/equity',fmt(f.debtEquity)],['Current ratio',fmt(f.currentRatio)],['Dividend yield',fmt(f.divYield,'pct')],['Beta',fmt(f.beta)],['52-week',fmt(f.low52)+' to '+fmt(f.high52)]];
         var grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;margin-top:12px">'+rows.map(function(r){return '<div style="border-top:1px solid var(--border);padding-top:6px"><div class="muted" style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase">'+r[0]+'</div><div style="font-family:var(--mono);font-size:14px;margin-top:2px">'+r[1]+'</div></div>';}).join('')+'</div>';
-        var lens=j.lenses?'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:16px">'+j.lenses.map(function(l){return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b style="font-size:13px">'+esc(l.name)+'</b><span class="'+(STANCE[l.stance]||'muted')+'" style="font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase">'+esc(l.stance||'')+'</span></div><p style="font-size:13px;line-height:1.55;margin:8px 0 0">'+esc(l.reading||'')+'</p><p class="muted" style="font-size:12px;line-height:1.5;margin:8px 0 0"><b>What would change this reading:</b> '+esc(l.whatWouldChangeMyMind||'')+'</p></div>';}).join('')+'</div>':'<p class="muted" style="font-size:13px;margin-top:12px">'+esc(j.note||'')+'</p>';
+        var lens=j.lenses?'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:16px">'+j.lenses.map(function(l){return '<div style="border-top:1px solid var(--border);padding:12px 0 4px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b style="font-size:13px">'+esc(l.name)+'</b><span class="'+(STANCE[l.stance]||'muted')+'" style="font-size:12px;font-weight:600">'+esc(l.stance||'')+'</span></div><p style="font-size:13px;line-height:1.55;margin:8px 0 0">'+esc(l.reading||'')+'</p><p class="muted" style="font-size:12px;line-height:1.5;margin:8px 0 0"><b>What would change this reading:</b> '+esc(l.whatWouldChangeMyMind||'')+'</p></div>';}).join('')+'</div>':'<p class="muted" style="font-size:13px;margin-top:12px">'+esc(j.note||'')+'</p>';
         box.innerHTML='<div class="mv-kicker">Company, analysts and six lenses</div>'+
           '<div style="margin-top:8px"><b style="font-size:15px">'+esc(f.name)+'</b> <span class="muted" style="font-size:13px">'+esc(f.industry||'')+(f.ipo?' · listed '+esc(String(f.ipo).slice(0,4)):'')+'</span>'+(f.web?' <a href="'+esc(f.web)+'" target="_blank" rel="noopener" style="font-size:12px">site</a>':'')+'</div>'+bar+grid+lens+
           '<p class="muted" style="font-size:12px;line-height:1.5;margin:14px 0 0">'+esc(j.disclaimer)+(j.cached?' Cached today.':'')+'</p>';
@@ -15621,7 +15621,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   var IDX=null, SET=null, viewer=null, points=null, NE=null, loadP=null, sat=null;
   function satFade(){ if(!viewer||!sat)return; var hgt=viewer.camera.positionCartographic.height, a=hgt>4e6?0:hgt<1.2e6?1:(4e6-hgt)/(4e6-1.2e6); if(Math.abs((sat.alpha||0)-a)<0.01&&sat.show===(a>0))return; sat.alpha=a; sat.show=a>0; viewer.scene.requestRender(); }
   function $(id){return document.getElementById(id);}
-  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||''; }catch(e){ return ''; } }
+  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||localStorage.getItem('pf_door_code')||''; }catch(e){ return ''; } }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function status(msg){ var s=$('wdStatus'); if(s)s.textContent=msg||''; }
   function names(){ return (IDX&&IDX.countries)||{}; }
@@ -15932,15 +15932,27 @@ input,select,textarea,.btn,.btn-add,.icon-btn,.btn-ghost,.btn-danger,.auth-switc
 [id^="gvBtn_"],[id^="grBtn_"]{border-width:0 0 2px;border-color:transparent;border-radius:0;background:transparent;padding:6px 2px;color:var(--muted)}
 [id^="gvBtn_"]:hover,[id^="grBtn_"]:hover{color:var(--text)}
 
-/* Surfaces. A panel is a hairline, not a lit slab; a panel inside a panel is a row. */
-.card{border-radius:var(--radius);box-shadow:none;background:var(--panel);transition:none}
-.card:hover{border-color:var(--border)}
-.card .card,.card .alert-item,.card .prob-box{border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;box-shadow:none;margin:0;padding:12px 0}
-.card .card:first-child,.card .alert-item:first-child{border-top:0;padding-top:0}
-.card .alert-item:last-child{padding-bottom:0}
-.card .list-rows{border:0;border-radius:0;background:transparent}
-.alert-item,.list-rows,.list-card,.list-head,.welcome-card,.research-card,.prob-box{border-radius:var(--radius);box-shadow:none}
-.research-card{border-left-width:1px;border-left-color:var(--border)}
+/* Surfaces. No boxes. A section is a rule, a heading and its content on the page's own ground;
+   the grid gaps and the rules do the grouping. Only things that float over the page (sheets,
+   menus, the palette, tooltips) keep a background and an edge. */
+main .card{background:transparent;border:0;border-top:1px solid var(--border);border-radius:0;padding:14px 0 22px;box-shadow:none;transition:none}
+main .card:hover{border-color:var(--border)}
+main .card .card,main .card .alert-item,main .card .prob-box{border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;margin:0;padding:12px 0}
+main .card .card:first-child,main .card .alert-item:first-child{border-top:0;padding-top:0}
+main .card .alert-item:last-child{padding-bottom:0}
+main .card .list-rows,.list-rows{border:0;border-top:1px solid var(--border);border-radius:0;background:transparent}
+.addwrap>.card,.addwrap.open>.card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:22px 24px}
+.alert-item{border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;margin:0;padding:12px 0}
+.list-card{border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;padding:12px 0}
+.list-card:hover{background:transparent;border-color:var(--border)}
+.list-card:hover .list-card-top{color:var(--text)}
+.list-head{border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;padding:0 0 14px}
+.welcome-card,.research-card,.prob-box{border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;padding:14px 0;box-shadow:none}
+.research-card{margin-bottom:0}
+.cmd-list{border:0;border-radius:0;background:transparent;overflow:visible}
+.cmd-row{padding:13px 0}
+.cmd-row:hover{background:transparent}
+.cmd-row:hover .cmd-sym{text-decoration:underline;text-underline-offset:.18em}
 .rec,.md{border:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0;background:transparent;padding:14px 0;margin-bottom:22px}
 .rec+.md,.md+.rec{border-top:0;margin-top:-22px}
 .rec-bar{border-radius:2px;border:0}
@@ -15957,8 +15969,29 @@ input,select,textarea,.btn,.btn-add,.icon-btn,.btn-ghost,.btn-danger,.auth-switc
 .research-badge{background:transparent;padding:0;font-family:inherit;font-size:12px}
 .empty{text-align:left;padding:12px 0;font-size:13px}
 .disclaimer{text-align:left;font-size:11.5px;padding:16px 0;margin-top:32px}
+/* Frames around drawn things go too; a globe and a treemap have their own edges. */
+#tab-world .wd-globe-wrap{border:0;border-radius:4px}
+#pfHeat .ht-map{border:0;border-radius:4px}
+#tab-world .wd-chip{border-color:transparent;background:var(--panel2)}
+#tab-world .wd-chip.on{border-color:var(--c)}
+/* Controls that were outlined squares: the quiet button, the icon button, the language switch
+   and the sign-in toggle become fills or underlines. The primary button stays a solid block. */
+.btn-ghost,.btn-danger{border-color:transparent;background:var(--panel2)}
+.btn-ghost:hover,.btn-danger:hover{border-color:transparent;background:var(--panel3)}
+[id^="gvBtn_"],[id^="grBtn_"],[id^="gvBtn_"]:hover,[id^="grBtn_"]:hover{background:transparent}
+/* A titled section already has its rule; the panel under it does not draw a second one. */
+.section-title+.card,.section-title+div>.card:first-child{border-top:0;padding-top:4px}
+.stat-row+.card{border-top:0;padding-top:4px}
+.btn-add{border-color:transparent;background:var(--panel2)}
+.btn-add:hover{border-color:transparent;background:var(--panel3)}
+.icon-btn{border-color:transparent;background:var(--panel2)}
+.icon-btn:hover{border-color:transparent;background:var(--panel3)}
+.icon-btn.open{border-color:transparent;color:var(--text);background:var(--panel3)}
+.lang-toggle{border:0;border-radius:0;font-family:inherit;font-size:13px;letter-spacing:0;gap:2px}
+.auth-switch{background:transparent;border:0;border-bottom:1px solid var(--border);border-radius:0;padding:0;gap:18px;margin-bottom:24px}
+.auth-switch button{flex:0 0 auto;padding:9px 0;border-radius:0;color:var(--muted)}
+.auth-switch button.on{background:transparent;color:var(--text);box-shadow:inset 0 -2px 0 var(--text)}
 /* The morning queue: the kind of item is a coloured word, not a coloured word and a dot. */
-.cmd-list{border-radius:var(--radius)}
 .cmd-dot{display:none}
 .cmd-kind{font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;width:60px}
 .cmd-score{font-family:inherit;font-size:12px}
@@ -16137,7 +16170,7 @@ input,select,textarea,.btn,.btn-add,.icon-btn,.btn-ghost,.btn-danger,.auth-switc
    the answer lands on the map labelled "model", weights rough, every row editable and deletable.
    A map the person has already touched is never overwritten. */
 (function(){
-  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||''; }catch(e){ return ''; } }
+  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||localStorage.getItem('pf_door_code')||''; }catch(e){ return ''; } }
   var asked={};
   window.prefillMap=function(sym){
     if(!sym||asked[sym])return; asked[sym]=true;
@@ -16147,7 +16180,7 @@ input,select,textarea,.btn,.btn-add,.icon-btn,.btn-ghost,.btn-danger,.auth-switc
     fetch(INVITE_WORKER+'/map/prefill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym})})
       .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
       .then(function(r){
-        if(!r.ok||!r.j){ if(st&&r.j&&r.j.error&&/access code/.test(r.j.error))st.textContent='Pre-fill needs a live access code.'; return; }
+        if(!r.ok||!r.j){ if(st&&r.j&&r.j.error&&/access code/.test(r.j.error))st.textContent='Pre-fill needs an access code on this profile. Enter once through perceptfolio.com/enter/ and the terminal keeps it.'; return; }
         var cur=relationsFor(sym); if(cur.suppliers.length||cur.customers.length)return;   /* the person got there first */
         (r.j.suppliers||[]).forEach(function(x){ cur.suppliers.push({name:x.name,ticker:x.ticker||'',weight:x.weight||10,note:x.note||'',prefilled:true}); });
         (r.j.customers||[]).forEach(function(x){ cur.customers.push({name:x.name,ticker:x.ticker||'',weight:x.weight||10,note:x.note||'',prefilled:true}); });
