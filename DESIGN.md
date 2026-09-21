@@ -127,6 +127,18 @@ last in terminal/index.html, carries the whole decision and can be removed to re
 - The sign-in screen shows the wordmark, the sentence and the form; the feature list stays on the
   landing page.
 
+## Paper (2026-09-21)
+
+The terminal's default is paper, not dark: a warm bone ground (#f4f1ea), ink text, hairlines in
+warm grey, one blue for links, green and red only for numbers that moved. Dark remains under
+Settings > Appearance and is kept only by a profile that chose it through the switch (the old
+default value does not count as a choice). Fields are underlines; quiet actions are underlined
+words; the one primary action on a screen is a solid ink button; the desktop sidebar is a list
+of words (icons remain on the collapsed rail and the phone). Nothing on the page is framed or
+filled; only what floats over it (sheets, menus, the palette, tooltips) has an edge. Section
+headings are Archivo 15px. No paragraph on screen says what a thing is for; empty states are
+one line; the folded notes are hidden (their text stays in the source).
+
 ## Browser surfaces
 
 Selection is --accent at .35. Scrollbars are --line2 thumbs on the page ground. Caret is --accent.

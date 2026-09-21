@@ -1291,7 +1291,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v117/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v118/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
@@ -1487,7 +1487,7 @@ t('the sign-in toggle is an underline, not a box', /\.auth-switch button\.on\{ba
 t('no rounded frame is drawn around a table', !/border:1px solid var\(--border\);border-radius:(9|10)px;overflow:hidden/.test(term));
 /* The door keeps the code it was opened with, for a profile that has none of its own. */
 t('the door keeps the code for the terminal', /localStorage\.setItem\('pf_door_code', payload\.code\)/.test(read('enter/enter.js')));
-t('every model helper falls back to the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 4);
+t('every model helper, and the settings status, reads the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 5);
 /* The greeting was chatbot furniture; a statement is headed by its date. */
 t('the dashboard and command screens are headed by the date', /function dateLine\(\)/.test(term) && !/'Good '\+period/.test(term));
 t('no headings are typed in Title Case',
@@ -1654,7 +1654,7 @@ t('password fields get a reveal toggle', /function initPasswordToggles/.test(ter
 /* The login form is on screen before any session exists, and those are the fields people type
    into most, so this cannot wait for enterSession. */
 t('and it runs before sign-in, not only after',
-  /DOMContentLoaded',\(\)=>\{try\{initPasswordToggles\(\)/.test(term));
+  /DOMContentLoaded',\(\)=>\{try\{applyTheme\(\);initPasswordToggles\(\)/.test(term));
 t('copy confirms on the button rather than silently', /btn\.textContent='Copied'/.test(term));
 t('copy falls back when the clipboard API is unavailable', /function fallbackCopy/.test(term));
 t('invite codes in the admin queue are copyable', /copyBtn\(r\.code\)/.test(admin));
@@ -1679,8 +1679,10 @@ t('and the screen says it too, with the arithmetic',
    rather than a shorter span relabelled. */
 t('a long window is served from the vendor calculation, not from waiting',
   /y5:  pick\(m,\['5YearPriceReturnDaily'/.test(term) && /source:'vendor'/.test(term));
-t('and says so when a five-year figure is simply not published',
-  /nothing is shown rather than a shorter span dressed up as five years/.test(term));
+/* The screen no longer explains this (the operator's instruction, 2026-09-21); the code still refuses
+   to stitch a shorter log into a five-year figure, which the vendor-only pin below covers. */
+t('and shows nothing rather than a shorter span dressed up as five years',
+  /<b>Nothing to rank over a '\+esc\(w\.label\)\+' yet\.<\/b>/.test(term));
 /* A hindsight ranking teaches only if it is next to what the system said at the time. */
 t('each row carries what the checklist said before the window opened',
   /function verdictBefore/.test(term) && /etDate\(c\.ts\)<=cutoffDate/.test(term));
@@ -1702,8 +1704,8 @@ t('a missing window falls back or is omitted, never inferred',
 /* A 59-session return under a "five years" heading is the same overclaim, just relocated. */
 t('the logged fallback must cover most of the window it is labelled with',
   /const need=Math\.max\(20,Math\.floor\(w\.days\*0\.8\)\)/.test(term));
-t('and the longest windows are vendor-only, which the empty state says',
-  /can only come from the vendor; it is never stitched together from a shorter log/.test(term));
+t('and the longest windows are vendor-only',
+  /y5:  pick\(m,\['5YearPriceReturnDaily'/.test(term) && !/y5:[^\n]*longSeries/.test(term));
 /* The reasoning is kept, folded shut rather than shouted. */
 t('it states its own falsification, in a collapsed note',
   /the checklist is not selecting winners/.test(term) &&
@@ -1744,7 +1746,7 @@ t('buttons that need the network are disabled with the reason, not left spinning
   /b\.title='Needs a connection\. You are offline\.'/.test(term) && /b\.textContent='Offline'/.test(term));
 t('and are restored with their original label', /b\.textContent=b\.dataset\.onlineLabel/.test(term));
 /* Empty states on the panels that were blank. */
-t('the analyzer says what it is before anything is analysed', /<b>Nothing analysed yet\.<\/b>/.test(term));
+t('the analyzer states its empty state in one line', /<div class="empty">Nothing analysed yet\.<\/div>/.test(term));
 t('the command tab explains what a review does', /<b>Nothing checked yet today\.<\/b>/.test(term));
 t('the audit shows a skeleton rather than a blank panel while it computes',
   /id="auditBody"[^>]*aria-busy="true"/.test(term));
