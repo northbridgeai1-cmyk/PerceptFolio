@@ -1030,6 +1030,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
           <button class="btn" style="width:100%" onclick="bringAccount()">Bring my account</button>
           <p class="muted" id="bringNote" style="font-size:12.5px;margin-top:8px;line-height:1.5"></p>
         </div>
+        <p class="muted" id="authStale" style="display:none;font-size:12.5px;margin-top:16px;line-height:1.5"></p>
       </div>
 
       <div id="authUp" style="display:none">
@@ -15659,6 +15660,20 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     finishLogin(u);
   }
   setCalcMode('normal');calcRender();
+})();
+/* Which copy is this? When the site cannot be reached (a network that blocks it, a plane), the
+   service worker serves the last copy it saved, silently, and a sign-in that fails on it looks
+   like a bug in the account rather than an old page. A HEAD to our own address tells them apart:
+   the worker never answers a HEAD from its cache, so a rejection means the server was not
+   reached, and the page says so instead of letting the old copy pass for the current one. */
+(function(){
+  if(location.protocol==='file:')return;
+  const el=document.getElementById('authStale'); if(!el)return;
+  fetch(location.pathname,{method:'HEAD',cache:'no-store'}).then(function(){},function(){
+    const msg=location.hostname+' cannot be reached from this network. This is the copy saved on this device; it may be out of date.';
+    el.textContent=msg; el.style.display='';
+    const app=document.getElementById('app'); if(app&&app.style.display!=='none'&&typeof toast==='function')toast(msg);
+  });
 })();
 </script>
 <script>
