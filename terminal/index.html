@@ -1391,9 +1391,9 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <select id="thesisSym" style="max-width:200px" onchange="loadThesis()"></select>
       <span class="muted" id="thesisStatus" style="font-size:12.5px"></span>
     </div>
-    <div class="field"><label>Why do we own it?</label><textarea id="thesisWhy" rows="2" placeholder="Durable advantage in X, strong free cash flow, reasonable price…" style="width:100%;background:transparent;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 0;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
-    <div class="field"><label>What must stay true?</label><textarea id="thesisMust" rows="2" placeholder="Margins stay above X. Revenue growth stays above Y. No major competitor displacement." style="width:100%;background:transparent;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 0;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
-    <div class="field"><label>What would make us sell?</label><textarea id="thesisInvalid" rows="2" placeholder="Quality score drops below 8. Margins compress two quarters running. Valuation exceeds X." style="width:100%;background:transparent;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 0;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <div class="field"><label>Why do we own it?</label><textarea id="thesisWhy" rows="2" placeholder="Durable advantage in X, strong free cash flow, reasonable price…" style="width:100%;background:var(--panel2);border:0;border-radius:12px;color:var(--text);padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <div class="field"><label>What must stay true?</label><textarea id="thesisMust" rows="2" placeholder="Margins stay above X. Revenue growth stays above Y. No major competitor displacement." style="width:100%;background:var(--panel2);border:0;border-radius:12px;color:var(--text);padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <div class="field"><label>What would make us sell?</label><textarea id="thesisInvalid" rows="2" placeholder="Quality score drops below 8. Margins compress two quarters running. Valuation exceeds X." style="width:100%;background:var(--panel2);border:0;border-radius:12px;color:var(--text);padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
     <div class="row">
       <div class="field" style="max-width:200px;margin-bottom:0"><label>Target price ($)</label><input id="thesisTarget" type="number" step="any" min="0" placeholder="where you think it goes" oninput="updatePlannedRR()"></div>
       <div class="field" style="max-width:200px;margin-bottom:0"><label>Stop price ($). Sell below</label><input id="thesisStop" type="number" step="any" min="0" placeholder="where you're wrong" oninput="updatePlannedRR()"></div>
@@ -1856,7 +1856,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
         <span class="muted" style="font-size:12px" id="weeklyPicksNote">A rotating batch of ~20 from the ~350-ticker built-in universe, minus anything already in your Portfolio or Watchlist. Refreshes on a weekly cycle, some names carry over, some rotate out. Instead of dumping the whole list at once. Still just fills the box below. Hit Run screen to actually score them.</span>
       </div>
     </div>
-    <textarea id="screenerInput" rows="3" placeholder="AAPL, MSFT, NVDA, JNJ, ..." style="width:100%;background:transparent;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:11px 13px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+    <textarea id="screenerInput" rows="3" placeholder="AAPL, MSFT, NVDA, JNJ, ..." style="width:100%;background:var(--panel2);border:0;border-radius:12px;color:var(--text);padding:11px 13px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
     <div class="row" style="margin-top:10px">
       <button class="btn" id="screenerStartBtn" onclick="startScreener()">Run screen</button>
       <button class="btn btn-danger" id="screenerStopBtn" onclick="stopScreener()" style="display:none">Stop</button>
@@ -16260,6 +16260,54 @@ header{background:var(--bg)}
   .btn{padding:10px 16px}
   .stat{padding:12px 0}
 }
+
+/* ===== Soft, 2026-09-21, later. "Everything is still square; it got worse." =====
+   The sharp corners of the paper pass were the wrong reading of the word. Nothing on the page
+   is a box, and what remains a shape is rounded: soft filled fields, rounded buttons, tiles
+   and frames, a round search field. The rules that cut the page into bands are gone too; space does the grouping,
+   and a section title keeps its one rule. */
+:root{--radius:12px}
+main .card{border-top:0;padding:0 0 6px}
+main .card+.card,.grid+.card,.card+.grid,.card+.section-title,.grid+.section-title{margin-top:30px}
+.section-title{margin-top:30px}
+.section-title+.card,.section-title+div>.card:first-child,.stat-row+.card{padding-top:0}
+.stat-row{border-top:0;border-bottom:0;padding:4px 0 0;margin-bottom:26px}
+.rec,.md{border-top:0;border-bottom:0;padding:6px 0}
+.rec+.md,.md+.rec{margin-top:-6px}
+main .card .card,main .card .alert-item,main .card .prob-box,.alert-item,.list-card,.welcome-card,.research-card,.prob-box,.list-rows,main .card .list-rows{border-top-color:var(--line)}
+.cmd-row,td,.list-row,.md-row{border-bottom-color:var(--line)}
+th{border-bottom-color:var(--border)}
+table thead th{background:transparent}
+.btn{border-radius:10px;padding:10px 20px}   /* rounded, not a pill: DESIGN.md keeps pills off buttons */
+.btn-sm{padding:7px 14px}
+input,select,textarea,#globalSearch,.prob-own input,#pfModel .mv-form input,#pfModel .mv-form select,#tab-world .wd-form input,.list-pick,.mycall
+  {border:0;border-radius:10px;background:var(--panel2);padding:9px 12px;box-shadow:none}
+input:focus,select:focus,textarea:focus,#globalSearch:focus,#tab-world .wd-form input:focus,.prob-own input:focus,#pfModel .mv-form input:focus,#pfModel .mv-form select:focus
+  {border:0;background:var(--panel2);box-shadow:0 0 0 2px var(--border);outline:none}
+input[type=checkbox],input[type=radio]{background:transparent;padding:0;border-radius:4px;box-shadow:none}
+textarea{border-radius:12px}
+select{padding-right:26px}
+.mycall{border:0;border-radius:999px;padding:5px 12px;max-width:110px;background:transparent;box-shadow:inset 0 0 0 1px currentColor}
+#globalSearch{padding-left:34px;border-radius:999px}
+.hd-search-ico{left:12px}
+.auth-switch{border-bottom:0}
+.theme-switch,.theme-knob{border-radius:999px}
+.avatar,.icon-btn{border-radius:999px}
+#pfHeat .ht-tile.ht-cell,#pfHeat .ht-sec{border-radius:10px}
+#pfHeat .ht-map{border-radius:12px}
+#pfHeat .ht-tile{border-color:transparent}
+#tab-world .wd-globe-wrap{border-radius:16px}
+.chart-box canvas{border-radius:12px}
+.rec-bar,.rec-bar i{border-radius:999px}
+.addwrap>.card,.addwrap.open>.card{border-radius:18px;border:0}
+.gs-panel,.ovf-menu{border-radius:14px}
+.disclaimer{border-top-color:var(--line)}
+#sidebar{border-right-color:var(--line)}
+header{border-bottom-color:var(--line)}
+.nav-sep{background:var(--line)}
+@media(max-width:600px){
+  .btn{padding:10px 18px}
+}
 </style>
 <script>
 /* Today's heat, in Market: the holdings as a treemap (size = value, colour = day change, from the
@@ -16302,6 +16350,7 @@ header{background:var(--bg)}
       '<div><div class="muted" style="margin-bottom:6px">Sectors</div><div class="ht-sectors" id="htSec"></div></div></div>'+
       '<div class="ht-note" id="htNote"></div>';
     var map=document.getElementById('htMap'), note=document.getElementById('htNote');
+    if(!hasKey&&MODE==='market'){ var grid=c.querySelector('.ht-grid'); if(grid)grid.outerHTML='<div class="empty">Needs the data key.</div>'; note.textContent=''; return; }
     if(MODE==='market'){
       var list=marketList(); if(!list.length){ map.innerHTML='<div class="empty" style="padding:24px 12px">No market list on this build.</div>'; }
       else list.forEach(function(sym){ var q=cache.quotes[sym]; var d=document.createElement('div'); d.className='ht-tile ht-cell'; d.style.background=colour(q?q.dp:null); d.title=sym+' · '+pctText(q?q.dp:null); d.innerHTML='<b>'+esc(sym)+'</b><span>'+pctText(q?q.dp:null)+'</span>'; d.onclick=function(){ if(typeof analyzeStock==='function')analyzeStock(sym); }; map.appendChild(d); });

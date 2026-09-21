@@ -139,6 +139,16 @@ filled; only what floats over it (sheets, menus, the palette, tooltips) has an e
 headings are Archivo 15px. No paragraph on screen says what a thing is for; empty states are
 one line; the folded notes are hidden (their text stays in the source).
 
+## Soft (2026-09-21, later)
+
+"Everything is still square; it got worse." The paper pass had set every radius to zero, which
+read as sharper, not calmer. Now nothing on the page is a box and nothing that remains a shape
+is sharp: fields are soft fills (--panel2, 10px), buttons are rounded (10px, not pills), the
+search field is round, tiles and frames are 10–16px, the switch and the avatar are circles. The
+rules that cut the page into bands are gone; space (30px) does the grouping and a section title
+keeps its one rule. Row hairlines use --line, a shade lighter than --border. A keyless heat map
+is one line, not fifty grey tiles.
+
 ## Browser surfaces
 
 Selection is --accent at .35. Scrollbars are --line2 thumbs on the page ground. Caret is --accent.
