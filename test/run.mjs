@@ -467,7 +467,9 @@ t('a paused code is refused on both lookup paths',
 t('macro data is gated on a live grant, not the sync key',
   /Macro data needs a live invite code, or the sync key/.test(worker));
 t('the FRED series allowlist is closed: four statistics and three rates',
-  /FRED_ALLOWED = new Set\(\['VIXCLS', 'SP500', 'WILL5000PR', 'GDP', 'DFF', 'DGS2', 'DGS10'\]\)/.test(worker));
+  /FRED_ALLOWED = new Set\(\['VIXCLS', 'SP500', 'GDP', 'DFF', 'DGS2', 'DGS10'\]\)/.test(worker));
+/* Wilshire withdrew WILL5000PR from FRED; asking for it prints an error on the Buffett card. */
+t('the terminal no longer asks FRED for the Wilshire 5000', !/need=\[[^\]]*'WILL5000PR'/.test(term));
 /* Earnings dates: one calendar for the whole market, a day at a time, behind the same door as
    macro data; on the screen they are context, never a signal. */
 t('the earnings calendar is one call a day for everybody', /const ck = 'earn:' \+ today;/.test(worker) && /expirationTtl: 86400/.test(worker.slice(worker.indexOf("'/earnings'"))));
@@ -1300,7 +1302,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v119/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v120/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
