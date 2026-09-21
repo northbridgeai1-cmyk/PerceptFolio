@@ -33,7 +33,22 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-22.2';
+const WORKER_VERSION = '2026-09-22.3';
+
+/* ---- The site's own addresses ----
+   ALLOWED_ORIGIN names the domain. The same deployment also answers at its Pages address, which is
+   where the owner had to go the day their own Wi-Fi blocked the domain, and the browser refused
+   every answer from here because the header named the other address: no prices, no sync. A request
+   from one of the site's own addresses gets that address in the header; anything else still gets
+   the configured one and is refused by the browser as before. env itself is not touched: the view
+   carries the origin for this request only. */
+const SITE_ORIGINS = /^https:\/\/(perceptfolio\.com|perceptfolio\.pages\.dev|[a-z0-9-]+\.perceptfolio\.pages\.dev)$/;
+function originView(env, request) {
+  const o = (request.headers.get('Origin') || '').trim();
+  const configured = (env.ALLOWED_ORIGIN || '').trim().replace(/\/+$/, '');
+  if (!o || o === configured || !SITE_ORIGINS.test(o)) return env;
+  return Object.assign(Object.create(env), { ALLOWED_ORIGIN: o });
+}
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -218,6 +233,7 @@ export default {
        unhandled exception produces Cloudflare's own error page, which has no CORS headers, and the
        browser reports a useless "Load failed" instead of what actually went wrong. */
     try {
+      env = originView(env, request);
       return await handle(request, env);
     } catch (err) {
       return json({ error: 'Worker crashed: ' + (err && err.message ? err.message : String(err)) }, 500, env);
@@ -494,7 +510,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/map/prefill']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/map/prefill']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -967,10 +983,47 @@ async function handle(request, env) {
      Anyone holding it can read this one portfolio blob — the same class of exposure as the invite
      itself, confined to the person's own data. It is NOT the operator's secret and grants nothing
      shared. */
+  /* TWO DEVICES A CODE (the owner's rule, 2026-09-22). A device names itself on every sync (a
+     random id the terminal keeps, and a label like "iPhone · Safari"); the first two under a code
+     are kept in udev:<code>, a third is refused with the list, and any holder of the code can
+     forget one from Settings, which is the same trust the code already carries. A sync that names
+     no device (the bring-my-account fetch, old builds) registers nothing and is not counted. The
+     seen stamp is written at most hourly a device, KV writes being the scarce thing. */
+  if (url.pathname === '/usync/devices' || url.pathname === '/usync/forget') {
+    let body = {};
+    if (request.method === 'POST') { try { body = await request.json(); } catch (e) { body = {}; } }
+    const code = clean(url.searchParams.get('code') || body.code, 12).toUpperCase();
+    if (!(await activeGrant(code))) return json({ error: 'Sync needs a live invite code.' }, 401, env);
+    const dk = 'udev:' + code;
+    let devs = []; try { devs = JSON.parse((await env.PF_SYNC.get(dk)) || '[]'); } catch (e) { devs = []; }
+    if (url.pathname === '/usync/forget' && request.method === 'POST') {
+      const id = clean(body.device, 40);
+      const left = devs.filter(d => d.id !== id);
+      if (left.length !== devs.length) await env.PF_SYNC.put(dk, JSON.stringify(left));
+      return json({ ok: true, devices: left, limit: 2 }, 200, env);
+    }
+    return json({ devices: devs, limit: 2 }, 200, env);
+  }
   if (url.pathname === '/usync') {
     const code = clean(url.searchParams.get('code'), 12).toUpperCase();
     if (!(await activeGrant(code))) {
       return json({ error: 'Sync needs a live invite code. If yours was paused, contact the person who issued it.' }, 401, env);
+    }
+    const device = clean(url.searchParams.get('device'), 40), dname = clean(url.searchParams.get('name'), 60);
+    if (device) {
+      const dk = 'udev:' + code;
+      let devs = []; try { devs = JSON.parse((await env.PF_SYNC.get(dk)) || '[]'); } catch (e) { devs = []; }
+      const mine = devs.find(d => d.id === device);
+      if (!mine) {
+        if (devs.length >= 2) {
+          return json({ error: 'This code keeps its book on two devices already. Forget one under Settings → Sync on a device that has it.', devices: devs, limit: 2 }, 409, env);
+        }
+        devs.push({ id: device, name: dname || 'a device', seen: Date.now() });
+        await env.PF_SYNC.put(dk, JSON.stringify(devs));
+      } else if (Date.now() - (mine.seen || 0) > 3600000 || (dname && dname !== mine.name)) {
+        mine.seen = Date.now(); if (dname) mine.name = dname;
+        await env.PF_SYNC.put(dk, JSON.stringify(devs));
+      }
     }
     const ukey = 'uslot:' + code;
     if (request.method === 'GET') {

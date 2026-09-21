@@ -1692,7 +1692,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <div class="card wd-intro">
     <h3>Where the plants are</h3>
     <div class="wd-form">
-      <input id="wdQ" placeholder="smart chip factories, or a company: TSMC" autocomplete="off" onkeydown="if(event.key==='Enter')wdSearch()">
+      <input id="wdQ" placeholder="a product, a company or a country: fish, TSMC, Ecuador" autocomplete="off" onkeydown="if(event.key==='Enter')wdSearch()">
       <button class="btn" onclick="wdSearch()">Show</button>
       <span class="muted" id="wdStatus" aria-live="polite"></span>
     </div>
@@ -1702,7 +1702,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="wd-globe-wrap">
       <div id="wdGlobe" aria-label="Globe"></div>
       <div class="wd-tip" id="wdTip" hidden></div>
-      <div class="wd-idle" id="wdIdle"><div class="mv-empty"><span class="dot"></span><div><b>Pick an industry, or type a company.</b></div></div></div>
+      <div class="wd-idle" id="wdIdle"><div class="mv-empty"><span class="dot"></span><div><b>Pick an industry, or type a product, a company or a country.</b></div></div></div>
     </div>
     <div class="wd-side">
       <div id="wdLegend"></div>
@@ -2240,10 +2240,9 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Sync across your devices</h3>
-    <div class="field"><label>Sync URL</label><input id="syncUrlInput" placeholder="https://perceptfolio-sync.yourname.workers.dev" autocomplete="off"></div>
-    <div class="field"><label>Sync key</label><input id="syncKeyInput" type="password" placeholder="The SYNC_SECRET you set in Cloudflare" autocomplete="off"></div>
+    <p class="muted" style="font-size:13px;margin:0 0 10px">Kept in step under your access code, on two devices.</p>
+    <div id="syncDevices"></div>
     <div class="row">
-      <button class="btn" onclick="saveSyncConfig()">Save &amp; connect</button>
       <button class="btn btn-ghost" onclick="syncNow()">Sync now</button>
       <button class="btn btn-ghost" onclick="syncPullForce()">Pull from cloud</button>
       <button class="btn btn-ghost" onclick="checkConnection()">Check connection</button>
@@ -3629,6 +3628,9 @@ async function saveAccessCode(){
   try{ localStorage.setItem('pf_door_code',v); }catch(e){}
   if(el)el.value='';
   if(st)st.textContent='Saved. Checking…';
+  /* The code is also how this device syncs; saving it here is enough. */
+  if(!syncActive()&&!syncBlockedReason()&&!(typeof isDemoUser==='function'&&isDemoUser())){ syncCfg={url:INVITE_WORKER,code:v}; try{ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); }catch(e){} try{ syncNow(); }catch(e){} }
+  try{ refreshMarketDataCard(); }catch(e){}
   macroCache={}; EARN=null; CYCLE=null;
   try{ loadEarnings().then(()=>{ if(typeof renderAll==='function')renderAll(); }); loadMarketData(true); }catch(e){}
   try{
@@ -14242,7 +14244,7 @@ async function renderAudit(){
             :'last export '+expDays+' day'+(expDays===1?'':'s')+' ago');
 
   out+=row(syncActive()?'ok':'wait','Sync',
-    syncConfigured()?'operator key, this device':(codeSyncActive()?'invite code, this device only':'off, this browser is the only copy'));
+    codeSyncActive()?'under your access code':'off, this browser is the only copy');
 
   /* ---- INPUT INTEGRITY: what was refused entry to the return series ---- */
   out+=head('Data integrity');
@@ -15109,7 +15111,26 @@ let syncCfg=null, syncTimer=null, syncing=false;
 
 function loadSyncCfg(){
   try{syncCfg=JSON.parse(localStorage.getItem(SYNC_CFG_KEY))||null;}catch(e){syncCfg=null;}
+  /* The code is the only way in (the owner's rule, 2026-09-22). A key an older build kept here is
+     dropped: the worker still takes it, but no device presents it any more. */
+  if(syncCfg&&syncCfg.key){
+    syncCfg=syncCfg.code?{url:INVITE_WORKER,code:syncCfg.code}:null;
+    try{ if(syncCfg)localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); else localStorage.removeItem(SYNC_CFG_KEY); }catch(e){}
+  }
   return syncCfg;
+}
+/* This device, to the worker: a random id kept here, and a label a person can recognise in the
+   list ("iPhone · Safari"). Two devices a code; the third is told which two, and can forget one. */
+function deviceId(){
+  let id=null; try{ id=localStorage.getItem('pf_device'); }catch(e){}
+  if(!id){ id=Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,6); try{ localStorage.setItem('pf_device',id); }catch(e){} }
+  return id;
+}
+function deviceLabel(){
+  const ua=navigator.userAgent||'';
+  const os=/iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android':/Mac/.test(ua)?'Mac':/Windows/.test(ua)?'Windows':/Linux/.test(ua)?'Linux':'Device';
+  const br=/Edg\//.test(ua)?'Edge':/OPR\//.test(ua)?'Opera':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'browser';
+  return os+' \u00b7 '+br;
 }
 function syncConfigured(){return !!(syncCfg&&syncCfg.url&&syncCfg.key);}
 /* Code-mode sync: an invited user syncing with their invite code instead of the master key. The two
@@ -15177,7 +15198,7 @@ function syncEndpoint(slot){
   /* The code keeps the book wherever a device holds one, so the owner's computer with the key and
      the owner's phone with the code write one record. The key, where a device has it, still
      serves the data routes. */
-  if(syncCfg.code)return base+'/usync?code='+encodeURIComponent(syncCfg.code);
+  if(syncCfg.code)return base+'/usync?code='+encodeURIComponent(syncCfg.code)+'&device='+encodeURIComponent(deviceId())+'&name='+encodeURIComponent(deviceLabel());
   return base+'/?slot='+encodeURIComponent(slot);
 }
 /* A book with anything in it. A default profile has nothing, and nothing is what a blank device
@@ -15198,86 +15219,31 @@ async function checkConnection(){
     '<span class="'+(ok===true?'pos':ok===false?'neg':'warn')+'" style="font-family:var(--mono);font-size:12px;min-width:14px">'+
       (ok===true?'✔':ok===false?'✘':'-')+'</span>'+
     '<span style="font-size:13px"><b>'+label+'</b>'+(detail?' <span class="muted" style="font-size:12px">- '+detail+'</span>':'')+'</span></div>';
-
-  const url=(document.getElementById('syncUrlInput').value||'').trim()||(syncCfg&&syncCfg.url)||'';
-  const key=(document.getElementById('syncKeyInput').value||'').trim()||(syncCfg&&syncCfg.key)||'';
-
-  if(!url){
-    box.innerHTML=row(false,'No worker URL','Paste it above, then press Check connection again.');
-    return;
-  }
-  box.innerHTML='<p class="muted" style="font-size:13px">Checking…</p>';
-
-  const base=url.replace(/\/+$/,'');
   let out='';
-  let v=null;
-
-  /* 1. unauthenticated — is anything there, and is it the current build? */
+  /* 1. the worker */
   try{
-    const r=await fetch(base+'/version');
-    if(r.ok){
-      v=await r.json();
-      out+=row(true,'Worker reachable',esc(base));
-      out+=row(true,'Build '+esc(v.version||'unknown'),
-        (v.routes||[]).includes('/finnhub')?'includes the market-data proxy':'<span class="neg">this build has no /finnhub route</span>');
-    }else if(r.status===401){
-      out+=row(false,'Old worker build deployed',
-        'The worker answers but has no public /version route, so it predates the market-data proxy. Re-paste worker.js into Cloudflare and press Deploy.');
-      box.innerHTML=out; return;
-    }else{
-      out+=row(false,'Worker returned HTTP '+r.status,'Check the URL points at the worker root.');
-      box.innerHTML=out; return;
-    }
-  }catch(e){
-    box.innerHTML=row(false,'Cannot reach the worker',
-      esc(base)+' did not respond. Check the address, and that the worker is deployed.');
-    return;
-  }
-
-  /* 2. authenticated — is the key right, and which secrets are set? */
-  if(!key){
-    out+=row(null,'No sync key entered','Paste your SYNC_SECRET above to check the rest.');
-    box.innerHTML=out; return;
-  }
+    const r=await fetch(INVITE_WORKER+'/version');
+    if(!r.ok){ box.innerHTML=row(false,'Worker returned HTTP '+r.status); return; }
+    const v=await r.json(); out+=row(true,'Worker reachable','build '+esc(v.version||'unknown'));
+  }catch(e){ box.innerHTML=row(false,'Cannot reach the worker','No connection, or this network blocks it.'); return; }
+  /* 2. the code */
+  const code=accessCodeFor(USER);
+  if(!code){ out+=row(false,'No access code on this device','Settings \u2192 Access code.'); box.innerHTML=out; return; }
   try{
-    const r=await fetch(base+'/version',{headers:{'Authorization':'Bearer '+key}});
-    const j=await r.json();
-    if(!j.configured){
-      out+=row(false,'Sync key rejected','The worker is fine; this key is not the SYNC_SECRET it holds.');
-      box.innerHTML=out; return;
-    }
-    out+=row(true,'Sync key accepted');
-    const c=j.configured;
-    out+=row(!!c.PF_SYNC,'KV storage bound',c.PF_SYNC?'':'Add a KV namespace named PF_SYNC.');
-    out+=row(!!c.FINNHUB_API_KEY,'Market data key (FINNHUB_API_KEY)',
-      c.FINNHUB_API_KEY?'this device needs no key of its own':'<b>not set</b>. Prices and fundamentals will not load unless this device has its own key');
-    out+=row(!!c.FRED_API_KEY,'Macro data key (FRED_API_KEY)',
-      c.FRED_API_KEY?'':'optional, the Market tab falls back to measured volatility');
-    out+=row(!!c.AI_API_KEY,'Summary key (AI_API_KEY)',
-      c.AI_API_KEY?'':'optional. News falls back to keyword matching');
-    const originOk=/^https:\/\/perceptfolio\.com$/.test(c.ALLOWED_ORIGIN||'');
-    out+=row(originOk,'ALLOWED_ORIGIN',
-      originOk?esc(c.ALLOWED_ORIGIN):'is '+esc(String(c.ALLOWED_ORIGIN))+'. Must be exactly https://perceptfolio.com, no trailing slash');
-  }catch(e){
-    out+=row(false,'Authenticated check failed',esc(e.message));
-  }
-
-  /* 3. the thing you actually care about — does a real quote come back? */
-  try{
-    const saved=syncCfg;
-    syncCfg={url:base,key};
-    const q=await getQuote('AAPL');
-    syncCfg=saved;
-    out+=row(!!(q&&isFinite(q.c)),'A live quote came back',
-      q&&isFinite(q.c)?'AAPL '+fmt$(q.c)+'. Market data is working on this device':'the request succeeded but returned no price');
-  }catch(e){
-    out+=row(false,'Live quote failed',esc(e.message));
-  }
-
+    const j=await (await fetch(INVITE_WORKER+'/status?code='+encodeURIComponent(code))).json();
+    out+=row(!!(j&&j.known&&j.active),'Access code',(j&&j.known&&j.active)?'live':(j&&j.reason)||'not reported live');
+  }catch(e){ out+=row(false,'Access code','could not be checked'); }
+  /* 3. sync and the devices */
+  if(syncActive()){
+    try{ const j=await (await fetch(INVITE_WORKER+'/usync/devices?code='+encodeURIComponent(code))).json(); const n=(j&&j.devices||[]).length; out+=row(true,'Sync',n+' of 2 devices'); renderSyncDevices((j&&j.devices)||[]); }
+    catch(e){ out+=row(false,'Sync','the device list could not be read'); }
+  }else out+=row(null,'Sync','off on this device');
+  /* 4. market data, a live quote */
+  try{ const q=await getQuote('AAPL'); out+=row(true,'Market data','built in'+(D.apiKey?', this device\u2019s own key':'')+' \u00b7 AAPL '+q.c); }
+  catch(e){ out+=row(false,'Market data',esc(e.message)); }
   box.innerHTML=out;
   refreshMarketDataCard();
 }
-
 /* Code sync: the invited user's equivalent of Save & connect. Stores {url, code} with no key, which
    is what codeSyncActive() keys off — deliberately a different shape from the operator's
    {url, key}, so no gate can confuse the two. */
@@ -15298,30 +15264,12 @@ function refreshCodeSyncOffer(){
   const demo=(typeof isDemoUser==='function'&&isDemoUser());
   el.style.display=(inv&&!syncActive()&&!demo)?'block':'none';
 }
-function saveSyncConfig(){
-  /* Refused rather than ignored: silently accepting a config that will never be used is how you end
-     up believing a device is syncing when it is not. */
-  if(isDemoUser()){setSyncStatus('Test account. Sync cannot be configured here.','warn');
-    return toast('Sync is disabled on the test account by design.');}
-  const url=(document.getElementById('syncUrlInput').value||'').trim();
-  const key=(document.getElementById('syncKeyInput').value||'').trim();
-  if(!url||!key)return toast('Enter both the sync URL and the sync key.');
-  if(!/^https:\/\//i.test(url))return toast('The sync URL must start with https://');
-  syncCfg={url,key};
-  localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg));
-  setSyncStatus('Connecting…');
-  /* The market-data card keys off whether sync is configured, so it has to be told right away —
-     otherwise it keeps demanding a Finnhub key on a device that just gained access to one. */
-  refreshMarketDataCard();
-  syncNow();
-}
 function disableSync(){
   try{ const p=DB.profiles[USER]; if(p&&codeSyncActive()){ p.codeSyncDeclined=Date.now(); persistDB(); } }catch(e){}
   if(!confirm('Turn off sync on this device? Your data stays here and stays in the cloud, this device just stops talking to it.'))return;
   localStorage.removeItem(SYNC_CFG_KEY);
   syncCfg=null;
-  const u=document.getElementById('syncUrlInput'),k=document.getElementById('syncKeyInput');
-  if(u)u.value='';if(k)k.value='';
+  renderSyncDevices([]);
   setSyncStatus('Sync is off on this device.');
   refreshMarketDataCard();
   toast('Sync turned off here.');
@@ -15493,9 +15441,13 @@ async function syncFetch(method,slot,body){
       body?{'Content-Type':'application/json'}:{}),
     body:body||undefined
   });
-  if(res.status===401)throw new Error(!syncCfg.code&&syncCfg.key
-    ?'Sync key rejected. Check it matches SYNC_SECRET exactly.'
-    :'Your access code was not accepted. If your access was paused, sync stops with it.');
+  if(res.status===401)throw new Error('Your access code was not accepted. If your access was paused, sync stops with it.');
+  if(res.status===409){
+    let j=null; try{ j=await res.json(); }catch(e){}
+    const err=new Error((j&&j.error)||'This code keeps its book on two devices already.'); err.devices=(j&&j.devices)||[]; err.limit=2;
+    try{ renderSyncDevices(err.devices,true); }catch(e){}
+    throw err;
+  }
   if(!res.ok){
     let detail='';
     try{const j=await res.json();detail=j.error||'';}catch(e){}
@@ -15559,7 +15511,7 @@ async function syncPull(force){
 }
 async function syncPullForce(){
   if(isDemoUser()){setSyncStatus('Test account. Sync is disabled here.','muted');return;}
-  if(!syncActive())return toast('Set up sync first.');
+  if(!syncActive())return toast('Sync needs your access code: Settings \u2192 Access code.');
   if(!confirm('Replace everything on this device with the cloud copy? Anything here that hasn\'t been synced will be lost.'))return;
   try{
     setSyncStatus('Pulling…');
@@ -15570,7 +15522,7 @@ async function syncPullForce(){
 }
 async function syncNow(){
   if(isDemoUser()){setSyncStatus('Test account. Sync is disabled here.','muted');return;}
-  if(!syncActive())return toast('Enter your sync URL and key first.');
+  if(!syncActive())return toast('Sync needs your access code: Settings \u2192 Access code.');
   if(syncing)return;
   syncing=true;
   try{
@@ -15605,12 +15557,28 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 function renderSyncSettings(){
   loadSyncCfg();
-  const u=document.getElementById('syncUrlInput'),k=document.getElementById('syncKeyInput');
-  if(u)u.value=(syncCfg&&syncCfg.url)||'';
-  if(k)k.value=(syncCfg&&syncCfg.key)||'';
-  if(!syncConfigured()){setSyncStatus('Not connected on this device.');return;}
+  if(!syncActive()){ renderSyncDevices([]); setSyncStatus(accessCodeFor(USER)?'Off on this device.':'Needs your access code: Settings \u2192 Access code.'); return; }
   const s=D&&D.syncedAt;
-  setSyncStatus(s?('Connected. Last synced '+new Date(s).toLocaleString()):'Connected, not synced yet.');
+  setSyncStatus(s?('Kept in step. Last synced '+new Date(s).toLocaleString()):'Kept in step, not synced yet.');
+  fetch(INVITE_WORKER+'/usync/devices?code='+encodeURIComponent(syncCfg.code)).then(r=>r.ok?r.json():null).then(j=>{ if(j)renderSyncDevices(j.devices||[]); }).catch(()=>{});
+}
+/* The two devices under the code: this one, and the other, with a way to forget the other (or a
+   third device's way in, when it is told the two that are there). */
+function renderSyncDevices(devs,refused){
+  const box=document.getElementById('syncDevices'); if(!box)return;
+  const me=deviceId(), ago=t=>{ const m=Math.round((Date.now()-(t||0))/60000); return m<2?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' d ago'; };
+  if(!devs||!devs.length){ box.innerHTML=''; return; }
+  box.innerHTML='<ul class="sync-devs">'+devs.map(d=>'<li><span>'+esc(d.name||'a device')+(d.id===me?' <i>this device</i>':'')+'</span><em>'+ago(d.seen)+'</em>'+(d.id===me&&!refused?'':'<button class="btn btn-ghost btn-sm" onclick="forgetDevice(\''+esc(d.id)+'\')">Forget</button>')+'</li>').join('')+'</ul>'+(refused?'<p class="muted" style="font-size:12.5px;margin:0 0 10px">Forget one, then sync again.</p>':'');
+}
+async function forgetDevice(id){
+  const code=(syncCfg&&syncCfg.code)||accessCodeFor(USER); if(!code)return;
+  if(!confirm('Forget that device? It stops syncing until it is added again.'))return;
+  try{
+    const r=await fetch(INVITE_WORKER+'/usync/forget',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,device:id})});
+    const j=await r.json(); renderSyncDevices((j&&j.devices)||[]);
+    if(!syncActive()&&accessCodeFor(USER)){ syncCfg={url:INVITE_WORKER,code:code}; try{ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); }catch(e){} }
+    syncNow();
+  }catch(e){ toast('Could not reach the sync service.'); }
 }
 
 /* ================= INSTALL (PWA) =================
@@ -16034,6 +16002,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   var BASE='/vendor/cesium/', DATA='/world/data/';
   var IDX=null, SET=null, viewer=null, points=null, NE=null, loadP=null, sat=null;
   var borders=null, hl=null, labels=null, atlasDone=false, FILTER=null;   /* the atlas: borders and names; FILTER is a country code or null */
+  var PW=null;   /* the product filter: one of the phrases in the list on the right, or null */
   function satFade(){ if(!viewer||!sat)return; var hgt=viewer.camera.positionCartographic.height, a=hgt>4e6?0:hgt<1.2e6?1:(4e6-hgt)/(4e6-1.2e6); if(Math.abs((sat.alpha||0)-a)<0.01&&sat.show===(a>0))return; sat.alpha=a; sat.show=a>0; viewer.scene.requestRender(); }
   function $(id){return document.getElementById(id);}
   function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||localStorage.getItem('pf_door_code')||''; }catch(e){ return ''; } }
@@ -16160,6 +16129,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   window.wdCountry=function(cc){ toggleCountry(cc); };
   function toggleCountry(cc){
     if(!SET)return;
+    PW=null;
     if(FILTER===cc){ FILTER=null; highlight(null); draw(SET,true); legend(SET); status(''); return; }
     var fs=SET.features.filter(function(f){return f.c===cc;});
     if(!fs.length){ status('Nothing from '+esc(SET.label)+' in '+(names()[cc]||cc)+'.'); return; }
@@ -16170,7 +16140,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   /* ---- drawing a set ---- */
   function draw(set,keepFilter){
     var C=window.Cesium; points.removeAll();
-    if(!keepFilter){ FILTER=null; if(hl)hl.removeAll(); }
+    if(!keepFilter){ FILTER=null; PW=null; if(hl)hl.removeAll(); }
     var color=C.Color.fromCssColorString(set.color||'#3b82f6'), outline=C.Color.BLACK.withAlpha(.7), pos=[];
     var cols={};
     set.features.forEach(function(f){ var c3=C.Cartesian3.fromDegrees(f.lo,f.la,1500); pos.push(c3); var col=f.col?(cols[f.col]||(cols[f.col]=C.Color.fromCssColorString(f.col))):color; points.add({position:c3,pixelSize:6.5,color:col,outlineColor:outline,outlineWidth:1,id:f}); });
@@ -16208,15 +16178,64 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       $('wdLegend').querySelectorAll('li.on').forEach(function(li){ li.onclick=function(){ var g=set.groups[+li.dataset.i]; flyTo(set.features.filter(function(f){return f.sym===g.sym;})); }; });
       return;
     }
-    var by={}; set.features.forEach(function(f){ var k=f.c||'?'; by[k]=(by[k]||0)+1; });
-    var top=Object.keys(by).sort(function(a,b){return by[b]-by[a];}).slice(0,FILTER?12:8), max=by[top[0]]||1, nm=names();
-    if(FILTER&&top.indexOf(FILTER)<0)top.push(FILTER);
-    var countries=Object.keys(by).filter(function(k){return k!=='?';}).length;
-    var head=FILTER?(nm[FILTER]||FILTER)+' · '+(by[FILTER]||0)+' of '+set.features.length+' plants · <a href="#" onclick="wdCountry(\''+esc(FILTER)+'\');return false">Show all</a>':set.features.length+' plants · '+countries+' countries';
+    /* What they make. The rows are the product phrases on the plants in view (the country's when
+       one is picked), most common first; a row filters the globe to that product, and again clears
+       it. Where they are is the globe's job: the atlas draws the borders, and a country is a
+       click on it or a word in the search. */
+    var inView=FILTER?set.features.filter(function(f){return f.c===FILTER;}):set.features, nm=names();
+    var by={}; inView.forEach(function(f){ prodPhrases(f.p).forEach(function(w){ by[w]=(by[w]||0)+1; }); });
+    var top=Object.keys(by).sort(function(a,b){return by[b]-by[a]||a.localeCompare(b);}).slice(0,12), max=by[top[0]]||1;
+    if(PW&&top.indexOf(PW)<0&&by[PW])top.push(PW);
+    var cs={}; set.features.forEach(function(f){ if(f.c)cs[f.c]=1; }); var countries=Object.keys(cs).length;
+    var head=FILTER?(nm[FILTER]||FILTER)+' · '+inView.length+' of '+set.features.length+' plants · <a href="#" onclick="wdCountry(\''+esc(FILTER)+'\');return false">Show all</a>':(set.country?set.features.length+' plants':set.features.length+' plants · '+countries+' countries');
     $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+head+' · OpenStreetMap as of '+esc(set.asOf||'')+'</div>'+
-      (set.saturated?'<p class="muted" style="font-size:12.5px;margin:8px 0 0">The source capped this answer, so the map is a sample rather than the whole set.</p>':'')+
+      (set.saturated?'<p class="muted" style="font-size:12.5px;margin:8px 0 0">'+esc(set.note||'The source capped this answer, so the map is a sample rather than the whole set.')+'</p>':'')+
       (set.partial?'<p class="muted" style="font-size:12.5px;margin:8px 0 0">Part of the source could not be reached when this layer was built, so the count is a floor.</p>':'')+
-      (set.features.length?'<ul class="wd-countries" style="--c:'+esc(set.color)+'">'+top.map(function(k){ return '<li'+(k==='?'?'':' class="pick'+(FILTER===k?' on':'')+'" onclick="wdCountry(\''+esc(k)+'\')"')+'><span>'+esc(k==='?'?'Unplaced':(nm[k]||k))+'</span><b>'+by[k]+'</b><span class="bar" style="width:'+Math.max(4,Math.round(by[k]/max*100))+'%"></span></li>'; }).join('')+'</ul>':'<p class="muted" style="font-size:13px;margin:10px 0 0">Nothing drawn on OpenStreetMap under that name. Try the company’s short name, or an industry above.</p>')+'</div>';
+      (top.length?'<ul class="wd-countries" style="--c:'+esc(set.color)+'">'+top.map(function(k){ return '<li class="pick'+(PW===k?' on':'')+'" onclick="wdProduct(\''+esc(k).replace(/'/g,'&#39;')+'\')"><span>'+esc(k)+'</span><b>'+by[k]+'</b><span class="bar" style="width:'+Math.max(4,Math.round(by[k]/max*100))+'%"></span></li>'; }).join('')+'</ul>':(set.features.length?'<p class="muted" style="font-size:13px;margin:10px 0 0">No product tags on these plants.</p>':'<p class="muted" style="font-size:13px;margin:10px 0 0">Nothing drawn on OpenStreetMap under that name. Try the company’s short name, or an industry above.</p>'))+'</div>';
+  }
+  /* A plant's product tag, as phrases: "steel;pipes" is steel and pipes, "solar panels" stays one.
+     The tag also carries what OpenStreetMap calls the land ("industrial land", "works", "factory"),
+     which says nothing about what is made and is left out. */
+  var NOT_PRODUCT={'yes':1,'no':1,'industrial':1,'industrial land':1,'industrial area':1,'industrial site':1,'works':1,'factory':1,'factories':1,'plant':1,'plants':1,'manufacturing':1,'manufacture':1,'manufacturer':1,'industry':1,'general':1,'other':1,'others':1,'misc':1,'various':1,'unknown':1,'none':1,'company':1,'site':1,'area':1,'land':1,'warehouse':1,'depot':1,'production':1,'products':1,'product':1};
+  function prodPhrases(p){
+    if(!p)return []; var seen={}, out=[];
+    String(p).toLowerCase().replace(/_/g,' ').split(/[;,|\/]+/).forEach(function(x){ x=x.replace(/\s+/g,' ').trim(); if(x.length>=3&&!NOT_PRODUCT[x]&&!seen[x]){ seen[x]=1; out.push(x); } });
+    return out;
+  }
+  window.wdProduct=function(w){
+    if(!SET)return;
+    PW=(PW===w)?null:w;
+    var fs=SET.features.filter(function(f){ return (!FILTER||f.c===FILTER)&&(!PW||prodPhrases(f.p).indexOf(PW)>=0); });
+    draw(Object.assign({},SET,{features:fs}),true); legend(SET); status(PW?fs.length+' making '+PW:'');
+  };
+  /* ---- a country: everything the bundle places inside it ----
+     "Ecuador", "USA", "EC": a search that names a country puts every plant the bundle has in it on
+     the globe, biggest names first when there are more than the globe wants, and the list on the
+     right says what they make. */
+  var ALIAS={'usa':'US','united states':'US','america':'US','u s':'US','u s a':'US','uk':'GB','britain':'GB','great britain':'GB','england':'GB','scotland':'GB','wales':'GB','china':'CN','prc':'CN','korea':'KR','holland':'NL','czechia':'CZ','turkiye':'TR','ivory coast':'CI','congo':'CD','drc':'CD','laos':'LA','burma':'MM','eswatini':'SZ','swaziland':'SZ','uae':'AE','emirates':'AE','iran':'IR','syria':'SY','russia':'RU','vietnam':'VN','viet nam':'VN','macedonia':'MK','moldova':'MD','bolivia':'BO','venezuela':'VE','tanzania':'TZ','brunei':'BN','cape verde':'CV','palestine':'PS','vatican':'VA','taiwan':'TW','hong kong':'HK','macau':'MO','macao':'MO'};
+  function plainName(x){ return String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ').trim(); }
+  function countryCode(q){
+    var nm=names(), b=plainName(q), t=String(q).trim();
+    if(/^[A-Z]{2}$/.test(t)&&nm[t])return t;
+    if(ALIAS[b]&&nm[ALIAS[b]])return ALIAS[b];
+    var hit=null, n=0, ks=Object.keys(nm);
+    for(var i=0;i<ks.length;i++){ if(plainName(nm[ks[i]])===b)return ks[i]; }
+    if(b.length>=5){ ks.forEach(function(cc){ var v=plainName(nm[cc]); if(v.indexOf(b)===0||v.indexOf(' '+b)>=0){ hit=cc; n++; } }); if(n===1)return hit; }
+    return null;
+  }
+  function showCountry(cc){
+    var nm=names()[cc]||cc, CAP=6000; markChip(null); status('Loading '+nm+'\u2026'); $('wdDetail').innerHTML='';
+    Promise.all([ensureViewer(),loadAll(),loadUniverseNames(),loadNE()]).then(function(){
+      var rows=[]; for(var i=0;i<ALL.length;i++){ if(ALL[i][4]===cc)rows.push(i); }
+      if(!rows.length){ status('Nothing placed in '+nm+' in the bundle. Try a product, a company or an industry.'); return; }
+      var total=rows.length, capped=total>CAP;
+      if(capped){ rows.sort(function(a,b){ return (ALL[b][1]?1:0)-(ALL[a][1]?1:0); }); rows=rows.slice(0,CAP); }
+      var feats=rows.map(function(i){ var r=ALL[i], f={i:'b'+i,n:r[0],la:r[2],lo:r[3],s:'o',c:cc}; if(r[1])f.o=r[1]; if(r[5])f.p=String(r[5]).replace(/_/g,' '); return f; });
+      return stamp(feats).then(function(all){
+        SET={label:nm,color:'#2f6f9f',country:cc,features:all,asOf:(IDX&&IDX.generatedAt||'').slice(0,10),saturated:capped,note:capped?'The bundle places '+total+' plants in '+nm+'; the '+CAP+' with a named operator or a listing come first.':null};
+        draw(SET); highlight(cc); legend(SET); status('');
+      });
+    }).catch(function(e){ status('Could not show '+nm+': '+e.message+'.'); });
   }
   function showDetail(f){
     var nm=names(), osm={n:'node',w:'way',r:'relation'}[f.i[0]]+'/'+f.i.slice(1);
@@ -16371,7 +16390,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   window.wdSearch=function(){
     var q=($('wdQ').value||'').replace(/\s+/g,' ').trim(); if(!q)return;
     if(/^(my |your |our )?(holdings|portfolio|positions)$/i.test(q)){ wdHoldings(); return; }
-    Promise.all([loadIndex(),loadProducts(),loadUniverseNames()]).then(function(){ var id=route(q); if(id){ showIndustry(id); return; } var w=productWord(q); if(w)showProduct(w); else searchCompany(q); }).catch(function(){ status('The industry list did not load.'); });
+    Promise.all([loadIndex(),loadProducts(),loadUniverseNames()]).then(function(){ var cc=countryCode(q); if(cc){ showCountry(cc); return; } var id=route(q); if(id){ showIndustry(id); return; } var w=productWord(q); if(w)showProduct(w); else searchCompany(q); }).catch(function(){ status('The industry list did not load.'); });
   };
   /* From a ticker: the company's short name, legal suffixes dropped. "Taiwan Semiconductor Manufacturing Co Ltd" → "Taiwan Semiconductor". */
   window.wdFromTicker=function(sym){
@@ -16660,6 +16679,13 @@ select{padding-right:20px}
 #sidebar nav button.active .ico{color:var(--text)}
 .nav-sep{margin:10px 12px}
 .side-foot{opacity:.6}
+/* The two devices under a code, in Settings. */
+.sync-devs{list-style:none;margin:0 0 12px;padding:0;border-top:1px solid var(--border)}
+.sync-devs li{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+.sync-devs li span{flex:1}
+.sync-devs li i{font-style:normal;color:var(--muted);font-size:12.5px;margin-left:6px}
+.sync-devs li em{font-style:normal;color:var(--muted);font-size:12.5px}
+.sync-devs li .btn{padding:0}
 
 /* Figures sit in columns without dividers; the rules above and below the row are enough. */
 .stat{border-right:0;margin-right:0;padding:14px 28px 14px 0}

@@ -232,28 +232,22 @@ no key. If you get a Cloudflare error page instead, something in Steps 3–5 did
 
 ---
 
-## Step 7 — Connect your computer
+## Step 7 — Your devices
 
-The book syncs under the access code, for the owner as for everyone: come through the door with
-the code, sign in, and the device keeps the book in step under that code, with nothing to type in
-Settings. A device that was set up with the operator key keeps the key for the data routes (the
-worker's Finnhub key, the calendar) and moves its book under the code at the next sign-in. A device
-whose book is still blank never seeds the slot, so a new phone cannot replace the real book.
+The book syncs under the access code, and only under it (2026-09-22): come through the door with
+the code, sign in, and the device keeps the book in step under that code. There is nothing to type
+in Settings; a device that has no code yet is told so, and Settings → Access code takes it.
 
-Market data on a device without the operator key: the Finnhub key in Settings → Market data travels
-with the book, so paste your own key once on any device and every device has it.
+**Two devices a code.** Each device names itself to the worker ("iPhone · Safari", "Mac · Chrome");
+the first two under a code are kept, a third is refused and shown the two, and any of them can
+forget one under Settings → Sync and backup. Forgetting a device stops it syncing until it is added
+again; nothing on it is deleted. A device whose book is still blank never seeds the slot, so a new
+phone cannot replace the real book, and a blank cloud copy never replaces a book with content
+without asking.
 
-To set a device up with the operator key by hand:
-
-1. Open perceptfolio.com, log into your account.
-2. Go to **Settings** → **Sync Across Your Devices**.
-3. **Sync URL:** your worker URL from Step 3.
-4. **Sync key:** the `SYNC_SECRET` from Step 5.
-5. Click **Save & connect**.
-
-You should see `✓ Synced` with a timestamp. Your data is now in the cloud.
-
-If you see `Sync key rejected`, the secret doesn't match — check for a copied trailing space.
+The operator key (`SYNC_SECRET`) is now for the admin page and the worker's own routes only; no
+terminal presents it. Market data does not depend on it either: every signed-in account reads
+through the worker with its code (Step 5).
 
 ---
 

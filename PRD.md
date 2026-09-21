@@ -566,3 +566,24 @@ Two instructions from the owner, in this order.
   of those is done the posture is: built in, on a plan that does not yet permit it. Calls per minute
   are also the plan's: sixty a minute shared by everyone on the free tier will be reached by the
   second active subscriber, and the terminal already says "rate limit" when it is.
+
+Later the same day, three more:
+
+- **"The only way to sync is with the code; not a URL and key; and only on two devices."** The
+  Sync URL and key fields are gone from Settings and no terminal presents the operator key any
+  more (a key an older build kept is dropped on load; the worker still takes it for admin). Every
+  sync names its device (a random id kept on the device, and a label like "iPhone · Safari"); the
+  worker keeps the first two under a code in `udev:<code>`, refuses a third with the list, and any
+  holder of the code can forget one (`/usync/devices`, `/usync/forget`). Settings → Sync shows the
+  two devices and the Forget button. Saving the access code under Settings turns sync on.
+- **"Search a country on the World; the list on the right should be what they produce."** A search
+  that names a country (its name, an alias like USA or UK, or its two-letter code) puts every plant
+  the bundle places in it on the globe, capped at six thousand biggest names first with the cap
+  said; the list on the right is now product phrases from the plants in view, most common first,
+  each a filter on the globe, with OpenStreetMap's land-use words ("industrial land", "works") left
+  out. Where a plant is stays the globe's job: the atlas draws the borders; a country is a click on
+  it or a word in the search.
+- **"The Finnhub key did not work."** It was not the key: the worker answered only
+  `https://perceptfolio.com`, and the owner, sent to the Pages address the day their Wi-Fi blocked
+  the domain, had every answer refused by the browser. The worker now answers the site's own
+  addresses (the domain, the Pages address and its previews) by the request's origin, nothing else.
