@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-22.3';
+const WORKER_VERSION = '2026-09-22.4';
 
 /* ---- The site's own addresses ----
    ALLOWED_ORIGIN names the domain. The same deployment also answers at its Pages address, which is
@@ -510,7 +510,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/map/prefill']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/map/prefill']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -601,6 +601,37 @@ async function handle(request, env) {
     }
     if (await tooMany(env, request, 'data', 60)) return json({ error: 'Too many requests from this address; try again in a minute.' }, 429, env);
     return finnhubProxy(url, env);
+  }
+
+  /* ---- Trade: what a country sells and buys, who buys it, and who sells a product (UN Comtrade) ----
+     The World tab's answer to "what does Ecuador make": not the plants OpenStreetMap happens to
+     carry but what the country exported and imported, by product, as it reported to the UN. Three
+     questions, all from UN Comtrade's keyless preview API, cached a month, rate-limited an address:
+       /trade?country=EC&flow=X|M            the top products, by value, for the latest year filed
+       /trade/partners?country=EC&code=0803&flow=X   who bought (or sold) that product
+       /trade/product?q=chocolate            who exports the product the word names, and their routes
+     The preview API answers five hundred rows at most and not the biggest first, so a country's
+     products are found in two steps: every chapter (ninety-seven at most), then the four-digit
+     headings of the top chapters by name. Values are US dollars as the reporter filed them.
+     Source line on every answer: the reader is owed the year and the reporter. */
+  if (url.pathname === '/trade' || url.pathname === '/trade/partners' || url.pathname === '/trade/product') {
+    if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405, env);
+    if (await tooMany(env, request, 'trade', 30)) return json({ error: 'Too many requests from this address; try again in a minute.' }, 429, env);
+    try {
+      if (url.pathname === '/trade/product') return json(await tradeProduct(env, clean(url.searchParams.get('q'), 60), url.searchParams.get('routes') === '1'), 200, env);
+      const cc = clean(url.searchParams.get('country'), 2).toUpperCase();
+      const flow = (url.searchParams.get('flow') || 'X').toUpperCase() === 'M' ? 'M' : 'X';
+      if (!/^[A-Z]{2}$/.test(cc)) return json({ error: 'country is a two-letter code.' }, 400, env);
+      if (url.pathname === '/trade/partners') {
+        const code = clean(url.searchParams.get('code'), 6).replace(/[^0-9]/g, '');
+        if (!/^\d{4}$|^\d{6}$/.test(code)) return json({ error: 'code is a four- or six-digit HS heading.' }, 400, env);
+        const yr = parseInt(url.searchParams.get('year') || '0', 10) || 0;
+        return json(await tradePartners(env, cc, code, flow, TRADE_YEARS.includes(yr) ? yr : 0), 200, env);
+      }
+      return json(await tradeCountry(env, cc, flow), 200, env);
+    } catch (e) {
+      return json({ error: String(e && e.message || e) }, 502, env);
+    }
   }
 
   /* ---- FRED proxy ----
@@ -1601,6 +1632,213 @@ function subPatch(status, currentPeriodEnd) {
    access code costs one KV read, and 31^10 codes make guessing pointless, but a script hammering
    /invite, /apply or /checkout should still be told to stop. Operator routes carry the secret and
    are not limited here. */
+/* ---- UN Comtrade, for the World tab's trade view ---- */
+const COMTRADE = 'https://comtradeapi.un.org/public/v1/preview/C/A/HS';
+const COMTRADE_REF = 'https://comtradeapi.un.org/files/v1/app/reference/';
+const TRADE_TTL = 30 * 86400;
+const TRADE_YEARS = [2024, 2023];   /* the preview API takes one year a call; the latest with rows wins */
+const NOT_A_COUNTRY = /\b(nes|bunkers|free zones|special categories|world|neutral zone|areas)\b|\(\.\.\./i;
+const bigFirst = (a, b) => (b.primaryValue || 0) - (a.primaryValue || 0);
+
+/* The HS nomenclature: chapters, headings and their subheadings, by code, with the heading's
+   children listed so a chapter can be asked for by its headings. Read from the UN's reference file
+   once a month; the six-digit list is kept apart, because only a product search reads it. */
+async function hsRef(env, six) {
+  const k = six ? 'hs:h6' : 'hs:h24';
+  const cached = await env.PF_SYNC.get(k);
+  if (cached) return JSON.parse(cached);
+  const r = await fetch(COMTRADE_REF + 'H6.json', { headers: { 'Accept': 'application/json' } });
+  if (!r.ok) throw new Error('The HS reference could not be read (HTTP ' + r.status + ').');
+  const j = await r.json();
+  const h24 = { h2: {}, h4: {}, kids: {} }, h6 = {};
+  for (const x of (j.results || [])) {
+    const code = String(x.id || ''), text = String(x.text || '').replace(/^\S+\s+-\s+/, '').trim();
+    if (x.aggrlevel === 2) h24.h2[code] = text.slice(0, 90);
+    else if (x.aggrlevel === 4) { h24.h4[code] = text.slice(0, 90); (h24.kids[code.slice(0, 2)] = h24.kids[code.slice(0, 2)] || []).push(code); }
+    else if (x.aggrlevel === 6) h6[code] = text.slice(0, 110);
+  }
+  await env.PF_SYNC.put('hs:h24', JSON.stringify(h24), { expirationTtl: TRADE_TTL });
+  await env.PF_SYNC.put('hs:h6', JSON.stringify(h6), { expirationTtl: TRADE_TTL });
+  return six ? h6 : h24;
+}
+/* The UN's area codes, both ways: a numeric code to its country, and a country to the numeric
+   code it reports under today (the newest entry, "USA" over "United States of America (...1980)"). */
+async function areaRef(env) {
+  const cached = await env.PF_SYNC.get('hs:areas');
+  if (cached) return JSON.parse(cached);
+  const r = await fetch(COMTRADE_REF + 'partnerAreas.json', { headers: { 'Accept': 'application/json' } });
+  if (!r.ok) throw new Error('The area reference could not be read (HTTP ' + r.status + ').');
+  const j = await r.json();
+  const byNum = {}, byCc = {};
+  for (const x of (j.results || [])) {
+    const n = String(x.PartnerCode != null ? x.PartnerCode : x.id), cc = String(x.PartnerCodeIsoAlpha2 || '').toUpperCase(), name = String(x.PartnerDesc || x.text || '');
+    byNum[n] = { cc, name, g: !!x.isGroup || NOT_A_COUNTRY.test(name) };
+    if (cc && !x.isGroup && !NOT_A_COUNTRY.test(name)) {
+      const when = String(x.entryEffectiveDate || '').slice(0, 10);
+      const cur = byCc[cc];
+      if (!cur || when > cur.when || (when === cur.when && name.length < cur.name.length)) byCc[cc] = { n, when, name };
+    }
+  }
+  const out = { byNum, byCc: Object.fromEntries(Object.entries(byCc).map(([cc, v]) => [cc, v.n])) };
+  await env.PF_SYNC.put('hs:areas', JSON.stringify(out), { expirationTtl: TRADE_TTL });
+  return out;
+}
+/* One call at a time, a second apart, across every request this isolate is serving: the preview
+   API drops a burst on the floor (the fifth call in two seconds simply gets no answer) and answers
+   429 soon after. A refused or dropped call is tried once more after a pause. */
+let comtradeQueue = Promise.resolve(), comtradeLast = 0;
+function comtrade(params) {
+  const run = async () => {
+    const u = new URL(COMTRADE);
+    for (const k in params) if (params[k] != null && params[k] !== '') u.searchParams.set(k, String(params[k]));
+    u.searchParams.set('partner2Code', '0'); u.searchParams.set('motCode', '0'); u.searchParams.set('customsCode', 'C00');
+    let r = null, err = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const wait = 1100 - (Date.now() - comtradeLast);
+      if (wait > 0) await new Promise(res => setTimeout(res, wait));
+      comtradeLast = Date.now();
+      try { r = await fetch(u.toString(), { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(25000) }); err = null; }
+      catch (e) { r = null; err = e; }
+      if (r && r.status !== 429 && r.status < 500) break;
+      await new Promise(res => setTimeout(res, 3000));
+    }
+    if (!r) throw new Error('UN Comtrade did not answer' + (err && err.name === 'TimeoutError' ? ' in time.' : '.'));
+    if (r.status === 429) throw new Error('UN Comtrade is rate-limiting; try again in a little while.');
+    if (!r.ok) throw new Error('UN Comtrade returned HTTP ' + r.status + '.');
+    const j = await r.json();
+    return (j && j.data) || [];
+  };
+  const p = comtradeQueue.then(run, run);
+  comtradeQueue = p.catch(() => {});
+  return p;
+}
+/* The latest year that has rows: one call a year, newest first, the first with rows wins. */
+async function comtradeLatest(params, years) {
+  for (const y of (years || TRADE_YEARS)) {
+    const rows = await comtrade(Object.assign({}, params, { period: String(y) }));
+    if (rows.length) return { year: y, rows };
+  }
+  return { year: 0, rows: [] };
+}
+async function tradeCountry(env, cc, flow) {
+  const ck = 'trade:c:' + cc + ':' + flow;
+  const cached = await env.PF_SYNC.get(ck);
+  if (cached) return JSON.parse(cached);
+  const [ref, areas] = await Promise.all([hsRef(env, false), areaRef(env)]);
+  const rc = areas.byCc[cc];
+  if (!rc) throw new Error('No trade reporter for ' + cc + '.');
+  const ly = await comtradeLatest({ reporterCode: rc, partnerCode: 0, flowCode: flow, cmdCode: 'AG2' });
+  ly.rows = ly.rows.filter(r => r.cmdCode !== 'TOTAL' && /^\d{2}$/.test(String(r.cmdCode)));
+  if (!ly.year || !ly.rows.length) throw new Error('UN Comtrade has no ' + (flow === 'X' ? 'export' : 'import') + ' filing for ' + cc + ' in these years.');
+  const chapters = ly.rows.sort(bigFirst);
+  const total = chapters.reduce((a, r) => a + (r.primaryValue || 0), 0);
+  const top = chapters.slice(0, 8);
+  const codes = []; top.forEach(r => (ref.kids[String(r.cmdCode)] || []).forEach(c => { if (codes.length < 100) codes.push(c); }));
+  let headings = [];
+  if (codes.length) {
+    const h4 = await comtrade({ reporterCode: rc, period: String(ly.year), partnerCode: 0, flowCode: flow, cmdCode: codes.join(',') });
+    headings = h4.sort(bigFirst).slice(0, 14).map(r => ({ code: String(r.cmdCode), name: ref.h4[String(r.cmdCode)] || String(r.cmdCode), value: r.primaryValue || 0, share: total ? (r.primaryValue || 0) / total : 0 }));
+  }
+  const out = {
+    country: cc, flow, year: ly.year, total,
+    top: headings,
+    chapters: top.map(r => ({ code: String(r.cmdCode), name: ref.h2[String(r.cmdCode)] || String(r.cmdCode), value: r.primaryValue || 0, share: total ? (r.primaryValue || 0) / total : 0 })),
+    source: 'UN Comtrade, as reported by ' + (areas.byNum[rc] ? areas.byNum[rc].name : cc), asOf: new Date().toISOString().slice(0, 10)
+  };
+  await env.PF_SYNC.put(ck, JSON.stringify(out), { expirationTtl: TRADE_TTL });
+  return out;
+}
+async function tradePartners(env, cc, code, flow, year) {
+  const ck = 'trade:p:' + cc + ':' + code + ':' + flow;
+  const cached = await env.PF_SYNC.get(ck);
+  if (cached) return JSON.parse(cached);
+  const [ref, areas] = await Promise.all([hsRef(env, code.length === 6), areaRef(env)]);
+  const rc = areas.byCc[cc];
+  if (!rc) throw new Error('No trade reporter for ' + cc + '.');
+  const years = year ? [year].concat(TRADE_YEARS.filter(y => y !== year && y < year)) : TRADE_YEARS;
+  const ly = await comtradeLatest({ reporterCode: rc, flowCode: flow, cmdCode: code }, years);
+  if (!ly.year) throw new Error('No filing for that product.');
+  const world = ly.rows.find(r => r.partnerCode === 0);
+  const rows = ly.rows.filter(r => r.partnerCode !== 0);
+  const total = world ? (world.primaryValue || 0) : rows.reduce((a, r) => a + (r.primaryValue || 0), 0);
+  const partners = rows.map(r => ({ r, a: areas.byNum[String(r.partnerCode)] })).filter(x => x.a && x.a.cc && !x.a.g).sort((x, y) => bigFirst(x.r, y.r)).slice(0, 8)
+    .map(x => ({ cc: x.a.cc, name: x.a.name, value: x.r.primaryValue || 0, share: total ? (x.r.primaryValue || 0) / total : 0 }));
+  const names = code.length === 6 ? ref : (await hsRef(env, false)).h4;
+  const out = { country: cc, code, name: (code.length === 6 ? names[code] : names[code]) || code, flow, year: ly.year, total, partners, source: 'UN Comtrade, as reported by ' + (areas.byNum[rc] ? areas.byNum[rc].name : cc), asOf: new Date().toISOString().slice(0, 10) };
+  await env.PF_SYNC.put(ck, JSON.stringify(out), { expirationTtl: TRADE_TTL });
+  return out;
+}
+/* The headings a word names, shortest description first: the word (or its singular) as a whole
+   word. "chocolate" is 1806; "bananas" 0803; "tuna" is only in the six-digit list, under ten codes
+   from live bluefin to canned skipjack, and the one that matters is found by asking the world's
+   export value of each. */
+function hsMatches(word, table, limit) {
+  const w = word.toLowerCase().replace(/[^a-z\s-]/g, ' ').trim();
+  if (w.length < 3) return null;
+  const forms = [w, w.replace(/ies$/, 'y'), w.replace(/es$/, ''), w.replace(/s$/, '')].filter((x, i, a) => x.length >= 3 && a.indexOf(x) === i);
+  const rx = new RegExp('(^|[^a-z])(' + forms.map(x => x.replace(/[.*+?^\$\{\}()|[\]\\]/g, '\\$&')).join('|') + ')(s|es)?([^a-z]|$)', 'i');
+  const out = [];
+  for (const code in table) { const t = table[code]; if (rx.test(t)) out.push({ code, text: t }); }
+  out.sort((a, b) => a.text.length - b.text.length);
+  return out.slice(0, limit || 4);
+}
+/* Of the candidate headings, the one the world exports most of; the rows come back with it. */
+async function hsBiggest(cands) {
+  let best = null;
+  for (const c of cands) {
+    const ly = await comtradeLatest({ partnerCode: 0, flowCode: 'X', cmdCode: c.code });
+    const total = ly.rows.reduce((a, r) => a + (r.primaryValue || 0), 0);
+    if (!best || total > best.total) best = { code: c.code, text: c.text, year: ly.year, rows: ly.rows, total };
+  }
+  return best;
+}
+/* Two answers under one word, because the second takes a while: the exporters (the heading found
+   and ranked, then one call), and, asked for with routes=1, each top exporter's first buyer, six
+   more calls a second apart. The terminal shows the first and draws the second when it lands. */
+async function tradeProduct(env, q, withRoutes) {
+  const word = String(q || '').trim();
+  if (!word) throw new Error('q is a product word.');
+  const slug = word.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+  const ck = 'trade:q:' + slug, rk = 'trade:r:' + slug;
+  let base = null;
+  const cached = await env.PF_SYNC.get(ck);
+  if (cached) base = JSON.parse(cached);
+  if (base && !withRoutes) return base;
+  if (base && withRoutes) {
+    const rc = await env.PF_SYNC.get(rk);
+    if (rc) return Object.assign({}, base, JSON.parse(rc));
+    const routes = await tradeRoutes(env, base);
+    await env.PF_SYNC.put(rk, JSON.stringify({ routes }), { expirationTtl: TRADE_TTL });
+    return Object.assign({}, base, { routes });
+  }
+  const [h24, areas] = await Promise.all([hsRef(env, false), areaRef(env)]);
+  let cands = hsMatches(word, h24.h4, 6);
+  if (!cands.length) cands = hsMatches(word, await hsRef(env, true), 8);
+  if (!cands.length) return { q: word, code: null, exporters: [], routes: [] };
+  const m = await hsBiggest(cands);
+  const ly = { year: m.year, rows: m.rows };
+  const seen = {};
+  const rows = ly.rows.filter(r => { const k = String(r.reporterCode); if (seen[k] || !(r.primaryValue > 0)) return false; seen[k] = 1; return true; });
+  const total = rows.reduce((a, r) => a + (r.primaryValue || 0), 0);
+  const exporters = rows.map(r => ({ r, a: areas.byNum[String(r.reporterCode)] })).filter(x => x.a && x.a.cc && !x.a.g).sort((x, y) => bigFirst(x.r, y.r)).slice(0, 12)
+    .map(x => ({ cc: x.a.cc, name: x.a.name, value: x.r.primaryValue || 0, share: total ? (x.r.primaryValue || 0) / total : 0 }));
+  const out = { q: word, code: m.code, name: m.text, year: ly.year, total, exporters, routes: null, source: 'UN Comtrade, as reported by each exporter', asOf: new Date().toISOString().slice(0, 10) };
+  await env.PF_SYNC.put(ck, JSON.stringify(out), { expirationTtl: TRADE_TTL });
+  if (!withRoutes) return out;
+  const routes = await tradeRoutes(env, out);
+  await env.PF_SYNC.put(rk, JSON.stringify({ routes }), { expirationTtl: TRADE_TTL });
+  return Object.assign({}, out, { routes });
+}
+/* The top exporters' first buyer each, so a route can be drawn; a refusal for one leaves the rest. */
+async function tradeRoutes(env, base) {
+  const routes = [];
+  for (const e of (base.exporters || []).slice(0, 6)) {
+    try { const p = await tradePartners(env, e.cc, base.code, 'X', base.year); if (p.partners[0]) routes.push({ from: e.cc, to: p.partners[0].cc, toName: p.partners[0].name, value: p.partners[0].value, share: p.partners[0].share, year: p.year }); } catch (err) {}
+  }
+  routes.sort((a, b) => b.value - a.value);
+  return routes;
+}
+
 /* The Finnhub proxy shared by /finnhub (the operator's devices, behind the key) and /data (every
    live code). ALLOWLIST, NOT PASSTHROUGH: only the endpoints the app calls; the token is attached
    here and the page never sees it. Not cached: a stale quote shown as live is worse than none. */

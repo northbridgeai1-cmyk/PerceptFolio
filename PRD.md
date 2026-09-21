@@ -587,3 +587,30 @@ Later the same day, three more:
   `https://perceptfolio.com`, and the owner, sent to the Pages address the day their Wi-Fi blocked
   the domain, had every answer refused by the browser. The worker now answers the site's own
   addresses (the domain, the Pages address and its previews) by the request's origin, nothing else.
+
+## 29. The World by what a country sells (2026-09-22, evening)
+
+"Search a country, see everything it produces; the list on the right should be what they produce,
+chocolate, tuna, bananas; add what they export and import, as ships I can click."
+
+- **What a country sells and buys** comes from UN Comtrade, as each country filed it, through the
+  worker (`/trade`, `/trade/partners`, `/trade/product`): the keyless preview API, one call a second
+  across the whole worker (it drops a burst), a month's cache, a per-address cap. A country's
+  headings are found in two steps because the API answers five hundred rows at most and not the
+  biggest first: every chapter, then the four-digit headings of the top chapters. The side panel
+  shows *Sells abroad* and *Buys abroad* with the year and the total, common headings in plain
+  words (crude oil, bananas, cocoa beans, canned tuna), the rest in the filing's own words, and the
+  source line names the reporter. Ecuador 2024: crude oil $7.8bn, shrimp $6.4bn, bananas $3.5bn,
+  cocoa beans $3.1bn, canned fish $1.6bn.
+- **A product word** ("bananas", "chocolate", "tuna") is matched to a heading (four-digit first,
+  six-digit after, the candidates ranked by what the world exports of each, so "tuna" is canned tuna
+  and not live bluefin) and answered with who sells it, then, on a second ask, each top seller's
+  first buyer as a route.
+- **Ships.** A route is drawn on the great circle from seller to buyer with a ship and the seller's
+  flag at a point along it; the card gives product, from, to, value and share in the year filed,
+  the heading, and any plant on the globe in that country making it (with its ticker). The card
+  says what the marker is: a trade flow, not a vessel. Live vessel positions are not offered: no
+  free feed carries them and a marker that pretended to would be a fabrication.
+- **What OpenStreetMap carries** stays as *Made on the globe*: the plants' product tags, the
+  filter they always were. Bananas and cocoa are grown, not made in a plant, so for Ecuador the
+  two lists differ, and the panel says which is which.
