@@ -238,3 +238,19 @@ for the gate suite's three operator checks.
 - `world/data/products/*.json`: static, public, OpenStreetMap-derived (ODbL); built offline from
   the extractor's cache and served by Pages like the layers.
 - The FRED allowlist grows by DFEDTARU, DFEDTARL and WALCL, all public series.
+
+## The data licence (2026-09-21)
+
+Finnhub's terms: every plan is personal; no redistribution of data or derived results; no business
+use without written approval. Posture from this date:
+
+- The worker's Finnhub key serves only the operator's own devices: the `/finnhub` proxy and the
+  earnings calendar sit behind the sync key; the council's facts and the map's company name are
+  fetched by the worker's key only when the caller holds the sync key.
+- A customer's terminal fetches its own quotes, profiles, metrics, recommendations, price targets
+  and earnings dates from Finnhub with its own key, for its own use. The key never leaves the browser.
+- What the worker serves to everyone: the listing (SEC, public domain), statements (SEC EDGAR,
+  public domain), macro (FRED, OECD, IMF, public), plants (OpenStreetMap, ODbL), and prices through
+  the price-feed switch. With no licensed feed set, the worker takes no marks, and history and the
+  model's candles come from Yahoo's public chart endpoint labelled as an unlicensed interim.
+- `/edgar` is keyless and public, rate-limited by address like the listing; nothing user-specific.

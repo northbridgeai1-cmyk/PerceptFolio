@@ -482,3 +482,45 @@ industry layers (280 of 29,535), and runs after every monthly extract.
   contraction), with the other areas as grey dots. Labelled as the OECD's indicator, built to
   lead turning points by six to nine months: where it points, not where output is measured.
   Never a verdict input.
+
+## 26. Before the first payment (council of 2026-09-21, decided the same day)
+
+A council was asked what was missing and whether to raise the price. Four voices, one verdict:
+hold the price, build almost nothing, resolve the data licence, freeze the scorecard, and let the
+record arrive. Done and decided:
+
+- **Price: hold at $149 / $1,490 (Business $119 / $1,190 a seat).** Review date: the day the first
+  90-day marks land (~139 calls; around late November 2026). Positive expectancy against the S&P →
+  $199 / $1,990, with the number and the reason on the pricing page. Flat or negative → the record
+  is the news and is shown; price is the least of it. Not before, and not without the record.
+- **Scorecard v1.0, frozen 2026-09-21.** `SCORECARD_VERSION` in the terminal; every recorded call
+  carries it; the scorecard view names it; the suite hashes `scoreStock()` and `CHECK_ORDER`
+  against it. To change a check: bump the version, re-pin the hash, and write the reason here.
+  The record is attributable to the scorecard that made it, and nothing can backdate one.
+- **The data licence.** Finnhub's terms make every plan personal and forbid redistribution or
+  business use without written approval. The worker's Finnhub key therefore serves only the
+  operator's own devices (the `/finnhub` proxy behind the sync key, the operator's calendar). What
+  the worker serves to everyone moved: the listing to the SEC's public ticker file; the council's
+  facts, the map's company name and the earnings dates to the customer's own key, fetched in the
+  terminal for personal use under that key's own plan; the model's candles, the five-year history
+  and the marks to a **price feed switch** (`PRICE_FEED` = eodhd or tiingo, `PRICE_FEED_KEY`) with
+  Yahoo's public chart as the labelled interim for history and candles, and **no worker marks until
+  a licensed feed is set** (each device marks with its own key while it is open; a missed anniversary
+  is excluded, as I11 always required). Nothing on the worker reads Yahoo's quote summary any more.
+  **Still to do, by the operator: buy the feed (EODHD's All-World ~$20/month or Tiingo's commercial
+  plan; both allow commercial display) and set the two secrets.** Until then the history says
+  "interim, unlicensed" in its source field.
+- **The statements behind the 22 checks.** `/edgar?symbol=` reads SEC EDGAR company facts (public
+  domain, keyless): fifteen lines by fiscal year, ten years, 10-K values, a value belonging to the
+  year its period ends and the latest filing winning; concepts merge across years (Apple's
+  "Revenues" stops in 2018). The Analyzer shows the table under an analysis, with margins and free
+  cash flow as arithmetic on the rows. Display only; no new check. Cached a week a company.
+- **Settings has a menu** (General · Access and data · Policy and rules · Accounts · Sync and
+  backup · Advanced), one group at a time, remembered on the device.
+- **News without a model.** The summary route now falls back to Workers AI like every other model
+  route, and when no model answers at all the terminal shows the plain read (how many headlines,
+  from where, the move, the recurring words, the first three titles) instead of an error.
+
+Open, and for the operator before selling: the securities-attorney review of the terms (Q3), and
+an account-recovery path beyond "export a file" (today: sync for the operator, code sync for an
+invited profile).

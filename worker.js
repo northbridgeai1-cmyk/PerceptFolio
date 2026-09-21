@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-21.5';
+const WORKER_VERSION = '2026-09-21.9';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -277,12 +277,46 @@ function markScheduleW(ts, h) {
   return { from, intended, due: nextTradingDayW(intended) };
 }
 
+/* ---- THE PRICE FEED ----
+   Finnhub's plans are personal and forbid redistribution, so the worker's Finnhub key may serve
+   only the operator's own devices (the /finnhub proxy, behind the sync key). Anything the worker
+   serves to everyone (marks, five-year history, the model's candles) comes from here: a licensed
+   vendor when PRICE_FEED and PRICE_FEED_KEY are set (EODHD or Tiingo, both sold with commercial
+   terms), and until then Yahoo's public chart endpoint, labelled as the interim it is. The marks
+   run only on a licensed feed; without one each device marks with its own key when it is open. */
+function priceFeed(env) {
+  const name = String(env.PRICE_FEED || '').toLowerCase();
+  if ((name === 'eodhd' || name === 'tiingo') && env.PRICE_FEED_KEY) return { name, key: env.PRICE_FEED_KEY, licensed: true };
+  return { name: 'yahoo', key: '', licensed: false };
+}
+/* Daily bars for one symbol, oldest first: [{d:'YYYY-MM-DD', o,h,l,c,v}]. */
+async function dailyBars(env, sym, days) {
+  const feed = priceFeed(env), from = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10), out = [];
+  const ua = { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)' };
+  if (feed.name === 'eodhd') {
+    const r = await fetch('https://eodhd.com/api/eod/' + encodeURIComponent(sym.replace(/^\^/, '')) + '.US?from=' + from + '&period=d&fmt=json&api_token=' + encodeURIComponent(feed.key), { headers: ua });
+    if (!r.ok) throw new Error('EODHD answered ' + r.status);
+    for (const b of await r.json()) if (b && b.date && isFinite(b.close) && b.close > 0) out.push({ d: b.date, o: b.open, h: b.high, l: b.low, c: b.adjusted_close || b.close, v: b.volume });
+  } else if (feed.name === 'tiingo') {
+    const r = await fetch('https://api.tiingo.com/tiingo/daily/' + encodeURIComponent(sym.toLowerCase()) + '/prices?startDate=' + from + '&token=' + encodeURIComponent(feed.key), { headers: ua });
+    if (!r.ok) throw new Error('Tiingo answered ' + r.status);
+    for (const b of await r.json()) if (b && b.date && isFinite(b.close) && b.close > 0) out.push({ d: String(b.date).slice(0, 10), o: b.adjOpen ?? b.open, h: b.adjHigh ?? b.high, l: b.adjLow ?? b.low, c: b.adjClose ?? b.close, v: b.adjVolume ?? b.volume });
+  } else {
+    const range = days > 800 ? '5y' : days > 380 ? '2y' : '1y';
+    const y = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=' + range + '&interval=1d', { headers: { 'User-Agent': 'Mozilla/5.0 PerceptFolio' } });
+    const j = await y.json(); const r0 = j && j.chart && j.chart.result && j.chart.result[0]; const q = r0 && r0.indicators && r0.indicators.quote && r0.indicators.quote[0];
+    if (r0 && q) for (let i = 0; i < r0.timestamp.length; i++) if (isFinite(q.close[i]) && q.close[i] > 0) out.push({ d: new Date(r0.timestamp[i] * 1000).toISOString().slice(0, 10), o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i], v: q.volume[i], t: r0.timestamp[i] });
+  }
+  return { feed, bars: out.filter(b => b.d >= from) };
+}
+function feedLabel(feed) { return feed.licensed ? feed.name : 'yahoo (interim, unlicensed; set PRICE_FEED and PRICE_FEED_KEY)'; }
+
 async function runCronMarks(env) {
   const startedAt = Date.now();
   const note = { at: startedAt, registries: 0, due: 0, marked: 0, errors: [] };
   try {
     if (!env.PF_SYNC) throw new Error('no KV binding');
-    if (!env.FINNHUB_API_KEY) throw new Error('no FINNHUB_API_KEY — marks need prices');
+    if (!priceFeed(env).licensed) throw new Error('no licensed price feed on the worker (PRICE_FEED, PRICE_FEED_KEY); each device marks with its own key while it is open');
 
     const list = await env.PF_SYNC.list({ prefix: 'creg:', limit: 100 });
     note.registries = list.keys.length;
@@ -322,11 +356,7 @@ async function runCronMarks(env) {
     if (note.due) {
       const px = {};
       for (const sym of [...symbols].slice(0, 45)) {
-        try {
-          const r = await fetch('https://finnhub.io/api/v1/quote?symbol=' + encodeURIComponent(sym)
-            + '&token=' + env.FINNHUB_API_KEY);
-          if (r.ok) { const q = await r.json(); if (q && q.c > 0) px[sym] = q.c; }
-        } catch (e) {}
+        try { const { bars } = await dailyBars(env, sym, 10); const last = bars[bars.length - 1]; if (last && last.c > 0) px[sym] = last.c; } catch (e) {}
       }
       if (!(px.SPY > 0)) throw new Error('no SPY quote — nothing can be marked against the index');
 
@@ -478,6 +508,7 @@ async function handle(request, env) {
         SYNC_SECRET: !!env.SYNC_SECRET,
         FRED_API_KEY: !!env.FRED_API_KEY,
         FINNHUB_API_KEY: !!env.FINNHUB_API_KEY,
+        PRICE_FEED: feedLabel(priceFeed(env)),
         AI_API_KEY: !!env.AI_API_KEY,
         ALLOWED_ORIGIN: env.ALLOWED_ORIGIN || '(unset — cross-origin reads are DENIED until this is set)',
         RESEND_API_KEY: !!env.RESEND_API_KEY,
@@ -559,6 +590,87 @@ async function handle(request, env) {
      THE SAME REASONING DOES NOT EXTEND TO /finnhub, which is why that route was left alone: it is
      per-ticker and per-user against a 60-per-minute shared quota, so a handful of invited users
      calling it would exhaust the limit and break market data for everybody including the operator. */
+  /* ---- GET /edgar?symbol=AAPL -> ten fiscal years of the statements, from the SEC ----
+     The statements behind the 22 checks, display only. SEC EDGAR's company-facts API is public
+     domain and keyless: every US filer's XBRL facts, one 3–4 MB file a company. It is reduced here
+     to fourteen lines by fiscal year (10-K values only; a restated figure wins by filing date) and
+     cached a week. The ticker becomes a CIK through the SEC's own ticker file. No door: this is
+     public data, rate-limited by address like the listing. */
+  if (url.pathname === '/edgar' && request.method === 'GET') {
+    if (await tooMany(env, request, '/edgar', 20)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const sym = clean(url.searchParams.get('symbol'), 10).toUpperCase();
+    if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
+    const ck = 'edgar:' + sym;
+    const hit = await env.PF_SYNC.get(ck); if (hit) return json(Object.assign(JSON.parse(hit), { cached: true }), 200, env);
+    const ua = { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)', 'Accept': 'application/json' };
+    /* Ticker -> CIK, from the SEC's file, kept a day. */
+    let ciks = null;
+    const cikKey = 'cik:' + new Date().toISOString().slice(0, 10);
+    const cikHit = await env.PF_SYNC.get(cikKey);
+    if (cikHit) ciks = JSON.parse(cikHit);
+    else {
+      try {
+        const r = await fetch('https://www.sec.gov/files/company_tickers_exchange.json', { headers: ua });
+        if (r.ok) { const list = await r.json(); ciks = {}; for (const row of list.data || []) if (row && row[2]) ciks[String(row[2]).toUpperCase()] = row[0]; await env.PF_SYNC.put(cikKey, JSON.stringify(ciks), { expirationTtl: 2 * 86400 }); }
+      } catch (e) { ciks = null; }
+    }
+    const cik = ciks && ciks[sym.replace(/\./g, '-')] || ciks && ciks[sym];
+    if (!cik) return json({ error: 'No SEC filer with the ticker ' + sym + '.' }, 404, env);
+    let facts;
+    try {
+      const r = await fetch('https://data.sec.gov/api/xbrl/companyfacts/CIK' + String(cik).padStart(10, '0') + '.json', { headers: ua });
+      if (!r.ok) return json({ error: 'EDGAR answered ' + r.status + ' for ' + sym + '.' }, 502, env);
+      facts = await r.json();
+    } catch (e) { return json({ error: 'Could not reach EDGAR.' }, 502, env); }
+    const gaap = (facts.facts && facts.facts['us-gaap']) || {};
+    /* Each line is the first concept the filer reports, in this order. Duration concepts take a
+       10-K's full-year value; instant concepts (the balance sheet) take the fiscal year end. */
+    const LINES = [
+      ['revenue', 'Revenue', ['Revenues', 'RevenueFromContractWithCustomerExcludingAssessedTax', 'SalesRevenueNet', 'RevenuesNetOfInterestExpense']],
+      ['grossProfit', 'Gross profit', ['GrossProfit']],
+      ['operatingIncome', 'Operating income', ['OperatingIncomeLoss']],
+      ['netIncome', 'Net income', ['NetIncomeLoss', 'ProfitLoss']],
+      ['eps', 'EPS, diluted', ['EarningsPerShareDiluted', 'EarningsPerShareBasic']],
+      ['ocf', 'Operating cash flow', ['NetCashProvidedByUsedInOperatingActivities']],
+      ['capex', 'Capital expenditure', ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets']],
+      ['dividends', 'Dividends paid', ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock']],
+      ['buybacks', 'Buybacks', ['PaymentsForRepurchaseOfCommonStock']],
+      ['cash', 'Cash', ['CashAndCashEquivalentsAtCarryingValue', 'CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents']],
+      ['debt', 'Long-term debt', ['LongTermDebtNoncurrent', 'LongTermDebt', 'LongTermDebtAndCapitalLeaseObligations']],
+      ['assets', 'Total assets', ['Assets']],
+      ['liabilities', 'Total liabilities', ['Liabilities']],
+      ['equity', 'Shareholders\u2019 equity', ['StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest']],
+      ['shares', 'Diluted shares', ['WeightedAverageNumberOfDilutedSharesOutstanding', 'CommonStockSharesOutstanding']]
+    ];
+    const INSTANT = new Set(['cash', 'debt', 'assets', 'liabilities', 'equity']);
+    const minFy = new Date().getUTCFullYear() - 11;
+    const byLine = {}, years = new Set();
+    for (const [key, label, concepts] of LINES) {
+      const merged = {}, used = [];
+      for (const c of concepts) {
+        const node = gaap[c]; if (!node || !node.units) continue;
+        const unit = node.units.USD || node.units['USD/shares'] || node.units.shares; if (!unit) continue;
+        const best = {};
+        for (const f of unit) {
+          if (f.form !== '10-K' || f.fp !== 'FY' || !isFinite(f.val)) continue;
+          if (!INSTANT.has(key)) { const span = (Date.parse(f.end) - Date.parse(f.start)) / 86400000; if (!(span > 300 && span < 400)) continue; }
+          const fy = +String(f.end).slice(0, 4); if (!(fy >= minFy)) continue;
+          const score = Date.parse(f.filed) || 0;
+          if (!best[fy] || score > best[fy].score) best[fy] = { v: f.val, score };
+        }
+        let took = 0;
+        for (const [y, bst] of Object.entries(best)) if (!(y in merged)) { merged[y] = bst.v; took++; }
+        if (took) used.push(c);
+      }
+      if (Object.keys(merged).length >= 2) { byLine[key] = { label, concept: used.join(' + '), years: merged }; Object.keys(merged).forEach(y => years.add(+y)); }
+    }
+    const ys = [...years].sort((a, b) => a - b).slice(-10);
+    if (!ys.length) return json({ error: 'EDGAR has no ten-year statements under ' + sym + ' (a foreign filer, a fund, or a new listing).' }, 404, env);
+    const out = { symbol: sym, cik, entity: facts.entityName || '', years: ys, lines: byLine, source: 'SEC EDGAR company facts (public domain); fiscal years from 10-K filings', asOf: new Date().toISOString().slice(0, 10) };
+    await env.PF_SYNC.put(ck, JSON.stringify(out), { expirationTtl: 7 * 86400 });
+    return json(out, 200, env);
+  }
+
   /* ---- GET /cycle?code= -> the OECD composite leading indicator for every area it covers ----
      One request to the OECD's public SDMX service for all twenty-two areas (the G20 economies and
      a few aggregates), fifteen months of the amplitude-adjusted index, reduced to [month, value]
@@ -635,11 +747,12 @@ async function handle(request, env) {
      and on a recorded call; it is never a signal. Same door as /fred: the operator's key, or a
      live invite code. */
   if (url.pathname === '/earnings') {
+    /* The operator's own devices only. This is Finnhub data under a personal plan, so it is not
+       served to anyone else; a customer's terminal asks Finnhub for its own symbols with its own
+       key (see loadEarnings in the terminal). */
     const authE = request.headers.get('Authorization') || '';
     const tokE = authE.startsWith('Bearer ') ? authE.slice(7) : '';
-    let okE = !!(tokE && env.SYNC_SECRET && safeEqual(tokE, env.SYNC_SECRET));
-    if (!okE) okE = !!(await activeGrant(clean(url.searchParams.get('code'), 12).toUpperCase()));
-    if (!okE) return json({ error: 'Earnings dates need a live invite code, or the sync key.' }, 401, env);
+    if (!(tokE && env.SYNC_SECRET && safeEqual(tokE, env.SYNC_SECRET))) return json({ error: 'The worker\'s calendar is for the operator\'s devices; a customer\'s terminal reads Finnhub with its own key.' }, 401, env);
     if (!env.FINNHUB_API_KEY) return json({ error: 'Worker is missing FINNHUB_API_KEY.' }, 500, env);
     const today = new Date().toISOString().slice(0, 10);
     const ck = 'earn:' + today;
@@ -922,8 +1035,8 @@ async function handle(request, env) {
       if (used >= 12) return json({ error: 'Daily summary limit reached for this account. It resets tomorrow.' }, 429, env);
       await env.PF_SYNC.put(capKey, String(used + 1), { expirationTtl: 172800 });
     }
-    if (!env.AI_API_KEY) {
-      return json({ error: 'Worker is missing AI_API_KEY. Add it under Settings > Variables and Secrets as a Secret, then Deploy. Without it the app falls back to its own keyword summary.' }, 500, env);
+    if (!env.AI_API_KEY && !env.AI) {
+      return json({ error: 'The worker has no model: neither AI_API_KEY nor the Workers AI binding. The app shows its plain read instead.' }, 500, env);
     }
     let body;
     try { body = await request.json(); }
@@ -987,28 +1100,11 @@ async function handle(request, env) {
       (move !== null ? '\nPrice move over the window: ' + move.toFixed(1) + '%' : '') +
       '\n\n<headlines>\n' + numbered + '\n</headlines>';
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': env.AI_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: env.AI_MODEL || 'claude-haiku-4-5-20251001',
-        max_tokens: 700,
-        temperature: 0,          // same inputs, same words. Prose may vary; a marked record may not.
-        system,
-        messages: [{ role: 'user', content: user }]
-      })
-    });
-    if (!res.ok) {
-      let detail = '';
-      try { const e = await res.json(); detail = (e.error && e.error.message) || ''; } catch (e) {}
-      return json({ error: 'Summary provider rejected the request (' + res.status + ')' + (detail ? ': ' + detail : '') }, 502, env);
-    }
-    const out = await res.json();
-    let text = (out.content && out.content[0] && out.content[0].text) ? out.content[0].text.trim() : '';
+    /* Anthropic when it can answer, Workers AI when it cannot (no credit, no key): the same
+       fallback every other model route uses, so a summary is written whenever any model is up. */
+    let text = '', modelUsed = '';
+    try { const r = await aiText(env, system, user, 700); text = String(r.text || '').trim(); modelUsed = r.model || ''; }
+    catch (e) { return json({ error: 'No model could write the summary: ' + (e && e.message ? e.message : String(e)) }, 502, env); }
     if (!text) return json({ error: 'Empty summary returned.' }, 502, env);
 
     /* Models sometimes wrap JSON in a markdown fence despite being told not to. Tolerate that
@@ -1054,6 +1150,7 @@ async function handle(request, env) {
       n: heads.length,
       dropped,
       verified: true,
+      model: modelUsed,
       at: Date.now()
     };
     /* 7 days: the key is the content, so an entry can only be re-read by an identical request. */
@@ -1099,7 +1196,7 @@ async function handle(request, env) {
       return json({ error: 'Worker is missing FINNHUB_API_KEY. Add it under Settings > Variables and Secrets as a Secret, then Deploy. Until then each device needs its own key in the app.' }, 500, env);
     }
     const ALLOWED = new Set([
-      '/quote', '/news', '/company-news',
+      '/quote', '/news', '/company-news', '/calendar/earnings',
       '/stock/candle', '/stock/earnings', '/stock/eps-estimate', '/stock/insider-transactions',
       '/stock/metric', '/stock/peers', '/stock/price-target', '/stock/profile2',
       '/stock/recommendation'
@@ -1738,12 +1835,8 @@ async function handleBilling(request, env, url) {
     if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
     const day = new Date().toISOString().slice(0, 10), ck = 'kronos:' + sym + ':' + horizon + ':' + day;
     const cached = await env.PF_SYNC.get(ck); if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
-    let candles = [];
-    try {
-      const y = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=2y&interval=1d', { headers: { 'User-Agent': 'Mozilla/5.0 PerceptFolio' } });
-      const j = await y.json(); const r0 = j && j.chart && j.chart.result && j.chart.result[0]; const q = r0 && r0.indicators && r0.indicators.quote && r0.indicators.quote[0];
-      if (r0 && q) for (let i = 0; i < r0.timestamp.length; i++) if (isFinite(q.close[i]) && q.close[i] > 0) candles.push({ t: r0.timestamp[i], open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] || 0 });
-    } catch (e) { /* fall through */ }
+    let candles = [], feedUsed = priceFeed(env);
+    try { const { bars } = await dailyBars(env, sym, 740); candles = bars.map(b => ({ t: b.t || Math.floor(Date.parse(b.d) / 1000), open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v })); } catch (e) { /* fall through */ }
     if (candles.length < 60) return json({ error: 'Not enough price history for ' + sym + '.' }, 502, env);
     let out;
     try {
@@ -1751,7 +1844,7 @@ async function handleBilling(request, env, url) {
       out = await r.json(); if (!r.ok || !out || !Array.isArray(out.path)) return json({ error: 'The model did not answer.', detail: out && out.detail }, 502, env);
     } catch (e) { return json({ error: 'The model is not reachable.' }, 502, env); }
     const last = candles[candles.length - 1];
-    const result = { symbol: sym, horizon, asOf: day, last: last.close, path: out.path, lo: out.lo, hi: out.hi, dates: out.dates, model: out.model, cached: false };
+    const result = { symbol: sym, horizon, asOf: day, last: last.close, path: out.path, lo: out.lo, hi: out.hi, dates: out.dates, model: out.model, prices: feedLabel(feedUsed), cached: false };
     await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 86400 });
     return json(result, 200, env);
   }
@@ -1766,14 +1859,10 @@ async function handleBilling(request, env, url) {
     if (!/^[A-Z.\-^=]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
     const day = new Date().toISOString().slice(0, 10), ck = 'hist:' + sym + ':5y:' + day;
     const cached = await env.PF_SYNC.get(ck); if (cached) return new Response(cached, { status: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, corsHeaders(env)) });
-    let dates = [], closes = [];
-    try {
-      const y = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=5y&interval=1d', { headers: { 'User-Agent': 'Mozilla/5.0 PerceptFolio' } });
-      const j = await y.json(); const r0 = j && j.chart && j.chart.result && j.chart.result[0]; const q = r0 && r0.indicators && r0.indicators.quote && r0.indicators.quote[0];
-      if (r0 && q) for (let i = 0; i < r0.timestamp.length; i++) if (isFinite(q.close[i]) && q.close[i] > 0) { dates.push(new Date(r0.timestamp[i] * 1000).toISOString().slice(0, 10)); closes.push(Math.round(q.close[i] * 10000) / 10000); }
-    } catch (e) { /* fall through */ }
+    let dates = [], closes = [], feedUsed = priceFeed(env);
+    try { const { bars } = await dailyBars(env, sym, 1830); for (const b of bars) { dates.push(b.d); closes.push(Math.round(b.c * 10000) / 10000); } } catch (e) { /* fall through */ }
     if (closes.length < 20) return json({ error: 'No history for ' + sym + '.' }, 502, env);
-    const out = JSON.stringify({ symbol: sym, asOf: day, dates, closes, source: 'yahoo' });
+    const out = JSON.stringify({ symbol: sym, asOf: day, dates, closes, source: feedLabel(feedUsed) });
     await env.PF_SYNC.put(ck, out, { expirationTtl: 86400 });
     return new Response(out, { status: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, corsHeaders(env)) });
   }
@@ -1793,14 +1882,20 @@ async function handleBilling(request, env, url) {
     if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
     const day = new Date().toISOString().slice(0, 10), ck = 'council:' + sym + ':' + day;
     const cached = await env.PF_SYNC.get(ck); if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
-    const fh = async (path) => { try { const r = await fetch('https://finnhub.io/api/v1' + path + (path.includes('?') ? '&' : '?') + 'token=' + env.FINNHUB_API_KEY); return r.ok ? await r.json() : null; } catch (e) { return null; } };
-    const [profile, metric, recs] = await Promise.all([fh('/stock/profile2?symbol=' + sym), fh('/stock/metric?symbol=' + sym + '&metric=all'), fh('/stock/recommendation?symbol=' + sym)]);
-    let target = null, recMean = null;
-    try {
-      const y = await fetch('https://query1.finance.yahoo.com/v10/finance/quoteSummary/' + encodeURIComponent(sym) + '?modules=financialData', { headers: { 'User-Agent': 'Mozilla/5.0 PerceptFolio' } });
-      const j = await y.json(); const fd = j && j.quoteSummary && j.quoteSummary.result && j.quoteSummary.result[0] && j.quoteSummary.result[0].financialData;
-      if (fd) { target = fd.targetMeanPrice && fd.targetMeanPrice.raw; recMean = fd.recommendationMean && fd.recommendationMean.raw; }
-    } catch (e) { /* optional */ }
+    /* The facts come from the caller's own Finnhub key (profile, metrics, recommendations, price
+       target), fetched in the terminal and posted here; the worker's key serves only a device that
+       holds the sync key. Nothing from Yahoo. */
+    const authK = request.headers.get('Authorization') || '';
+    const tokK = authK.startsWith('Bearer ') ? authK.slice(7) : '';
+    const operator = !!(tokK && env.SYNC_SECRET && safeEqual(tokK, env.SYNC_SECRET));
+    const given = (body.facts && typeof body.facts === 'object') ? body.facts : null;
+    const fh = async (path) => { if (!operator || !env.FINNHUB_API_KEY) return null; try { const r = await fetch('https://finnhub.io/api/v1' + path + (path.includes('?') ? '&' : '?') + 'token=' + env.FINNHUB_API_KEY); return r.ok ? await r.json() : null; } catch (e) { return null; } };
+    const profile = given ? given.profile : await fh('/stock/profile2?symbol=' + sym);
+    const metric = given ? given.metric : await fh('/stock/metric?symbol=' + sym + '&metric=all');
+    const recs = given ? given.recs : await fh('/stock/recommendation?symbol=' + sym);
+    const pt = given ? given.target : await fh('/stock/price-target?symbol=' + sym);
+    let target = (pt && isFinite(pt.targetMean) && pt.targetMean > 0) ? pt.targetMean : null, recMean = null;
+    if (!profile && !metric) return json({ error: 'The council needs the company facts from your own data key. Add a Finnhub key under Settings.' }, 400, env);
     const m = (metric && metric.metric) || {};
     const rec = Array.isArray(recs) && recs[0] ? recs[0] : null;
     /* The free feed returns one row per month; the last twelve make the counts a trend instead of a snapshot. */
@@ -1900,17 +1995,21 @@ async function handleBilling(request, env, url) {
     if (await tooMany(env, request, '/universe', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
     const day = new Date().toISOString().slice(0, 10), ck = 'universe:' + day;
     const cached = await env.PF_SYNC.get(ck); if (cached) return new Response(cached, { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600', ...corsHeaders(env) } });
-    if (!env.FINNHUB_API_KEY) return json({ error: 'The listing needs the data key on the worker.' }, 503, env);
+    /* The SEC's own ticker file: every registrant with a ticker and its exchange, public domain,
+       no key, so the listing owes nothing to a personal data plan. Nasdaq and NYSE only; funds,
+       notes, preferreds, warrants and units are dropped by name. Names arrive in capitals and are
+       set in title case for the palette. */
     let rows;
     try {
-      const r = await fetch('https://finnhub.io/api/v1/stock/symbol?exchange=US&token=' + env.FINNHUB_API_KEY);
+      const r = await fetch('https://www.sec.gov/files/company_tickers_exchange.json', { headers: { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)' } });
       if (!r.ok) return json({ error: 'The listing did not answer (' + r.status + ').' }, 502, env);
       const list = await r.json();
-      const venues = { XNYS: 'NYSE', XNAS: 'Nasdaq', XASE: 'NYSE American', ARCX: 'NYSE Arca', BATS: 'Cboe' };
-      rows = (Array.isArray(list) ? list : []).filter(s => s && s.type === 'Common Stock' && venues[s.mic] && /^[A-Z]{1,5}$/.test(s.symbol) && s.description).map(s => [s.symbol, clean(s.description, 60), venues[s.mic]]).sort((a, b) => a[0].localeCompare(b[0]));
+      const tc = s => String(s).replace(/\w[^\s\-\/]*/g, x => /^[A-Z0-9&.']+$/.test(x) && x.length > 3 ? x.charAt(0) + x.slice(1).toLowerCase() : x).replace(/\b(Inc|Corp|Ltd|Plc|Llc|Co|Lp|Sa|Nv|Ag)\b\.?/g, m => m);
+      rows = (Array.isArray(list.data) ? list.data : []).filter(r => r && /^(Nasdaq|NYSE)$/.test(r[3]) && /^[A-Z]{1,5}$/.test(String(r[2] || '')) && r[1] && !/\b(ETF|Trust|Fund|Notes?|Preferred|Depositary|Warrants?|Units?|Rights?|Debentures?)\b/i.test(r[1]))
+        .map(r => [r[2], clean(tc(r[1]), 60), r[3]]);
     } catch (e) { return json({ error: 'The listing did not answer.' }, 502, env); }
     if (rows.length < 1000) return json({ error: 'The listing came back too short to trust (' + rows.length + ').' }, 502, env);
-    const body = JSON.stringify({ asOf: day, count: rows.length, source: 'Finnhub symbol list, US common stock on NYSE, Nasdaq, NYSE American, NYSE Arca and Cboe.', columns: ['symbol', 'name', 'venue'], rows });
+    const body = JSON.stringify({ asOf: day, count: rows.length, source: 'SEC company tickers (public domain): Nasdaq and NYSE registrants, funds and notes dropped by name.', columns: ['symbol', 'name', 'venue'], rows });
     await env.PF_SYNC.put(ck, body, { expirationTtl: 2 * 86400 });
     return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600', ...corsHeaders(env) } });
   }
@@ -1932,7 +2031,9 @@ async function handleBilling(request, env, url) {
     const cached = await env.PF_SYNC.get(ck); if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
     if (!(env.AI_API_KEY || env.AI)) return json({ error: 'The pre-fill needs a model on the worker.', configured: false }, 503, env);
     let name = sym, industry = '';
-    if (env.FINNHUB_API_KEY) { try { const r = await fetch('https://finnhub.io/api/v1/stock/profile2?symbol=' + sym + '&token=' + env.FINNHUB_API_KEY); const p = r.ok ? await r.json() : null; if (p && p.name) { name = p.name; industry = p.finnhubIndustry || ''; } } catch (e) { /* the symbol alone will do */ } }
+    /* The company's name and industry come from the caller's own profile lookup (its own key); the
+       symbol alone will do without them. The worker's key is not spent on anyone else's behalf. */
+    if (body.name) { name = clean(body.name, 80); industry = clean(body.industry || '', 60); }
     const system = 'You map the supply chain of a listed company from public, well-documented knowledge (annual reports, investor materials, widely reported sourcing). Output strict JSON only: {"suppliers":[{"name":"","ticker":"","weight":0,"note":""}],"customers":[{"name":"","ticker":"","weight":0,"note":""}]}. Up to eight of each, most important first. "ticker": the US-listed symbol only when certain, else "". "weight": a rough integer share, 1 to 100, of the company\'s cost base (suppliers) or revenue (customers); when unknown use 10. "note": one plain clause on what flows between them. If the company is small or its chain is not publicly documented, return empty arrays. Never invent a company, a ticker or a number. No prose outside the JSON.';
     let suppliers = [], customers = [], note = null, modelUsed = null;
     try {

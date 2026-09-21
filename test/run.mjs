@@ -13,6 +13,7 @@
    THE SHIPPED FILES rather than importing a copy, so the thing under test is the thing that ships.
    ============================================================================ */
 import fs from 'fs';
+import crypto from 'crypto';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -474,7 +475,10 @@ t('the terminal no longer asks FRED for the Wilshire 5000', !/need=\[[^\]]*'WILL
    macro data; on the screen they are context, never a signal. */
 t('the earnings calendar is one call a day for everybody', /const ck = 'earn:' \+ today;/.test(worker) && /expirationTtl: 86400/.test(worker.slice(worker.indexOf("'/earnings'"))));
 t('it is reduced to symbol and date before it is stored', /next\[sym\] = \{ d, h: r\.hour \|\| '' \}/.test(worker));
-t('it needs a live code or the sync key', /Earnings dates need a live invite code, or the sync key\./.test(worker));
+/* Finnhub's plans are personal and forbid redistribution, so the worker's calendar serves the
+   operator's devices only; a customer's terminal reads its own symbols with its own key. */
+t('the worker\'s calendar is for the operator\'s devices only', /The worker\\'s calendar is for the operator\\'s devices/.test(worker) && !/activeGrant\(clean\(url\.searchParams\.get\('code'\), 12\)\.toUpperCase\(\)\)\);\n    if \(!okE\)/.test(worker));
+t('a customer\'s terminal asks Finnhub for its own symbols with its own key', /fh\('\/calendar\/earnings\?symbol='\+encodeURIComponent\(s\)/.test(term) && /if\(D&&D\.apiKey\)\{/.test(term));
 t('the terminal keeps the calendar for the day', /localStorage\.setItem\('pf_earn_v1'/.test(term) && /c\.asOf===today&&c\.next/.test(term));
 t('a recorded call carries the next earnings date it knew about', /earningsAt:\(typeof nextEarnings==='function'&&nextEarnings\(sym\)\)\?nextEarnings\(sym\)\.d:null/.test(term));
 t('the date is printed on the holding and watchlist rows', /earningsCell\(h\.sym\)/.test(term) && /earningsCell\(s\)/.test(term));
@@ -1308,15 +1312,15 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('every regex-escape helper reads the dollar-ampersand literally (a String.replace once swallowed it into the matched text)', (term.match(/replace\(\/\[\.\*\+\?\^\$\{\}\(\)\|\[\\\]\\\\\]\/g,'\\\\\$&'\)/g) || []).length >= 2 && !/'\\\\  window\./.test(term) && !/'\\\\<\/body>/.test(term));
   t('satellite on the way down: Esri World Imagery layered over Natural Earth II, faded in below 4,000 km, only requested when shown, both CSPs allow exactly those hosts', /ArcGisMapServerImageryProvider\.fromUrl\('https:\/\/services\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer'/.test(term) && /function satFade\(\)/.test(term) && /hgt>4e6\?0:hgt<1\.2e6\?1/.test(term) && /sat\.show=a>0/.test(term) && /ctl\.minimumZoomDistance=600;/.test(term) && /img-src 'self' data: blob: https:\/\/services\.arcgisonline\.com https:\/\/server\.arcgisonline\.com/.test(term) && /img-src 'self' data: blob: https:\/\/services\.arcgisonline\.com https:\/\/server\.arcgisonline\.com/.test(mw) && /connect-src \$\{connect\} https:\/\/services\.arcgisonline\.com https:\/\/server\.arcgisonline\.com/.test(mw));
   t('the intro paragraphs are gone, not folded: none standing, none behind a summary', !/class="aside about"/.test(term) && !/<p class="muted" style="margin-bottom:12px/.test(term));
-  t('five years of history: the worker serves 5y, the device keeps it outside the synced log, charts and windows read it', /range=5y/.test(worker) && /HKEY='pf_hist_v1'/.test(term) && /window\.longSeries=function\(sym\)/.test(term) && /longSeries\(sym\)\)\|\|\(D\.priceLog\|\|\{\}\)\[sym\]/.test(term) && /histFill\(sym\);   \/\* five years/.test(term) && /HMAX=120/.test(term));
-  t('the whole listing is built in: /universe daily from the worker key, name search in the palette, a whole-market scan in the Screener', /url\.pathname === '\/universe'/.test(worker) && /stock\/symbol\?exchange=US/.test(worker) && /type === 'Common Stock'/.test(worker) && /window\.universeMatches=function/.test(term) && /universeMatches\(raw,6\)/.test(term) && /window\.scanUniverse=function/.test(term) && /onclick="scanUniverse\(\)"/.test(term) && /startScreener\(givenList\)/.test(term));
+  t('five years of history: the worker serves 5y, the device keeps it outside the synced log, charts and windows read it', /dailyBars\(env, sym, 1830\)/.test(worker) && /HKEY='pf_hist_v1'/.test(term) && /window\.longSeries=function\(sym\)/.test(term) && /longSeries\(sym\)\)\|\|\(D\.priceLog\|\|\{\}\)\[sym\]/.test(term) && /histFill\(sym\);   \/\* five years/.test(term) && /HMAX=120/.test(term));
+  t('the whole listing is built in: /universe daily from the SEC\'s public file, name search in the palette, a whole-market scan in the Screener', /url\.pathname === '\/universe'/.test(worker) && /company_tickers_exchange\.json/.test(worker) && !/stock\/symbol\?exchange=US/.test(worker) && /window\.universeMatches=function/.test(term) && /universeMatches\(raw,6\)/.test(term) && /window\.scanUniverse=function/.test(term) && /onclick="scanUniverse\(\)"/.test(term) && /startScreener\(givenList\)/.test(term));
   t('no About-this asides, no World aside, no Kelly essay, no Kronos operator note: the numbers stand on their own', !/class="aside about"/.test(term) && !/What.s automatic and what isn.t<\/summary><div>An industry or a company/.test(term) && !/Kelly maximises the growth rate/.test(term) && !/deploy <code>kronos\/app\.py<\/code>/.test(term) && /<div id="kOut"><\/div>/.test(term));
   t('the Top button is round with an up arrow', /border-radius:50%;width:44px;height:44px/.test(term) && /b\.innerHTML='<svg viewBox="0 0 24 24"[^']*M12 19V6/.test(term) && !/b\.textContent='Top'/.test(term));
   t('Market: the heat card sits after Calendar effects; Today’s heat switches between the holdings and the market (Dow 30 and twelve mega-caps)', /var after=cards\[1\]\|\|cards\[0\]/.test(term) && /window\.heatMode=function\(m\)/.test(term) && /function marketList\(\)/.test(term) && /P\.dow30/.test(term) && /P\.megatech/.test(term) && /ht-market/.test(term));
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v124/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v125/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
@@ -1520,6 +1524,51 @@ t('no headings are typed in Title Case',
     .every(x => !term.includes('>' + x)));
 /* The sign-in screen is a door, not a second landing page. */
 t('the feature list is off the sign-in screen', /\.auth-grid,\.auth-points\{display:none\}/.test(term));
+
+/* ==================== THE DATA LICENCE ==================== */
+G('Nothing the worker serves to everyone comes off the personal Finnhub key');
+
+/* Finnhub's terms: personal plans, no redistribution, no business use without written approval.
+   The worker's key may therefore serve only the operator's own devices, behind the sync key. */
+t('the /finnhub proxy is behind the sync key', (() => { const gate = worker.indexOf("Everything past this point is yours alone"); const route = worker.indexOf("url.pathname === '/finnhub'"); return gate > 0 && route > gate && /if \(!safeEqual\(token, env\.SYNC_SECRET\)\) \{/.test(worker.slice(gate, gate + 400)); })());
+t('marks run only on a licensed price feed', /if \(!priceFeed\(env\)\.licensed\) throw new Error\('no licensed price feed/.test(worker) && !/finnhub\.io\/api\/v1\/quote\?symbol=' \+ encodeURIComponent\(sym\)\n            \+ '&token='/.test(worker));
+t('history and the model\'s candles come from the price feed, labelled when it is the interim', /function dailyBars\(env, sym, days\)/.test(worker) && /source: feedLabel\(feedUsed\)/.test(worker) && /prices: feedLabel\(feedUsed\)/.test(worker) && /yahoo \(interim, unlicensed; set PRICE_FEED and PRICE_FEED_KEY\)/.test(worker));
+t('a licensed feed is two secrets away: EODHD or Tiingo', /eodhd\.com\/api\/eod\//.test(worker) && /api\.tiingo\.com\/tiingo\/daily\//.test(worker));
+t('the council takes its facts from the caller\'s own key; the worker\'s key only for the operator', /const given = \(body\.facts && typeof body\.facts === 'object'\) \? body\.facts : null;/.test(worker) && /if \(!operator \|\| !env\.FINNHUB_API_KEY\) return null;/.test(worker) && /facts:facts\|\|undefined/.test(term));
+t('nothing on the worker reads Yahoo\'s quote summary any more', !/quoteSummary/.test(worker));
+t('the map pre-fill takes the company name from the caller', /if \(body\.name\) \{ name = clean\(body\.name, 80\)/.test(worker) && !/stock\/profile2\?symbol=' \+ sym \+ '&token=' \+ env\.FINNHUB_API_KEY/.test(worker));
+
+/* ==================== THE STATEMENTS BEHIND THE CHECKS ==================== */
+G('Ten fiscal years from EDGAR, display only');
+
+t('the worker reads SEC company facts, keyless, cached a week', /data\.sec\.gov\/api\/xbrl\/companyfacts\/CIK/.test(worker) && /const ck = 'edgar:' \+ sym;/.test(worker) && /expirationTtl: 7 \* 86400/.test(worker.slice(worker.indexOf("'/edgar'"))));
+t('a value belongs to the year its period ends, latest filing wins, concepts merge across years', /const fy = \+String\(f\.end\)\.slice\(0, 4\);/.test(worker) && /if \(!\(y in merged\)\) \{ merged\[y\] = bst\.v; took\+\+; \}/.test(worker));
+t('the terminal shows them under an analysis and adds no check', /window\.pfStatements=statements;/.test(term) && /Free cash flow and margins are arithmetic on the rows above/.test(term) && !/lines\.revenue[^\n]*pass/.test(term));
+t('per-share figures are labelled as filed', /not restated for later splits/.test(term));
+
+/* ==================== THE SETTINGS MENU AND THE PLAIN READ ==================== */
+G('Settings in groups; the news read without a model');
+
+t('Settings has a menu and shows one group at a time', /window\.showSettings=function\(name\)/.test(term) && /\.set-hidden\{display:none!important\}/.test(term));
+t('when no model answers, the plain read is shown instead of an error', /function plainNewsRead\(sym\)/.test(term) && /if\(a\.error\)return plainNewsRead\(sym\)\+/.test(term));
+t('the summary route falls back to Workers AI like every other model route', /const r = await aiText\(env, system, user, 700\)/.test(worker) && !/'x-api-key': env\.AI_API_KEY,\n        'anthropic-version': '2023-06-01',\n        'content-type': 'application\/json'\n      \},\n      body: JSON\.stringify\(\{\n        model: env\.AI_MODEL/.test(worker));
+
+/* ==================== THE SCORECARD IS FROZEN ==================== */
+G('Scorecard v1.0, frozen 2026-09-21: the record is attributable to it');
+
+/* The graded record is only worth what its scorecard is. An edit to scoreStock() or to the order
+   of the 22 checks orphans every call made before it, so the two are hashed here against the
+   version constant. To change the checks: bump SCORECARD_VERSION, replace this hash, and say why
+   in PRD §26. A change that skips that fails the build. */
+t('the scorecard carries a version', /const SCORECARD_VERSION='1\.0 \(2026-09-21\)';/.test(term));
+t('every recorded call is stamped with it', /scorecard:SCORECARD_VERSION/.test(term));
+t('the scorecard view names it', /id="scorecardVersion"/.test(term) && /'scorecard v'\+SCORECARD_VERSION/.test(term));
+t('scoreStock() and CHECK_ORDER match the frozen v1.0 hash', (() => {
+  const s0 = term.indexOf('async function scoreStock(sym){'), e0 = term.indexOf('\n}\n', s0) + 2;
+  const c0 = term.indexOf('const CHECK_ORDER=['), ce = term.indexOf('];', c0) + 2;
+  const src = (term.slice(s0, e0) + term.slice(c0, ce)).replace(/\s+/g, ' ');
+  return crypto.createHash('sha256').update(src).digest('hex').slice(0, 16) === '52c4bc7ebcd23963';
+})(), 'the checks changed; bump SCORECARD_VERSION, re-pin the hash, and record why in PRD §26');
 
 /* ==================== QUIET NOTES ==================== */
 G('State the number, do not lecture');
