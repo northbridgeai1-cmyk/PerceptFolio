@@ -466,8 +466,8 @@ t('a paused code is refused on both lookup paths',
   /return rec\.paused \? null : rec/.test(worker));
 t('macro data is gated on a live grant, not the sync key',
   /Macro data needs a live invite code, or the sync key/.test(worker));
-t('the FRED series allowlist is closed: four statistics and three rates',
-  /FRED_ALLOWED = new Set\(\['VIXCLS', 'SP500', 'GDP', 'DFF', 'DGS2', 'DGS10'\]\)/.test(worker));
+t('the FRED series allowlist is closed: three statistics, the policy rate and its range, two yields, the balance sheet',
+  /FRED_ALLOWED = new Set\(\['VIXCLS', 'SP500', 'GDP', 'DFF', 'DFEDTARU', 'DFEDTARL', 'DGS2', 'DGS10', 'WALCL'\]\)/.test(worker));
 /* Wilshire withdrew WILL5000PR from FRED; asking for it prints an error on the Buffett card. */
 t('the terminal no longer asks FRED for the Wilshire 5000', !/need=\[[^\]]*'WILL5000PR'/.test(term));
 /* Earnings dates: one calendar for the whole market, a day at a time, behind the same door as
@@ -479,6 +479,18 @@ t('the terminal keeps the calendar for the day', /localStorage\.setItem\('pf_ear
 t('a recorded call carries the next earnings date it knew about', /earningsAt:\(typeof nextEarnings==='function'&&nextEarnings\(sym\)\)\?nextEarnings\(sym\)\.d:null/.test(term));
 t('the date is printed on the holding and watchlist rows', /earningsCell\(h\.sym\)/.test(term) && /earningsCell\(s\)/.test(term));
 t('the rates line never feeds a verdict', /function renderRates\(data\)/.test(term) && !/renderRates\([^)]*\)[^\n]*levels\.push/.test(term));
+/* The business cycle: the OECD's leading indicator for twenty-two areas, one CSV a day (the JSON
+   answer for several areas comes back cut), placed on the cycle by level and three-month slope. */
+t('the cycle route reads the OECD as CSV, cached a day, behind the same door as macro data', /DF_CLI,4\.1\/\.M\.LI\.\.\.AA\.\.\.H\?startPeriod=' \+ start \+ '&format=csv'/.test(worker) && /const ck = 'cycle:' \+ today;/.test(worker) && /The cycle needs a live invite code, or the sync key\./.test(worker));
+t('a phase is level against 100 and the three-month change, and nothing else', /const phase=dev>=0\?\(slope>=0\?'Expansion':'Slowdown'\):\(slope>=0\?'Recovery':'Contraction'\);/.test(term));
+t('the cycle card says what the indicator is and how far it leads', /built to lead turning points by six to nine months/.test(term));
+t('the cycle card never feeds a verdict', !/renderCycle\([^)]*\)[^\n]*levels\.push/.test(term));
+/* The thesis is a sheet behind the holding's menu. */
+t('the thesis form is a sheet, not a panel on the tab', /<div class="addwrap" id="thesisWrap">/.test(term) && /function openThesis\(sym\)/.test(term));
+t('the holding menu opens it', /run:"openThesis\('"\+sym\+"'\)"/.test(term));
+/* World: a product word finds plants; the owner is named with its ticker. */
+t('a World search reads the bundle by name, operator and product', /localMatches\(q,true\)/.test(term) && /\(products&&r\[5\]&&rx\.test\(r\[5\]\)\)/.test(term));
+t('the owner\'s ticker comes from Wikidata, the holding or the listing, never a short word', /function tickerFor\(f\)/.test(term) && /head\.length>=4&&UNI\[head\]&&\(n>=2\|\|head\.length>=5\)/.test(term));
 t('a paused grant loses macro data too', /return rec\.paused \? null : rec/.test(worker));
 t('the terminal presents its invite code when it has no sync key',
   /codeParam=syncConfigured\(\)\?'':'&code='/.test(term));
@@ -1287,7 +1299,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('the terminal viewport meta covers the notch and resizes for the keyboard', /viewport-fit=cover/.test(term) && /interactive-widget=resizes-content/.test(term));
   t('the layers are complete: fifteen, none partial, every plant named and placed or honestly unplaced', (() => { const idx2 = JSON.parse(read('world/data/index.json')); return idx2.industries.length === 15 && idx2.industries.every(i => !i.partial && i.count >= 100); })());
   t('heatmaps: holdings as a squarified treemap by value and day change, sectors as the eleven SPDR ETFs, in Market, free quotes only', /id="v2-heat"/.test(term) && /function treemap\(items,W,H\)/.test(term) && /\['XLK','Technology'\]/.test(term) && /Math\.min\(1,Math\.abs\(pct\)\/3\)/.test(term) && /if\(t==='market'\)setTimeout\(load,30\)/.test(term) && !/finnhub\.io\/api\/v1\/stock\/candle/.test(term.slice(term.indexOf('id="v2-heat"'))));
-  t('your holdings on World: one request for every name, bundle matches first, Nominatim on top, a colour per holding, a legend that flies', /INVITE_WORKER\+'\/world\/batch'/.test(term) && /function localMatches\(name\)/.test(term) && /function mergeNear\(base,extra\)/.test(term) && /wd-chip-mine/.test(term) && /flyTo\(set\.features\.filter/.test(term) && /UNKNOWN\[sym\]\?\[\]:localMatches\(q\)/.test(term) && /NAMES\[sym\]=n; delete UNKNOWN\[sym\];/.test(term) && /url\.pathname === '\/world\/batch'/.test(worker));
+  t('your holdings on World: one request for every name, bundle matches first, Nominatim on top, a colour per holding, a legend that flies', /INVITE_WORKER\+'\/world\/batch'/.test(term) && /function localMatches\(name,products\)/.test(term) && /function mergeNear\(base,extra\)/.test(term) && /wd-chip-mine/.test(term) && /flyTo\(set\.features\.filter/.test(term) && /UNKNOWN\[sym\]\?\[\]:localMatches\(q\)/.test(term) && /NAMES\[sym\]=n; delete UNKNOWN\[sym\];/.test(term) && /url\.pathname === '\/world\/batch'/.test(worker));
   t('the all-plants index ships beside the layers, one row a plant', (() => { const a = JSON.parse(read('world/data/all.json')); return Array.isArray(a.rows) && a.rows.length > 20000 && a.columns[0] === 'name' && a.rows.every(r => (r.length === 7 || r.length === 8) && typeof r[0] === 'string' && Number.isFinite(r[2]) && Number.isFinite(r[3])); })());
   t('the analyst counts carry a twelve-month trend: stacked monthly bars, buy share first to last', /analystsHistory: history/.test(worker) && /recs\.slice\(0, 12\)/.test(worker) && /f\.analystsHistory\.slice\(\)\.reverse\(\)/.test(term) && /aria-label="Analyst counts by month"/.test(term) && /buy share/.test(term));
   t('the World layers refresh themselves monthly through a pull request, base sets cached for the month, no secrets', (() => { const y = read('.github/workflows/world-refresh.yml'); return /cron: '17 6 1 \* \*'/.test(y) && /actions\/cache@v4/.test(y) && /world\/\.cache/.test(y) && /world-extract\.mjs --force/.test(y) && /create-pull-request@v7/.test(y) && /add-paths: world\/data/.test(y) && !/secrets\./.test(y); })());
@@ -1302,7 +1314,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v121/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v122/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
