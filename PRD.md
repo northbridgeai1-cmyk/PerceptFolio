@@ -452,3 +452,26 @@ every town over fifty thousand people as it comes into range, and a country filt
 country on the globe or in the legend and the set narrows to what it has there; click again to
 widen. `scripts/world-clean.mjs` drops the food, drink and farm plants a name regex let into the
 industry layers (280 of 29,535), and runs after every monthly extract.
+
+## 25. The thesis behind the row, products on the World, the cycle (2026-09-21, later)
+
+- **Thesis.** The investment thesis is no longer a panel on the Portfolio tab; it is a sheet
+  opened from a holding's ⋮ menu ("Thesis" / "Write a thesis"). Same form, same fields, same
+  functions; only where it lives changed. The THESIS command in the palette opens the sheet.
+- **World, products.** `scripts/world-products.mjs` builds `world/data/products/<word>.json`
+  from the extractor's cached base sets: every named plant whose product tag carries the word
+  (491 words with at least twelve plants; a file is capped at 1,500 and says so). A search word
+  found in that index shows those plants; an industry keyword still opens its layer, and a
+  listed company's name is still a company search. Static files on Pages: no worker, no code.
+- **World, owners.** A plant's owner is named with its ticker ("The Mosaic Company (MOS)"), from
+  Wikidata's listing, the holding, or the US listing matched on the company's short name (four
+  letters at least, on a word boundary, so "Chips" is never a ticker).
+- **Rates.** The line now carries the Fed's target range and its balance sheet (WALCL) with the
+  three-month change, read as buying or selling bonds. It says why when it cannot show.
+- **Business cycle.** `/cycle` on the worker reads the OECD's composite leading indicator for
+  the twenty-two areas it covers (CSV; the SDMX-JSON answer for several areas comes back cut at
+  about 24 KB), reduced to [month, value] and cached a day. The Market tab places a country on
+  the cycle from its level against 100 and its three-month change (recovery, expansion, slowdown,
+  contraction), with the other areas as grey dots. Labelled as the OECD's indicator, built to
+  lead turning points by six to nine months: where it points, not where output is measured.
+  Never a verdict input.

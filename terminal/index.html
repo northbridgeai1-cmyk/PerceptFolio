@@ -1385,7 +1385,11 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <button class="btn btn-ghost" onclick="setCash()">Update cash</button>
     </div>
   </div>
-  <div class="card" style="margin-top:16px">
+  <!-- The thesis is a sheet, opened from a holding's menu (⋮ → Thesis). The form, its ids and its
+       functions are unchanged; only where it lives did. -->
+  <div class="addwrap" id="thesisWrap">
+  <div class="card" style="position:relative">
+    <button class="add-close" onclick="closeAddModal()" title="Close">✕</button>
     <h3>Investment thesis</h3>
     <div class="row" style="margin-bottom:10px">
       <select id="thesisSym" style="max-width:200px" onchange="loadThesis()"></select>
@@ -1442,7 +1446,8 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <button class="btn" style="align-self:flex-end" onclick="saveThesis()">Save thesis</button>
       <button class="btn-danger btn btn-ghost" style="align-self:flex-end" onclick="deleteThesis()">Delete</button>
     </div>
-    <details class="aside"><summary>Four of these the app can act on</summary><div>the target, the stop, the deadline and the quality threshold. The free text it can store but never read. The stop is what actually limits a loss, it turns "how often am I right" into "how much do I make when I'm right versus lose when I'm wrong", which is the number that decides whether the account grows. The deadline handles the third outcome nobody plans for: the thesis was neither right nor wrong, it just never happened, and the money sat there.</div></details>
+    </div>
+  <details class="aside" style="display:none"><summary>Four of these the app can act on</summary><div>the target, the stop, the deadline and the quality threshold. The free text it can store but never read. The stop is what actually limits a loss, it turns "how often am I right" into "how much do I make when I'm right versus lose when I'm wrong", which is the number that decides whether the account grows. The deadline handles the third outcome nobody plans for: the thesis was neither right nor wrong, it just never happened, and the money sat there.</div></details>
   </div>
 
   <div class="section-title">Your holdings</div>
@@ -1746,6 +1751,15 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <div class="section-title">Market weather. Long-run valuation</div>
   <div id="weatherVerdict" style="margin-bottom:14px"></div>
   <div id="ratesLine" style="margin:0 0 16px"></div>
+  <div class="section-title">Business cycle</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:8px">
+      <input id="cycleQ" list="cycleAreas" placeholder="Country or area" style="max-width:260px" autocomplete="off" onchange="setCycleArea()" onkeydown="if(event.key==='Enter')setCycleArea()">
+      <datalist id="cycleAreas"></datalist>
+    </div>
+    <div id="cycleBox"></div>
+    <div class="muted" id="cycleNote" style="font-size:13px;margin-top:6px"></div>
+  </div>
   <div class="grid grid-3" id="weatherCards">
     <div class="card" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w4"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
   </div>
@@ -3525,6 +3539,8 @@ async function saveAccessCode(){
   try{ localStorage.setItem('pf_door_code',v); }catch(e){}
   if(el)el.value='';
   if(st)st.textContent='Saved. Checking…';
+  macroCache={}; EARN=null; CYCLE=null;
+  try{ loadEarnings().then(()=>{ if(typeof renderAll==='function')renderAll(); }); loadMarketData(true); }catch(e){}
   try{
     const j=await (await fetch(INVITE_WORKER+'/status?code='+encodeURIComponent(v))).json();
     if(st)st.textContent=(j&&j.known&&j.active)?'Saved. The code is live.':'Saved, but the worker does not report this code as live.';
@@ -4525,6 +4541,14 @@ function openAdd(id){
   const first=el.querySelector('input:not([type=checkbox]),select');
   if(first)setTimeout(()=>first.focus(),40);
 }
+/* The thesis sheet for one holding: pick it in the form's own select, load it, open the sheet. */
+function openThesis(sym){
+  closeAddModal();
+  const sel=document.getElementById('thesisSym');
+  if(sel){ if(![...sel.options].some(o=>o.value===sym)){ const o=document.createElement('option'); o.value=sym; o.textContent=sym; sel.appendChild(o); } sel.value=sym; }
+  if(typeof loadThesis==='function')loadThesis();
+  const el=document.getElementById('thesisWrap'); if(el){ el.classList.add('open'); _addOpen='thesisWrap'; }
+}
 function closeAddModal(){
   if(!_addOpen)return;
   const el=document.getElementById(_addOpen);
@@ -4808,7 +4832,7 @@ function loadedInto(el,html){
    guessing in a terminal is how the wrong ticker gets analysed. */
 const CMD_VERBS={
   SCORE:{tab:'analyzer',needsSym:true,run:sym=>{showTab('analyzer');analyzeStock(sym);}},
-  THESIS:{tab:'portfolio',needsSym:true,run:sym=>{showTab('portfolio');const el=document.getElementById('thesisSym');if(el){el.value=sym;el.focus();}}},
+  THESIS:{tab:'portfolio',needsSym:true,run:sym=>{showTab('portfolio');openThesis(sym);}},
   MAP:{tab:'map',needsSym:true,run:sym=>{showTab('map');}},
   WORLD:{tab:'world',needsSym:true,run:sym=>{showTab('world');if(window.wdFromTicker)wdFromTicker(sym);}},
   NEWS:{tab:'news',needsSym:true,run:sym=>{showTab('news');}},
@@ -5290,6 +5314,7 @@ function closeList(){ listView=null; renderAll(); }
 function holdingMenu(btn,sym,idx){
   openMenu(btn,[
     {label:'Analyze '+sym, run:"analyzeStock('"+sym+"')"},
+    {label:(D.theses&&D.theses[sym])?'Thesis':'Write a thesis', run:"openThesis('"+sym+"')"},
     {label:'Sell / trim',  run:"toggleSellRow("+idx+")"},
     {label:isFavorite(sym)?'Remove from favourites':'Add to favourites', run:"toggleFavorite('"+sym+"')"},
     {label:'Remove holding', run:"removeHolding("+idx+")", danger:true}
@@ -12787,10 +12812,12 @@ async function loadMarketData(force){
       else renderTodaysMove({error:'NEEDS_WORKER'});
       renderRegimeBanner({});   // clears rather than leaving a stale banner
       renderWeather({error:'NEEDS_WORKER'});
+      renderRates({error:'NEEDS_WORKER'});
+      renderCycle();
       return;
     }
     if(force)macroCache={};
-    const need=['VIXCLS','SP500','GDP','DFF','DGS2','DGS10'];   /* WILL5000PR is gone from FRED (Wilshire withdrew it); the Buffett figure is typed in */
+    const need=['VIXCLS','SP500','GDP','DFF','DFEDTARU','DFEDTARL','DGS2','DGS10','WALCL'];   /* WILL5000PR is gone from FRED (Wilshire withdrew it); the Buffett figure is typed in */
     const out={};
     for(const s of need){
       if(macroCache[s]&&!force){out[s]=macroCache[s];continue;}
@@ -12798,7 +12825,7 @@ async function loadMarketData(force){
         /* SP500 needs enough history for the regime detector (20 recent + 60 prior + 1); 120 gives
            headroom for holidays and gaps. VIX only needs a few readings for the day toggle. The
            three rates want a recent row and one from roughly three months back, for the change. */
-        const limit=s==='SP500'?120:(s==='VIXCLS'?5:(/^D(FF|GS2|GS10)$/.test(s)?70:2));
+        const limit=s==='SP500'?120:(s==='VIXCLS'?5:(/^(DFF|DGS2|DGS10)$/.test(s)?70:(s==='WALCL'?16:2)));
         out[s]=await fredSeries(s,limit);
         macroCache[s]=out[s];
       }catch(e){out[s]={error:e.message};}
@@ -12833,6 +12860,7 @@ async function loadMarketData(force){
     renderRegimeBanner(out);
     renderWeather(out);
     renderRates(out);
+    renderCycle();
   }finally{macroLoading=false;}
 }
 /* The code a profile presents to the worker for macro data and earnings dates: its own invite,
@@ -12848,17 +12876,91 @@ function accessCodeFor(user){
    and DGS10 skip holidays, so "three months ago" is the nearest row at or before that date. */
 function renderRates(data){
   const el=document.getElementById('ratesLine'); if(!el)return;
-  const pick=(s)=>{ const o=(data&&data[s])||null; if(!o||o.error||!Array.isArray(o)||!o.length)return null;
+  const pick=(s,months)=>{ const o=(data&&data[s])||null; if(!o||o.error||!Array.isArray(o)||!o.length)return null;
     const rows=o.filter(r=>r&&r.value!=='.'&&isFinite(parseFloat(r.value))).map(r=>({d:r.date,v:parseFloat(r.value)})).sort((a,b)=>a.d<b.d?1:-1);
-    if(!rows.length)return null; const last=rows[0]; const ago=new Date(Date.parse(last.d)-91*86400000).toISOString().slice(0,10);
+    if(!rows.length)return null; const last=rows[0]; const ago=new Date(Date.parse(last.d)-(months||3)*30.4*86400000).toISOString().slice(0,10);
     const prev=rows.find(r=>r.d<=ago)||null; return {v:last.v,d:last.d,chg:prev?last.v-prev.v:null}; };
-  const ff=pick('DFF'), y2=pick('DGS2'), y10=pick('DGS10');
-  if(!ff&&!y2&&!y10){ const err=data&&data.DFF&&data.DFF.error; el.innerHTML=err&&/FRED|key/i.test(err)?'<span class="muted">Rates need the FRED key on the worker.</span>':''; return; }
+  const ff=pick('DFF'), tu=pick('DFEDTARU'), tl=pick('DFEDTARL'), y2=pick('DGS2'), y10=pick('DGS10'), bs=pick('WALCL');
+  if(!ff&&!y2&&!y10&&!bs){
+    const err=data&&(data.error||(data.DFF&&data.DFF.error))||'';
+    el.innerHTML='<span class="muted">'+(err==='NEEDS_WORKER'?'Rates need an access code: Settings \u2192 Access code.':/FRED|key/i.test(err)?'Rates need the FRED key on the worker.':/sync key/i.test(err)?'Rates: the sync key was rejected. Settings \u2192 Sync.':err?esc(err):'')+'</span>';
+    return;
+  }
   const bp=(x)=>x==null?'':' <span class="muted">('+(x>=0?'+':'\u2212')+Math.abs(Math.round(x*100))+'bp in 3 months)</span>';
-  const cell=(label,r)=>r?'<span><span class="muted">'+label+'</span> <b>'+r.v.toFixed(2)+'%</b>'+bp(r.chg)+'</span>':'';
-  const curve=(y2&&y10)?'<span><span class="muted">2s10s</span> <b>'+((y10.v-y2.v)>=0?'+':'\u2212')+Math.abs(Math.round((y10.v-y2.v)*100))+'bp</b></span>':'';
-  const asOf=(y10||y2||ff).d;
-  el.innerHTML='<div class="rates">'+[cell('Fed funds',ff),cell('2-year',y2),cell('10-year',y10),curve].filter(Boolean).join('<i></i>')+'</div><div class="muted" style="font-size:11.5px;margin-top:4px">FRED, as of '+esc(asOf)+'</div>';
+  const cell=(label,html)=>html?'<span><span class="muted">'+label+'</span> '+html+'</span>':'';
+  const ffHtml=ff?'<b>'+ff.v.toFixed(2)+'%</b>'+(tl&&tu?' <span class="muted">(target '+tl.v.toFixed(2)+'\u2013'+tu.v.toFixed(2)+'%)</span>':'')+bp(ff.chg):'';
+  const curve=(y2&&y10)?'<b>'+((y10.v-y2.v)>=0?'+':'\u2212')+Math.abs(Math.round((y10.v-y2.v)*100))+'bp</b>':'';
+  /* WALCL is in $ millions, weekly. Its direction is the Fed buying or selling bonds. */
+  const bsHtml=bs?'<b>$'+(bs.v/1e6).toFixed(2)+'tn</b>'+(bs.chg!=null?' <span class="muted">('+(bs.chg>=0?'+':'\u2212')+'$'+Math.abs(Math.round(bs.chg/1000))+'bn in 3 months, '+(bs.chg>=0?'buying':'selling')+' bonds)</span>':''):'';
+  const asOf=(y10||y2||ff||bs).d;
+  el.innerHTML='<div class="rates">'+[cell('Fed funds',ffHtml),cell('2-year',y2?'<b>'+y2.v.toFixed(2)+'%</b>'+bp(y2.chg):''),cell('10-year',y10?'<b>'+y10.v.toFixed(2)+'%</b>'+bp(y10.chg):''),cell('2s10s',curve),cell('Fed balance sheet',bsHtml)].filter(Boolean).join('<i></i>')+'</div><div class="muted" style="font-size:11.5px;margin-top:4px">FRED, as of '+esc(asOf)+'</div>';
+}
+
+/* ---- The business cycle: the OECD's composite leading indicator, placed on the cycle ----
+   Twenty-two areas (the G20 and a few aggregates) from the worker's /cycle, kept for the day.
+   Level against 100 (the long-run trend) and the three-month change give a phase: below and
+   rising is recovery, above and rising expansion, above and falling slowdown, below and falling
+   contraction. The indicator is built to lead turning points by six to nine months, so this is
+   where it points, not where output has been measured. */
+let CYCLE=null, cycleLoading=null;
+function loadCycle(){
+  if(CYCLE)return Promise.resolve(CYCLE);
+  const today=new Date().toISOString().slice(0,10);
+  try{ const c=JSON.parse(localStorage.getItem('pf_cycle_v1')||'null'); if(c&&c.asOf===today&&c.areas){ CYCLE=c; return Promise.resolve(CYCLE); } }catch(e){}
+  if(cycleLoading)return cycleLoading;
+  const code=accessCodeFor(USER);
+  if(!syncConfigured()&&!code)return Promise.resolve(null);
+  const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
+  const auth=syncConfigured()?{headers:{'Authorization':'Bearer '+syncCfg.key}}:{};
+  cycleLoading=fetch(base+'/cycle'+(syncConfigured()?'':'?code='+encodeURIComponent(code)),auth).then(r=>r.ok?r.json():null).then(j=>{
+    cycleLoading=null; if(!j||!j.areas)return null; CYCLE=j; try{ localStorage.setItem('pf_cycle_v1',JSON.stringify(j)); }catch(e){} return CYCLE;
+  }).catch(()=>{ cycleLoading=null; return null; });
+  return cycleLoading;
+}
+function cyclePhase(months){
+  if(!months||months.length<4)return null;
+  const last=months[months.length-1], prev=months[months.length-4];
+  const dev=last[1]-100, slope=last[1]-prev[1];
+  const phase=dev>=0?(slope>=0?'Expansion':'Slowdown'):(slope>=0?'Recovery':'Contraction');
+  /* The point on the wave: a state (level, slope) is a phase angle; the wave is y=sin t with
+     recovery on the rise below the line, expansion above it, slowdown past the peak, contraction
+     below on the way down. A typical amplitude is a point or two, a typical quarter's move half a
+     point, so those are the units. */
+  const theta=Math.atan2(slope/0.5,dev/1.0); let tt=Math.PI/2-theta; while(tt<-Math.PI/2)tt+=2*Math.PI; while(tt>=3*Math.PI/2)tt-=2*Math.PI;
+  return {level:last[1],month:last[0],dev,slope,phase,t:tt};
+}
+function cycleAreaFor(text){
+  if(!CYCLE)return null; const q=String(text||'').trim().toLowerCase(); if(!q)return null;
+  const keys=Object.keys(CYCLE.areas);
+  return keys.find(k=>k.toLowerCase()===q)||keys.find(k=>CYCLE.areas[k].name.toLowerCase()===q)||keys.find(k=>CYCLE.areas[k].name.toLowerCase().indexOf(q)===0)||keys.find(k=>CYCLE.areas[k].name.toLowerCase().indexOf(q)>=0)||null;
+}
+function setCycleArea(){ const el=document.getElementById('cycleQ'); if(!el)return; const k=cycleAreaFor(el.value); if(k){ try{ localStorage.setItem('pf_cycle_area',k); }catch(e){} renderCycle(); } else { const st=document.getElementById('cycleNote'); if(st)st.textContent='Not one of the '+(CYCLE?Object.keys(CYCLE.areas).length:22)+' areas the OECD covers.'; } }
+function renderCycle(){
+  const box=document.getElementById('cycleBox'); if(!box)return;
+  loadCycle().then(j=>{
+    const note=document.getElementById('cycleNote'), list=document.getElementById('cycleAreas');
+    if(!j){ box.innerHTML=''; if(note)note.textContent=(!syncConfigured()&&!accessCodeFor(USER))?'Needs an access code: Settings \u2192 Access code.':'The OECD indicator did not load.'; return; }
+    if(list&&!list.children.length)Object.keys(j.areas).sort((a,b)=>j.areas[a].name.localeCompare(j.areas[b].name)).forEach(k=>{ const o=document.createElement('option'); o.value=j.areas[k].name; list.appendChild(o); });
+    let key=null; try{ key=localStorage.getItem('pf_cycle_area'); }catch(e){}
+    if(!key||!j.areas[key])key=j.areas.USA?'USA':Object.keys(j.areas)[0];
+    const q=document.getElementById('cycleQ'); if(q&&document.activeElement!==q)q.value=j.areas[key].name;
+    const me=cyclePhase(j.areas[key].months); if(!me){ box.innerHTML=''; if(note)note.textContent='Not enough months for '+j.areas[key].name+'.'; return; }
+    const W=640,H=200,L=36,R=604,MID=104,AMP=58;
+    const X=tt=>L+(tt+Math.PI/2)/(2*Math.PI)*(R-L), Y=tt=>MID-AMP*Math.sin(tt);
+    let path=''; for(let i=0;i<=120;i++){ const tt=-Math.PI/2+i/120*2*Math.PI; path+=(i?'L':'M')+X(tt).toFixed(1)+' '+Y(tt).toFixed(1); }
+    const others=Object.keys(j.areas).filter(k=>k!==key).map(k=>({k,p:cyclePhase(j.areas[k].months)})).filter(x=>x.p);
+    const lab=(tt,txt,above)=>'<text x="'+X(tt).toFixed(0)+'" y="'+(above?MID-AMP-14:MID+AMP+22)+'" text-anchor="middle" font-size="12" fill="var(--muted)">'+txt+'</text>';
+    box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="auto" role="img" aria-label="'+esc(j.areas[key].name)+' on the business cycle">'+
+      '<line x1="'+L+'" y1="'+MID+'" x2="'+R+'" y2="'+MID+'" stroke="var(--border)" stroke-width="1"/>'+
+      '<path d="'+path+'" fill="none" stroke="var(--text)" stroke-width="1.5" opacity=".55"/>'+
+      lab(-Math.PI/4,'Recovery',false)+lab(Math.PI/4,'Expansion',true)+lab(3*Math.PI/4,'Slowdown',true)+lab(5*Math.PI/4,'Contraction',false)+
+      others.map(x=>'<circle cx="'+X(x.p.t).toFixed(1)+'" cy="'+Y(x.p.t).toFixed(1)+'" r="3.5" fill="var(--muted)" opacity=".45"><title>'+esc(j.areas[x.k].name)+' · '+x.p.level.toFixed(2)+' · '+x.p.phase+'</title></circle>').join('')+
+      '<circle cx="'+X(me.t).toFixed(1)+'" cy="'+Y(me.t).toFixed(1)+'" r="7" fill="var(--brand2)" stroke="var(--bg)" stroke-width="2"/>'+
+      '<text x="'+X(me.t).toFixed(1)+'" y="'+(Y(me.t)+(Math.sin(me.t)>=0?22:-13)).toFixed(1)+'" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--text)">'+esc(j.areas[key].name)+'</text>'+
+      '</svg>';
+    const when=new Date(me.month+'-15').toLocaleDateString(undefined,{month:'short',year:'numeric'});
+    if(note)note.innerHTML='<b>'+esc(j.areas[key].name)+'</b> \u00b7 indicator '+me.level.toFixed(2)+' ('+esc(when)+') \u00b7 '+(me.slope>=0?'+':'\u2212')+Math.abs(me.slope).toFixed(2)+' over three months \u00b7 <b class="'+(me.phase==='Expansion'||me.phase==='Recovery'?'pos':'warn')+'">'+me.phase+'</b><span class="muted"> \u00b7 OECD composite leading indicator, built to lead turning points by six to nine months; grey dots are the other areas</span>';
+  });
 }
 
 /* ---- Earnings dates: one calendar for the whole market, a day at a time ----
@@ -15788,7 +15890,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       h.setInputAction(function(m){
         var now=Date.now(); if(now-last<40)return; last=now;
         var p=sc.pick(m.endPosition), tip=$('wdTip'), f=p&&p.id&&p.id.n?p.id:null;
-        if(f){ tip.textContent=(f.sym?f.sym+' · ':'')+f.n+(f.o&&f.o!==f.n?' · '+f.o:'')+(f.pl?' · '+f.pl:(names()[f.c]?' · '+names()[f.c]:'')); tip.style.left=m.endPosition.x+'px'; tip.style.top=m.endPosition.y+'px'; tip.hidden=false; sc.canvas.style.cursor='pointer'; }
+        if(f){ var ol=ownerLine(f); tip.textContent=f.n+(ol&&ol!==f.n?' · '+ol:(tickerFor(f)?' ('+tickerFor(f)+')':''))+(f.pl?' · '+f.pl:(names()[f.c]?' · '+names()[f.c]:'')); tip.style.left=m.endPosition.x+'px'; tip.style.top=m.endPosition.y+'px'; tip.hidden=false; sc.canvas.style.cursor='pointer'; }
         else { tip.hidden=true; sc.canvas.style.cursor=''; }
       },C.ScreenSpaceEventType.MOUSE_MOVE);
       /* A click on a plant opens it; a click on the ground picks that country, and the set
@@ -15902,9 +16004,10 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   }
   function showDetail(f){
     var nm=names(), osm={n:'node',w:'way',r:'relation'}[f.i[0]]+'/'+f.i.slice(1);
-    $('wdDetail').innerHTML='<div class="wd-detail"><h4>'+esc(f.n)+'</h4><div class="wd-kv">'+(f.sym?'<span>Holding</span><span class="mono">'+esc(f.sym)+'</span>':'')+(f.o?'<span>Operator</span><span>'+esc(f.o)+'</span>':'')+(f.p?'<span>Makes</span><span>'+esc(f.p)+'</span>':'')+
+    var tk=tickerFor(f);
+    $('wdDetail').innerHTML='<div class="wd-detail"><h4>'+esc(f.n)+(tk&&!f.o?' <span class="mono" style="font-size:13px;color:var(--muted)">('+esc(tk)+')</span>':'')+'</h4><div class="wd-kv">'+(f.sym?'<span>Holding</span><span class="mono">'+esc(f.sym)+'</span>':'')+(f.o?'<span>Operator</span><span>'+esc(f.o)+(tk?' <span class="mono">('+esc(tk)+')</span>':'')+'</span>':'')+(f.p?'<span>Makes</span><span>'+esc(f.p)+'</span>':'')+
       '<span>Where</span><span>'+esc(f.pl||nm[f.c]||f.c||'Unplaced')+'</span>'+(f.pl&&(nm[f.c]||f.c)&&!(new RegExp(', '+String(nm[f.c]||f.c).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$')).test(f.pl)?'<span>Country</span><span>'+esc(nm[f.c]||f.c)+'</span>':'')+(f.t?'<span>Owner listed as</span><span class="mono">'+esc(f.t)+'</span>':'')+'</div><div class="wd-links">'+
-      (f.t&&typeof analyzeStock==='function'?'<button class="btn btn-ghost btn-sm" type="button" onclick="analyzeStock('+JSON.stringify(String(f.t).replace(/[^A-Z0-9.\-]/gi,''))+')">Analyze '+esc(f.t)+'</button>':'')+
+      (tk&&typeof analyzeStock==='function'?'<button class="btn btn-ghost btn-sm" type="button" onclick="analyzeStock('+JSON.stringify(String(tk).replace(/[^A-Z0-9.\-]/gi,''))+')">Analyze '+esc(tk)+'</button>':'')+
       (f.w?'<a class="btn btn-ghost btn-sm" href="'+esc(f.w)+'" target="_blank" rel="noopener noreferrer">Website</a>':'')+
       (/^Q\d+$/.test(f.i)?'<a class="btn btn-ghost btn-sm" href="https://www.wikidata.org/wiki/'+esc(f.i)+'" target="_blank" rel="noopener noreferrer">On Wikidata</a>':'<a class="btn btn-ghost btn-sm" href="https://www.openstreetmap.org/'+esc(osm)+'" target="_blank" rel="noopener noreferrer">On OpenStreetMap</a>')+'</div></div>';
     var C=window.Cesium; viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(f.lo,f.la,30000),duration:1.4}); viewer.scene.requestRender();
@@ -15922,7 +16025,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   /* ---- a company: live, through the worker ---- */
   function stamp(feats){
     var need=feats.some(function(f){return !f.c||!f.pl;}); if(!need)return Promise.resolve(feats);
-    return Promise.all([loadNE(),loadPlaces()]).then(function(){ feats.forEach(function(f){ if(!f.c){ var cc=countryOf(f.lo,f.la); if(cc)f.c=cc; } if(!f.pl){ var pl=placeOf(f.la,f.lo,f.c); if(pl)f.pl=pl; } }); return feats; }).catch(function(){ return feats; });
+    return Promise.all([loadNE(),loadPlaces()]).then(function(){ feats.forEach(function(f){ if(!f.c){ var cc=countryOf(f.lo,f.la)||countryNear(f.la,f.lo); if(cc)f.c=cc; } if(!f.pl){ var pl=placeOf(f.la,f.lo,f.c); if(pl)f.pl=pl; } }); return feats; }).catch(function(){ return feats; });
   }
   var neP=null;
   function loadNE(){
@@ -15933,13 +16036,58 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   function inRing(ring,x,y){ var inside=false; for(var i=0,j=ring.length-1;i<ring.length;j=i++){ var xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1]; if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)inside=!inside; } return inside; }
   function countryOf(lon,lat){ for(var i=0;i<NE.length;i++){ var b=NE[i].box; if(lon<b[0]||lon>b[2]||lat<b[1]||lat>b[3])continue; var polys=NE[i].polys; for(var k=0;k<polys.length;k++){ if(!inRing(polys[k][0],lon,lat))continue; var hole=false; for(var m=1;m<polys[k].length;m++)if(inRing(polys[k][m],lon,lat)){hole=true;break;} if(!hole)return NE[i].cc; } } return ''; }
   function searchCompany(q){
-    markChip(null); status('Asking OpenStreetMap about '+q+'…'); $('wdDetail').innerHTML='';
-    var ask=fetch(INVITE_WORKER+'/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),q:q})}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); });
-    Promise.all([ensureViewer(),ask]).then(function(res){
-      var r=res[1]; if(!r.ok){ status((r.j&&r.j.error)||'No answer from the worker.'); return; }
-      return stamp(r.j.features||[]).then(function(feats){ SET={label:q,color:'#1f9e8c',features:feats,asOf:r.j.asOf,saturated:!!r.j.saturated}; draw(SET); legend(SET); status(''); });
+    markChip(null); status('Looking for '+q+'\u2026'); $('wdDetail').innerHTML='';
+    var ask=fetch(INVITE_WORKER+'/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),q:q})}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); }).catch(function(){ return {ok:false,j:{error:'the worker could not be reached'}}; });
+    /* The bundle first: 28,000 plants matched on name, operator and product, so "fish" is every
+       fish plant and "Mosaic" every Mosaic site. The live answer (OpenStreetMap by name) is merged
+       in; a refusal there still leaves the bundle's answer on the globe. */
+    Promise.all([ensureViewer(),loadAll(),ask,loadUniverseNames()]).then(function(res){
+      var r=res[2], local=localMatches(q,true), live=(r.ok&&r.j&&r.j.features)||[], note=null;
+      if(!r.ok&&r.j&&r.j.error)note=/access code|invite code/i.test(r.j.error)?'Live lookup needs an access code (Settings); this is the bundle\u2019s answer.':null;
+      var feats=mergeNear(local,live);
+      if(!feats.length){ status(r.ok?'Nothing under that name or product. Try a company\u2019s short name, or an industry above.':((r.j&&r.j.error)||'No answer.')); return; }
+      return stamp(feats).then(function(all){ SET={label:q,color:'#1f9e8c',features:all,asOf:(r.j&&r.j.asOf)||(IDX&&IDX.generatedAt||'').slice(0,10),saturated:!!(r.j&&r.j.saturated),note:note}; draw(SET); legend(SET); status(''); });
     }).catch(function(e){ status('Could not search: '+e.message+'.'); });
   }
+  /* ---- a product: one static file a word, built from the whole base set ----
+     "fish" is neither an industry layer nor a company. world/data/products/<word>.json holds every
+     named plant whose product tag mentions the word (capped, and the file says so); index.json
+     lists the words. A query that is a listed company's name stays a company search ("Apple"),
+     otherwise its first word found in the index is taken as the product. */
+  var PRODS=null;
+  function loadProducts(){ if(PRODS)return Promise.resolve(PRODS); return fetch(DATA+'products/index.json').then(function(r){ return r.ok?r.json():null; }).then(function(j){ PRODS=(j&&j.words)||{}; return PRODS; }).catch(function(){ PRODS={}; return PRODS; }); }
+  function productWord(q){
+    if(!PRODS)return null; var b=bare(q); if(UNI&&UNI[b])return null;
+    var words=String(q).toLowerCase().replace(/[^a-z0-9\-\s]/g,' ').split(/\s+/).filter(function(w){return w.length>=3;});
+    for(var i=0;i<words.length;i++){ var w=words[i], forms=[w,w.replace(/ies$/,'y'),w.replace(/es$/,''),w.replace(/s$/,''),w+'s',w+'es']; for(var k=0;k<forms.length;k++)if(PRODS[forms[k]])return forms[k]; }
+    return null;
+  }
+  function showProduct(w){
+    markChip(null); status('Loading '+w+'\u2026'); $('wdDetail').innerHTML='';
+    Promise.all([ensureViewer(),fetch(DATA+'products/'+encodeURIComponent(w)+'.json').then(function(r){ if(!r.ok)throw new Error('no file for '+w); return r.json(); }),loadUniverseNames()]).then(function(res){
+      var j=res[1], feats=(j.rows||[]).map(function(r,i){ var f={i:'p'+w+':'+i,n:r[0],la:r[2],lo:r[3],s:'o',p:r[5]}; if(r[1])f.o=r[1]; if(r[4])f.c=r[4]; return f; });
+      return stamp(feats).then(function(all){ SET={label:w.charAt(0).toUpperCase()+w.slice(1),color:'#c98a3f',features:all,asOf:(IDX&&IDX.generatedAt||'').slice(0,10),saturated:!!j.capped,note:j.capped?'The word has '+j.count+' plants on OpenStreetMap; the '+all.length+' with an operator or a Wikidata entry are shown.':null}; draw(SET); legend(SET); status(''); });
+    }).catch(function(e){ status('Could not show '+w+': '+e.message+'.'); });
+  }
+  /* ---- the owner's ticker: the listing, matched on the company's short name ---- */
+  var UNI=null, UNIP=null, SUFFIX=/\b(inc|incorporated|corp|corporation|co|company|ltd|limited|plc|llc|lp|sa|ag|nv|se|holdings?|group|the)\b\.?/gi;
+  function bare(s){ return String(s||'').toLowerCase().replace(/&/g,' and ').replace(SUFFIX,' ').replace(/[^a-z0-9]+/g,' ').trim(); }
+  function loadUniverseNames(){
+    if(UNI)return Promise.resolve(UNI); if(UNIP)return UNIP;
+    UNIP=(typeof loadUniverse==='function'?loadUniverse():Promise.resolve([])).then(function(rows){ UNI={}; (rows||[]).forEach(function(r){ var b=bare(r[1]); if(b.length>=4&&!UNI[b])UNI[b]=r[0]; }); return UNI; }).catch(function(){ UNI={}; return UNI; });
+    return UNIP;
+  }
+  /* The listed owner of a plant: the bundle's own ticker (Wikidata), a holding's symbol, or the
+     listing entry whose short name the operator or plant name begins with. Four letters at least,
+     on a word boundary, so "Chips" never becomes a ticker and "Intel Jones Farm" is INTC. */
+  function tickerFor(f){
+    if(f.t)return String(f.t).toUpperCase(); if(f.sym)return f.sym; if(!UNI)return '';
+    var cands=[f.o,f.n].filter(Boolean);
+    for(var i=0;i<cands.length;i++){ var b=bare(cands[i]); if(!b)continue; if(UNI[b])return UNI[b];
+      var words=b.split(' '); for(var n=Math.min(4,words.length);n>=1;n--){ var head=words.slice(0,n).join(' '); if(head.length>=4&&UNI[head]&&(n>=2||head.length>=5))return UNI[head]; } }
+    return '';
+  }
+  function ownerLine(f){ var tk=tickerFor(f), who=f.o||''; if(!who&&tk)who=f.n; return who?(who+(tk?' ('+tk+')':'')):''; }
 
   /* ---- every plant of every company you hold, in one request ---- */
   var PALETTE=['#3b82f6','#22c55e','#f59e0b','#ec4899','#a78bfa','#06b6d4','#f97316','#84cc16','#e879f9','#14b8a6','#ef4444','#fbbf24','#0ea5e9','#b45309','#9ca3af','#1f9e8c','#c98a3f','#d9a441','#2ea043','#e5534b'];
@@ -15956,6 +16104,12 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
      still reads "near Mesa, Arizona" rather than a pair of numbers. */
   var PLACES=null, REGION_CC={US:1,CA:1,AU:1,BR:1,MX:1,IN:1};
   function loadPlaces(){ if(PLACES)return Promise.resolve(PLACES); return fetch('/world/places.json').then(function(r){ return r.ok?r.json():null; }).then(function(j){ PLACES=(j&&j.rows)||[]; return PLACES; }).catch(function(){ PLACES=[]; return PLACES; }); }
+  function countryNear(lat,lon){
+    if(!PLACES||!PLACES.length)return '';
+    var cl=Math.cos(lat*Math.PI/180), best=null, bd=Infinity;
+    for(var i=0;i<PLACES.length;i++){ var p=PLACES[i]; var dy=p[3]-lat; if(dy>1.5||dy<-1.5)continue; var dx=(p[4]-lon)*cl; if(dx>1.5||dx<-1.5)continue; var d=dx*dx+dy*dy; if(d<bd){bd=d;best=p;} }
+    return (best&&Math.sqrt(bd)*111<150)?best[2]:'';
+  }
   function placeOf(lat,lon,cc){
     if(!PLACES||!PLACES.length)return '';
     var cl=Math.cos(lat*Math.PI/180), best=null, bd=Infinity;
@@ -15966,9 +16120,9 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   }
   var ALL=null;
   function loadAll(){ if(ALL)return Promise.resolve(ALL); return fetch(DATA+'all.json').then(function(r){ if(!r.ok)throw new Error('all'); return r.json(); }).then(function(j){ ALL=j.rows||[]; return ALL; }).catch(function(){ ALL=[]; return ALL; }); }
-  function localMatches(name){
+  function localMatches(name,products){
     var rx=new RegExp('(^|[^A-Za-z])('+String(name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')([^A-Za-z]|$)','i'), out=[];
-    for(var i=0;i<ALL.length&&out.length<400;i++){ var r=ALL[i]; if(rx.test(r[0])||(r[1]&&rx.test(r[1]))){ var f={i:'b'+i,n:r[0],la:r[2],lo:r[3],s:'o'}; if(r[1])f.o=r[1]; if(r[4])f.c=r[4]; if(r[5])f.p=r[5].replace(/_/g,' '); if(r[6])f.q=r[6]; if(r[7])f.pl=r[7]; out.push(f); } }
+    for(var i=0;i<ALL.length&&out.length<(products?1500:400);i++){ var r=ALL[i]; if(rx.test(r[0])||(r[1]&&rx.test(r[1]))||(products&&r[5]&&rx.test(r[5]))){ var f={i:'b'+i,n:r[0],la:r[2],lo:r[3],s:'o'}; if(r[1])f.o=r[1]; if(r[4])f.c=r[4]; if(r[5])f.p=r[5].replace(/_/g,' '); if(r[6])f.q=r[6]; if(r[7])f.pl=r[7]; out.push(f); } }
     return out;
   }
   function mergeNear(base,extra){
@@ -16001,7 +16155,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   window.wdSearch=function(){
     var q=($('wdQ').value||'').replace(/\s+/g,' ').trim(); if(!q)return;
     if(/^(my |your |our )?(holdings|portfolio|positions)$/i.test(q)){ wdHoldings(); return; }
-    loadIndex().then(function(){ var id=route(q); if(id)showIndustry(id); else searchCompany(q); }).catch(function(){ status('The industry list did not load.'); });
+    Promise.all([loadIndex(),loadProducts(),loadUniverseNames()]).then(function(){ var id=route(q); if(id){ showIndustry(id); return; } var w=productWord(q); if(w)showProduct(w); else searchCompany(q); }).catch(function(){ status('The industry list did not load.'); });
   };
   /* From a ticker: the company's short name, legal suffixes dropped. "Taiwan Semiconductor Manufacturing Co Ltd" → "Taiwan Semiconductor". */
   window.wdFromTicker=function(sym){

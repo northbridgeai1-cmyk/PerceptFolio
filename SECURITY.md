@@ -230,3 +230,11 @@ for the gate suite's three operator checks.
 - Settings → Access code stores a code on the profile record (`p.code`) and beside the door's own
   copy in localStorage; sign-in still reads only `p.invite`, so a code saved here can never lock
   a profile out.
+
+## The cycle route and the product index (2026-09-21, later)
+
+- `GET /cycle?code=`: one request a day to the OECD's public SDMX service (no key), reduced and
+  cached a day, behind the same door as `/fred`. Nothing user-specific.
+- `world/data/products/*.json`: static, public, OpenStreetMap-derived (ODbL); built offline from
+  the extractor's cache and served by Pages like the layers.
+- The FRED allowlist grows by DFEDTARU, DFEDTARL and WALCL, all public series.

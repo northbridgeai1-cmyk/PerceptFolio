@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-21.2';
+const WORKER_VERSION = '2026-09-21.4';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -559,6 +559,48 @@ async function handle(request, env) {
      THE SAME REASONING DOES NOT EXTEND TO /finnhub, which is why that route was left alone: it is
      per-ticker and per-user against a 60-per-minute shared quota, so a handful of invited users
      calling it would exhaust the limit and break market data for everybody including the operator. */
+  /* ---- GET /cycle?code= -> the OECD composite leading indicator for every area it covers ----
+     One request to the OECD's public SDMX service for all twenty-two areas (the G20 economies and
+     a few aggregates), fifteen months of the amplitude-adjusted index, reduced to [month, value]
+     pairs and cached a day. The terminal turns level and slope into a phase on the cycle. Same
+     door as /fred. No key is needed at the OECD. */
+  if (url.pathname === '/cycle') {
+    const authC = request.headers.get('Authorization') || '';
+    const tokC = authC.startsWith('Bearer ') ? authC.slice(7) : '';
+    let okC = !!(tokC && env.SYNC_SECRET && safeEqual(tokC, env.SYNC_SECRET));
+    if (!okC) okC = !!(await activeGrant(clean(url.searchParams.get('code'), 12).toUpperCase()));
+    if (!okC) return json({ error: 'The cycle needs a live invite code, or the sync key.' }, 401, env);
+    const today = new Date().toISOString().slice(0, 10);
+    const ck = 'cycle:' + today;
+    const hit = await env.PF_SYNC.get(ck);
+    if (hit) return json(Object.assign(JSON.parse(hit), { cached: true }), 200, env);
+    const start = new Date(Date.now() - 460 * 86400000).toISOString().slice(0, 7);
+    /* CSV, not SDMX-JSON: the OECD's JSON answer for several areas at once comes back silently cut
+       at about 24 KB (a country with three months where its neighbour has fifteen); the CSV is
+       whole. Names come from a fixed list, since the CSV carries codes. */
+    const NAMES = { USA: 'United States', CHN: 'China', DEU: 'Germany', JPN: 'Japan', GBR: 'United Kingdom', FRA: 'France', ITA: 'Italy', CAN: 'Canada', KOR: 'Korea', MEX: 'Mexico', ESP: 'Spain', TUR: 'Türkiye', BRA: 'Brazil', IND: 'India', IDN: 'Indonesia', ZAF: 'South Africa', AUS: 'Australia', G20: 'G20', G7: 'G7', NAFTA: 'NAFTA', G4E: 'Major four European countries', A5M: 'Major five Asian economies' };
+    let res;
+    try { res = await fetch('https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/.M.LI...AA...H?startPeriod=' + start + '&format=csv', { headers: { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)' } }); }
+    catch (e) { return json({ error: 'Could not reach the OECD: ' + (e && e.message ? e.message : String(e)) }, 502, env); }
+    if (!res.ok) return json({ error: 'The OECD answered ' + res.status + '.' }, 502, env);
+    const csv = await res.text();
+    const areas = {};
+    try {
+      const rows = csv.trim().split('\n'), head = rows[0].split(',');
+      const ia = head.indexOf('REF_AREA'), it = head.indexOf('TIME_PERIOD'), iv = head.indexOf('OBS_VALUE');
+      if (ia < 0 || it < 0 || iv < 0) throw new Error('columns');
+      for (const r of rows.slice(1)) {
+        const x = r.split(','), a = x[ia], m = x[it], v = parseFloat(x[iv]);
+        if (!/^[A-Z0-9]{2,6}$/.test(a) || !/^\d{4}-\d{2}$/.test(m) || !isFinite(v)) continue;
+        (areas[a] = areas[a] || { name: NAMES[a] || a, months: [] }).months.push([m, Math.round(v * 1000) / 1000]);
+      }
+      for (const a of Object.values(areas)) a.months.sort((x, y) => x[0] < y[0] ? -1 : 1);
+    } catch (e) { return json({ error: 'The OECD answer had an unexpected shape.' }, 502, env); }
+    const out = { asOf: today, source: 'OECD composite leading indicator, amplitude adjusted (DF_CLI)', areas };
+    if (Object.keys(areas).length) await env.PF_SYNC.put(ck, JSON.stringify(out), { expirationTtl: 86400 });
+    return json(out, 200, env);
+  }
+
   /* ---- GET /earnings?code= -> the next earnings date for every US-listed symbol, cached a day ----
      Finnhub's calendar answers one window for the whole market, so this costs one call a day for
      everybody rather than one per holding per device. Reduced to {symbol: "YYYY-MM-DD"} before it
@@ -596,7 +638,10 @@ async function handle(request, env) {
   if (url.pathname === '/fred') {
     /* Four market statistics, and three rates: the Fed funds effective rate, the two-year and the
        ten-year Treasury yields, so the Market tab can print the curve beside the valuation figures. */
-    const FRED_ALLOWED = new Set(['VIXCLS', 'SP500', 'GDP', 'DFF', 'DGS2', 'DGS10']);   /* WILL5000PR was withdrawn from FRED in 2024 */
+    /* Four statistics; the policy rate and its target range; the two- and ten-year yields; and the
+       Fed's balance sheet (WALCL, weekly, $m), whose direction is the Fed buying or selling bonds.
+       WILL5000PR was withdrawn from FRED in 2024. */
+    const FRED_ALLOWED = new Set(['VIXCLS', 'SP500', 'GDP', 'DFF', 'DFEDTARU', 'DFEDTARL', 'DGS2', 'DGS10', 'WALCL']);
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
     let allowed = safeEqual(tok0, env.SYNC_SECRET);
