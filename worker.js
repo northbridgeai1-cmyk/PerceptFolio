@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-21.4';
+const WORKER_VERSION = '2026-09-21.5';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -596,7 +596,34 @@ async function handle(request, env) {
       }
       for (const a of Object.values(areas)) a.months.sort((x, y) => x[0] < y[0] ? -1 : 1);
     } catch (e) { return json({ error: 'The OECD answer had an unexpected shape.' }, 502, env); }
-    const out = { asOf: today, source: 'OECD composite leading indicator, amplitude adjusted (DF_CLI)', areas };
+    /* Every country: the IMF's World Economic Outlook, real GDP growth by year with the Fund's own
+       projections (229 economies, 1980 to five years out). Public, no key, revised twice a year, so
+       it is kept a week. Reduced to the last ten years and the projections. */
+    let imf = null;
+    const wk = 'cycle:imf:' + Math.floor(Date.now() / (7 * 86400000));
+    const imfHit = await env.PF_SYNC.get(wk);
+    if (imfHit) imf = JSON.parse(imfHit);
+    else {
+      try {
+        const [rg, rn] = await Promise.all([
+          fetch('https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH', { headers: { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)' } }),
+          fetch('https://www.imf.org/external/datamapper/api/v1/countries', { headers: { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)' } })
+        ]);
+        if (rg.ok && rn.ok) {
+          const g = (await rg.json()).values.NGDP_RPCH, names = (await rn.json()).countries;
+          const y0 = new Date().getUTCFullYear() - 10, countries = {};
+          for (const [iso, series] of Object.entries(g || {})) {
+            if (!/^[A-Z]{3}$/.test(iso) || !names[iso]) continue;
+            const years = {};
+            for (const [y, v] of Object.entries(series)) if (+y >= y0 && isFinite(v)) years[y] = Math.round(v * 10) / 10;
+            if (Object.keys(years).length >= 5) countries[iso] = { name: names[iso].label, g: years };
+          }
+          imf = { source: 'IMF World Economic Outlook, real GDP growth (NGDP_RPCH)', year: new Date().getUTCFullYear(), countries };
+          if (Object.keys(countries).length > 100) await env.PF_SYNC.put(wk, JSON.stringify(imf), { expirationTtl: 7 * 86400 });
+        }
+      } catch (e) { imf = null; }
+    }
+    const out = { asOf: today, source: 'OECD composite leading indicator, amplitude adjusted (DF_CLI)', areas, imf };
     if (Object.keys(areas).length) await env.PF_SYNC.put(ck, JSON.stringify(out), { expirationTtl: 86400 });
     return json(out, 200, env);
   }
