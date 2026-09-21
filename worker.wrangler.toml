@@ -29,6 +29,14 @@ name = "RL_LOOSE"
 namespace_id = "1002"
 simple = { limit = 30, period = 60 }
 
+# RL_DATA for /data, the built-in market data: Finnhub's own sixty a minute, which is also the
+# terminal's budget for itself, so a legitimate refresh (four to six calls a symbol) is never cut
+# off here before Finnhub would cut it off anyway.
+[[ratelimits]]
+name = "RL_DATA"
+namespace_id = "1003"
+simple = { limit = 60, period = 60 }
+
 # Cloudflare's own model, the fallback for the six lenses, the Map's pre-fill and the news summary
 # when no Anthropic key is set or its account has no credit. Free daily allowance; no other account.
 [ai]

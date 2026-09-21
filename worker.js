@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-22.1';
+const WORKER_VERSION = '2026-09-22.2';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -1593,7 +1593,7 @@ async function tooMany(env, request, name, perMinute) {
   /* Cloudflare's Rate Limiting binding when it is bound (worker.wrangler.toml): a real sliding
      window at the edge. KV reads are cached for up to a minute, so a KV counter cannot see a burst;
      it remains only as the fallback where no binding exists, which is the Node test harness. */
-  const rl = perMinute <= 10 ? env.RL_TIGHT : env.RL_LOOSE;
+  const rl = perMinute <= 10 ? env.RL_TIGHT : (perMinute >= 60 && env.RL_DATA) ? env.RL_DATA : env.RL_LOOSE;
   if (rl && typeof rl.limit === 'function') {
     try { const r = await rl.limit({ key: name + ':' + ip }); return r && r.success === false; } catch (e) { /* fall through to KV */ }
   }
