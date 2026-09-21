@@ -990,7 +990,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <div class="logo" style="font-size:19px;margin-bottom:26px"><svg class="logo-mark" width="1.4em" height="1.4em" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="37" height="37" rx="9" fill="none" stroke="var(--border)" stroke-width="1.5"/><text x="5" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--text)">P</text><text x="20" y="28" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="21" font-weight="700" fill="var(--brand2)">F</text></svg><span class="logo-word"><span class="c1">Percept</span><span class="c2">Folio</span></span></div>
       <div class="auth-eyebrow">NorthBridge · Financial</div>
       <h1 class="auth-h1">Know what to buy.<br>Know what to sell.</h1>
-      <p class="auth-sub">A private research terminal. You set the rules once; it applies them to every position, every day, and shows its working.</p>
+
       <ul class="auth-points">
         <li><span class="auth-dot"></span><div><b>A checklist, not a hunch</b><span>Twenty-two checks across quality, value and momentum. Every verdict shows which ones it passed.</span></div></li>
         <li><span class="auth-dot"></span><div><b>It grades itself</b><span>Every call is recorded and marked against the S&amp;P on a fixed horizon, displayed whether or not it flatters the system.</span></div></li>
@@ -1048,7 +1048,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
           <input id="newInvite" placeholder="XXXXX-XXXXX" maxlength="11" autocomplete="off"
                  style="text-transform:uppercase;font-family:var(--mono);letter-spacing:.08em"
                  onkeydown="if(event.key==='Enter')createProfile()">
-          <p class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.5">Issued when an access request is approved. Request one from the front page.</p>
         </div>
         <!-- One checkbox covering both documents rather than two. Two boxes for a single decision
              is a dark pattern in reverse: it looks more rigorous and is just more friction. Both are
@@ -1060,7 +1059,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
         <button class="btn" style="width:100%" onclick="createProfile()">Create account</button>
       </div>
 
-      <p class="auth-legal">Sign-in is local to this browser. Your email and password are hashed and stored here, never sent to a server, so there is no account to recover if you lose them. Use <b>Settings → Export</b> to back up or move devices, and <b>Sync</b> to keep two of your own devices in step.<br><br>PerceptFolio is research software, not investment advice, and is not a registered investment adviser.</p>
+      <p class="auth-legal">PerceptFolio is research software, not investment advice, and is not a registered investment adviser.</p>
     </div>
   </div>
 </div>
@@ -1228,7 +1227,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     </div>
     <button class="btn" onclick="runDailyReview()" id="cmdRunBtn">Run review</button>
   </div>
-  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"><b>Nothing checked yet today.</b> Run review pulls fresh prices, re-scores every holding and watchlist name, records any verdict that changed, and stamps any call that has reached its horizon. It is the one action that keeps the record accumulating, because a mark can only be taken while this app is open.</div>
+  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"><b>Nothing checked yet today.</b></div>
   <!-- The track record sits above the actions on purpose. Anything that tells you what to do should
        have to state, in the same breath, how often it has been right. -->
   <div id="cmdRecord" class="rec"></div>
@@ -1263,7 +1262,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </table>
       <div id="bizDashClientsEmpty" class="empty">No clients yet. Head to the <b>Clients</b> tab to create one.</div>
     </div>
-    <p class="muted" style="margin-top:12px;font-size:12px">Same private-note caveat as the Clients tab: this isn't a billing system, and taking a cut of gains has real regulatory strings attached (SEC Rule 205-3). See the Clients tab for the full disclaimer.</p>
   </div>
   <!-- Personal dashboard: hidden entirely for a business account's own view -->
   <div id="personalDashboardBody">
@@ -1308,16 +1306,16 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </div>
       <h3 id="growthChartTitle">Portfolio growth</h3>
       <div class="chart-box" id="growthChartBox" style="display:none"><canvas id="growthChart"></canvas></div>
-      <div id="growthChartEmpty" class="empty">PerceptFolio can only track what happens from here; it has no record of your portfolio before today. Hit Refresh Data (or just keep using the app) and this fills in day by day.</div>
+      <div id="growthChartEmpty" class="empty">No history yet.</div>
     </div>
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card"><h3>Stocks, ETFs &amp; cash</h3><div class="chart-box"><canvas id="pieType"></canvas></div></div>
       <div class="card"><h3>By holding</h3><div class="chart-box"><canvas id="pieHold"></canvas></div></div>
     </div>
     <div class="section-title">★ Favorites. Stocks you're watching closely</div>
-    <div class="card"><div id="favoritesList"><div class="empty">Star any stock in Portfolio, Watchlist, or the Analyzer to pin it here for a quick daily check. Separate from your full Watchlist, which can grow long.</div></div></div>
+    <div class="card"><div id="favoritesList"><div class="empty">No favorites yet.</div></div></div>
     <div class="section-title">Today's signals</div>
-    <div class="card"><div id="signalsList"><div class="empty">Add holdings and watchlist stocks, then hit Refresh Data. Signals show up here the moment your buy/sell criteria trigger.</div></div></div>
+    <div class="card"><div id="signalsList"><div class="empty">No signals today.</div></div></div>
     <div class="row" style="margin-top:14px">
       <button class="btn" onclick="refreshAll()">Refresh data</button>
       <span class="muted" id="lastRefresh"></span>
@@ -1374,7 +1372,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     </div>
     <div class="row" style="margin-top:8px">
       <label class="row" style="gap:6px;align-items:center;font-size:13px;color:var(--muted)">
-        <input type="checkbox" id="tiFromCash" checked style="width:auto" onchange="renderTradeImpact()"> Funded from cash (uncheck if this is new money going in)
+        <input type="checkbox" id="tiFromCash" checked style="width:auto" onchange="renderTradeImpact()"> Funded from cash
       </label>
     </div>
     <div id="tradeImpact" style="margin-top:14px"></div>
@@ -1393,9 +1391,9 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <select id="thesisSym" style="max-width:200px" onchange="loadThesis()"></select>
       <span class="muted" id="thesisStatus" style="font-size:12.5px"></span>
     </div>
-    <div class="field"><label>Why do we own it?</label><textarea id="thesisWhy" rows="2" placeholder="Durable advantage in X, strong free cash flow, reasonable price…" style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
-    <div class="field"><label>What must stay true?</label><textarea id="thesisMust" rows="2" placeholder="Margins stay above X. Revenue growth stays above Y. No major competitor displacement." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
-    <div class="field"><label>What would make us sell?</label><textarea id="thesisInvalid" rows="2" placeholder="Quality score drops below 8. Margins compress two quarters running. Valuation exceeds X." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <div class="field"><label>Why do we own it?</label><textarea id="thesisWhy" rows="2" placeholder="Durable advantage in X, strong free cash flow, reasonable price…" style="width:100%;background:transparent;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 0;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <div class="field"><label>What must stay true?</label><textarea id="thesisMust" rows="2" placeholder="Margins stay above X. Revenue growth stays above Y. No major competitor displacement." style="width:100%;background:transparent;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 0;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <div class="field"><label>What would make us sell?</label><textarea id="thesisInvalid" rows="2" placeholder="Quality score drops below 8. Margins compress two quarters running. Valuation exceeds X." style="width:100%;background:transparent;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 0;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
     <div class="row">
       <div class="field" style="max-width:200px;margin-bottom:0"><label>Target price ($)</label><input id="thesisTarget" type="number" step="any" min="0" placeholder="where you think it goes" oninput="updatePlannedRR()"></div>
       <div class="field" style="max-width:200px;margin-bottom:0"><label>Stop price ($). Sell below</label><input id="thesisStop" type="number" step="any" min="0" placeholder="where you're wrong" oninput="updatePlannedRR()"></div>
@@ -1428,7 +1426,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
           <div class="prob-own">
             <input id="thesisPrior" type="number" min="1" max="99" step="1" placeholder="-" oninput="updatePlannedRR()"><span>%</span>
           </div>
-          <div class="prob-n">What you actually believe, before you saw the model.</div>
+
         </div>
         <div class="prob-cell">
           <div class="prob-k">Gap, logged</div>
@@ -1486,7 +1484,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </tr></thead>
       <tbody id="holdingsBody"></tbody>
     </table>
-    <p class="muted" style="margin-top:10px">Price column is editable. Click in and type to set/override any price (required for mutual funds, useful if an auto lookup fails). Click any column header to sort, click again to reverse.</p>
     <div id="holdingsEmpty" class="empty">No holdings yet. Add what you own above, PerceptFolio remembers it.</div>
   </div>
 
@@ -1526,7 +1523,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <input id="wTicker" placeholder="Ticker (e.g. MSFT)" style="max-width:170px" onkeydown="if(event.key==='Enter')addWatch()">
       <button class="btn" onclick="addWatch()">Add</button>
     </div>
-    <p class="muted" style="margin-top:10px;font-size:12.5px" id="addTickerNote">Everything here is auto-scored on every refresh, in a list or not. When one passes your buy criteria, you get an alert.</p>
   </div>
   </div>
 
@@ -1545,7 +1541,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
              onkeydown="if(event.key==='Enter')createList()">
       <button class="btn" onclick="createList()">Create</button>
     </div>
-    <p class="muted" style="margin-top:10px;font-size:12.5px">A ticker can sit in several lists or none. Deleting a list never deletes its tickers, they move to Unlisted and carry on being scored.</p>
   </div>
   </div>
 
@@ -1621,7 +1616,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <tbody id="historyBody"></tbody>
     </table>
     <div id="historyEmpty" class="empty">No transactions yet. Every buy, sell, and dividend you record from here on shows up in this ledger, including buying more of something you already own.</div>
-    <p class="muted" style="margin-top:10px;font-size:12px">This ledger starts from the moment you record a trade in PerceptFolio; it can't reconstruct purchases you made before adding them here. Deleting a row only removes the history entry; it does not change your current holdings.</p>
   </div>
 
   <!-- HOW YOU BEHAVE -->
@@ -1692,7 +1686,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="wd-globe-wrap">
       <div id="wdGlobe" aria-label="Globe"></div>
       <div class="wd-tip" id="wdTip" hidden></div>
-      <div class="wd-idle" id="wdIdle"><div class="mv-empty"><span class="dot"></span><div><b>Pick an industry above, or type a company</b><p>Every dot is a plant someone has drawn on OpenStreetMap. Click one for its name, operator and country.</p></div></div></div>
+      <div class="wd-idle" id="wdIdle"><div class="mv-empty"><span class="dot"></span><div><b>Pick an industry, or type a company.</b></div></div></div>
     </div>
     <div class="wd-side">
       <div id="wdLegend"></div>
@@ -1726,7 +1720,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
        Nothing on this panel feeds a score, a verdict or a size. -->
   <div class="card">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-      <h3 style="margin:0">Calendar effects: Context, not a signal</h3>
+      <h3 style="margin:0">Calendar effects</h3>
       <span class="pill pill-na" style="font-size:10px">not used in any verdict</span>
     </div>
     <div id="seasonalBody" style="margin-top:12px"></div>
@@ -1831,7 +1825,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <div class="spacer"></div>
       <button class="btn btn-ghost" id="newsLoadBtn" onclick="loadNews(true)">Load my positions</button>
     </div>
-    <p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">Loaded on demand, not on every page view. Each holding costs one API call and Finnhub's free tier allows sixty a minute. Cached for thirty minutes.</p>
   </div>
   <div id="newsBody" style="margin-top:16px"><div class="empty" style="text-align:left;line-height:1.7"><b>No news loaded yet.</b><br><span style="font-size:12.5px">News is fetched on demand so it does not spend your Finnhub quota in the background. Press Refresh, or open a ticker from Portfolio. Headlines are shown as context only: this product never turns a headline into a buy or sell verdict, because a model asked to justify a verdict from headlines will always find a reason.</span></div></div>
 </div>
@@ -1862,7 +1855,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
         <span class="muted" style="font-size:12px" id="weeklyPicksNote">A rotating batch of ~20 from the ~350-ticker built-in universe, minus anything already in your Portfolio or Watchlist. Refreshes on a weekly cycle, some names carry over, some rotate out. Instead of dumping the whole list at once. Still just fills the box below. Hit Run screen to actually score them.</span>
       </div>
     </div>
-    <textarea id="screenerInput" rows="3" placeholder="AAPL, MSFT, NVDA, JNJ, ..." style="width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 13px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+    <textarea id="screenerInput" rows="3" placeholder="AAPL, MSFT, NVDA, JNJ, ..." style="width:100%;background:transparent;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:11px 13px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
     <div class="row" style="margin-top:10px">
       <button class="btn" id="screenerStartBtn" onclick="startScreener()">Run screen</button>
       <button class="btn btn-danger" id="screenerStopBtn" onclick="stopScreener()" style="display:none">Stop</button>
@@ -1905,10 +1898,10 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="row">
       <input id="aTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:170px" onkeydown="if(event.key==='Enter')analyzeStock()">
       <button class="btn" onclick="analyzeStock()">Run quality + price check</button>
-      <span class="muted">ETFs: quality checks apply to companies, not ETFs. Use this for individual stocks.</span>
+
     </div>
   </div>
-  <div id="analyzerResult"><div class="empty" style="text-align:left;line-height:1.7"><b>Nothing analysed yet.</b><br><span style="font-size:12.5px">Enter a US ticker above. The Analyzer runs the 22 checks, shows what each one measured and whether it passed, and records the verdict as a call so it can be graded later. It is deliberately not a recommendation.</span></div></div>
+  <div id="analyzerResult"><div class="empty">Nothing analysed yet.</div></div>
   <div class="card" style="margin-top:16px">
     <h3>Compare two stocks</h3>
     <div class="row">
@@ -1930,7 +1923,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <h3 style="margin:0">Are you paid for being different?</h3>
       <button class="btn btn-ghost btn-sm" onclick="renderBenchmarks()">Recalculate</button>
     </div>
-    <p class="muted" style="margin-top:6px;font-size:13px">Two benchmarks. One asks whether your sizing beats doing nothing clever with the same stocks; the other asks whether any of it beats the index.</p>
     <div id="benchBody" style="margin-top:12px"></div>
   </div>
 
@@ -2001,7 +1993,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="sec-no">01</div>
     <div>
       <div class="section-title" style="margin-top:0">Ranges. What the spread of outcomes looks like</div>
-      <p class="muted" style="font-size:13px;max-width:70ch;line-height:1.6">These answer "where might this end up", not "what should I do today". Every one is a distribution under stated assumptions, and every one is wrong in a way the assumptions decide.</p>
     </div>
   </div>
 
@@ -2031,7 +2022,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="sec-no" style="color:var(--yellow)">02</div>
     <div>
       <div class="section-title" style="margin-top:0">Signals. Rules that emit a position today</div>
-      <p class="muted" style="font-size:13px;max-width:70ch;line-height:1.6">Not forecasts. A signal reads the prices in front of it and tells you how much to hold right now. It says nothing about where the price is going, and it is separated from the section above for exactly that reason.</p>
     </div>
   </div>
 
@@ -2087,7 +2077,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 
 <!-- CLIENTS (business accounts only) -->
 <div id="tab-clients" class="tabs-hidden">
-  <p class="muted" style="margin-bottom:14px">A business account doesn't hold its own investments in PerceptFolio. Portfolio, Watchlist, and Alerts are hidden here for that reason. Manage client portfolios below, or click <b>Switch</b> on a client to work inside their account.</p>
   <div class="card">
     <h3>Create client</h3>
     <details class="aside"><summary>What a client account is, and is not</summary><div>This isn't a real brokerage account for your client. Their actual money stays wherever it's actually held (their own broker/custodian). This just gives you, the quant, a separate, walled-off place to track and score that client's holdings by hand, same as any other portfolio in this app. Most people never give the client login access at all. It's for your own recordkeeping. The email below is just an internal ID (it doesn't need to be real, and doesn't need to reach them) unless you specifically want them to log in themselves; if you do, set a password and hand them both. Either way, you can also work in their portfolio anytime via Switch, and export a snapshot for them via Settings → Export if you ever want to hand off a copy.</div></details>
@@ -2132,6 +2121,17 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <span class="theme-side" style="right:0">☾ Dark</span>
     </div>
   </div>
+  <!-- The access code, for a profile made before the door asked for one. The Model view, the
+       Council, Map pre-fill and World search send it to the worker. Kept beside the profile as
+       p.code, which leaves sign-in as it was: the invite gate reads p.invite, not this. -->
+  <div class="card" style="margin-top:16px" id="accessCodeCard">
+    <h3>Access code</h3>
+    <div class="row">
+      <input id="accessCodeInput" placeholder="XXXXX-XXXXX" autocomplete="off" spellcheck="false" style="max-width:180px;text-transform:uppercase;font-family:var(--mono);letter-spacing:.06em">
+      <button class="btn" onclick="saveAccessCode()">Save</button>
+    </div>
+    <p class="muted" id="accessCodeStatus" style="margin-top:8px;font-size:13px"></p>
+  </div>
   <!-- MARKET DATA — HIDES ITSELF ONCE THE WORKER SUPPLIES THE KEY.
        The card is not deleted, and the reason matters. A device only reaches the worker's key if
        sync is configured AND the worker answers. If either is untrue — a browser that was never set
@@ -2146,19 +2146,18 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <h3 id="mktDataTitle">Market data</h3>
     <p class="muted" id="fhViaWorker" style="margin-bottom:10px;display:none"></p>
     <div id="fhManual">
-      <p class="muted" style="margin-bottom:10px">Prices, fundamentals and news come from Finnhub. Get a free key at <b>finnhub.io/register</b> (about two minutes) and paste it here, it stays in this browser and is never sent to NorthBridge.</p>
+      <p class="muted" style="margin-bottom:10px"><a href="https://finnhub.io/register" target="_blank" rel="noopener">finnhub.io/register</a></p>
       <div class="row">
         <input id="apiKeyInput" placeholder="Finnhub API key" style="max-width:340px">
-        <button class="btn" onclick="saveApiKey()">Save Key</button>
+        <button class="btn" onclick="saveApiKey()">Save key</button>
         <span id="apiStatus" class="muted"></span>
       </div>
     </div>
     <details id="fhAdvanced" style="display:none;margin-top:4px">
       <summary style="cursor:pointer;font-size:12.5px;color:var(--muted)">Override with a key just for this device</summary>
-      <p class="muted" style="margin:9px 0 10px;font-size:12.5px">Only needed to spend a different quota here, or to keep working if the worker is unreachable. Leave it empty and the worker's key is used.</p>
       <div class="row">
         <input id="apiKeyInputAdv" placeholder="Finnhub API key" style="max-width:340px">
-        <button class="btn" onclick="saveApiKey(true)">Save Key</button>
+        <button class="btn" onclick="saveApiKey(true)">Save key</button>
         <span id="apiStatusAdv" class="muted"></span>
       </div>
     </details>
@@ -2229,7 +2228,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
          to the one thing the master key used to be the only way to get. -->
     <div id="codeSyncOffer" style="display:none;margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:12px 14px">
       <b style="font-size:13.5px">Sync with your invite code</b>
-      <p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.55">Your invite code can sync this account across your own devices, no operator key needed. Be aware of the trade: your portfolio is stored on the worker under that code and is readable by anyone holding it, and sync stops the moment your access is paused.</p>
+      <p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.55">Stored on the worker under your code, readable by anyone holding it.</p>
       <button class="btn btn-sm" style="margin-top:8px" onclick="enableCodeSync()">Turn on code sync</button>
     </div>
     <!-- F1. A managed or business profile is told why sync is off, up front. A panel that simply
@@ -2256,7 +2255,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
            accept=".json" greys the backup file out in the Files picker and makes import impossible. -->
       <label class="btn btn-ghost" style="display:inline-block">Import JSON<input type="file" accept=".json,application/json,text/json,text/plain" style="display:none" onchange="importData(event)"></label>
     </div>
-    <p class="muted" style="margin-top:10px">Your data lives in this browser only. Export regularly, and import on a new device to move everything over.</p>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Danger zone</h3>
@@ -2270,7 +2268,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <h3 style="margin:0">Audit</h3>
       <button class="btn btn-ghost btn-sm" onclick="renderAudit()">Re-check</button>
     </div>
-    <p class="muted" style="margin-top:6px;font-size:13px">What this install actually is, as opposed to what any screen claims. Anything red is a promise this copy is not currently keeping.</p>
     <div id="auditBody" style="margin-top:14px"aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w4"></span><span class="sk sk-row sk-w3"></span></div></div>
   </div>
 </div>
@@ -2362,8 +2359,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <button class="btn fc-go" onclick="fcGainLoss()">Calculate</button>
       <div class="calc-out" id="fcGlOut" style="display:none"></div>
     </div>
-
-    <p class="muted" style="font-size:11px;margin-top:14px;line-height:1.5">Everything here is arithmetic on the numbers you type. None of it is a forecast, and none of it accounts for fees, taxes, or the reality that returns arrive unevenly rather than as a smooth annual percentage.</p>
   </div>
 </div>
 
@@ -2527,7 +2522,7 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   listOpen:{},
   alerts:[],priceAlerts:[],analyses:{},manual:{},myTags:{},privacyMode:false,history:[],
   displayName:'',avatarColor:'',avatarImage:'',weeklyPicks:{weekKey:'',tickers:[],newCount:0},
-  transactions:[],dividends:[],theme:'dark',
+  transactions:[],dividends:[],theme:'light',
   syncedAt:0,lastLocalEdit:0,
   calls:[],                                     // graded in the Market tab's scorecard
   pendingCalls:{},                              // D1 hysteresis: unconfirmed verdicts, keyed sym|track
@@ -3516,6 +3511,28 @@ function removeClient(email){
   toast('Client removed.');
 }
 function logout(){saveDB();USER=null;D=null;bizContext=null;sessionStorage.removeItem('qf_user');location.reload();}
+/* Settings > Access code. Saved on the profile record (p.code) and, for this device, beside the
+   door's own copy; the four model helpers read either. Checked against the worker so the status
+   says whether the code is live rather than merely well-formed. */
+async function saveAccessCode(){
+  const el=document.getElementById('accessCodeInput'),st=document.getElementById('accessCodeStatus');
+  const v=(el&&el.value||'').trim().toUpperCase();
+  if(!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(v)){ if(st)st.textContent='A code looks like XXXXX-XXXXX.'; return; }
+  if(!USER||!DB||!DB.profiles||!DB.profiles[USER])return;
+  DB.profiles[USER].code=v; persistDB();
+  try{ localStorage.setItem('pf_door_code',v); }catch(e){}
+  if(el)el.value='';
+  if(st)st.textContent='Saved. Checking…';
+  try{
+    const j=await (await fetch(INVITE_WORKER+'/status?code='+encodeURIComponent(v))).json();
+    if(st)st.textContent=(j&&j.known&&j.active)?'Saved. The code is live.':'Saved, but the worker does not report this code as live.';
+  }catch(e){ if(st)st.textContent='Saved. Could not reach the worker to check it.'; }
+}
+function renderAccessCode(){
+  const st=document.getElementById('accessCodeStatus'); if(!st)return;
+  let has=''; try{ const p=USER&&DB&&DB.profiles&&DB.profiles[USER]; has=(p&&(p.invite||p.inviteCode||p.code))||localStorage.getItem('pf_door_code')||''; }catch(e){}
+  st.textContent=has?'A code is saved on this profile.':'';
+}
 /* The headline of a statement is its date. Localised by the language switch (<html lang>). */
 function dateLine(){
   const lang=document.documentElement.lang==='es'?'es':'en';
@@ -4692,7 +4709,7 @@ function initPasswordToggles(){
 /* The login and sign-up fields are on screen before any session exists, so this cannot wait for
    enterSession. Those are the password fields people actually type into most. */
 if(document.readyState==='loading')
-  document.addEventListener('DOMContentLoaded',()=>{try{initPasswordToggles();initToTop();}catch(e){}});
+  document.addEventListener('DOMContentLoaded',()=>{try{applyTheme();initPasswordToggles();initToTop();}catch(e){}});
 else{try{initPasswordToggles();initToTop();}catch(e){}}
 
 
@@ -4964,12 +4981,7 @@ function renderHindsight(){
   const rows=hindsightRows();
   if(rows.length<2){
     el.innerHTML='<div class="empty" style="text-align:left;line-height:1.7">'+
-      '<b>Nothing to rank over a '+esc(w.label)+' yet.</b><br><span style="font-size:var(--fs-sm)">'+
-      'These figures come from the scoring call, so a ticker appears here once it has been scored at least once. '+
-      (w.days>1300?'This app\'s own history holds five years, so a window this long can only come from the vendor; it is never stitched together from a shorter log. ':'')+
-      'Run a refresh, or analyse a ticker, and it fills in immediately rather than accumulating over time. '+
-      (w.k==='y5'?'A five-year figure also depends on the vendor publishing that window for a given ticker; where it does not, nothing is shown rather than a shorter span dressed up as five years. ':'')+
-      'It deliberately does not rank the whole market: that needs about four thousand quotes per window against a sixty-per-minute limit.</span></div>';
+      '<b>Nothing to rank over a '+esc(w.label)+' yet.</b></div>';
     return;
   }
   const vendorN=rows.filter(r=>r.source==='vendor').length;
@@ -6256,9 +6268,7 @@ function renderMarksDue(){
   const marked=CALL_HORIZONS.reduce((n,h)=>n+(D.calls||[]).filter(c=>(c.marks||{})[h]&&!(c.marks||{})[h].missed).length,0);
 
   if(!soon.length&&!missed.length){
-    el.innerHTML='<div class="md-head">Marks</div><p class="muted" style="font-size:13px;line-height:1.6">'+
-      'Nothing falls due in the next fortnight. Marks are taken automatically whenever the app is open and a call '+
-      'crosses 30, 90, 180 or 365 days, so the only thing required of you is opening it.</p>';
+    el.innerHTML='<div class="md-head">Marks</div><p class="muted" style="font-size:13px;line-height:1.6">Nothing due in the next fortnight.</p>';
     return;
   }
 
@@ -10257,7 +10267,7 @@ function renderAll(){
         '<button class="btn-danger btn btn-sm" onclick="toggleFavorite(\''+esc(s)+'\')">✕</button></div>';
     }).join('');
   }else{
-    fl.innerHTML='<div class="empty">Star any stock in Portfolio, Watchlist, or the Analyzer to pin it here for a quick daily check. Separate from your full Watchlist, which can grow long.</div>';
+    fl.innerHTML='<div class="empty">No favorites yet.</div>';
   }
 
   /* signals */
@@ -10275,7 +10285,7 @@ function renderAll(){
       '<div><b>'+esc(x.s)+'</b>, <span class="pill '+x.v.cls+'">'+x.v.label+'</span><br><span class="muted">Quality '+x.sc.qScore+'/12 · Price '+x.sc.pScore+'/6 · '+(x.isH?'You own this':'On watchlist')+'</span></div>'+
       '<div class="spacer"></div><button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(x.s)+'\')">Review</button></div>').join('');
   }else{
-    sl.innerHTML='<div class="empty">No buy/sell signals right now. That\'s normal. Good setups are rare. Keep the watchlist growing.</div>';
+    sl.innerHTML='<div class="empty">No signals today.</div>';
   }
 
   /* alerts tab */
@@ -10477,7 +10487,7 @@ function drawGrowthChart(){
     return;
   }
 
-  if(hist.length<2)return showEmpty('PerceptFolio can only track what happens from here; it has no record of your portfolio before today. Hit Refresh Data (or just keep using the app) and this fills in day by day.');
+  if(hist.length<2)return showEmpty('No history yet.');
   box.style.display='block';empty.style.display='none';
   if(!ctx)return;
   if(growthChartInst)growthChartInst.destroy();
@@ -10537,18 +10547,23 @@ function chartOpts(scrubbable,unit){
    so the whole UI follows. Charts don't (Chart.js bakes colours in at construction time), so any live
    chart is re-rendered after the switch. */
 function applyTheme(){
-  const light=(D&&D.theme==='light');
+  /* Paper unless this profile chose dark itself. Every profile made before 2026-09-21 carries
+     theme:'dark' because that was the default, not a decision, so only a theme set through the
+     switch (themeChosen) counts. */
+  const light=!(D&&D.theme==='dark'&&D.themeChosen);
   document.body.classList.toggle('theme-light',light);
+  if(typeof renderAccessCode==='function')renderAccessCode();
   const sw=document.getElementById('themeSwitch');
   if(sw)sw.classList.toggle('is-dark',!light);
 }
 function setTheme(v){
   if(!D)return;
   D.theme=(v==='light')?'light':'dark';
+  D.themeChosen=true;
   saveDB();applyTheme();renderAll();
 }
 function toggleTheme(){
-  setTheme((D&&D.theme==='light')?'dark':'light');
+  setTheme(document.body.classList.contains('theme-light')?'dark':'light');
 }
 
 /* ================= FLOATING CALCULATOR =================
@@ -11294,7 +11309,7 @@ function updateThesisProbability(){
   const gapEl=document.getElementById('probGap'),noteEl=document.getElementById('probGapNote');
   if(own==null){
     gapEl.innerHTML='<span class="muted">-</span>';
-    noteEl.textContent='Put your own number in and the gap is saved with the thesis, then graded at the deadline.';
+    noteEl.textContent='';
   }else{
     const gap=own-pc;
     gapEl.innerHTML='<span class="'+(Math.abs(gap)<10?'pos':Math.abs(gap)<25?'warn':'neg')+'">'+
@@ -11863,7 +11878,7 @@ function renderTradeImpact(){
   const amt=parseFloat((document.getElementById('tiAmount')||{}).value);
   const fromCash=!!(document.getElementById('tiFromCash')||{}).checked;
   if(!sym||!isFinite(amt)||amt<=0){
-    el.innerHTML='<div class="empty">Enter a ticker and a dollar amount. You\'ll get the position size, the cash left, the market exposure and the policy check. Before the money moves, not after.</div>';
+    el.innerHTML='';
     return;
   }
   const pol=policy();
@@ -12224,7 +12239,7 @@ function renderCommand(){
         '</div>'+
       '</div>':'');
   }).join('')+'</div>'+
-  '<p class="muted" style="margin-top:14px;font-size:11.5px;line-height:1.55">Click any row for the reasoning. Nothing here places a trade. PerceptFolio has no broker connection and reports only what your own rules flagged.</p>';
+  '';
 }
 async function runDailyReview(){
   const btn=document.getElementById('cmdRunBtn'),st=document.getElementById('cmdStatus');
@@ -13267,7 +13282,7 @@ function renderWeather(data){
       'Wilshire '+fmtAsOf(w[0].date)+' ÷ GDP '+fmtAsOf(g[0].date)));
   }else{
     cards.push(weatherCard('Buffett Indicator','-','not entered','','',
-      'Enter it below, or set up the FRED key for a rough calculated version.',
+      '',
       (w&&w.error)?esc(w.error):(g&&g.error?esc(g.error):'')));
   }
 
@@ -13284,7 +13299,7 @@ function renderWeather(data){
       age!=null&&age>2?'<span class="neg">'+age+' months old. Worth updating</span>':''));
   }else{
     cards.push(weatherCard('CAPE (Shiller P/E)','-','not entered','','',
-      'No free API publishes this. Enter it below from multpl.com; it changes slowly.',''));
+      '',''));
   }
 
   /* --- Margin debt: manual --- */
@@ -13303,7 +13318,7 @@ function renderWeather(data){
       age!=null&&age>2?'<span class="neg">'+age+' months old. Worth updating</span>':'FINRA publishes monthly, roughly a month in arrears'));
   }else{
     cards.push(weatherCard('Margin Debt','-','not entered','','',
-      'FINRA publishes this monthly with no API. Enter it below.',''));
+      '',''));
   }
 
   el.innerHTML=cards.join('');
@@ -13318,7 +13333,7 @@ function renderWeatherVerdict(levels){
   if(!el)return;
   const n=levels.length;
   if(!n){
-    el.innerHTML='<div class="empty">Enter at least one figure below and PerceptFolio will read them together.</div>';
+    el.innerHTML='';
     return;
   }
   const score=levels.reduce((a,b)=>a+b,0)/n;   // 0 = fair, 2 = stretched
@@ -13598,6 +13613,9 @@ function median(arr){
    Once marks exist the assumption is dropped and the operator's OWN observed mean and dispersion are
    used, so the target moves as the record does: a noisier or thinner edge demands more evidence,
    which is the honest behaviour and the uncomfortable one. */
+/* The pre-record sample size is sized from this: an assumption, not a measurement. It is replaced by
+   the operator's own edge and dispersion once a sample exists, and it is no longer printed on the
+   screen (2026-09-21: the operator's instruction was the number, not the caveat). */
 const EDGE_ASSUMPTION={mean:2,sd:12};      // per-call points, used only until a real sample exists
 const Z95=1.96;
 const RECORD_FLOOR=20;                     // below this, dispersion itself is not estimable
@@ -13733,11 +13751,9 @@ function recordStripHTML(){
     const pct=0;
     return '<div class="rec-head">Track record · 90-day marks</div>'+
       '<div class="rec-top"><span class="rec-val muted">-<span class="rec-unit">no expectancy yet</span></span></div>'+
-      '<div class="rec-read thin">Nothing has been marked at 90 days. The app cannot claim an edge it has not measured, '+
-        'and it will not estimate one from a shorter window to fill the space.</div>'+
+      '<div class="rec-read thin">Nothing marked at 90 days yet.</div>'+
       '<div class="rec-bar"><i style="width:'+pct+'%"></i></div>'+
-      '<div class="rec-foot"><span><b>0</b> of ~'+(requiredSample(null).n||'-')+' marked calls'+
-        ' <span class="muted" style="font-weight:400">(assumes a '+EDGE_ASSUMPTION.mean+'pt edge at '+EDGE_ASSUMPTION.sd+'pt dispersion, an assumption, not a measurement)</span></span>'+
+      '<div class="rec-foot"><span><b>0</b> of ~'+(requiredSample(null).n||'-')+' marked calls</span>'+
         '<span>'+(aw.waiting?'<b>'+aw.waiting+'</b> logged, waiting on an anniversary':'nothing logged yet')+
         (aw.unmarkable?' · <b>'+aw.unmarkable+'</b> unmarkable':'')+dueSoonNote()+' · '+scorecardLink+'</span></div>';
   }
@@ -13779,9 +13795,7 @@ function recordStripHTML(){
     '<div class="rec-bar"><i class="'+(pct>=100?'done':'')+'" style="width:'+pct+'%"></i></div>'+
     '<div class="rec-foot">'+
       '<span><b>'+rec.n+'</b> of ~'+(need||'-')+' marked calls'+
-        ' <span class="muted" style="font-weight:400">('+(req.usingOwn
-          ? 'from your own '+req.mean.toFixed(2)+'pt edge at '+req.sd.toFixed(2)+'pt dispersion'
-          : 'assumes a '+EDGE_ASSUMPTION.mean+'pt edge at '+EDGE_ASSUMPTION.sd+'pt dispersion, an assumption')+')</span>'+
+        (req.usingOwn?' <span class="muted" style="font-weight:400">('+req.mean.toFixed(2)+'pt edge, '+req.sd.toFixed(2)+'pt dispersion)</span>':'')+
         (pct>=100?'. Sample is no longer thin':'')+'</span>'+
       '<span>hit rate <b>'+st.hitRate.toFixed(0)+'%</b> ('+st.wins+'/'+st.n+')'+
         (st.payoff!=null?' · payoff <b>'+st.payoff.toFixed(2)+'×</b>':'')+
@@ -14586,7 +14600,7 @@ function renderScorecard(){
     if(emptyEl){
       emptyEl.style.display='block';
       emptyEl.innerHTML=!total
-        ? 'No calls recorded yet. PerceptFolio logs a call every time its verdict on a ticker changes, from the next Refresh onward; it can\'t grade calls it never wrote down.'
+        ? 'No calls recorded yet.'
         : (missed&&!pending
           ? 'You have '+total+' recorded call'+(total===1?'':'s')+', but none could be marked at this horizon. Marks are taken when the app is open and a call crosses its anniversary; these ones passed theirs while the app was closed. They are excluded rather than counted with the wrong holding period. Newer calls will grade normally, or switch to <b>Since the call</b> for the open-ended view.'
           : 'You have '+total+' recorded call'+(total===1?'':'s')+', none of which has reached this horizon yet. Try a shorter window or <b>Since the call</b>.');
@@ -15379,7 +15393,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       if(card) return;
       card=document.createElement('div'); card.id='pfKeyCard'; card.className='card'; card.style.cssText='margin:14px 0 18px';
       card.innerHTML='<div style="font-weight:700;font-size:15px;margin-bottom:6px">Connect your free data key to see prices</div>'+
-        '<div class="muted" style="font-size:13px;line-height:1.55">1. Create a free account at <b>finnhub.io/register</b> and copy the API key it shows.<br>2. Paste it here. It stays in this browser; nothing is sent to NorthBridge.</div>'+
+        '<div class="muted" style="font-size:13px"><a href="https://finnhub.io/register" target="_blank" rel="noopener">finnhub.io/register</a></div>'+
         '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="pfKeyInput" placeholder="Finnhub API key" style="flex:1;min-width:220px;font-family:var(--mono)" autocomplete="off"><button type="button" class="btn btn-p btn-sm" id="pfKeySave">Save and refresh</button></div>';
       host.insertBefore(card,host.firstChild.nextSibling);
       document.getElementById('pfKeySave').onclick=function(){ var v=(document.getElementById('pfKeyInput').value||'').trim(); if(!v) return; D.apiKey=v; if(typeof saveDB==='function') saveDB(); card.remove(); if(typeof refreshAll==='function') refreshAll(); else if(typeof loadMarketData==='function') loadMarketData(true); };
@@ -15996,6 +16010,10 @@ main .card .list-rows,.list-rows{border:0;border-top:1px solid var(--border);bor
 .cmd-kind{font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;width:60px}
 .cmd-score{font-family:inherit;font-size:12px}
 
+/* The folded notes ("+ How the ruler works") are gone from the screen. The operator's instruction
+   was every paragraph and anything that says what a thing is for; the reasoning stays in the
+   source, where the tests still read it, and comes back by deleting this one line. */
+.aside{display:none}
 /* The door. The wordmark, the sentence and the form; the feature list belongs to the landing page. */
 .auth-brand{background:var(--bg)}
 .auth-grid,.auth-points{display:none}
@@ -16008,6 +16026,84 @@ main .card .list-rows,.list-rows{border:0;border-top:1px solid var(--border);bor
   .hero-value{font-size:36px}
   .section-title{font-size:16px}
   [id^="gvBtn_"],[id^="grBtn_"]{font-size:12px;padding:6px 0}
+}
+/* ===== Paper, 2026-09-21. The third word from the operator was still "square" and "AI made". =====
+   A dark ground with rounded, outlined controls is the default of every generated dashboard, so
+   the default is now paper: a warm bone ground, ink text, hairlines, one blue for links, green
+   and red for numbers that moved. Fields are underlines, quiet actions are words, the sidebar is
+   a list of words, nothing is filled or framed except the one primary button on a screen. Dark
+   stays under Settings > Appearance; a profile that chose it keeps it. */
+body.theme-light{--bg:#f4f1ea;--panel:#f4f1ea;--panel2:#e9e5dc;--panel3:#ddd8cd;--border:#d2cdc2;--line:#e1dcd2;
+  --text:#17181c;--muted:#63625c;--faint:#6b6a64;--accent:#1d4ed8;--green:#1a7a3f;--red:#b42318;--yellow:#8a5a00;--brand2:#0f5c51;
+  --btn-bg:#17181c;--btn-fg:#f4f1ea;--pie-border:#f4f1ea;--research:#8a5a1a}
+:root{--radius:0}
+body.theme-light ::selection{background:rgba(29,78,216,.18)}
+body.theme-light .gs-panel,body.theme-light .ovf-menu,body.theme-light .addwrap>.card,body.theme-light .addwrap.open>.card{background:#fbfaf7;box-shadow:0 12px 34px rgba(40,35,20,.16)}
+body.theme-light.is-demo #app::before{background:#e0b25a}
+
+/* Fields are underlines. A form on paper has a line to write on, not a box to fill. */
+input,select,textarea,#globalSearch,.prob-own input,#pfModel .mv-form input,#pfModel .mv-form select,#tab-world .wd-form input,.list-pick,.mycall
+  {border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;padding:8px 0;box-shadow:none;height:auto}
+input:focus,select:focus,textarea:focus,#globalSearch:focus,#tab-world .wd-form input:focus,.prob-own input:focus,#pfModel .mv-form input:focus,#pfModel .mv-form select:focus
+  {border-color:var(--text);background:transparent;box-shadow:none;outline:none}
+input[type=checkbox],input[type=radio]{border:0;padding:0;width:auto;height:auto;accent-color:var(--text)}
+input[type=date]{padding-right:0}
+select{padding-right:20px}
+.mycall{border-bottom-style:dashed;padding:5px 0;max-width:96px}
+#globalSearch{padding-left:24px;font-size:13.5px}
+.hd-search-ico{left:2px}
+#pfModel .mv-form .btn{height:auto}
+
+/* Quiet actions are words. The primary button on a screen stays a solid block of ink. */
+.btn{border-radius:2px;padding:10px 18px}
+.btn-ghost,.btn-danger,.btn-add,.btn.btn-ghost.btn-sm,.btn-ghost.btn-sm,.btn-add:hover,.btn-ghost:hover,.btn-danger:hover
+  {background:transparent;border:0;padding:6px 0;color:var(--text);font-weight:500;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:.24em;text-decoration-thickness:1px}
+.btn-danger,.btn-danger:hover{color:var(--red)}
+.btn-ghost:hover,.btn-danger:hover,.btn-add:hover{text-decoration-color:currentColor}
+.btn-add .plus{display:none}
+.row>.btn-ghost+.btn-ghost,.row>.btn-ghost+.btn-danger,.row>.btn-danger+.btn-ghost{margin-left:6px}
+.btn-ghost.on,#pfHeat .btn.on,.nw-win.on{background:transparent;border:0;color:var(--text);font-weight:600;text-decoration-color:currentColor}
+.icon-btn,.icon-btn:hover,.icon-btn.open{background:transparent;border:0;color:var(--text)}
+.lang-toggle button{padding:8px 4px;color:var(--muted)}
+.lang-toggle button[aria-pressed="true"]{background:transparent;color:var(--text);box-shadow:inset 0 -2px 0 var(--text)}
+.theme-switch{border-radius:4px;border:0;background:var(--panel2)}
+.theme-knob{border-radius:3px;background:var(--text)}
+.theme-switch .theme-side{color:var(--muted)}
+[id^="gvBtn_"],[id^="grBtn_"],[id^="mvBtn_"]{text-decoration:none;padding:6px 0;border-width:0 0 2px;border-style:solid;border-color:transparent;color:var(--muted)}
+.list-row-tag,.list-card-tag,.tour-tag{border:0;padding:0;color:var(--muted)}
+.rec-bar{background:var(--panel2)}
+
+/* The sidebar is a list of words. Icons stay for the collapsed rail and the phone, where words
+   would not fit. */
+#sidebar{background:var(--bg)}
+@media(min-width:769px){
+  body:not(.side-collapsed) #sidebar nav button .ico{display:none}
+  body:not(.side-collapsed) #sidebar nav button{padding:7px 8px 7px 12px;font-size:14px}
+  body:not(.side-collapsed) #sidebar nav button.active:before{left:0}
+}
+#sidebar nav button{color:var(--muted)}
+#sidebar nav button:hover{background:transparent;color:var(--text)}
+#sidebar nav button.active{color:var(--text)}
+#sidebar nav button.active:before{background:var(--text)}
+#sidebar nav button.active .ico{color:var(--text)}
+.nav-sep{margin:10px 12px}
+.side-foot{opacity:.6}
+
+/* Figures sit in columns without dividers; the rules above and below the row are enough. */
+.stat{border-right:0;margin-right:0;padding:14px 28px 14px 0}
+.stat-row{gap:0}
+header{background:var(--bg)}
+.avatar{background:var(--panel2);border:0}
+.card h3{font-family:var(--display);font-size:15px;font-weight:700;letter-spacing:-.01em}
+#tab-world .wd-chip{background:transparent;border:0;padding:5px 0;border-radius:0;color:var(--muted);text-decoration:underline;text-decoration-color:transparent;text-underline-offset:.24em}
+#tab-world .wd-chip:hover{color:var(--text)}
+#tab-world .wd-chip.on{background:transparent;border:0;color:var(--text);text-decoration-color:currentColor}
+#tab-world .wd-chips{gap:4px 18px}
+#pfHeat .ht-scale{color:var(--muted)}
+.chart-box canvas{border-radius:0}
+@media(max-width:600px){
+  .btn{padding:10px 16px}
+  .stat{padding:12px 0}
 }
 </style>
 <script>
@@ -16047,7 +16143,7 @@ main .card .list-rows,.list-rows{border:0;border-top:1px solid var(--border);bor
     var hold=((typeof D!=='undefined'&&D&&D.holdings)||[]).filter(function(h){ return h&&h.sym&&isFinite(h.shares)&&h.shares>0&&isFinite(h.price)&&h.price>0; }).map(function(h){ return {sym:h.sym,v:h.shares*h.price,pct:isFinite(h.dayPct)?h.dayPct:null}; }).sort(function(a,b){return b.v-a.v;});
     var hasKey=typeof hasMarketData==='function'&&hasMarketData();
     c.innerHTML='<div class="ht-head"><h3 style="margin:0">Today’s heat</h3><span class="row" style="gap:6px"><button type="button" class="btn btn-ghost btn-sm'+(MODE==='holdings'?' on':'')+'" onclick="heatMode(\'holdings\')">My holdings</button><button type="button" class="btn btn-ghost btn-sm'+(MODE==='market'?' on':'')+'" onclick="heatMode(\'market\')">Market</button><span class="ht-scale">−3%<i></i>+3%</span></span></div>'+
-      '<div class="ht-grid"><div><div class="muted" style="margin-bottom:6px">'+(MODE==='market'?'The Dow 30 and twelve mega-caps, coloured by the day’s move':'Your holdings, sized by value, coloured by the day’s move')+'</div><div class="ht-map'+(MODE==='market'?' ht-market':'')+'" id="htMap"></div></div>'+
+      '<div class="ht-grid"><div><div class="ht-map'+(MODE==='market'?' ht-market':'')+'" id="htMap"></div></div>'+
       '<div><div class="muted" style="margin-bottom:6px">Sectors</div><div class="ht-sectors" id="htSec"></div></div></div>'+
       '<div class="ht-note" id="htNote"></div>';
     var map=document.getElementById('htMap'), note=document.getElementById('htNote');
@@ -16068,7 +16164,7 @@ main .card .list-rows,.list-rows{border:0;border-top:1px solid var(--border);bor
     var sec=document.getElementById('htSec');
     SECTORS.forEach(function(s){ var q=cache.quotes[s[0]]; var d=document.createElement('div'); d.className='ht-sec'; d.style.background=colour(q?q.dp:null); d.title=s[1]+' ('+s[0]+') · '+pctText(q?q.dp:null); d.innerHTML='<b>'+s[0]+'</b><span>'+pctText(q?q.dp:null)+'</span><small>'+esc(s[1])+'</small>'; d.onclick=function(){ if(typeof analyzeStock==='function')analyzeStock(s[0]); }; sec.appendChild(d); });
     var unpriced=MODE==='market'?0:hold.filter(function(h){return h.pct==null;}).length;
-    note.textContent=(hasKey?(MODE==='market'?'The market tiles and the sector tiles are quoted when this tab opens and held for five minutes.':'Sector tiles are the SPDR sector ETFs, quoted when this tab opens and held for five minutes.'):(MODE==='market'?'The market tiles need the data key.':'Sectors need the data key.'))+(unpriced?' '+unpriced+' holding'+(unpriced>1?'s have':' has')+' a price but no day change yet; Refresh data fills it in.':'')+' Colour saturates at three percent either way; click a tile to analyze it.';
+    note.textContent=(hasKey?'':'Needs the data key.')+(unpriced?' '+unpriced+' holding'+(unpriced>1?'s':'')+' without a day change yet.':'');
   }
   function marketList(){ var P=(typeof PRESET_LISTS!=='undefined'&&PRESET_LISTS)||{}; var a=((P.dow30||{}).tickers||[]).concat(((P.megatech||{}).tickers||[])); var seen={}; return a.filter(function(s){ if(seen[s])return false; seen[s]=true; return true; }); }
   window.heatMode=function(m){ MODE=m==='market'?'market':'holdings'; try{ localStorage.setItem('pf_heat_mode',MODE); }catch(e){} load(true); };
@@ -16177,6 +16273,7 @@ main .card .list-rows,.list-rows{border:0;border-top:1px solid var(--border);bor
     var rel=(typeof relationsFor==='function')?relationsFor(sym):null; if(!rel)return;
     if(rel.suppliers.length||rel.customers.length||rel.prefilledAt)return;
     var st=document.getElementById('mapStatus');
+    if(st)st.textContent='Mapping '+sym+'\u2026';
     fetch(INVITE_WORKER+'/map/prefill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym})})
       .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
       .then(function(r){
