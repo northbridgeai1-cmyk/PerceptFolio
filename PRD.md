@@ -543,3 +543,26 @@ An account lives in the browser that made it, which is why a profile signed in o
   verdict and gain, your call, the menu) instead of eleven columns that scrolled off the screen;
   forms put two fields to a line; the filter row is a two-column grid; checkboxes stay small; the
   Settings menu and the record footer wrap.
+
+## 28. Sign in and work: the book under the code, market data built in (2026-09-22)
+
+Two instructions from the owner, in this order.
+
+- **"Instead of syncing with the Cloudflare key it can sync with the access code."** The book now
+  syncs under the access code for the owner as for everyone (§27); a device set up with the operator
+  key keeps the key for the data routes and moves its book under the code at its next sign-in. Two
+  guards went in with it: a device whose book is still blank never seeds a slot, and a blank cloud
+  copy never replaces a book with content without asking. The worker's bearer wall is untouched.
+- **"Whenever someone logs in everything works; they don't need a Finnhub key, it's built in."**
+  This overrides D4 (subscribers connect their own key). The worker's `/data` route answers any
+  live access code on the same allowlist as `/finnhub`, through one shared proxy, capped at
+  Finnhub's own minute limit per address, and stops with the code the moment it is paused. The
+  terminal counts the code as a source of market data: no key card, no key step in the first-run
+  card, "Market data, built in" under Settings; a key typed into a device still wins on that device.
+  **The licence follows from this.** Every subscriber now reads Finnhub under the operator's plan,
+  and Finnhub's terms make a plan personal without written approval (§26). So either the Finnhub
+  plan is upgraded to one that covers it, or written approval is obtained, or the price feed switch
+  (`PRICE_FEED`, `PRICE_FEED_KEY`) is bought and the terminal's data layer ported to it. Until one
+  of those is done the posture is: built in, on a plan that does not yet permit it. Calls per minute
+  are also the plan's: sixty a minute shared by everyone on the free tier will be reached by the
+  second active subscriber, and the terminal already says "rate limit" when it is.

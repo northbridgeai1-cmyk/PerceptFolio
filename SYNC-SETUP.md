@@ -141,8 +141,10 @@ Put it in the worker instead, where the browser never sees it:
 3. **Type:** Secret · **Variable name:** `FINNHUB_API_KEY` · **Value:** your key
 4. **Deploy**
 
-Now any device with sync configured gets market data with an empty key box. The Settings screen
-says so when it is happening, so it is never ambiguous which key is in use.
+Now every signed-in account gets market data with nothing to enter: the operator's devices through
+`/finnhub` behind the sync key, everyone else through `/data` with their access code (PRD §28).
+The Settings screen says "Market data, built in" when it is happening, so it is never ambiguous
+which key is in use. Mind the plan: everyone shares this key's calls per minute and its terms.
 
 **Order of preference.** A key typed into a device wins on that device; otherwise the worker's key
 is used. So you can still give one browser a separate key without disturbing the rest.

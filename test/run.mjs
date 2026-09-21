@@ -190,9 +190,10 @@ t('the worker reports its own build so a paste-deploy can be verified',
   /const WORKER_VERSION/.test(worker) && /url\.pathname === '\/version'/.test(worker));
 t('/version never leaks secret values, only whether they are set',
   /FINNHUB_API_KEY: !!env\.FINNHUB_API_KEY/.test(worker) && !/FINNHUB_API_KEY: env\.FINNHUB_API_KEY[^!]/.test(worker));
-t('the app falls back to the worker when no local key is set',
-  /if\(!D\.apiKey&&syncConfigured\(\)\)/.test(term));
-t('a local key still wins over the worker', term.indexOf('if(!D.apiKey&&syncConfigured()') < term.indexOf("if(!D.apiKey)throw new Error('NO_KEY')"));
+t('the app falls back to the worker when no local key is set: the key for the operator, the access code for everyone else',
+  /if\(!D\.apiKey&&\(syncConfigured\(\)\|\|code\)\)\{/.test(term) && term.includes("await fetch(INVITE_WORKER+'/data?'+new URLSearchParams(Object.assign({code:code},q)).toString())"));
+t('a local key still wins over the worker', term.indexOf('if(!D.apiKey&&(syncConfigured()||code))') < term.indexOf("if(!D.apiKey)throw new Error('NO_KEY')") && /const code=\(!D\.apiKey&&!syncConfigured\(\)\)\?accessCodeFor\(USER\):'';/.test(term));
+t('market data is built in for every signed-in account (2026-09-22): /data takes a live code on the /finnhub allowlist through one shared proxy, capped per address, and stops with the code; the terminal counts the code as a source, the Settings card says built in, the first-run card drops the key step', /if \(url\.pathname === '\/data' && request\.method === 'GET'\) \{/.test(worker) && /Market data needs a live access code/.test(worker) && /await tooMany\(env, request, 'data', 60\)/.test(worker) && /async function finnhubProxy\(url, env\)/.test(worker) && (worker.match(/finnhubProxy\(url, env\)/g)||[]).length >= 3 && /k !== 'path' && k !== 'token' && k !== 'code'/.test(worker) && worker.indexOf("url.pathname === '/data'") < worker.indexOf('Everything past this point is yours alone') && /function hasMarketData\(\)\{return !!\(D\.apiKey\|\|syncConfigured\(\)\|\|accessCodeFor\(USER\)\);\}/.test(term) && /title\.textContent='Market data, built in';/.test(term) && /id="wcKeyStep"/.test(term) && /ks\.style\.display=built\?'none':''/.test(term));
 t('feature gates count the worker as a source of market data',
   !/if\(!D\.apiKey\)\{toast\(/.test(term) && /function hasMarketData\(\)/.test(term));
 
@@ -478,7 +479,7 @@ t('it is reduced to symbol and date before it is stored', /next\[sym\] = \{ d, h
 /* Finnhub's plans are personal and forbid redistribution, so the worker's calendar serves the
    operator's devices only; a customer's terminal reads its own symbols with its own key. */
 t('the worker\'s calendar is for the operator\'s devices only', /The worker\\'s calendar is for the operator\\'s devices/.test(worker) && !/activeGrant\(clean\(url\.searchParams\.get\('code'\), 12\)\.toUpperCase\(\)\)\);\n    if \(!okE\)/.test(worker));
-t('a customer\'s terminal asks Finnhub for its own symbols with its own key', /fh\('\/calendar\/earnings\?symbol='\+encodeURIComponent\(s\)/.test(term) && /if\(D&&D\.apiKey\)\{/.test(term));
+t('a terminal without the operator\'s calendar asks for its own symbols\' earnings dates, one call each', /fh\('\/calendar\/earnings\?symbol='\+encodeURIComponent\(s\)/.test(term) && /if\(D&&\(D\.apiKey\|\|!syncConfigured\(\)\)&&hasMarketData\(\)\)\{/.test(term));
 t('the terminal keeps the calendar for the day', /localStorage\.setItem\('pf_earn_v1'/.test(term) && /c\.asOf===today&&c\.next/.test(term));
 t('a recorded call carries the next earnings date it knew about', /earningsAt:\(typeof nextEarnings==='function'&&nextEarnings\(sym\)\)\?nextEarnings\(sym\)\.d:null/.test(term));
 t('the date is printed on the holding and watchlist rows', /earningsCell\(h\.sym\)/.test(term) && /earningsCell\(s\)/.test(term));
@@ -1320,7 +1321,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v131/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v132/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }

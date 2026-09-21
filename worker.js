@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-21.9';
+const WORKER_VERSION = '2026-09-22.1';
 
 /* Compares two strings in constant time. A naive === bails out at the first differing character,
    which leaks the secret one character at a time to anyone willing to measure response times. */
@@ -494,7 +494,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/map/prefill']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/map/prefill']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -569,6 +569,22 @@ async function handle(request, env) {
     const inv = JSON.parse(c);
     if (inv.paused) return null;
     return { code, tier: inv.tier || null, legacy: true };
+  }
+
+  /* ---- Market data for every signed-in account: GET /data?code=&path=&... ----
+     The owner's instruction of 2026-09-22: a person who signs in has prices, with nothing to type.
+     The worker's Finnhub key answers for any live access code, on the same endpoints as /finnhub,
+     and stops with the code the moment it is paused; the operator's own devices keep /finnhub
+     behind the key. This puts every subscriber on the operator's Finnhub plan, whose terms make it
+     personal (PRD §27): the plan, or Finnhub's written approval, has to cover it. The per-address
+     cap is Finnhub's own minute limit, so one client cannot spend the key for everyone else. */
+  if (url.pathname === '/data' && request.method === 'GET') {
+    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+    if (!(await activeGrant(code))) {
+      return json({ error: 'Market data needs a live access code. If yours was paused, contact the person who issued it.' }, 401, env);
+    }
+    if (await tooMany(env, request, 'data', 60)) return json({ error: 'Too many requests from this address; try again in a minute.' }, 429, env);
+    return finnhubProxy(url, env);
   }
 
   /* ---- FRED proxy ----
@@ -1192,41 +1208,7 @@ async function handle(request, env) {
      NOT CACHED, deliberately. A stale quote presented as live is worse than no quote, and KV writes
      are the scarce resource on the free tier at a thousand a day. Quotes go straight through. */
   if (url.pathname === '/finnhub') {
-    if (!env.FINNHUB_API_KEY) {
-      return json({ error: 'Worker is missing FINNHUB_API_KEY. Add it under Settings > Variables and Secrets as a Secret, then Deploy. Until then each device needs its own key in the app.' }, 500, env);
-    }
-    const ALLOWED = new Set([
-      '/quote', '/news', '/company-news', '/calendar/earnings',
-      '/stock/candle', '/stock/earnings', '/stock/eps-estimate', '/stock/insider-transactions',
-      '/stock/metric', '/stock/peers', '/stock/price-target', '/stock/profile2',
-      '/stock/recommendation'
-    ]);
-    const p = url.searchParams.get('path') || '';
-    if (!ALLOWED.has(p)) {
-      return json({ error: 'Endpoint not permitted: ' + clean(p, 60) }, 400, env);
-    }
-    const target = new URL('https://finnhub.io/api/v1' + p);
-    // Everything except our own routing parameter is forwarded verbatim.
-    for (const [k, v] of url.searchParams) {
-      if (k !== 'path' && k !== 'token') target.searchParams.set(k, v);
-    }
-    target.searchParams.set('token', env.FINNHUB_API_KEY);
-
-    let res;
-    try { res = await fetch(target.toString()); }
-    catch (e) { return json({ error: 'Could not reach Finnhub: ' + (e && e.message ? e.message : String(e)) }, 502, env); }
-
-    /* The app distinguishes these three, so the status is preserved rather than flattened into a
-       generic failure — a rate limit and a dead key need different reactions from the operator. */
-    if (res.status === 401 || res.status === 403) return json({ error: 'Finnhub rejected the key held by this worker.' }, res.status, env);
-    if (res.status === 429) return json({ error: 'Finnhub rate limit reached.' }, 429, env);
-    if (!res.ok) return json({ error: 'Finnhub returned HTTP ' + res.status }, res.status, env);
-
-    const body = await res.text();
-    return new Response(body, {
-      status: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders(env) }
-    });
+    return finnhubProxy(url, env);
   }
 
   /* ---- GET /requests — the approval queue ---- */
@@ -1566,6 +1548,46 @@ function subPatch(status, currentPeriodEnd) {
    access code costs one KV read, and 31^10 codes make guessing pointless, but a script hammering
    /invite, /apply or /checkout should still be told to stop. Operator routes carry the secret and
    are not limited here. */
+/* The Finnhub proxy shared by /finnhub (the operator's devices, behind the key) and /data (every
+   live code). ALLOWLIST, NOT PASSTHROUGH: only the endpoints the app calls; the token is attached
+   here and the page never sees it. Not cached: a stale quote shown as live is worse than none. */
+async function finnhubProxy(url, env) {
+  if (!env.FINNHUB_API_KEY) {
+    return json({ error: 'Worker is missing FINNHUB_API_KEY. Add it under Settings > Variables and Secrets as a Secret, then Deploy. Until then each device needs its own key in the app.' }, 500, env);
+  }
+  const ALLOWED = new Set([
+    '/quote', '/news', '/company-news', '/calendar/earnings',
+    '/stock/candle', '/stock/earnings', '/stock/eps-estimate', '/stock/insider-transactions',
+    '/stock/metric', '/stock/peers', '/stock/price-target', '/stock/profile2',
+    '/stock/recommendation'
+  ]);
+  const p = url.searchParams.get('path') || '';
+  if (!ALLOWED.has(p)) {
+    return json({ error: 'Endpoint not permitted: ' + clean(p, 60) }, 400, env);
+  }
+  const target = new URL('https://finnhub.io/api/v1' + p);
+  // Everything except our own routing parameters is forwarded verbatim.
+  for (const [k, v] of url.searchParams) {
+    if (k !== 'path' && k !== 'token' && k !== 'code') target.searchParams.set(k, v);
+  }
+  target.searchParams.set('token', env.FINNHUB_API_KEY);
+
+  let res;
+  try { res = await fetch(target.toString()); }
+  catch (e) { return json({ error: 'Could not reach Finnhub: ' + (e && e.message ? e.message : String(e)) }, 502, env); }
+
+  /* The app distinguishes these three, so the status is preserved rather than flattened into a
+     generic failure — a rate limit and a dead key need different reactions from the operator. */
+  if (res.status === 401 || res.status === 403) return json({ error: 'Finnhub rejected the key held by this worker.' }, res.status, env);
+  if (res.status === 429) return json({ error: 'Finnhub rate limit reached.' }, 429, env);
+  if (!res.ok) return json({ error: 'Finnhub returned HTTP ' + res.status }, res.status, env);
+
+  const body = await res.text();
+  return new Response(body, {
+    status: 200,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders(env) }
+  });
+}
 async function tooMany(env, request, name, perMinute) {
   const ip = (request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown').split(',')[0].trim();
   /* Cloudflare's Rate Limiting binding when it is bound (worker.wrangler.toml): a real sliding

@@ -1279,9 +1279,9 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div id="welcomeCard" class="welcome-card" style="display:none">
       <h2>Let's set up your portfolio</h2>
       <p class="muted" style="margin-bottom:16px">Three steps and PerceptFolio starts working for you.</p>
-      <p style="margin-bottom:10px"><span class="step-num">1</span>Add a Finnhub API key in <b>Settings</b>. Free at finnhub.io, about 2 minutes, no card. This is what loads prices.</p>
-      <p style="margin-bottom:10px"><span class="step-num">2</span>Add what you own in <b>Portfolio</b>. Stocks, ETFs, mutual funds, and cash on hand.</p>
-      <p style="margin-bottom:18px"><span class="step-num">3</span>Add a few tickers to your <b>Watchlist</b>. PerceptFolio scores them automatically.</p>
+      <p id="wcKeyStep" style="margin-bottom:10px"><span class="step-num">1</span>Add a Finnhub API key in <b>Settings</b>. Free at finnhub.io, about 2 minutes, no card. This is what loads prices.</p>
+      <p style="margin-bottom:10px"><span class="step-num wc-n">2</span>Add what you own in <b>Portfolio</b>. Stocks, ETFs, mutual funds, and cash on hand.</p>
+      <p style="margin-bottom:18px"><span class="step-num wc-n">3</span>Add a few tickers to your <b>Watchlist</b>. PerceptFolio scores them automatically.</p>
       <button class="btn" onclick="showTab('portfolio')">Add your first holding</button>
     </div>
     <!-- THE RECORD SITS ABOVE THE PORTFOLIO VALUE, deliberately.
@@ -3982,12 +3982,17 @@ function fhUsage(){
 async function fh(path){
   _fhCalls.push(Date.now());
   if(_fhCalls.length>200)_fhCalls=_fhCalls.slice(-120);
-  if(!D.apiKey&&syncConfigured()){
+  /* Built in. The operator's devices ask /finnhub with the key; every other signed-in account asks
+     /data with its access code, and the worker's key answers. A key typed into this device wins. */
+  const code=(!D.apiKey&&!syncConfigured())?accessCodeFor(USER):'';
+  if(!D.apiKey&&(syncConfigured()||code)){
     const qi=path.indexOf('?');
     const base=qi<0?path:path.slice(0,qi);
     const q={path:base};
     if(qi>=0)new URLSearchParams(path.slice(qi+1)).forEach((v,k)=>{ if(k!=='token')q[k]=v; });
-    const r=await fetch(workerUrl('finnhub',q),{headers:{'Authorization':'Bearer '+syncCfg.key}});
+    const r=syncConfigured()
+      ? await fetch(workerUrl('finnhub',q),{headers:{'Authorization':'Bearer '+syncCfg.key}})
+      : await fetch(INVITE_WORKER+'/data?'+new URLSearchParams(Object.assign({code:code},q)).toString());
     if(r.status===401||r.status===403)throw new Error('BAD_KEY');
     if(r.status===429)throw new Error('RATE_LIMIT');
     if(!r.ok){
@@ -4008,7 +4013,7 @@ async function fh(path){
 
 /* Anything gated on "is there a key" must now count the worker as one, or screens stay hidden on a
    device that has perfectly good market data coming through the proxy. */
-function hasMarketData(){return !!(D.apiKey||syncConfigured());}
+function hasMarketData(){return !!(D.apiKey||syncConfigured()||accessCodeFor(USER));}
 async function getQuote(sym){const q=await fh('/quote?symbol='+sym);if(!q||!q.c)throw new Error('NO_DATA');return q;}
 async function getMetrics(sym){return fh('/stock/metric?symbol='+sym+'&metric=all');}
 async function getEarnings(sym){return fh('/stock/earnings?symbol='+sym);}
@@ -10194,6 +10199,8 @@ function renderAll(){
   const isNew=D.holdings.length===0&&D.watchlist.length===0;
   const wc=document.getElementById('welcomeCard');
   if(wc)wc.style.display=(isNew&&!bizOwnView)?'block':'none';
+  /* Market data is built in for a signed-in account; the key step only appears where it is true. */
+  if(wc){ const ks=document.getElementById('wcKeyStep'), built=hasMarketData(); if(ks)ks.style.display=built?'none':''; wc.querySelectorAll('.wc-n').forEach((n,i)=>{ n.textContent=String(built?i+1:i+2); }); const sub=wc.querySelector('p.muted'); if(sub)sub.textContent=(built?'Two':'Three')+' steps and PerceptFolio starts working for you.'; }
 
   /* dashboard numbers */
   let value=0,costTotal=0;
@@ -10975,7 +10982,7 @@ async function saveApiKey(adv){
   st.className='muted';
   try{
     await getQuote('AAPL');
-    st.textContent=D.apiKey?'✔ Key works':'✔ Worker is serving market data';
+    st.textContent=D.apiKey?'✔ Key works':'✔ Market data is built in';
     st.className='pos';
   }catch(e){ st.textContent='✘ Failed ('+e.message+')'; st.className='neg'; }
   refreshMarketDataCard();
@@ -10994,14 +11001,14 @@ function refreshMarketDataCard(){
   const a=document.getElementById('apiKeyInput'), b=document.getElementById('apiKeyInputAdv');
   if(a)a.value=D.apiKey||''; if(b)b.value=D.apiKey||'';
 
-  if(syncConfigured()&&!D.apiKey){
+  if((syncConfigured()||accessCodeFor(USER))&&!D.apiKey){
     // The worker holds the key. Nothing is required here, so nothing is asked for.
-    title.textContent='Market data, supplied by your worker';
+    title.textContent='Market data, built in';
     via.style.display='block';
-    via.innerHTML='<span class="pos">✔ Your worker is supplying market data.</span> The key lives there as a secret, so this device does not need one and there is nothing to enter. Prices, fundamentals and news all route through it.';
+    via.innerHTML='<span class="pos">✔ Prices, fundamentals and news come with your access.</span> Nothing to enter.';
     manual.style.display='none';
     adv.style.display='block';
-  }else if(syncConfigured()&&D.apiKey){
+  }else if((syncConfigured()||accessCodeFor(USER))&&D.apiKey){
     title.textContent='Market data, using this device\'s own key';
     via.style.display='block';
     via.innerHTML='This device is using a key saved here, not the one your worker holds. Clear the box and save to fall back to the worker.';
@@ -13141,7 +13148,7 @@ function loadEarnings(){
   const keep=j=>{ earnLoading=null; if(!j||!j.next)return null; EARN=j; try{ localStorage.setItem('pf_earn_v1',JSON.stringify(j)); }catch(e){} return EARN; };
   /* This device's own Finnhub key: its own symbols, one calendar call each, personal use under
      the key's own plan. Holdings and watchlist, forty at most a day. */
-  if(D&&D.apiKey){
+  if(D&&(D.apiKey||!syncConfigured())&&hasMarketData()){
     const syms=[]; (D.holdings||[]).forEach(h=>{ if(h&&h.sym&&syms.indexOf(h.sym)<0)syms.push(h.sym); }); (D.watchlist||[]).forEach(w=>{ const s=typeof w==='string'?w:(w&&w.sym); if(s&&syms.indexOf(s)<0)syms.push(s); });
     const to=new Date(Date.now()+60*86400000).toISOString().slice(0,10), next={};
     earnLoading=(async()=>{
@@ -14225,8 +14232,8 @@ async function renderAudit(){
   out+=row(fu.used<fu.limit*0.8?'ok':'wait','Finnhub quota',
     fu.used+'/'+fu.limit+' calls in the last minute');
 
-  out+=row(D.apiKey?'ok':(syncConfigured()?'ok':'bad'),'Market data',
-    D.apiKey?'own Finnhub key on this device':(syncConfigured()?'through the worker':'no key and no worker. Prices cannot load'));
+  out+=row(hasMarketData()?'ok':'bad','Market data',
+    D.apiKey?'own Finnhub key on this device':(syncConfigured()?'through the worker':(accessCodeFor(USER)?'built in, by access code':'no key, no code and no worker. Prices cannot load')));
 
   const lastExp=D.lastExportAt||0;
   const expDays=lastExp?Math.floor((Date.now()-lastExp)/86400000):null;
@@ -15765,7 +15772,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   /* First-run data key. No key and no worker proxy means no prices; say so once, with the two steps. */
   function keyNudge(){
     try{
-      if(typeof D==='undefined'||!D||!USER) return; var have=!!D.apiKey||(typeof syncConfigured==='function'&&syncConfigured());
+      if(typeof D==='undefined'||!D||!USER) return; var have=(typeof hasMarketData==='function')?hasMarketData():!!D.apiKey;
       var host=document.getElementById('greetingText'); host=host&&host.parentElement; if(!host) return;
       var card=document.getElementById('pfKeyCard');
       if(have){ if(card) card.remove(); return; }
@@ -15861,7 +15868,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     box.innerHTML='<div class="mv-kicker">Company, analysts and six lenses</div><div class="mv-empty" style="margin-top:10px"><span class="dot" style="background:var(--accent);box-shadow:0 0 0 4px rgba(59,130,246,.18)"></span><div><b>Reading '+esc(sym)+'</b><p>Profile, ratios and analyst counts first; the six readings take a few seconds.</p></div></div>';
     /* The facts travel with the request, fetched here with this device's own key (personal use
        under its own plan); the worker's key serves only the operator's devices. */
-    var factsP=(typeof fh==='function'&&typeof D!=='undefined'&&D&&D.apiKey)
+    var factsP=(typeof fh==='function'&&typeof hasMarketData==='function'&&hasMarketData())
       ? Promise.all([fh('/stock/profile2?symbol='+sym).catch(function(){return null;}),fh('/stock/metric?symbol='+sym+'&metric=all').catch(function(){return null;}),fh('/stock/recommendation?symbol='+sym).catch(function(){return null;}),fh('/stock/price-target?symbol='+sym).catch(function(){return null;})]).then(function(r){ return {profile:r[0],metric:r[1],recs:r[2],target:r[3]}; })
       : Promise.resolve(null);
     var opHead=(typeof syncConfigured==='function'&&syncConfigured())?{'Authorization':'Bearer '+syncCfg.key}:{};
@@ -16949,7 +16956,7 @@ header{border-bottom-color:var(--line)}
     if(rel.suppliers.length||rel.customers.length||rel.prefilledAt)return;
     var st=document.getElementById('mapStatus');
     if(st)st.textContent='Mapping '+sym+'\u2026';
-    var profP=(typeof getProfile==='function'&&typeof D!=='undefined'&&D&&D.apiKey)?getProfile(sym).catch(function(){return null;}):Promise.resolve(null);
+    var profP=(typeof getProfile==='function'&&typeof hasMarketData==='function'&&hasMarketData())?getProfile(sym).catch(function(){return null;}):Promise.resolve(null);
     profP.then(function(p){ return fetch(INVITE_WORKER+'/map/prefill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym,name:p&&p.name||undefined,industry:p&&p.finnhubIndustry||undefined})}); })
       .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
       .then(function(r){
