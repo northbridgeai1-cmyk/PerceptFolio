@@ -232,6 +232,14 @@ no key. If you get a Cloudflare error page instead, something in Steps 3–5 did
 
 ## Step 7 — Connect your computer
 
+The owner's email (the `OWNER_EMAILS` list in the terminal) sets a device up at sign-in: the first
+time, the form asks for the operator key once, checks it against the worker, and keeps it where
+Settings keeps it. The device then syncs the owner's book, gets market data through the worker and
+reaches the model routes, with nothing to type in Settings. The door's operator entry and the admin
+page leave the key on the device too, so a device that came in either way asks for nothing at all.
+
+Any other account, or a device you want to set up by hand:
+
 1. Open perceptfolio.com, log into your account.
 2. Go to **Settings** → **Sync Across Your Devices**.
 3. **Sync URL:** your worker URL from Step 3.

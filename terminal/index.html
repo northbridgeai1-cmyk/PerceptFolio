@@ -1030,6 +1030,11 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
           <button class="btn" style="width:100%" onclick="bringAccount()">Bring my account</button>
           <p class="muted" id="bringNote" style="font-size:12.5px;margin-top:8px;line-height:1.5"></p>
         </div>
+        <div id="authOwner" style="display:none;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+          <div class="field"><label>Operator key</label><input type="password" id="loginOpKey" placeholder="Once on this device" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter')doLogin()"></div>
+          <p class="muted" id="ownerNote" style="font-size:12.5px;margin-top:8px;line-height:1.5"></p>
+          <button class="btn-ghost" onclick="doLogin(true)">Sign in without it</button>
+        </div>
         <p class="muted" id="authStale" style="display:none;font-size:12.5px;margin-top:16px;line-height:1.5"></p>
       </div>
 
@@ -2987,18 +2992,23 @@ async function enterDemo(){
   await finishLogin(DEMO_ID);
 }
 
-async function doLogin(){
+async function doLogin(withoutKey){
   const email=document.getElementById('loginEmail').value.trim().toLowerCase();
   const pw=document.getElementById('loginPassword').value;
   /* Rebuilt from scratch on every sign-in rather than reused, so a session that left it in a odd
      state cannot poison the next check. A test account you have to remember to reset is not one. */
   if(email===DEMO_ID&&pw===DEMO_PW)return enterDemo();
   if(!email)return toast('Enter your email.');
-  if(!DB.profiles[email]&&isOwnerEmail(email)){
-    if(!pw||pw.length<4)return toast('Choose a password of four characters or more.');
-    DB.profiles[email]={pinHash:await pwHash(pw),data:defaultData(),accountType:'personal',userId:makeUserId(),owner:true,createdAt:Date.now()};
-    persistDB(); rememberDevice(email);
-    toast('Owner account set up on this device.');
+  if(isOwnerEmail(email)){
+    const p=DB.profiles[email];
+    if(!p&&(!pw||pw.length<4))return toast('Choose a password of four characters or more.');
+    if(p&&p.pinHash&&!(await pwVerify(pw,p.pinHash)))return toast('Wrong password.');
+    if(!withoutKey&&!(await ownerDevice()))return;
+    if(!p){
+      DB.profiles[email]={pinHash:await pwHash(pw),data:defaultData(),accountType:'personal',userId:makeUserId(),owner:true,createdAt:Date.now()};
+      persistDB();
+    }
+    rememberDevice(email);
     return finishLogin(email);
   }
   if(!DB.profiles[email]){
@@ -3017,6 +3027,40 @@ async function doLogin(){
 function rememberDevice(email){
   const box=document.getElementById('stayIn');
   try{ localStorage.setItem('pf_last_email',email); if(!box||box.checked)localStorage.setItem('pf_user',email); else localStorage.removeItem('pf_user'); }catch(e){}
+}
+/* The owner's devices are the operator's devices, and what makes one is the operator key: with it
+   the worker keeps the book under the owner's slot, answers for Finnhub with its own key and takes
+   the model routes, so the owner signs in and works. Without it the sign-in made an empty book that
+   asked for a Finnhub key, which read as the account being gone. The key reaches a device once, by
+   any of three doors: the operator entry at /enter, the admin page, or the field under this form,
+   and it lives where Settings already keeps it. Checked against /version, which answers with the
+   configured list only to the real key. */
+function showOwnerPanel(msg){
+  const box=document.getElementById('authOwner'); if(box)box.style.display='block';
+  const n=document.getElementById('ownerNote'); if(n)n.textContent=msg||'';
+  const k=document.getElementById('loginOpKey'); if(k)k.focus();
+}
+async function ownerDevice(){
+  loadSyncCfg();
+  if(syncConfigured())return true;
+  let key=((document.getElementById('loginOpKey')||{}).value||'').trim();
+  if(!key){ try{ key=localStorage.getItem('pf_op_key')||''; }catch(e){} }
+  if(!key){ try{ const a=JSON.parse(localStorage.getItem('pf_admin_cfg')||'null'); if(a&&a.key)key=String(a.key); }catch(e){} }
+  if(!key){ showOwnerPanel('Paste the operator key once; this device keeps it. It brings your book and market data.'); return false; }
+  let j=null;
+  try{
+    const r=await fetch(INVITE_WORKER+'/version',{headers:{'Authorization':'Bearer '+key,'Accept':'application/json'}});
+    j=await r.json();
+  }catch(e){
+    /* Offline-first: the sign-in goes ahead and the key waits for a connection. */
+    try{ localStorage.setItem('pf_op_key',key); }catch(e2){}
+    toast('No connection to the worker; the key will be tried at the next sign-in.');
+    return true;
+  }
+  if(!j||!j.configured){ try{ localStorage.removeItem('pf_op_key'); }catch(e){} showOwnerPanel('That is not the operator key.'); return false; }
+  syncCfg={url:INVITE_WORKER,key:key};
+  try{ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); localStorage.removeItem('pf_op_key'); }catch(e){}
+  return true;
 }
 /* ================= ACCESS CHECK-IN =================
 
