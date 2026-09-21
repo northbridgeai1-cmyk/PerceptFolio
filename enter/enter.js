@@ -23,7 +23,14 @@
     try {
       const r = await fetch('/api/enter', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ ...payload, next }) });
       const j = await r.json().catch(() => ({}));
-      if (r.ok && j.ok) { msgEl.className = 'msg ok'; msgEl.textContent = 'Opening…'; location.href = j.next || '/terminal/'; return; }
+      if (r.ok && j.ok) {
+        /* The terminal's model routes (the Model view, the Council, Map pre-fill, World search) ask
+           the worker with the profile's access code. A profile made before the invite gate has
+           none, so the code that just opened the door is kept for it, on this origin only, the
+           same place the terminal already keeps a profile's own code. */
+        try { if (payload.code) localStorage.setItem('pf_door_code', payload.code); } catch (e) {}
+        msgEl.className = 'msg ok'; msgEl.textContent = 'Opening…'; location.href = j.next || '/terminal/'; return;
+      }
       msgEl.className = 'msg err'; msgEl.textContent = j.error || 'That did not work. Try again.';
       const field = form.querySelector('input'); field.setAttribute('aria-invalid', 'true'); field.focus();
     } catch {
