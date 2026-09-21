@@ -29,9 +29,6 @@
            none, so the code that just opened the door is kept for it, on this origin only, the
            same place the terminal already keeps a profile's own code. */
         try { if (payload.code) localStorage.setItem('pf_door_code', payload.code); } catch (e) {}
-        /* The operator's key likewise: the terminal's owner sign-in sets the device up from it
-           (sync, market data, the model routes) so the owner signs in and works. */
-        try { if (payload.secret) localStorage.setItem('pf_op_key', payload.secret); } catch (e) {}
         msgEl.className = 'msg ok'; msgEl.textContent = 'Opening…'; location.href = j.next || '/terminal/'; return;
       }
       msgEl.className = 'msg err'; msgEl.textContent = j.error || 'That did not work. Try again.';

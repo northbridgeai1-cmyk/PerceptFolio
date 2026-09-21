@@ -232,13 +232,16 @@ no key. If you get a Cloudflare error page instead, something in Steps 3–5 did
 
 ## Step 7 — Connect your computer
 
-The owner's email (the `OWNER_EMAILS` list in the terminal) sets a device up at sign-in: the first
-time, the form asks for the operator key once, checks it against the worker, and keeps it where
-Settings keeps it. The device then syncs the owner's book, gets market data through the worker and
-reaches the model routes, with nothing to type in Settings. The door's operator entry and the admin
-page leave the key on the device too, so a device that came in either way asks for nothing at all.
+The book syncs under the access code, for the owner as for everyone: come through the door with
+the code, sign in, and the device keeps the book in step under that code, with nothing to type in
+Settings. A device that was set up with the operator key keeps the key for the data routes (the
+worker's Finnhub key, the calendar) and moves its book under the code at the next sign-in. A device
+whose book is still blank never seeds the slot, so a new phone cannot replace the real book.
 
-Any other account, or a device you want to set up by hand:
+Market data on a device without the operator key: the Finnhub key in Settings → Market data travels
+with the book, so paste your own key once on any device and every device has it.
+
+To set a device up with the operator key by hand:
 
 1. Open perceptfolio.com, log into your account.
 2. Go to **Settings** → **Sync Across Your Devices**.

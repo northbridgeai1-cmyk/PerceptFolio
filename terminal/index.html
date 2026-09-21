@@ -1030,11 +1030,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
           <button class="btn" style="width:100%" onclick="bringAccount()">Bring my account</button>
           <p class="muted" id="bringNote" style="font-size:12.5px;margin-top:8px;line-height:1.5"></p>
         </div>
-        <div id="authOwner" style="display:none;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
-          <div class="field"><label>Operator key</label><input type="password" id="loginOpKey" placeholder="Once on this device" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter')doLogin()"></div>
-          <p class="muted" id="ownerNote" style="font-size:12.5px;margin-top:8px;line-height:1.5"></p>
-          <button class="btn-ghost" onclick="doLogin(true)">Sign in without it</button>
-        </div>
         <p class="muted" id="authStale" style="display:none;font-size:12.5px;margin-top:16px;line-height:1.5"></p>
       </div>
 
@@ -2992,7 +2987,7 @@ async function enterDemo(){
   await finishLogin(DEMO_ID);
 }
 
-async function doLogin(withoutKey){
+async function doLogin(){
   const email=document.getElementById('loginEmail').value.trim().toLowerCase();
   const pw=document.getElementById('loginPassword').value;
   /* Rebuilt from scratch on every sign-in rather than reused, so a session that left it in a odd
@@ -3003,7 +2998,6 @@ async function doLogin(withoutKey){
     const p=DB.profiles[email];
     if(!p&&(!pw||pw.length<4))return toast('Choose a password of four characters or more.');
     if(p&&p.pinHash&&!(await pwVerify(pw,p.pinHash)))return toast('Wrong password.');
-    if(!withoutKey&&!(await ownerDevice()))return;
     if(!p){
       DB.profiles[email]={pinHash:await pwHash(pw),data:defaultData(),accountType:'personal',userId:makeUserId(),owner:true,createdAt:Date.now()};
       persistDB();
@@ -3027,40 +3021,6 @@ async function doLogin(withoutKey){
 function rememberDevice(email){
   const box=document.getElementById('stayIn');
   try{ localStorage.setItem('pf_last_email',email); if(!box||box.checked)localStorage.setItem('pf_user',email); else localStorage.removeItem('pf_user'); }catch(e){}
-}
-/* The owner's devices are the operator's devices, and what makes one is the operator key: with it
-   the worker keeps the book under the owner's slot, answers for Finnhub with its own key and takes
-   the model routes, so the owner signs in and works. Without it the sign-in made an empty book that
-   asked for a Finnhub key, which read as the account being gone. The key reaches a device once, by
-   any of three doors: the operator entry at /enter, the admin page, or the field under this form,
-   and it lives where Settings already keeps it. Checked against /version, which answers with the
-   configured list only to the real key. */
-function showOwnerPanel(msg){
-  const box=document.getElementById('authOwner'); if(box)box.style.display='block';
-  const n=document.getElementById('ownerNote'); if(n)n.textContent=msg||'';
-  const k=document.getElementById('loginOpKey'); if(k)k.focus();
-}
-async function ownerDevice(){
-  loadSyncCfg();
-  if(syncConfigured())return true;
-  let key=((document.getElementById('loginOpKey')||{}).value||'').trim();
-  if(!key){ try{ key=localStorage.getItem('pf_op_key')||''; }catch(e){} }
-  if(!key){ try{ const a=JSON.parse(localStorage.getItem('pf_admin_cfg')||'null'); if(a&&a.key)key=String(a.key); }catch(e){} }
-  if(!key){ showOwnerPanel('Paste the operator key once; this device keeps it. It brings your book and market data.'); return false; }
-  let j=null;
-  try{
-    const r=await fetch(INVITE_WORKER+'/version',{headers:{'Authorization':'Bearer '+key,'Accept':'application/json'}});
-    j=await r.json();
-  }catch(e){
-    /* Offline-first: the sign-in goes ahead and the key waits for a connection. */
-    try{ localStorage.setItem('pf_op_key',key); }catch(e2){}
-    toast('No connection to the worker; the key will be tried at the next sign-in.');
-    return true;
-  }
-  if(!j||!j.configured){ try{ localStorage.removeItem('pf_op_key'); }catch(e){} showOwnerPanel('That is not the operator key.'); return false; }
-  syncCfg={url:INVITE_WORKER,key:key};
-  try{ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); localStorage.removeItem('pf_op_key'); }catch(e){}
-  return true;
 }
 /* ================= ACCESS CHECK-IN =================
 
@@ -3215,20 +3175,29 @@ async function finishLogin(email){
   /* A profile with an access code keeps its book under that code from the first sign-in, so the
      same account can be brought to another device. Said once, in the words the setting uses: kept
      on the worker under your code, readable by anyone holding it. Settings turns it off. */
-  if(email!==DEMO_ID&&!isOwnerEmail(email)&&!p.owner&&!syncActive()&&!syncBlockedReason()&&!p.codeSyncDeclined){
+  if(email!==DEMO_ID&&!syncBlockedReason()&&!p.codeSyncDeclined){
     const c=(typeof accessCodeFor==='function')?accessCodeFor(email):'';
-    if(c){
+    if(c&&!syncActive()){
       syncCfg={url:INVITE_WORKER,code:c};
       try{ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); }catch(e){}
       if(!p.codeSyncTold){ p.codeSyncTold=Date.now(); persistDB(); toast('Your book is kept under your access code so you can sign in on another device. Readable by anyone holding the code; Settings \u2192 Sync turns it off.'); }
       if(typeof refreshCodeSyncOffer==='function')refreshCodeSyncOffer();
+    }else if(c&&isOwnerEmail(email)&&syncConfigured()&&!syncCfg.code){
+      /* The owner's device that was set up with the operator key: one last pull from the key's
+         slot, then the code keeps the book here as on every other device, and the first push
+         seeds the code's slot. The key stays for the data routes. */
+      try{ await syncPull(false); }catch(e){}
+      syncCfg=Object.assign({},syncCfg,{code:c});
+      try{ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); }catch(e){}
     }
   }
   /* Pull once on login so you land on whatever the other device left. Deliberately not awaited —
-     a slow or unreachable worker must never block getting into the app. */
+     a slow or unreachable worker must never block getting into the app. A device whose book is
+     still blank never seeds the slot: a fresh sign-in on a new phone would otherwise be the
+     newest copy and replace the real book on the next device to pull. */
   if(syncActive()){
     syncPull(false)
-      .then(r=>{ if(!r.applied&&!r.pushedInstead&&r.empty)return syncPush(); })
+      .then(r=>{ if(!r.applied&&!r.pushedInstead&&r.empty&&bookHasContent(D))return syncPush(); })
       .catch(e=>setSyncStatus('✗ '+e.message,'neg'));
   }
   if(hasMarketData()&&D.rules.autoRefresh==='yes')refreshAll();
@@ -6523,9 +6492,9 @@ function callId(c){return c.ts+':'+c.sym+':'+(c.track||'checklist');}
    code. The demo account registers nothing. */
 function cronIdent(){
   if(typeof isDemoUser==='function'&&isDemoUser())return null;
+  const code=(syncCfg&&syncCfg.code)||(DB.profiles[USER]||{}).invite||'';
+  if(code)return{q:'code',code:code,base:(syncCfg&&syncCfg.url)||INVITE_WORKER};
   if(syncConfigured())return{q:'slot',auth:{'Authorization':'Bearer '+syncCfg.key},base:syncCfg.url};
-  const inv=(DB.profiles[USER]||{}).invite;
-  if(inv)return{q:'code',code:inv,base:INVITE_WORKER};
   return null;
 }
 async function cronUrl(path){
@@ -15198,8 +15167,17 @@ async function syncSlotId(){
 }
 function syncEndpoint(slot){
   const base=syncCfg.url.replace(/\/+$/,'');
-  if(codeSyncActive())return base+'/usync?code='+encodeURIComponent(syncCfg.code);
+  /* The code keeps the book wherever a device holds one, so the owner's computer with the key and
+     the owner's phone with the code write one record. The key, where a device has it, still
+     serves the data routes. */
+  if(syncCfg.code)return base+'/usync?code='+encodeURIComponent(syncCfg.code);
   return base+'/?slot='+encodeURIComponent(slot);
+}
+/* A book with anything in it. A default profile has nothing, and nothing is what a blank device
+   must never push over a real copy. */
+function bookHasContent(d){
+  if(!d)return false;
+  return !!((d.holdings&&d.holdings.length)||(d.watchlist&&d.watchlist.length)||(d.calls&&d.calls.length)||(d.history&&d.history.length)||d.cash||d.lastLocalEdit||d.syncedAt);
 }
 /* A single request that tells you which of the four usual failures you have.
    Uses /version, which is public, so it can distinguish "worker unreachable" from "worker fine, key
@@ -15508,9 +15486,9 @@ async function syncFetch(method,slot,body){
       body?{'Content-Type':'application/json'}:{}),
     body:body||undefined
   });
-  if(res.status===401)throw new Error(syncCfg.key
+  if(res.status===401)throw new Error(!syncCfg.code&&syncCfg.key
     ?'Sync key rejected. Check it matches SYNC_SECRET exactly.'
-    :'Your invite code was not accepted. If your access was paused, sync stops with it.');
+    :'Your access code was not accepted. If your access was paused, sync stops with it.');
   if(!res.ok){
     let detail='';
     try{const j=await res.json();detail=j.error||'';}catch(e){}
@@ -15552,8 +15530,9 @@ async function syncPull(force){
   if(remote.empty)return{applied:false,empty:true};
   const localStamp=D.syncedAt||0;
   if(!force&&remote.updatedAt<=localStamp)return{applied:false,empty:false,upToDate:true};
-  // Local edits made since the last successful sync would be lost by taking the cloud copy.
-  const localDirty=(D.lastLocalEdit||0)>localStamp;
+  // Local edits made since the last successful sync would be lost by taking the cloud copy; so
+  // would everything, if the cloud copy is a blank book from a device that had nothing yet.
+  const localDirty=(D.lastLocalEdit||0)>localStamp||(bookHasContent(D)&&!bookHasContent(remote.data));
   if(!force&&localDirty){
     const when=new Date(remote.updatedAt).toLocaleString();
     if(!confirm('The cloud copy (saved '+when+') is newer, but you have unsaved changes on this device that would be replaced.\n\nOK = take the cloud copy and lose this device\'s changes.\nCancel = keep this device and push it up instead.')){
