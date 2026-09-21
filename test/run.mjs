@@ -484,7 +484,7 @@ t('the rates line never feeds a verdict', /function renderRates\(data\)/.test(te
 t('the cycle route reads the OECD as CSV, cached a day, behind the same door as macro data', /DF_CLI,4\.1\/\.M\.LI\.\.\.AA\.\.\.H\?startPeriod=' \+ start \+ '&format=csv'/.test(worker) && /const ck = 'cycle:' \+ today;/.test(worker) && /The cycle needs a live invite code, or the sync key\./.test(worker));
 t('a phase is distance from trend and direction, and nothing else', /const phase=devN>=0\?\(slopeN>=0\?'Expansion':'Past the peak'\):\(slopeN>=0\?'Past the trough':'Contraction'\);/.test(term));
 t('every country comes from the IMF outlook; its trend is its own median, the pandemic swing left out', /NGDP_RPCH/.test(worker) && /if\(y===2020\|\|y===2021\)continue;/.test(term));
-t('the diagram is the textbook one: real GDP over time, a dashed trend, two peaks and a trough', /Real GDP<\/text>/.test(term) && />Time<\/text>/.test(term) && /stroke-dasharray="5 4"/.test(term) && /Trough<\/text>/.test(term) && (term.match(/>Peak<\/text>/g) || []).length === 2);
+t('the diagram is real GDP over time with a dashed trend and nothing written on the curve', /Real GDP<\/text>/.test(term) && />Time<\/text>/.test(term) && /stroke-dasharray="5 4"/.test(term) && !/Trough<\/text>/.test(term) && !/>Peak<\/text>/.test(term) && !/'Contraction',-54/.test(term));
 t('the cycle card says what the indicator is and how far it leads', /built to lead by six to nine months/.test(term));
 t('the cycle card never feeds a verdict', !/renderCycle\([^)]*\)[^\n]*levels\.push/.test(term));
 /* The thesis is a sheet behind the holding's menu. */
@@ -1316,7 +1316,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v123/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v124/.test(sw));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
 
