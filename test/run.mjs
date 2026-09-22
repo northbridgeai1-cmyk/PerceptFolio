@@ -570,9 +570,14 @@ G('B2: a record that cannot be rebuilt must nag before it can be lost');
 t('exports are timestamped', /D\.lastExportAt=Date\.now\(\)/.test(term));
 t('a never-exported profile with data gets the red banner', /No backup exists\./.test(term));
 t('a stale backup gets the amber banner with the age', /Last backup '\+st\.days\+' days ago/.test(term));
-t('the never-exported banner cannot be snoozed, the stale one can',
-  /st\.level==='stale'&&sessionStorage\.getItem\('pf_backup_snooze'\)/.test(term) &&
-  /never\?'':'<button[^>]*pf_backup_snooze/.test(term));
+/* Owner, 2026-09-22: Not now, beside Export backup, at either level. A banner with no way out is
+   read as furniture and stops being read; it returns next visit, and only an export ends it. */
+t('either banner can be closed for the visit, and it returns next visit',
+  /if\(!st\|\|sessionStorage\.getItem\('pf_backup_snooze'\)\)/.test(term) &&
+  /<button class="btn btn-ghost btn-sm" onclick="snoozeBackupBanner\(\)">Not now<\/button>/.test(term) &&
+  /function snoozeBackupBanner\(\)/.test(term) &&
+  /sessionStorage\.setItem\('pf_backup_snooze','1'\)/.test(term) &&
+  !/localStorage\.setItem\('pf_backup_snooze'/.test(term));
 t('iOS Safari uninstalled adds the 7-day eviction warning',
   /iosSafariUninstalled/.test(term) && /deletes this site\\'s storage after 7 days/.test(term));
 t('an empty profile is never nagged', /hasData=\(D\.holdings\|\|\[\]\)\.length>0/.test(term));

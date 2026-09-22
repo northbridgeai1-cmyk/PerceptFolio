@@ -11483,7 +11483,10 @@ function renderBackupBanner(){
   const el=document.getElementById('backupBanner');
   if(!el)return;
   const st=backupState();
-  if(!st||(st.level==='stale'&&sessionStorage.getItem('pf_backup_snooze'))){el.style.display='none';return;}
+  /* Not now closes it for this visit, at either level. It is a warning, not a wall: a banner with
+     no way out gets read as furniture and stops being read at all. It returns next visit, and only
+     an actual export removes it for good, because until then the claim is simply true. */
+  if(!st||sessionStorage.getItem('pf_backup_snooze')){el.style.display='none';return;}
   const never=st.level==='never';
   const ios=iosSafariUninstalled();
   el.style.display='block';
@@ -11497,9 +11500,16 @@ function renderBackupBanner(){
       (ios?' <b>On iPhone Safari this is urgent:</b> iOS deletes this site\'s storage after 7 days without a visit unless the app is added to the home screen.':'')+
     '</span>'+
     '<button class="btn btn-sm" onclick="exportData()">Export backup</button>'+
-    (never?'':'<button class="btn btn-ghost btn-sm" onclick="sessionStorage.setItem(\'pf_backup_snooze\',\'1\');renderBackupBanner()">Later</button>');
+    '<button class="btn btn-ghost btn-sm" onclick="snoozeBackupBanner()">Not now</button>';
 }
 
+/* One visit, not forever: sessionStorage clears when the tab closes, so the warning comes back
+   until a backup actually exists. */
+function snoozeBackupBanner(){
+  try{ sessionStorage.setItem('pf_backup_snooze','1'); }catch(e){}
+  renderBackupBanner();
+  toast('Hidden for this visit. Settings \u2192 Backup / Restore has the export whenever you want it.');
+}
 function importData(ev){
   const f=ev.target.files[0];if(!f)return;
   const r=new FileReader();
