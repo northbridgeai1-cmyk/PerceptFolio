@@ -17,13 +17,13 @@ export function Security() {
   return (
     <main id="main" className="wrap max-w-[960px] pt-[var(--spacing-sec)] pb-[var(--spacing-sec)] [&_h2]:mt-12 [&_h2]:mb-4 [&_h2]:text-[24px]">
       <h1 className="mb-3">Security and data handling.</h1>
-      <p className="lede">What is stored, where, by whom, for how long, and how you would check. One page, so the questionnaire can be answered before it is sent. Last updated 21 September 2026.</p>
+      <p className="lede">What is stored, where, by whom, for how long, and how you would check. One page. Last updated 22 September 2026.</p>
 
       <h2>Where your data lives</h2>
       <T head={['Data', 'Where', 'Who can read it']} rows={[
         ['Holdings, notes, thesis text', 'Your browser, on each device you use. Never sent to us.', 'You.'],
         ['Sync (optional)', 'Cloudflare KV, under your access code, so two of your devices share one book.', 'Anyone holding the code; NorthBridge does not read it. Settings turns it off.'],
-        ['The record’s server copy', 'Cloudflare KV, under your code: calls, marks and chain heads. Your choice on Personal; always on for Business seats.', 'You, through your evidence pack; the firm’s admin seat for its own seats.'],
+        ['The record’s server copy', 'Cloudflare KV, under your code: calls, marks and chain heads. On by your choice.', 'You, through your evidence pack.'],
         ['Account', 'Email, plan, status, access code, Stripe customer id.', 'The operator. Stripe holds the card; we never see it.'],
         ['Requests and applications', 'What you wrote on the form, twelve months.', 'The operator.'],
       ]} />
@@ -43,7 +43,7 @@ export function Security() {
         ['Cannot be edited quietly', 'Every mark carries the hash of the mark before it; a change breaks every later hash.'],
         ['Cannot be backdated', 'The chain head is posted once a day to our service and stamped with its clock; one entry per server day, never rewritten.'],
         ['Can be checked by you', 'Export the evidence pack (calls, marks, chain, server head log) and run it through the verify page, without an account.'],
-        ['On a desk', 'Every call carries the seat that made it and the version of the rulebook it was made under; rulebook changes are logged.'],
+        ['Made under which rules', 'Every call carries a version of the bars it was made under, so it can be read against them after the bars move.'],
       ]} />
 
       <h2>Who else touches anything</h2>

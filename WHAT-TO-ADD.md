@@ -210,3 +210,5 @@ Everything with a code side was built in one pass and is uncommitted on `rebuild
 | A8.4 | Built | Same table as A3.6. |
 
 **Owner steps, in order:** buy the price feed and set `PRICE_FEED`, `PRICE_FEED_KEY`; decide `DATA_TIERS`; create the Business Stripe prices; enable Email Routing and flip `SUPPORT_LIVE`; deploy the worker (`npx wrangler deploy -c worker.wrangler.toml`, which also installs the cron trigger) and Pages (`node scripts/assemble.mjs && npx wrangler pages deploy dist --project-name perceptfolio --branch main`); then open the terminal on the sandbox account and walk Portfolio → Review, Settings → Evidence pack, and `/verify/`.
+
+**2026-09-22, the owner's decision:** one plan only. The terminal, $760 a month or $8,360 a year, one person, quote-first. The Personal/Business split, the Founding label and the firm application (/apply) are withdrawn from the site, the quote and the terms. The seat machinery built under A7 stays in the code, issuable by the operator, not sold. A2.8's "per-seat price above three: OPEN" is closed by this decision.

@@ -6,7 +6,6 @@ import { Nav } from '@/components/Nav';
 import { Footer } from '@/components/Footer';
 import { Landing } from '@/pages/Landing';
 import { Pricing } from '@/pages/Pricing';
-import { Apply } from '@/pages/Apply';
 import { Thanks } from '@/pages/Thanks';
 import { Terms, Privacy, Refunds, NotFound } from '@/pages/Legal';
 import { Security } from '@/pages/Security';
@@ -34,7 +33,7 @@ function App() {
       <a href="#main" className="absolute -left-[9999px] top-3 z-[100] rounded-[8px] bg-text px-4 py-[10px] font-semibold text-bg focus:left-3">Skip to content</a>
       <Sprite /><Scroll /><Nav />
       <Routes>
-        <Route path="/" element={<Landing />} /><Route path="/pricing" element={<Pricing />} /><Route path="/apply" element={<Apply />} /><Route path="/thanks" element={<Thanks />} />
+        <Route path="/" element={<Landing />} /><Route path="/pricing" element={<Pricing />} /><Route path="/thanks" element={<Thanks />} />
         <Route path="/terms" element={<Terms />} /><Route path="/privacy" element={<Privacy />} /><Route path="/refunds" element={<Refunds />} />
         <Route path="/security" element={<Security />} /><Route path="/flat-quarter" element={<FlatQuarter />} /><Route path="*" element={<NotFound />} />
       </Routes>

@@ -5,7 +5,7 @@ import { Demo } from '@/components/Demo';
 import { CompanyDemo } from '@/components/CompanyDemo';
 import { RequestForm } from '@/components/RequestForm';
 import { Faq } from '@/components/Faq';
-import { PLANS, SCREENS } from '@/lib/config';
+import { PLAN, SCREENS } from '@/lib/config';
 
 /* Composition alternates, no two adjacent sections share a layout: bleed, stack, left-heavy,
    right-heavy, centred strip, wide type, form, accordion. No eyebrows, no section numbers. */
@@ -95,18 +95,9 @@ export function Landing() {
         <h2 id="h-who" className="mb-10 max-w-[14ch] text-[clamp(36px,4.6vw,60px)]">Who this is for, and who it is not.</h2>
         <div className="grid grid-cols-2 items-start gap-[clamp(32px,5vw,80px)] max-[780px]:grid-cols-1 max-[780px]:gap-8">
           <div><h3 className="mb-3">The person who makes the call.</h3><p className="text-[17px] text-dim">You hold a small number of positions with conviction. You are expected to explain each one, sometimes months later, and you would rather be shown the arithmetic than told the answer. You want the reason written down before the price moves, not invented after it.</p></div>
-          <div><h3 className="mb-3">The firm that needs one standard.</h3><p className="text-[17px] text-dim">Three or more analysts, one rulebook set by whoever runs the desk, and every call carrying the name of the person who made it. A record that cannot be tidied up is worth more to you than one that looks good.</p></div>
+          <div><h3 className="mb-3">The record that explains it later.</h3><p className="text-[17px] text-dim">Every verdict, the price and the index at that instant, the mark on each anniversary, the thesis and its assumptions as you reviewed them. Hash-chained, posted daily to a clock you do not control, exportable and verifiable by someone who does not trust you. A record that cannot be tidied up is worth more than one that looks good.</p></div>
           <div className="col-span-full mt-6 grid grid-cols-2 items-start gap-[clamp(32px,5vw,80px)] border-t border-line pt-8 max-[780px]:grid-cols-1 max-[780px]:gap-8"><h3 className="text-faint">Who it is not for.</h3><p className="text-[17px] text-dim">Anyone looking for a tip, a signal, or a number that says how often it wins. It does not place trades, does not connect to a broker, and is not investment advice. Judgement stays with the person at the keyboard.</p></div>
         </div>
-      </div></section>
-
-      <section id="desk" className="sec" aria-labelledby="h-desk"><div className="wrap">
-        <h2 id="h-desk" className="mb-3">How a desk uses it.</h2>
-        <p className="lede mb-8">Three or more seats, one rulebook, one record, one statement.</p>
-        <div className="grid grid-cols-4 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[960px]:grid-cols-2 max-[600px]:grid-cols-1" role="list" aria-label="Business mode, in four parts">
-          {[['Three seats', 'Each analyst signs in with a seat of their own. Every call is stamped with the seat that made it; a reviewer seat reads everything and makes no calls.'], ['One rulebook', 'Whoever runs the desk sets the checks, the limits and the horizons once, and publishes. Every seat applies the same version, and every change is logged.'], ['One record', 'Every seat\u2019s calls and marks, chained, with the rulebook version each call was made under. The firm exports it as one evidence pack.'], ['One statement', 'A quarterly record statement per seat and for the firm: calls made, marks landed, expectancy with its interval, sizing refusals.']].map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-sans text-[15px] font-bold tracking-normal">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
-        </div>
-        <p className="mt-4 text-[14px] text-faint">Seats are by application: <Link to="/apply">request seats for a firm</Link>. The price is on the <Link to="/pricing">pricing page</Link>.</p>
       </div></section>
 
       <section id="request" className="sec" aria-labelledby="h-access"><div className="wrap">
@@ -115,7 +106,7 @@ export function Landing() {
         <div className="grid grid-cols-[minmax(0,560px)_1fr] items-start gap-[clamp(40px,6vw,96px)] min-[781px]:max-[960px]:gap-[clamp(56px,9vw,96px)] max-[780px]:grid-cols-1 max-[780px]:gap-12">
           <RequestForm />
           <dl className="mt-[6px]">
-            {[['Reviewed by a person', 'Not a queue and not an autoresponder. Every request is read by someone in the financial branch who can act on it, and you get a straight answer, including no.'], ['A demo, then a decision', `You see the terminal on your own positions before anyone asks you for anything. If it suits the work, it is $${PLANS.personal.monthly} a month or $${PLANS.personal.yearly.toLocaleString()} a year, and your code arrives by email.`], ['Market data, built in', 'Prices, fundamentals and news for US-listed stocks and ETFs come with your access, from Finnhub through our service; daily closes for the history. Each price on screen says whether it is a quote or a close, and from where. Prefer your own free Finnhub key? Connect it in Settings and it wins on that device.'], ['Thesis before position', 'Any position taken through the terminal carries a written thesis, a stop and a deadline, recorded when it is opened. A reason invented after the price moves is not a reason.']].map(([t, d]) => <div key={t} className="border-b border-line pb-5 mb-5 last:mb-0 last:border-b-0 last:pb-0"><dt className="mb-[6px] font-display text-[16px] font-bold tracking-[-.01em]">{t}</dt><dd className="max-w-[48ch] text-[15px] leading-[1.6] text-dim">{d}</dd></div>)}
+            {[['Reviewed by a person', 'Not a queue and not an autoresponder. Every request is read by someone in the financial branch who can act on it, and you get a straight answer, including no.'], ['A demo, then a decision', `You see the terminal on your own positions before anyone asks you for anything. If it suits the work, it is $${PLAN.monthly} a month or $${PLAN.yearly.toLocaleString()} a year, and your code arrives by email.`], ['Market data, built in', 'Prices, fundamentals and news for US-listed stocks and ETFs come with your access, from Finnhub through our service; daily closes for the history. Each price on screen says whether it is a quote or a close, and from where. Prefer your own free Finnhub key? Connect it in Settings and it wins on that device.'], ['Thesis before position', 'Any position taken through the terminal carries a written thesis, a stop and a deadline, recorded when it is opened. A reason invented after the price moves is not a reason.']].map(([t, d]) => <div key={t} className="border-b border-line pb-5 mb-5 last:mb-0 last:border-b-0 last:pb-0"><dt className="mb-[6px] font-display text-[16px] font-bold tracking-[-.01em]">{t}</dt><dd className="max-w-[48ch] text-[15px] leading-[1.6] text-dim">{d}</dd></div>)}
           </dl>
         </div>
         <p className="mt-8 text-[15px] text-faint">Already convinced? <Link to="/pricing">See the plans</Link>.</p>

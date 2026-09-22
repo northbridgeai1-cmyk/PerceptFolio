@@ -12,14 +12,10 @@ export const CONTACT = 'northbridgeai1@gmail.com';
 export const SUPPORT_LIVE = false;
 export const SUPPORT = SUPPORT_LIVE ? 'support@perceptfolio.com' : CONTACT;
 
-/* A2.8. Personal is the Founding price: held for anyone who has paid it, rising for new accounts
-   after foundingUntil (a date the owner may move; the worker's FOUNDING_UNTIL must match).
-   Business is a desk price: three seats included, seats beyond that quoted in the reply. The
-   worker's PRICES must agree with these numbers; the suite checks both. */
-export const PLANS = {
-  personal: { monthly: 149, yearly: 1490, foundingUntil: '2027-03-31' },
-  business: { monthly: 760, yearly: 8360, seatsIncluded: 3 },
-} as const;
+/* One plan (owner's decision, 2026-09-22): the terminal, $760 a month or $8,360 a year, one
+   person, quote-first. There is no second plan and no seat price. The worker's PRICE must agree
+   with these numbers; the suite checks both. */
+export const PLAN = { monthly: 760, yearly: 8360 } as const;
 
 /* A5.3. The screens, and the decision each one answers. `still` is true where /preview/<id>.html
    exists (a snapshot of that screen on the sandbox account, made with Settings → Snapshot this

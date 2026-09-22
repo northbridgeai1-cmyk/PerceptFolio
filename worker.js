@@ -1881,23 +1881,15 @@ const PLANS = {
 };
 const GRACE_DAYS = 7;
 
-/* List prices, the same numbers the site shows (site/src/lib/config.ts must agree; the suite
-   checks). A2.8, 2026-09-21: Personal is the Founding price, held for whoever paid it, and rises
-   on FOUNDING_UNTIL. Business is a desk price: $760 a month for three seats, $8,360 a year (one
-   month free), further seats quoted in the reply because the per-seat figure above three is
-   OPEN. The operator's reply is the binding price. */
-const PRICES = { personal: { monthly: 149, yearly: 1490 }, business: { monthly: 760, yearly: 8360, seatsIncluded: 3 } };
-const FOUNDING_UNTIL = '2027-03-31';
+/* One plan (owner's decision, 2026-09-22): the terminal, $760 a month or $8,360 a year, for one
+   person. site/src/lib/config.ts carries the same two numbers; the suite checks they agree. The
+   business tier, seats and the org routes stay in the code for the firm machinery that exists,
+   but nothing is sold under them and the quote never mentions them. The operator's reply is the
+   binding price. */
+const PRICE = { monthly: 760, yearly: 8360 };
 function quoteFor(plan, seats) {
-  if (plan !== 'business') {
-    return { plan, seats: 1, monthly: PRICES.personal.monthly, yearly: PRICES.personal.yearly, discountPct: 0, foundingUntil: FOUNDING_UNTIL,
-      text: `Personal, Founding price: $${PRICES.personal.monthly} a month, or $${PRICES.personal.yearly.toLocaleString()} a year (two months free). The Founding price is held for anyone who has paid it; it rises for new accounts after ${FOUNDING_UNTIL}.` };
-  }
-  const n = Math.max(PRICES.business.seatsIncluded, seats || PRICES.business.seatsIncluded);
-  const extra = n - PRICES.business.seatsIncluded;
-  const line = extra ? `\nThe firm asked for ${n} seats: ${PRICES.business.seatsIncluded} are included; the ${extra} further seat${extra === 1 ? '' : 's'} are quoted in this reply.` : '';
-  return { plan, seats: n, monthly: PRICES.business.monthly, yearly: PRICES.business.yearly, discountPct: 0, seatsIncluded: PRICES.business.seatsIncluded, extraSeats: extra,
-    text: `Business: $${PRICES.business.monthly} a month for ${PRICES.business.seatsIncluded} seats, or $${PRICES.business.yearly.toLocaleString()} a year (one month free). One rulebook for the desk, every call signed by the seat that made it, the firm's record exportable.${line}\nSupport by email on weekdays, US Eastern, answered the same or the next business day. The site and the service run on Cloudflare's network; the footer of the site measures whether the service is answering; an incident is told to the firm's contact by email.` };
+  return { plan: 'terminal', seats: 1, monthly: PRICE.monthly, yearly: PRICE.yearly, discountPct: 0,
+    text: `The terminal: $${PRICE.monthly} a month, or $${PRICE.yearly.toLocaleString()} a year (one month free). One person, one book, your own rules; the record, its server copy if you want it, and the evidence pack. Fourteen-day refund on any payment.\nSupport by email on weekdays, US Eastern, answered the same or the next business day. The site and the service run on Cloudflare's network; the footer of the site measures whether the service is answering; an incident is told to you by email.` };
 }
 
 function billingConfigured(env) {

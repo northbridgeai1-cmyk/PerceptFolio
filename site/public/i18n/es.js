@@ -44,7 +44,7 @@ window.PF_ES = {
   /* faq */
   'Questions worth answering.': 'Preguntas que merecen respuesta.', 'Is this available to the public?': '¿Está disponible al público?', 'Is any of this investment advice?': '¿Es esto asesoramiento de inversión?', 'Does it promise to beat the market?': '¿Promete batir al mercado?', 'Where does my data live?': '¿Dónde viven mis datos?', 'Why is my scorecard empty when I start?': '¿Por qué mi marcador está vacío al empezar?', 'Does it place trades?': '¿Ejecuta operaciones?',
   /* pricing */
-  'Two plans. One rulebook.': 'Dos planes. Un reglamento.', 'Personal': 'Personal', 'Business': 'Empresa', 'Yearly': 'Anual', 'Monthly': 'Mensual', '/ year': '/ año', '/ month': '/ mes', 'Request access': 'Solicitar acceso', 'Request seats for a firm': 'Solicitar puestos para una firma', 'What it sits beside.': 'Junto a qué se sitúa.',
+  'One terminal. One price.': 'Una terminal. Un precio.', 'The terminal': 'La terminal', 'Request access': 'Pedir acceso', 'Yearly': 'Anual', 'Monthly': 'Mensual', '/ year': '/ año', '/ month': '/ mes', 'Request access': 'Solicitar acceso', 'Request seats for a firm': 'Solicitar puestos para una firma', 'What it sits beside.': 'Junto a qué se sitúa.',
   /* door */
   'Enter your access code.': 'Introduce tu código de acceso.', 'Access code': 'Código de acceso', 'Open the terminal': 'Abrir la terminal', 'Operator': 'Operador', 'Operator key': 'Clave de operador', 'Open admin': 'Abrir administración',
   'It arrived by email when your access was set up. It works on every device you own.': 'Llegó por correo cuando se activó tu acceso. Funciona en todos tus dispositivos.',
