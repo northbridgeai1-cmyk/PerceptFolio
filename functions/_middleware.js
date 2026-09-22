@@ -61,7 +61,9 @@ function csp(path, env) {
     return `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://services.arcgisonline.com https://server.arcgisonline.com; font-src 'self' data:; connect-src ${connect} https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
   }
   if (FRAMEABLE.test(path)) {
-    return `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'self'`;
+    /* Pages injects the Web Analytics beacon into this document as well; admitted here so the
+       console stays clean, not because the preview needs counting. */
+    return `default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'self'`;
   }
   return `default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect} https://cloudflareinsights.com; form-action 'self' https://checkout.stripe.com; base-uri 'self'; object-src 'none'; frame-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests`;
 }

@@ -1407,8 +1407,8 @@ G('The terminal is not served without a session');
      style, keep script-src at 'self' (the file has no inline script; check that too, so nobody adds
      one and widens the hole), and be frameable by this origin only. */
   t('the preview snapshot is served under a policy its inline styles satisfy, framed by this origin only', (() => {
-    const prev = (mw.match(/if \(FRAMEABLE\.test\(path\)\) \{\s*return `([^`]*)`/)||[])[1] || '';
-    return /style-src 'self' 'unsafe-inline'/.test(prev) && /script-src 'self';/.test(prev) && /frame-ancestors 'self'/.test(prev) && !/frame-ancestors 'none'/.test(prev);
+    const prev = (mw.match(/if \(FRAMEABLE\.test\(path\)\) \{[\s\S]*?return `([^`]*)`/)||[])[1] || '';
+    return /style-src 'self' 'unsafe-inline'/.test(prev) && /script-src 'self' https:\/\/static\.cloudflareinsights\.com;/.test(prev) && !/script-src[^;]*unsafe-inline/.test(prev) && /frame-ancestors 'self'/.test(prev) && !/frame-ancestors 'none'/.test(prev);
   })());
   t('the preview snapshot carries no inline script block, so script-src can stay at self (its leftover on* attributes are refused by that policy and never fire: pointer-events none)',
     !/<script>[^<]/.test(read('preview/dashboard.html')));
