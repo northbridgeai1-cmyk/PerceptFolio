@@ -30,12 +30,12 @@ export function Landing() {
           <h1 className="mb-6">A research terminal that keeps score on itself.</h1>
           <p className="lede text-[21px] max-w-[56ch]"><b className="font-semibold text-text">Bloomberg tells you everything that is happening. PerceptFolio tells you whether your decisions worked.</b></p>
           <p className="mt-4 max-w-[56ch] text-[17px] text-dim">Software for people who buy and sell shares. It checks each company against rules you set, writes down what it told you, and later shows whether that was right. Twenty-two checks, one verdict, a record nobody can edit.</p>
-          <div className="mt-8 flex flex-wrap items-center gap-5"><Button asChild variant="primary" size="lg"><a href="#request">Ask for access</a></Button><Button asChild variant="secondary" size="lg"><a href="/enter/">I have a code</a></Button><a href="#demo" className="text-[15px] text-dim underline underline-offset-[.2em] decoration-line2 hover:text-text hover:decoration-current">or try it on real history first</a></div>
+          <div className="mt-8 flex flex-wrap items-center gap-5"><Button asChild variant="primary" size="lg"><a href="#request">Ask for access</a></Button><a href="#demo" className="text-[15px] text-dim underline underline-offset-[.2em] decoration-line2 hover:text-text hover:decoration-current">or try it on real history first</a></div>
         </div></div>
         <TerminalDashboard />
         <div className="wrap">
           <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[780px]:grid-cols-1" role="list" aria-label="How to get in, in three steps">
-            {[['1. Ask', 'Fill in the form at the bottom of this page. A person at NorthBridge reads it and replies by email.'], ['2. See it', 'A demo of the terminal on your own positions. If it suits your work, the price is $760 a month or $8,360 a year.'], ['3. Enter', 'Your access code arrives by email. Open perceptfolio.com/enter, type the code, choose a password for your device, and the terminal is yours.']].map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-sans text-[15px] font-bold tracking-normal">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
+            {[['1. Ask', 'Fill in the form at the bottom of this page. A person at NorthBridge reads it and replies by email.'], ['2. See it', 'A demo of the terminal on your own positions. If it suits your work, the price is $760 a month or $8,360 a year.'], ['3. Enter', 'Your access code arrives by email, with the link straight to the terminal. Type the code, choose a password for your device, and it is yours.']].map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-sans text-[15px] font-bold tracking-normal">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
           </div>
         </div>
       </header>

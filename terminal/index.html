@@ -239,6 +239,15 @@ main>div:not(.tabs-hidden){animation:tabIn .16s var(--ease)}
 }
 /* Where you are, in the header. Cheap orientation once the sidebar labels can be hidden. */
 .nw-win.on{background:var(--panel2);border-color:var(--brand2);color:var(--text)}
+/* WHICH ONE AM I ON. The selected button in a row of choices (1 month / 1 year / 5 years, 30D /
+   Max, Today / Yesterday) carried an accent border and accent text, which on a pale surface is
+   too quiet to find at a glance. A tinted fill behind it settles that without shouting: the row
+   still reads as one row, and the selected one is obvious. aria-pressed carries the same fact for
+   a screen reader, so it is never colour alone. */
+.btn.is-on,.btn-ghost.is-on{background:color-mix(in srgb,var(--accent) 14%,transparent);
+  border-color:var(--accent);color:var(--accent);font-weight:650}
+body.theme-light .btn.is-on,body.theme-light .btn-ghost.is-on{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.btn.is-on:hover,.btn-ghost.is-on:hover{background:color-mix(in srgb,var(--accent) 20%,transparent)}
 /* Sources fold away behind an arrow. The headlines are the evidence, but nobody wants forty of
    them stacked on screen at once. */
 .nw-src{margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
@@ -1247,6 +1256,22 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
        honest: a mark not taken on the day cannot be taken later. -->
   <div id="marksDue" class="md"></div>
   <div id="commandQueue"></div>
+  <!-- The market scan. The queue above is about what you own and watch; this is about everything
+       else that is listed. It walks the whole US listing in the background at the pace the data
+       allows, and shows only the names that cleared the buy bar or broke the sell bar you set.
+       Everything it passed over is by definition neither. -->
+  <div class="card" id="mktScanCard" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;align-items:center">
+      <h3 style="margin:0">The market, against your bars</h3>
+      <div class="row" style="gap:6px">
+        <button class="btn btn-sm" id="mktScanBtn" onclick="startMarketScan()">Scan the market</button>
+        <button class="btn btn-ghost btn-sm" id="mktScanStop" onclick="stopMarketScan()" style="display:none">Stop</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearMarketScan()" title="Forget what the scan found and start the walk again">Start over</button>
+      </div>
+    </div>
+    <div class="muted" id="mktScanNote" style="font-size:12.5px;margin-top:8px"></div>
+    <div id="mktScanBody" style="margin-top:10px"></div>
+  </div>
   <!-- A6.3. Release dates: context AFTER the queue, never above it. The queue is what the screen
        is for; a calendar that pushes it below the fold is furniture in the way of the work. -->
   <div id="econCal" class="md"></div>
@@ -1767,19 +1792,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <details class="aside"><summary>How the ruler works</summary><div>The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b>, it's a ruler, not a forecast.</div></details>
   </div>
 
-  <!-- 1a. Rates and the economy. The price of money and the economy it is priced in, from FRED
-       through the worker. Context beside everything else on this tab and never an input to a
-       verdict; every tile carries its own date, because a monthly statistic sitting beside a daily
-       one must say so before anything else. -->
-  <div class="card">
-    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-      <h3 style="margin:0">Rates and the economy</h3>
-      <span class="pill pill-na" style="font-size:10px">context, not a verdict</span>
-    </div>
-    <div id="ratesLine" style="margin-top:12px" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
-    <details class="aside"><summary>Reading the card</summary><div><b>Fed funds</b> is the overnight rate the Fed sets, inside its target range; the <b>3-month</b> bill tracks it. The <b>2-year</b> is the market's bet on where that rate goes next; the <b>10-</b> and <b>30-year</b> price growth and inflation for decades ahead, and the <b>mortgage</b> rate is what the 10-year costs a household. When the 2-year sits above the 10-year (a negative <b>2s10s</b>) the curve is inverted, which has preceded most US recessions by a year or so and has also sent false alarms. <b>Inflation</b> is the CPI over the past twelve months, realised; the <b>breakeven</b> is the inflation the bond market expects over the next ten. <b>Unemployment</b> is the labour market as of last month. The <b>balance sheet</b> rising is the Fed buying bonds, falling is the Fed letting them run off. None of it feeds a score or a verdict here. It is the weather the businesses you rate are operating in.</div></details>
-  </div>
-
   <!-- 1b. Calendar effects — CONTEXT ONLY, and the panel says so twice.
        This exists because on the fourth of September somebody publishes "September is the worst
        month for stocks" and does not divide by the standard deviation. The defence against a bad
@@ -1793,6 +1805,19 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div id="seasonalBody" style="margin-top:12px"></div>
   </div>
 
+  <!-- 1a. Rates and the economy. The price of money and the economy it is priced in, from FRED
+       through the worker. Context beside everything else on this tab and never an input to a
+       verdict; every tile carries its own date, because a monthly statistic sitting beside a daily
+       one must say so before anything else. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Rates and the economy</h3>
+      <span class="pill pill-na" style="font-size:10px">context, not a verdict</span>
+    </div>
+    <div id="ratesLine" style="margin-top:12px" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
+    <details class="aside"><summary>Reading the card</summary><div><b>Fed funds</b> is the overnight rate the Fed sets, inside its target range; the <b>3-month</b> bill tracks it. The <b>2-year</b> is the market's bet on where that rate goes next; the <b>10-</b> and <b>30-year</b> price growth and inflation for decades ahead, and the <b>mortgage</b> rate is what the 10-year costs a household. When the 2-year sits above the 10-year (a negative <b>2s10s</b>) the curve is inverted, which has preceded most US recessions by a year or so and has also sent false alarms. <b>Inflation</b> is the CPI over the past twelve months, realised; the <b>breakeven</b> is the inflation the bond market expects over the next ten. <b>Unemployment</b> is the labour market as of last month. The <b>balance sheet</b> rising is the Fed buying bonds, falling is the Fed letting them run off. None of it feeds a score or a verdict here. It is the weather the businesses you rate are operating in.</div></details>
+  </div>
+
   <!-- Hindsight. What the best and worst names DID, and why that is not a shopping list. -->
   <div class="card">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap">
@@ -1800,7 +1825,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <div class="row" style="gap:6px">
         <button class="btn btn-ghost btn-sm" id="hsBtn_m1" onclick="setHindsight('m1')">1 month</button>
         <button class="btn btn-ghost btn-sm" id="hsBtn_m6" onclick="setHindsight('m6')">6 months</button>
-        <button class="btn btn-ghost btn-sm on" id="hsBtn_y1" onclick="setHindsight('y1')">1 year</button>
+        <button class="btn btn-ghost btn-sm is-on" id="hsBtn_y1" onclick="setHindsight('y1')">1 year</button>
         <button class="btn btn-ghost btn-sm" id="hsBtn_y5" onclick="setHindsight('y5')">5 years</button>
       </div>
     </div>
@@ -5308,7 +5333,7 @@ function renderHindsight(){
   const w=hsWindow();
   HS_WINDOWS.forEach(x=>{
     const b=document.getElementById('hsBtn_'+x.k);
-    if(b)b.classList.toggle('on',x.k===hindsightWin);
+    if(b){ b.classList.toggle('is-on',x.k===hindsightWin); b.setAttribute('aria-pressed',x.k===hindsightWin?'true':'false'); }
   });
   /* The market list is fetched once, on first sight of the panel; the panel draws itself again
      when it lands, and falls back to the book alone if it never does. */
@@ -10865,17 +10890,21 @@ function clearScrub(){
 }
 function setGraphView(v){graphView=v;drawGrowthChart();}
 function setGraphRange(d){graphRange=d;drawGrowthChart();}
+/* Mark one button in a row as the chosen one. Ids are a prefix plus the value, so a row is
+   described by its prefix and its values and nothing has to be listed twice. */
+function markChoice(prefix,values,chosen){
+  values.forEach(v=>{
+    const b=document.getElementById(prefix+v);
+    if(!b)return;
+    const on=String(v)===String(chosen);
+    b.classList.toggle('is-on',on);
+    b.setAttribute('aria-pressed',on?'true':'false');
+    b.style.borderColor=''; b.style.color='';      // the class owns the look now
+  });
+}
 function updateGraphButtons(){
-  ['growth','valuegain','vsspy','dividends'].forEach(v=>{
-    const b=document.getElementById('gvBtn_'+v);
-    if(b)b.style.borderColor=(graphView===v)?'var(--accent)':'';
-    if(b)b.style.color=(graphView===v)?'var(--accent)':'';
-  });
-  [30,365,1095,0].forEach(r=>{
-    const b=document.getElementById('grBtn_'+r);
-    if(b)b.style.borderColor=(graphRange===r)?'var(--accent)':'';
-    if(b)b.style.color=(graphRange===r)?'var(--accent)':'';
-  });
+  markChoice('gvBtn_',['growth','valuegain','vsspy','dividends'],graphView);
+  markChoice('grBtn_',[30,365,1095,0],graphRange);
 }
 function drawGrowthChart(){
   const box=document.getElementById('growthChartBox'),empty=document.getElementById('growthChartEmpty');
@@ -12894,6 +12923,7 @@ function renderCommand(){
   }).join('')+'</div>'+
   '';
   renderEconCal();
+  renderMarketScan();
   /* A3.1. The open REVIEW row carries the digest; it is fetched after the row is drawn. */
   if(cmdOpen!=null&&q[cmdOpen]&&q[cmdOpen].digest)fillDigestInto(q[cmdOpen].digest,document.getElementById('cmdDigest-'+q[cmdOpen].digest));
 }
@@ -14137,14 +14167,7 @@ function renderRegimeBanner(data){
     '<p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.55">Variance ratio on S&P daily returns, recent '+REGIME_RECENT+' days against the prior '+REGIME_PRIOR+'. Flags at 2× in either direction. This detects that something changed; it says nothing about what caused it or which way prices go next.</p>'+
   '</div>';
 }
-function updateMoveButtons(){
-  ['today','yesterday','tomorrow'].forEach(d=>{
-    const b=document.getElementById('mvBtn_'+d);
-    if(!b)return;
-    b.style.borderColor=(moveDay===d)?'var(--accent)':'';
-    b.style.color=(moveDay===d)?'var(--accent)':'';
-  });
-}
+function updateMoveButtons(){ markChoice('mvBtn_',['today','yesterday','tomorrow'],moveDay); }
 function weatherCard(title,value,asOf,band,bandCls,detail,note){
   return '<div class="card">'+
     '<h3>'+esc(title)+'</h3>'+
@@ -14661,6 +14684,88 @@ function priceSourceLine(){
   const q=D.apiKey?'quotes: Finnhub, your key':(syncConfigured()||accessCodeFor(USER))?'quotes: Finnhub, built in':'quotes: none';
   const h=D.historySource?('closes: '+D.historySource):'closes: refreshed at the last review';
   return q+' · '+h;
+}
+/* ============================ THE MARKET SCAN ============================
+   "Read the whole stock market and only give me the buys and the sells."
+
+   Six and a half thousand US listings, and one company costs about four data calls, so the whole
+   market is roughly twenty-six thousand calls: at sixty a minute that is hours, not seconds. The
+   honest way to do it is to walk, not to promise a sweep: the scan takes the listing in order
+   (the most-traded names come first), scores as many as the minute allows, remembers where it got
+   to, and carries on from there the next time. It says how far it has walked and when the walk
+   started, so nobody mistakes a tenth of the market for the market.
+
+   Only two verdicts are shown: cleared your buy bar, or broke your sell bar. Everything else is
+   neither, and a list of neithers is what makes a screener useless. A find older than a week is
+   dropped, because a verdict from a price nine days ago is not a verdict about today. */
+const SCAN_STALE_MS=7*864e5;
+function scanState(){ if(!D.marketScan)D.marketScan={cursor:0,started:0,hits:[],scanned:0}; return D.marketScan; }
+let _scanRunning=false,_scanStop=false;
+function clearMarketScan(){ D.marketScan={cursor:0,started:0,hits:[],scanned:0}; saveDB(); renderMarketScan(); }
+function stopMarketScan(){ _scanStop=true; }
+function scanHits(){
+  const s=scanState(), cut=Date.now()-SCAN_STALE_MS;
+  const live=(s.hits||[]).filter(h=>h.at>cut);
+  if(live.length!==(s.hits||[]).length){ s.hits=live; saveDB(); }
+  return live;
+}
+function renderMarketScan(){
+  const note=document.getElementById('mktScanNote'), body=document.getElementById('mktScanBody');
+  if(!note||!body)return;
+  const s=scanState(), hits=scanHits(), total=(typeof universeSize==='function'&&universeSize())||0;
+  const r=D.rules||{};
+  note.innerHTML=(s.scanned?'<b>'+s.scanned.toLocaleString()+'</b> of '+(total?total.toLocaleString():'the whole listing')+' scanned'+(s.started?', since '+new Date(s.started).toISOString().slice(0,10):'')+'. ':'Not started. ')+
+    'It walks the listing in the background while you work, at the pace the data allows, and keeps its place between visits. Your bars: quality '+(r.qBuy==null?'?':r.qBuy)+'+ and value '+(r.pBuy==null?'?':r.pBuy)+'+ to buy, quality '+(r.qSell==null?'?':r.qSell)+' or less to sell.';
+  if(!hits.length){ body.innerHTML='<div class="muted" style="font-size:13px">'+(s.scanned?'Nothing in what it has scanned so far clears your buy bar or breaks your sell bar. That is the usual answer.':'Press Scan the market. Only the names that clear your buy bar or break your sell bar appear here.')+'</div>'; return; }
+  const buys=hits.filter(h=>h.verdict==='buy'), sells=hits.filter(h=>h.verdict==='sell');
+  const rows=hits.slice().sort((a,b)=>(a.verdict===b.verdict?(b.q-a.q):(a.verdict==='buy'?-1:1))).map(h=>
+    '<tr><td><b>'+esc(h.sym)+'</b> <span class="muted" style="font-size:11.5px">'+esc((h.name||'').slice(0,28))+'</span></td>'+
+    '<td><span class="pill '+(h.verdict==='buy'?'pill-buy':'pill-sell')+'">'+(h.verdict==='buy'?'BUY candidate':'SELL signal')+'</span></td>'+
+    '<td class="muted" style="font-size:12px;white-space:nowrap">'+h.q+'/12 · '+h.p+'/6 · '+h.m+'/4</td>'+
+    '<td>'+fmt$(h.price)+'</td><td class="muted" style="font-size:12px;white-space:nowrap">'+new Date(h.at).toISOString().slice(0,10)+'</td>'+
+    '<td><button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(h.sym)+'\')">Look</button></td></tr>').join('');
+  body.innerHTML='<div class="muted" style="font-size:12.5px;margin-bottom:6px">'+buys.length+' cleared the buy bar, '+sells.length+' broke the sell bar, from what has been scanned so far.</div>'+
+    '<div style="overflow-x:auto"><table style="font-size:13px"><thead><tr><th>Ticker</th><th>Verdict</th><th>Quality · value · momentum</th><th>Price</th><th>Scored</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+async function startMarketScan(){
+  if(_scanRunning)return;
+  if(!hasMarketData()){ toast('The scan needs market data: Settings \u2192 Market data.'); showTab('settings'); return; }
+  const btn=document.getElementById('mktScanBtn'), stop=document.getElementById('mktScanStop');
+  let rows=[];
+  try{ rows=await loadUniverse(); }catch(e){}
+  if(!rows||!rows.length){ toast('The listing did not load. Try again in a minute.'); return; }
+  const s=scanState(); if(!s.started)s.started=Date.now();
+  _scanRunning=true; _scanStop=false;
+  if(btn)btn.style.display='none'; if(stop)stop.style.display='inline-block';
+  const note=document.getElementById('mktScanNote');
+  try{
+    while(!_scanStop&&s.cursor<rows.length){
+      const sym=rows[s.cursor][0], name=rows[s.cursor][1];
+      if(note)note.innerHTML='<b>Scanning '+esc(sym)+'</b> \u00b7 '+(s.cursor+1).toLocaleString()+' of '+rows.length.toLocaleString()+' \u00b7 it keeps its place, so stopping loses nothing.';
+      try{
+        let sc=D.analyses[sym];
+        const fresh=sc&&sc.when&&(Date.now()-sc.when)<12*3600*1000;
+        if(!fresh){ sc=await scoreStock(sym); }
+        if(sc&&!sc.error){
+          /* The same verdict the Analyzer would give, under the same bars, for a name not held. */
+          const v=verdictOf(sc,false,sym);
+          if(v.key==='buy'||v.key==='sell'){
+            s.hits=(s.hits||[]).filter(h=>h.sym!==sym);
+            s.hits.push({sym,name:name||'',verdict:v.key,q:sc.qScore,p:sc.pScore,m:sc.mScore,price:sc.price,at:Date.now()});
+          }
+          s.scanned++;
+        }
+      }catch(e){ /* one name's failure never stops the walk */ }
+      s.cursor++;
+      if(s.cursor%10===0){ saveDB(); renderMarketScan(); if(note)note.innerHTML='<b>Scanning\u2026</b> '+s.cursor.toLocaleString()+' of '+rows.length.toLocaleString(); }
+      await new Promise(r=>setTimeout(r,250));   // the fetch pacing does the real work; this keeps the page responsive
+    }
+    if(s.cursor>=rows.length){ s.cursor=0; s.started=Date.now(); toast('The scan has been all the way through the listing. It starts again from the top.'); }
+  }finally{
+    _scanRunning=false; saveDB();
+    if(btn)btn.style.display='inline-block'; if(stop)stop.style.display='none';
+    renderMarketScan();
+  }
 }
 /* Where a review has got to. Market data is sixty calls a minute and one company costs several,
    so a book of twenty names is paced across a few minutes. A line that does not move for that long
@@ -16898,7 +17003,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 })();
 </script>
 <script>
-/* Company, analysts and six lenses (under an analysis) and Kelly (in Risk). Data via the worker:
+/* Company, analysts and six lenses, under an analysis. Data via the worker:
    Finnhub's free profile, metrics and recommendation counts, a consensus target, and six short
    readings written by the model in the published frameworks of six investors, labelled as such. */
 (function(){
@@ -16946,30 +17051,8 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   var host=document.getElementById('analyzerResult');
   if(host){ var last=''; new MutationObserver(function(){ var t=(host.querySelector('h2,h3,.sym,[data-sym]')||{}).textContent||''; var m=(host.getAttribute('data-sym')||t).match(/\b[A-Z]{1,6}\b/); var sym=m?m[0]:''; if(sym&&sym!==last&&!/Nothing analysed/.test(host.textContent)){ last=sym; setTimeout(function(){ council(sym,host); },400); } }).observe(host,{childList:true}); }
 
-  /* Kelly, in Risk. f* = p/L − q/W with W and L as fractions of price from the thesis's target and
-     stop; p from the marked record of the checklist track when it has thirty marks, otherwise a
-     stated 50%. Shown as full and half Kelly, capped by the concentration limit, and never as an
-     instruction: the terminal's five limits still decide. */
-  function kelly(){
-    var host=document.getElementById('tab-risk'); if(!host||document.getElementById('pfKelly'))return;
-    var d=document.createElement('div'); d.id='pfKelly'; d.className='card'; d.style.marginTop='14px';
-    d.innerHTML='<div class="mv-kicker">Kelly criterion</div><div class="mv-title">How much, if the odds were exactly as your thesis says</div>'+
-      '<div class="mv-form"><input id="kPrice" placeholder="PRICE" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><input id="kTarget" placeholder="TARGET" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><input id="kStop" placeholder="STOP" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><input id="kP" placeholder="P(WIN) %" inputmode="decimal" style="text-transform:none;letter-spacing:0;width:110px"><button class="btn btn-p" id="kGo">Size it</button></div>'+
-      '<div id="kOut"></div>';
-    host.insertBefore(d,host.firstChild);
-    var marks=(D&&D.calls||[]).filter(function(c){return c.track==='checklist'&&c.mark&&isFinite(c.mark.edge);});
-    var pRec=marks.length>=30?marks.filter(function(c){return c.mark.edge>0;}).length/marks.length:null;
-    document.getElementById('kP').value=pRec!=null?(pRec*100).toFixed(0):'50';
-    document.getElementById('kGo').addEventListener('click',function(){
-      var px=parseFloat(document.getElementById('kPrice').value), tg=parseFloat(document.getElementById('kTarget').value), st=parseFloat(document.getElementById('kStop').value), p=parseFloat(document.getElementById('kP').value)/100, out=document.getElementById('kOut');
-      if(!(px>0&&tg>px&&st>0&&st<px&&p>0&&p<1)){ out.innerHTML='<div class="mv-empty"><span class="dot"></span><div><b>Needs a price, a target above it, a stop below it, and a probability between 0 and 100</b><p>The target and stop are your thesis; Kelly only turns them into a fraction.</p></div></div>'; return; }
-      var W=(tg-px)/px, L=(px-st)/px, q=1-p, f=p/L-q/W, half=f/2, cap=(D&&D.rules&&isFinite(D.rules.maxPosition)?D.rules.maxPosition/100:null);   // maxPosition is a percent
-      var line=function(l,v){return '<span>'+l+' <b class="'+(v>0?'pos':'neg')+'">'+(v*100).toFixed(1)+'%</b></span>';};
-      out.innerHTML='<div class="mv-stats">'+line('full Kelly',f)+line('half Kelly',half)+'<span>odds <b>'+(W/L).toFixed(2)+'</b> to 1</span><span>p(win) <b>'+(p*100).toFixed(0)+'%</b>'+(pRec==null?' <span class="muted">(assumed)</span>':' <span class="muted">(your record)</span>')+'</span></div>'+
-        '<p class="mv-note">'+(f<=0?'Negative Kelly: at these odds and this probability the bet has no edge, and the fraction to hold is zero.':'Half Kelly of the portfolio is <b>'+(half*100).toFixed(1)+'%</b>'+(cap!=null&&half>cap?', which the concentration limit of '+(cap*100).toFixed(0)+'% caps.':'.'))+' This is arithmetic on your own inputs, not a recommendation; the five limits still decide.</p>';
-    });
-  }
-  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='risk')setTimeout(kelly,50); return r; }; }
+  /* The Kelly card was removed on 2026-09-22: nobody used it, and it took the space above the
+     limits that actually decide a size. The five sizing limits are the answer to how much. */
 })();
 </script>
 <style id="v2-world">
@@ -17156,6 +17239,11 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
         contextOptions:{webgl:{alpha:false,antialias:true,powerPreference:'low-power'}}
       });
       var sc=viewer.scene;
+      /* requestRenderMode draws a frame only when one is asked for. The base map's tiles arrive
+         after the first frame, so without this the first look is white borders on a black ball:
+         the globe is there and its map is not, which is what "the World is not working" looked
+         like. Each tile batch asks for a frame; the event stops firing when the globe settles. */
+      sc.globe.tileLoadProgressEvent.addEventListener(function(){ sc.requestRender(); });
       sc.backgroundColor=C.Color.fromCssColorString('#07090f'); sc.globe.baseColor=C.Color.fromCssColorString('#101827');
       sc.globe.showGroundAtmosphere=true; sc.globe.depthTestAgainstTerrain=true; sc.fog.enabled=false; sc.highDynamicRange=false;
       if(sc.sun)sc.sun.show=false; if(sc.moon)sc.moon.show=false;
