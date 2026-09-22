@@ -41,3 +41,9 @@ simple = { limit = 60, period = 60 }
 # when no Anthropic key is set or its account has no credit. Free daily allowance; no other account.
 [ai]
 binding = "AI"
+
+# A2.3/A4.3. The daily marker and the notices. 21:40 UTC is after the US close on a trading
+# day; the run itself checks the exchange calendar and the licence (it records why it did
+# nothing when there is no licensed feed). Without this block scheduled() never fires.
+[triggers]
+crons = ["40 21 * * 1-5"]

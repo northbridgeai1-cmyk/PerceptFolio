@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>Verify a record | PerceptFolio</title>
+<meta name="description" content="Check a PerceptFolio evidence pack: the hash chain, the server-clocked heads, and the sequence, without an account and without trusting NorthBridge.">
+<meta name="theme-color" content="#0b0c0f">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/verify/verify.css">
+<!-- A2.5. The verifier. Everything it does is in verify.js, which carries the same canonicalJson,
+     chainRecord, reviewRecord and sha as the terminal, byte for byte (the test suite compares
+     them). No inline script or style: the public Content-Security-Policy applies here. The pack
+     never leaves this page; the only request this page can make is, on request, one GET of the
+     live head log for a code you type. -->
+</head>
+<body>
+<nav class="nav"><div class="nav-in"><a class="logo" href="/"><span class="c1">Percept</span><span class="c2">Folio</span></a><a class="nav-back" href="/#record">Back to the site</a></div></nav>
+<main class="wrap">
+  <h1>Verify a record.</h1>
+  <p class="lede">Drop an evidence pack exported from the terminal (Settings, Backup, Evidence pack). The page recomputes every hash in the chain and checks each server-dated head against the mark it names. Nothing you drop here is sent anywhere.</p>
+
+  <section class="card">
+    <label class="drop" id="drop" for="file">
+      <input id="file" type="file" accept=".json,application/json,text/plain">
+      <span class="drop-l">Drop the pack here, or choose a file</span>
+      <span class="drop-s" id="fileName">perceptfolio-evidence-YYYY-MM-DD.json</span>
+    </label>
+  </section>
+
+  <section class="card" id="resultCard" hidden>
+    <h2 id="verdict"></h2>
+    <table class="t" id="checks" aria-label="Checks"><thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card" id="headsCard" hidden>
+    <h2>Server heads</h2>
+    <table class="t" id="heads" aria-label="Server-dated chain heads"><thead><tr><th>Day (server clock)</th><th>Entries then</th><th>Head</th><th>Matches the pack</th></tr></thead><tbody></tbody></table>
+    <div class="row">
+      <label class="lbl" for="code">Compare with the live server log (optional)</label>
+      <input id="code" type="text" inputmode="latin" autocomplete="off" spellcheck="false" placeholder="access code, XXXXX-XXXXX" maxlength="11">
+      <button id="fetchHeads" type="button" class="btn">Fetch</button>
+      <span class="muted" id="liveNote"></span>
+    </div>
+  </section>
+
+  <section class="card" id="entriesCard" hidden>
+    <h2>The chain</h2>
+    <table class="t" id="entries" aria-label="Chain entries"><thead><tr><th>#</th><th>Kind</th><th>Ticker</th><th>Horizon</th><th>Recorded</th><th>Hash</th><th>OK</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="legend">
+    <table class="t" aria-label="What each result means"><tbody>
+      <tr><th>Chain recomputed</th><td>Every entry's hash equals SHA-256 of its canonical record with the previous hash inside it. A change anywhere breaks every later hash.</td></tr>
+      <tr><th>Head matches</th><td>The last recomputed hash equals the head the pack claims, and the count equals the pack's count.</td></tr>
+      <tr><th>Server heads</th><td>Each day's entry names a head and a count. The pack's entry at that count must carry that hash. If it does, nothing up to that count changed since that day, on the server's clock.</td></tr>
+      <tr><th>What this does not prove</th><td>That the prices in the marks were true on the day. A chain built from invented prices verifies. The cron marks and the named price feed are what answer that.</td></tr>
+    </tbody></table>
+  </section>
+  <p class="src">Source line: the same arithmetic ships inside the terminal; this page carries a copy of it, and the test suite checks the two are identical.</p>
+</main>
+<script src="/verify/verify.js" defer></script>
+</body>
+</html>

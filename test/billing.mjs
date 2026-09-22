@@ -176,7 +176,9 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
   const prevFetch = globalThis.fetch;
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url); seen.push({ u, auth: opts.headers && opts.headers.Authorization });
-    if (u.includes('query1.finance.yahoo.com')) { const n = 120; const ts = [...Array(n)].map((_, i) => 1700000000 + i * 86400); const px = [...Array(n)].map((_, i) => 100 + i * 0.3); return new Response(JSON.stringify({ chart: { result: [{ timestamp: ts, indicators: { quote: [{ open: px, high: px.map(x => x + 1), low: px.map(x => x - 1), close: px, volume: px.map(() => 1000) }] } }] } }), { status: 200 }); }
+    /* Bars dated up to today: dailyBars() keeps only bars inside the window it asked for, so a
+       fixed 2023 start would be filtered to nothing and read as "not enough history". */
+    if (u.includes('query1.finance.yahoo.com')) { const n = 120; const t0 = Math.floor(Date.now() / 1000) - n * 86400; const ts = [...Array(n)].map((_, i) => t0 + i * 86400); const px = [...Array(n)].map((_, i) => 100 + i * 0.3); return new Response(JSON.stringify({ chart: { result: [{ timestamp: ts, indicators: { quote: [{ open: px, high: px.map(x => x + 1), low: px.map(x => x - 1), close: px, volume: px.map(() => 1000) }] } }] } }), { status: 200 }); }
     if (u.includes('kronos.example')) return new Response(JSON.stringify({ path: [136, 137, 138], lo: [130, 131, 132], hi: [140, 141, 142], dates: ['2026-09-15', '2026-09-16', '2026-09-17'], model: 'NeoQuasar/Kronos-small' }), { status: 200 });
     return prevFetch(url, opts);
   };
@@ -198,16 +200,18 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
   const prev = globalThis.fetch; const hits = [];
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url); hits.push(u);
-    if (u.includes('query1.finance.yahoo.com/v8')) { const n = 500; const ts = [...Array(n)].map((_, i) => 1690000000 + i * 86400); const px = ts.map((_, i) => 400 + i * 0.1); return new Response(JSON.stringify({ chart: { result: [{ timestamp: ts, indicators: { quote: [{ open: px, high: px, low: px, close: px, volume: px }] } }] } }), { status: 200 }); }
+    if (u.includes('query1.finance.yahoo.com/v8')) { const n = 500; const t0 = Math.floor(Date.now() / 1000) - n * 86400; const ts = [...Array(n)].map((_, i) => t0 + i * 86400); const px = ts.map((_, i) => 400 + i * 0.1); return new Response(JSON.stringify({ chart: { result: [{ timestamp: ts, indicators: { quote: [{ open: px, high: px, low: px, close: px, volume: px }] } }] } }), { status: 200 }); }
     if (u.includes('finnhub.io/api/v1/stock/profile2')) return new Response(JSON.stringify({ name: 'NVIDIA Corp', finnhubIndustry: 'Semiconductors', marketCapitalization: 4500000, ipo: '1999-01-22', weburl: 'https://nvidia.com' }), { status: 200 });
     if (u.includes('finnhub.io/api/v1/stock/metric')) return new Response(JSON.stringify({ metric: { peTTM: 52.1, grossMarginTTM: 74.6, roeTTM: 91.9, beta: 1.7 } }), { status: 200 });
     if (u.includes('finnhub.io/api/v1/stock/recommendation')) return new Response(JSON.stringify([...Array(14)].map((_, i) => ({ period: '2026-' + String(9 - (i % 9)).padStart(2, '0') + '-01', strongBuy: 20 - i, buy: 30, hold: 6 + i, sell: 1, strongSell: 0 }))), { status: 200 });
-    if (u.includes('quoteSummary')) return new Response(JSON.stringify({ quoteSummary: { result: [{ financialData: { targetMeanPrice: { raw: 210 }, recommendationMean: { raw: 1.6 } } }] } }), { status: 200 });
+    /* The council reads the price target from Finnhub now, nothing from Yahoo; the operator's key
+       answers only a call that carries the sync secret. */
+    if (u.includes('finnhub.io/api/v1/stock/price-target')) return new Response(JSON.stringify({ targetMean: 210, targetHigh: 250, targetLow: 150 }), { status: 200 });
     if (u.includes('api.anthropic.com')) return new Response(JSON.stringify({ content: [{ text: JSON.stringify({ lenses: [{ id: 'value', name: 'Value (after Buffett)', stance: 'cautious', reading: 'A wonderful business at a price that leaves no margin of safety at 52 times earnings.', whatWouldChangeMyMind: 'A multiple below 25.' }] }) }] }), { status: 200 });
     return prev(url, opts);
   };
   let rr = await req('/history?symbol=SPY'); let hj = await rr.json();
-  t('history: two years of daily closes for any symbol, no key needed', rr.status === 200 && hj.closes.length === 500 && hj.dates.length === 500 && hj.source === 'yahoo');
+  t('history: two years of daily closes for any symbol, no key needed', rr.status === 200 && hj.closes.length === 500 && hj.dates.length === 500 && /^yahoo/.test(hj.source));
   const n1 = hits.filter(u => u.includes('yahoo')).length; rr = await req('/history?symbol=SPY'); await rr.json();
   t('history: cached for the day', hits.filter(u => u.includes('yahoo')).length === n1);
   rr = await req('/history?symbol=$$'); t('history: a bad symbol is refused', rr.status === 400);
@@ -215,7 +219,7 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
   const live = [...store.keys()].filter(k => k.startsWith('code:')).map(k => JSON.parse(store.get(k))).find(g => g && g.code && !g.paused && g.tier === 'business');
   rr = await worker.fetch(new Request(W + '/council', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: 'ZZZZZ-ZZZZZ', symbol: 'NVDA' }) }), e3);
   t('council: refused without a live code', rr.status === 401);
-  rr = await worker.fetch(new Request(W + '/council', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA' }) }), e3); const cj = await rr.json();
+  rr = await worker.fetch(new Request(W + '/council', { method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer op-secret' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA' }) }), e3); const cj = await rr.json();
   t('council: profile, ratios, analyst counts and target from the free feeds', rr.status === 200 && cj.facts.name === 'NVIDIA Corp' && cj.facts.pe === 52.1 && cj.facts.analysts.buy === 30 && cj.facts.targetMean === 210);
   t('council: the analyst counts carry a twelve-month history, newest first', Array.isArray(cj.facts.analystsHistory) && cj.facts.analystsHistory.length === 12 && cj.facts.analystsHistory[0].strongBuy === 20 && cj.facts.analystsHistory[11].hold === 17 && cj.facts.analysts.buy === 30);
   t('council: six-lens readings arrive as structured JSON with a stance and a what-would-change line', Array.isArray(cj.lenses) && cj.lenses[0].stance === 'cautious' && /margin of safety/.test(cj.lenses[0].reading) && !!cj.lenses[0].whatWouldChangeMyMind);
@@ -229,7 +233,8 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
     };
     rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: 'ZZZZZ-ZZZZZ', symbol: 'NVDA' }) }), e3);
     t('map prefill: refused without a live code', rr.status === 401);
-    rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA' }) }), e3); const mj = await rr.json();
+    /* The caller posts the name and industry from its own profile lookup; the worker no longer spends its key on them. */
+    rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA', name: 'NVIDIA Corp', industry: 'Semiconductors' }) }), e3); const mj = await rr.json();
     t('map prefill: suppliers and customers from the model, tidied: no self-links, no nameless rows, weights clamped, tickers only when plausible', rr.status === 200 && mj.suppliers.length === 2 && mj.suppliers[0].ticker === 'TSM' && mj.suppliers[1].ticker === '' && !mj.suppliers.some(x => x.ticker === 'NVDA') && mj.customers[0].weight === 100 && mj.name === 'NVIDIA Corp');
     t('map prefill: labelled as the model’s knowledge, not filings, and editable', /general knowledge/.test(mj.disclaimer) && /not from filings/.test(mj.disclaimer) && /Edit anything/.test(mj.disclaimer) && /Never invent a company, a ticker or a number/.test(read('worker.js')));
     const n = asked.filter(u => u.includes('anthropic')).length; rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'NVDA' }) }), e3); const mj2 = await rr.json();
@@ -245,7 +250,7 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
       rr = await worker.fetch(new Request(W + '/map/prefill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'MSFT' }) }), e5); const gj = await rr.json();
       t('map prefill: with no Anthropic key at all, Workers AI is the model', rr.status === 200 && gj.model === 'workers-ai');
       store.delete('council:MSFT:' + new Date().toISOString().slice(0, 10));
-      rr = await worker.fetch(new Request(W + '/council', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: live.code, symbol: 'MSFT' }) }), { ...e5, AI: { run: async () => ({ response: JSON.stringify({ lenses: [{ id: 'value', name: 'Value (after Buffett)', stance: 'favourable', reading: 'r', whatWouldChangeMyMind: 'w' }] }) }) } }); const hj = await rr.json();
+      rr = await worker.fetch(new Request(W + '/council', { method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer op-secret' }, body: JSON.stringify({ code: live.code, symbol: 'MSFT' }) }), { ...e5, AI: { run: async () => ({ response: JSON.stringify({ lenses: [{ id: 'value', name: 'Value (after Buffett)', stance: 'favourable', reading: 'r', whatWouldChangeMyMind: 'w' }] }) }) } }); const hj = await rr.json();
       t('council: the six lenses come through Workers AI too', rr.status === 200 && Array.isArray(hj.lenses) && hj.lenses[0].stance === 'favourable' && hj.model === 'workers-ai');
       globalThis.fetch = noCredit;
     }
@@ -306,6 +311,100 @@ r = await req('/org?code=' + code); j = await r.json(); t('a personal code has n
   rr = await askB({ code: live.code, qs: [...Array(25)].map((_, i) => 'Company ' + i) }); bj = await rr.json();
   t('batch: capped at twenty names', rr.status === 200 && Object.keys(bj.results).length === 20);
   globalThis.fetch = prev;
+}
+/* --- A2.1: the built-in data route and the DATA_TIERS switch --- */
+{
+  const prev = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => { const u = String(url); if (u.includes('finnhub.io/api/v1/quote')) return new Response(JSON.stringify({ c: 101.5, pc: 100 }), { status: 200 }); return prev(url, opts); };
+  store.set('grant:DATAA-PERS1', JSON.stringify({ code: 'DATAA-PERS1', tier: 'personal', paused: false }));
+  store.set('grant:DATAA-EMPL1', JSON.stringify({ code: 'DATAA-EMPL1', tier: 'employee', paused: false }));
+  const eD = { ...env, FINNHUB_API_KEY: 'fh' };
+  const ask = (code, e) => worker.fetch(new Request(W + '/data?code=' + code + '&path=/quote&symbol=AAPL'), e || eD);
+  let rr = await ask('ZZZZZ-ZZZZZ'); t('data: refused without a live code (401)', rr.status === 401);
+  rr = await ask('DATAA-PERS1'); let dj = await rr.json();
+  t('data: with DATA_TIERS unset every live code rides the worker key (the owner\'s standing instruction)', rr.status === 200 && dj.c === 101.5);
+  const eS = { ...eD, DATA_TIERS: 'employee, operator' };
+  rr = await ask('DATAA-PERS1', eS); dj = await rr.json();
+  t('data: with DATA_TIERS set, a plan outside it gets 402 and is told to connect its own key, not "bad key"', rr.status === 402 && dj.notIncluded === true && /own free Finnhub key/.test(dj.error));
+  rr = await ask('DATAA-EMPL1', eS); dj = await rr.json();
+  t('data: a plan inside DATA_TIERS is still served', rr.status === 200 && dj.c === 101.5);
+  rr = await worker.fetch(new Request(W + '/status?code=DATAA-PERS1'), eS); dj = await rr.json();
+  t('status: reports dataIncluded so the Settings card can say which it is before the first request', dj.known === true && dj.dataIncluded === false);
+  rr = await worker.fetch(new Request(W + '/status?code=DATAA-PERS1'), eD); dj = await rr.json();
+  t('status: dataIncluded is true when the switch is unset', dj.dataIncluded === true);
+  globalThis.fetch = prev;
+}
+/* --- A2.3: the record's server copy --- */
+{
+  store.set('grant:RECRD-PERS1', JSON.stringify({ code: 'RECRD-PERS1', tier: 'personal', paused: false }));
+  const put = (code, body) => worker.fetch(new Request(W + '/record?code=' + code, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), env);
+  let rr = await put('ZZZZZ-ZZZZZ', { calls: [] }); t('record: refused without a live code (401)', rr.status === 401);
+  const good = 'a'.repeat(64);
+  rr = await put('RECRD-PERS1', { calls: [
+    { id: '1:AAPL:checklist', sym: 'aapl', ts: 1700000000000, date: '2026-09-01', verdict: 'buy', price: 200, spy: 650, thesis: 'SECRET THESIS', notes: 'private', marks: { 30: { price: 210, spy: 655, at: 1, hash: good, seq: 0 }, 90: { price: 'x', hash: 'nothex', seq: 1 }, abc: { price: 1 } } },
+    { id: '', sym: 'MSFT', ts: 1 } ],
+    reviews: [{ sym: 'AAPL', at: 2, marks: [{ n: 1, mark: 'supported' }, { n: 2, mark: 'nonsense' }], hash: good, seq: 1 }],
+    chain: { head: good, n: 2 }, holdings: [{ sym: 'AAPL', shares: 100 }] });
+  let rj = await rr.json();
+  t('record: stored, with the empty-id call dropped', rr.status === 200 && rj.calls === 1 && rj.reviews === 1);
+  const rec = JSON.parse(store.get('rec:c:RECRD-PERS1'));
+  t('record: thesis text, notes and holdings never reach the store', !('thesis' in rec.calls[0]) && !('notes' in rec.calls[0]) && !('holdings' in rec));
+  t('record: the ticker is upper-cased, a bad hash is dropped, a non-numeric horizon is dropped, a bad review mark is dropped', rec.calls[0].sym === 'AAPL' && rec.calls[0].marks[30].hash === good && rec.calls[0].marks[90].hash === null && !rec.calls[0].marks.abc && rec.reviews[0].marks.length === 1);
+  rr = await worker.fetch(new Request(W + '/record?code=RECRD-PERS1'), env); rj = await rr.json();
+  t('record: read back by the same identity, with the chain state', rr.status === 200 && rj.chain.head === good && rj.chain.n === 2 && rj.calls.length === 1);
+  rr = await worker.fetch(new Request(W + '/record?code=RECRD-PERS1', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: 'x'.repeat(1024 * 1024 + 1) }), env);
+  t('record: over a megabyte is refused (413)', rr.status === 413);
+}
+/* --- A4.3: notices --- */
+{
+  store.set('grant:NOTIF-PERS1', JSON.stringify({ code: 'NOTIF-PERS1', tier: 'personal', paused: false, email: 'p@example.com' }));
+  const sent = []; const prev = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => { if (String(url).includes('api.resend.com')) { sent.push(JSON.parse(opts.body)); return new Response('{"id":"m"}', { status: 200 }); } return prev(url, opts); };
+  let rr = await worker.fetch(new Request(W + '/notify?code=NOTIF-PERS1'), env); let nj = await rr.json();
+  t('notify: off by default', rr.status === 200 && nj.marks === false && nj.reviews === false);
+  rr = await worker.fetch(new Request(W + '/notify?code=NOTIF-PERS1', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ marks: true, reviews: true }) }), env); nj = await rr.json();
+  t('notify: saved, and says whether an address exists for the code', nj.ok && nj.marks && nj.reviews && nj.address === true);
+  const KVl = { ...env.PF_SYNC, list: async ({ prefix }) => ({ keys: [...store.keys()].filter(k => k.startsWith(prefix)).map(name => ({ name })) }) };
+  const eL = { ...env, PF_SYNC: KVl };
+  store.set('rec:c:NOTIF-PERS1', JSON.stringify({ calls: [], reviews: [], chain: null, due: [{ sym: 'AAPL', date: '2020-01-01' }, { sym: 'MSFT', date: '2999-01-01' }] }));
+  /* runReviewNotices is module-private; drive it through scheduled(), which calls it after the marker. */
+  await worker.scheduled({}, { ...eL, PRICE_FEED: '', PRICE_FEED_KEY: '' }, { waitUntil: p => p });
+  await new Promise(r => setTimeout(r, 50));
+  const due = sent.find(m => /review/.test(m.subject));
+  t('reviews due: one notice for the overdue ticker, none for the future one, to the grant\'s address', !!due && due.to[0] === 'p@example.com' && /AAPL/.test(due.text) && !/MSFT/.test(due.text));
+  const n1 = sent.length; await worker.scheduled({}, { ...eL }, { waitUntil: p => p }); await new Promise(r => setTimeout(r, 50));
+  t('reviews due: not sent twice the same day', sent.length === n1);
+  globalThis.fetch = prev;
+}
+/* --- A4.6, A4.7: share a call, read-only token --- */
+{
+  const eS = { ...env, SITE_URL: 'https://perceptfolio.com' };
+  const good = 'b'.repeat(64);
+  store.set('grant:SHARE-PERS1', JSON.stringify({ code: 'SHARE-PERS1', tier: 'personal', paused: false }));
+  store.set('rec:c:SHARE-PERS1', JSON.stringify({ calls: [{ id: '5:NVDA:checklist', sym: 'NVDA', verdict: 'buy', label: 'BUY', date: '2026-06-01', ts: 5, price: 100, spy: 500, by: { seat: 2, name: 'Dana', sig: 'x', key: 'y' }, marks: { 30: { price: 110, spy: 505, at: 6, hash: good, seq: 3 } } }], reviews: [], chain: { head: good, n: 4 } }));
+  store.set('chain:c:SHARE-PERS1', JSON.stringify([{ day: '2026-07-01', at: 1, head: good, n: 4 }]));
+  let rr = await worker.fetch(new Request(W + '/share?code=SHARE-PERS1', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ callId: 'nope' }) }), eS);
+  t('share: a call not in the server copy is refused (404)', rr.status === 404);
+  rr = await worker.fetch(new Request(W + '/share?code=SHARE-PERS1', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ callId: '5:NVDA:checklist' }) }), eS); let sj = await rr.json();
+  t('share: makes a public page id and a site URL', rr.status === 200 && /^[a-z0-9]{12}$/.test(sj.id) && sj.url === 'https://perceptfolio.com/call/?id=' + sj.id);
+  rr = await worker.fetch(new Request(W + '/share/' + sj.id), eS); let pj = await rr.json();
+  t('share: the public document carries the call, its marks with hashes, the chain state and the server heads, and never the identity', rr.status === 200 && pj.call.sym === 'NVDA' && pj.call.marks[30].hash === good && pj.chain.n === 4 && pj.serverHeads.length === 1 && !('ident' in pj) && pj.by.name === 'Dana' && !('sig' in pj.by));
+  rr = await worker.fetch(new Request(W + '/share/' + sj.id + '?code=OTHER-CODE1', { method: 'DELETE' }), eS);
+  t('share: another identity cannot withdraw it', rr.status === 401 || rr.status === 404);
+  rr = await worker.fetch(new Request(W + '/share/' + sj.id + '?code=SHARE-PERS1', { method: 'DELETE' }), eS);
+  t('share: the author withdraws it, and the page is gone', rr.status === 200 && (await worker.fetch(new Request(W + '/share/' + sj.id), eS)).status === 404);
+  rr = await worker.fetch(new Request(W + '/token?code=SHARE-PERS1', { method: 'POST' }), eS); let tj = await rr.json();
+  t('token: 48 hex characters, with JSON and CSV URLs', rr.status === 200 && /^[0-9a-f]{48}$/.test(tj.token) && /\/me\?token=/.test(tj.url) && /format=csv$/.test(tj.csv));
+  rr = await worker.fetch(new Request(W + '/me?token=' + tj.token), eS); let mj = await rr.json();
+  t('me: the token reads the record, read-only', rr.status === 200 && mj.readOnly === true && mj.calls.length === 1 && mj.calls[0].sym === 'NVDA');
+  rr = await worker.fetch(new Request(W + '/me?token=' + tj.token + '&format=csv'), eS); const csv = await rr.text();
+  t('me: CSV with one row per call and the marks as columns', rr.status === 200 && /^id,date,ticker/.test(csv) && /5:NVDA:checklist,2026-06-01,NVDA/.test(csv) && /mark30_hash/.test(csv) && csv.includes(good));
+  rr = await worker.fetch(new Request(W + '/me?token=' + 'f'.repeat(48)), eS); t('me: an unknown token is refused (401)', rr.status === 401);
+  rr = await worker.fetch(new Request(W + '/token?code=SHARE-PERS1', { method: 'DELETE' }), eS); const dj = await rr.json();
+  t('token: revoked, and the URL stops working', dj.revoked === 1 && (await worker.fetch(new Request(W + '/me?token=' + tj.token), eS)).status === 401);
+  const g = JSON.parse(store.get('grant:SHARE-PERS1')); g.paused = true; store.set('grant:SHARE-PERS1', JSON.stringify(g));
+  rr = await worker.fetch(new Request(W + '/token?code=SHARE-PERS1', { method: 'POST' }), eS);
+  t('token: a paused code cannot mint one', rr.status === 401);
 }
 console.log(failed ? `\n${failed} FAILED` : '\nALL BILLING CHECKS PASSED');
 process.exit(failed ? 1 : 0);

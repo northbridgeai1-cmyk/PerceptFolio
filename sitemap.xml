@@ -8,11 +8,11 @@
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
   </url>
-  <url>
-    <loc>https://perceptfolio.com/refused/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
+  <!-- /refused/ is off the site by decision D12 (PRD §2). It was listed here while the assembler
+       never shipped it, so the sitemap advertised a 404 (A1.3). -->
+  <url><loc>https://perceptfolio.com/pricing</loc></url>
+  <url><loc>https://perceptfolio.com/security</loc></url>
+  <url><loc>https://perceptfolio.com/flat-quarter</loc></url>
   <url><loc>https://perceptfolio.com/privacy/</loc></url>
   <url><loc>https://perceptfolio.com/terms/</loc></url>
 </urlset>

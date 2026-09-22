@@ -361,7 +361,7 @@ function render(){
               ? ((r.seatCodes&&r.seatCodes.length>1)
                   ? '<div style="margin-bottom:14px"><b>'+r.seatCodes.length+' seat codes</b>, one per member, sent to '+esc(r.email)+' in the grant email. Each makes its own account.'+
                     '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">'+r.seatCodes.map((c,i)=>'<span style="font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 8px"><span class="muted">'+(i+1)+(i===0?' admin':'')+'</span> '+esc(c)+' <button type="button" class="link-btn" style="margin-left:6px;font-size:11px" onclick="pauseSeat(\''+esc(c)+'\',true)">pause</button><button type="button" class="link-btn" style="font-size:11px" onclick="pauseSeat(\''+esc(c)+'\',false)">resume</button></span>').join('')+'</div>'+
-                    '<button class="btn btn-sm" style="margin-top:8px" onclick="copyText(\''+esc(r.seatCodes.join(', '))+'\')">Copy all codes</button></div>'
+                    '<button class="btn btn-sm" style="margin-top:8px" onclick="copyText(\''+esc(r.seatCodes.join(', '))+'\')">Copy all codes</button> <button class="btn btn-sm" style="margin-top:8px" onclick="seatStatus(\''+esc(r.id)+'\')">Seats</button><div id="seats-'+esc(r.id)+'" style="margin-top:8px"></div></div>'
                   : '')+
                 '<div style="margin-bottom:12px"><b>Or email each member directly.</b> <span class="muted">Paste their emails and each gets their own code and their own email.</span>'+
                 '<textarea id="mem-'+esc(r.id)+'" rows="3" style="width:100%;margin-top:8px;font:inherit;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px" placeholder="analyst1@firm.com, analyst2@firm.com"></textarea>'+
@@ -472,6 +472,18 @@ function mailQuote(id){
     'Payment is by card through a secure link we send once you confirm. Fourteen-day refund on either plan.\n\n'+
     'PerceptFolio is research software, not investment advice, and it never places a trade.';
   location.href='mailto:'+encodeURIComponent(r.email)+'?subject='+encodeURIComponent('PerceptFolio: your quote')+'&body='+encodeURIComponent(body);
+}
+/* A7.5. One line per seat: devices and last sync, the last server-dated chain head, the record
+   copy's age, calls, registered keys. What a desk head asks on day two. */
+async function seatStatus(id){
+  const host=$('seats-'+id); if(!host)return; host.innerHTML='<span class="muted">Loading…</span>';
+  try{
+    const r=await fetch(base()+'/org/status?id='+encodeURIComponent(id),{headers:hdrs()}); const j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    const d=ts=>ts?new Date(ts).toISOString().slice(0,10):'never';
+    host.innerHTML='<table style="width:100%;font-size:12.5px;border-collapse:collapse"><thead><tr><th>Seat</th><th>Email</th><th>Role</th><th>Devices</th><th>Last sync</th><th>Last head</th><th>Record copy</th><th>Calls</th><th>Keys</th><th></th></tr></thead><tbody>'+
+      j.seats.map(sx=>'<tr><td style="border-top:1px solid var(--line);padding:4px 6px">'+sx.seat+(sx.paused?' <span class="muted">paused</span>':'')+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+esc(sx.email||'')+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+esc(sx.role)+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+sx.devices+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+d(sx.lastSync)+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+(sx.lastHead?esc(sx.lastHead.day)+' · '+sx.lastHead.n:'none')+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+d(sx.recordAt)+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+sx.calls+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+sx.keys+'</td><td style="border-top:1px solid var(--line);padding:4px 6px"><button type="button" class="link-btn" style="font-size:11px" onclick="pauseSeat(\''+esc(sx.code)+'\','+(sx.paused?'false':'true')+')">'+(sx.paused?'resume':'pause')+'</button></td></tr>').join('')+
+      '</tbody></table><div class="muted" style="font-size:11.5px;margin-top:4px">Rulebook '+esc(j.rulebookVersion||'not published')+'. Rotating a seat is pause, then a new member code for the same email.</div>';
+  }catch(e){ host.innerHTML='<span class="muted">'+esc(e.message||String(e))+'</span>'; }
 }
 async function issueMembers(id){
   const ta=$('mem-'+id), st=$('ms-'+id); if(!ta)return;

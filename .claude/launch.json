@@ -42,6 +42,18 @@
         "."
       ],
       "port": 8788
+    },
+    {
+      "name": "dist-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8790",
+        "--directory",
+        "dist"
+      ],
+      "port": 8790
     }
   ]
 }

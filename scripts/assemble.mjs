@@ -17,7 +17,7 @@ copy('terminal');                              // gated by functions/_middleware
 copy('admin.html');                            // gated, operator only
 copy('enter');                                 // the door
 copy('functions');                             // the gate, /api/enter, /api/leave, /api/portal
-copy('fonts'); copy('demo'); copy('preview'); copy('favicon.svg'); copy('manifest.json'); copy('sw.js'); copy('robots.txt'); copy('sitemap.xml');
+copy('fonts'); copy('demo'); copy('preview'); copy('verify'); copy('call'); copy('favicon.svg'); copy('manifest.json'); copy('sw.js'); copy('robots.txt'); copy('sitemap.xml');
 copy('vendor');                                // Chart.js and Cesium, served from this origin (see vendor/README.md)
 copy('world/data'); copy('world/ne110.json'); copy('world/places.json');  // the World view's bundled plant layers and the country polygons; catalog.mjs and the extract script are source, not product
 /* No 404.html on Pages: its absence is what makes Pages serve index.html for unknown paths, which

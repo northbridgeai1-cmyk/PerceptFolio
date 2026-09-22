@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { TerminalDashboard } from '@/components/TerminalDashboard';
 import { Demo } from '@/components/Demo';
+import { CompanyDemo } from '@/components/CompanyDemo';
 import { RequestForm } from '@/components/RequestForm';
 import { Faq } from '@/components/Faq';
-import { PLANS } from '@/lib/config';
+import { PLANS, SCREENS } from '@/lib/config';
 
 /* Composition alternates, no two adjacent sections share a layout: bleed, stack, left-heavy,
    right-heavy, centred strip, wide type, form, accordion. No eyebrows, no section numbers. */
@@ -27,14 +28,19 @@ export function Landing() {
       <header className="relative pt-[var(--spacing-sec)]">
         <div className="wrap"><div className="max-w-[920px]">
           <h1 className="mb-6">A research terminal that keeps score on itself.</h1>
-          <p className="lede text-[21px] max-w-[56ch]">Twenty-two checks, one verdict, a record nobody can edit. For people who make the call and stand behind it.</p>
+          <p className="lede text-[21px] max-w-[56ch]"><b className="font-semibold text-text">Bloomberg tells you everything that is happening. PerceptFolio tells you whether your decisions worked.</b> Twenty-two checks, one verdict, a record nobody can edit. For people who make the call and stand behind it.</p>
           <div className="mt-8 flex flex-wrap items-center gap-5"><Button asChild variant="primary" size="lg"><a href="#request">Request a demo</a></Button><a href="#demo" className="text-[15px] text-dim underline underline-offset-[.2em] decoration-line2 hover:text-text hover:decoration-current">or try it on real history first</a></div>
         </div></div>
         <TerminalDashboard />
       </header>
 
+      <section id="company" className="sec" aria-labelledby="h-company"><div className="wrap">
+        <div className="max-w-[64ch]"><h2 id="h-company" className="mb-4">A real company, in the time it takes to read this.</h2><p className="text-dim">Ten years of statements, a year of closes, what it filed, who holds it. Public data, dated and sourced. This is what the checks read.</p></div>
+        <CompanyDemo />
+      </div></section>
+
       <section id="try" className="sec" aria-labelledby="h-try"><div className="wrap">
-        <div className="max-w-[64ch]"><h2 id="h-try" className="mb-4">Try it before anyone talks to you.</h2><p className="text-dim">Three years of real daily closes, ticker hidden. Make a call, set a horizon, and watch it get marked against the S&amp;P, the same arithmetic the terminal runs on every verdict it issues.</p></div>
+        <div className="max-w-[64ch]"><h2 id="h-try" className="mb-4">Then make a call on real history.</h2><p className="text-dim">Three years of real daily closes, ticker hidden. Make a call, set a horizon, and watch it get marked against the S&amp;P, the same arithmetic the terminal runs on every verdict it issues.</p></div>
         <Demo />
       </div></section>
 
@@ -53,12 +59,19 @@ export function Landing() {
         <div className="max-[780px]:order-2"><h2 id="h-record" className="mb-5">It writes down what it said. Then it checks.</h2>
           <p className="text-dim">The moment a verdict changes it is logged with the price and the S&amp;P at that instant and given fixed anniversaries. On each one it is marked against the index. <b className="font-semibold text-text">The result is shown whether or not it flatters the system</b>, and nothing in the record can be edited afterwards.</p>
           <p className="mt-4 text-dim">You will not find a win rate here. A hit rate is the most manufacturable number in finance; what is reported is expectancy against the market, with an interval wide enough to show when the sample is too thin to mean anything. The calls needed to separate a real edge from luck is <span className="num">(1.96 × dispersion ÷ edge)²</span>: roughly 138 at a two-point edge with twelve-point dispersion.</p>
-          <div className="mt-6 flex max-w-[58ch] items-start gap-[14px] rounded-[12px] border border-line bg-panel px-5 py-4"><span className="mt-2 h-[9px] w-[9px] shrink-0 rounded-full bg-amber shadow-[0_0_0_4px_rgba(217,164,65,.15)]" aria-hidden="true" /><p className="text-[15px] text-dim"><b className="font-semibold text-text">The record is new.</b> Calls are being logged now. The first marks land in about a quarter, and until then the scorecard is honestly empty.</p></div></div>
+          <div className="mt-6 flex max-w-[58ch] items-start gap-[14px] rounded-[12px] border border-line bg-panel px-5 py-4"><span className="mt-2 h-[9px] w-[9px] shrink-0 rounded-full bg-amber shadow-[0_0_0_4px_rgba(217,164,65,.15)]" aria-hidden="true" /><p className="text-[15px] text-dim"><b className="font-semibold text-text">The record is new.</b> Calls are being logged now. The first marks land in about a quarter, and until then the scorecard is honestly empty.</p></div>
+          <p className="mt-4 max-w-[58ch] text-[15px] text-faint">It fills from every verdict change across your whole watchlist, and from the model's forecasts, not only from your trades. The terminal shows your own rate on the Command strip: calls a quarter, against the roughly 138 the interval needs.</p></div>
         <div className="overflow-x-auto rounded-[12px] border border-tline bg-tpanel text-text shadow-[0_24px_60px_-24px_rgba(0,0,0,.6)] max-[780px]:order-1" aria-label="The call log: ticker, call, held, versus index, result">
           <table className="w-full min-w-[520px] border-collapse text-[14px]"><thead><tr>{['Ticker', 'Call', 'Held', 'vs index', 'Result'].map(h => <th key={h} className="border-b border-tline bg-tbg px-[18px] py-[14px] text-left font-mono text-[12px] font-semibold uppercase tracking-[.12em] text-tmuted">{h}</th>)}</tr></thead>
             <tbody>{[['BUY', '90 d'], ['SELL', '90 d'], ['BUY', '180 d'], ['BUY', '30 d']].map(([c, h], i) => <tr key={i}><td className="border-b border-tline px-[18px] py-[14px] font-mono font-semibold" /><td className="border-b border-tline px-[18px] py-[14px]"><span className={'inline-block rounded-[6px] px-2 py-1 font-mono text-[12px] font-semibold ' + (c === 'BUY' ? 'bg-[rgba(46,160,67,.14)] text-[#4ade80]' : 'bg-[rgba(229,83,75,.14)] text-[#f87171]')}>{c}</span></td><td className="num border-b border-tline px-[18px] py-[14px] text-tmuted">{h}</td><td className="border-b border-tline px-[18px] py-[14px] text-tmuted" /><td className="border-b border-tline px-[18px] py-[14px] italic text-tmuted">awaiting mark</td></tr>)}</tbody>
             <tfoot><tr><td colSpan={5} className="bg-tbg px-[18px] py-[14px] text-[13px] text-tmuted">Empty by design. A fixed-horizon record cannot be reconstructed backwards, so every account's record begins the day it begins.</td></tr></tfoot></table>
         </div>
+      </div>
+      <div className="wrap mt-12">
+        <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[780px]:grid-cols-1" role="list" aria-label="How the record is kept">
+          {[['Hash-chained', 'Every mark carries the hash of the mark before it. Change one and every later hash breaks.'], ['Server-clocked', 'The chain head is posted to our service once a day and stamped with its clock. A device cannot backdate a day or rewrite an earlier one.'], ['Verifiable', 'Export the evidence pack and check it on the verify page: no account, and no need to trust NorthBridge.']].map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-sans text-[15px] font-bold tracking-normal">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
+        </div>
+        <p className="mt-4 text-[14px] text-faint"><a href="/verify/">Verify a record</a>. The chain and the daily head are in the code that ships; the verify page runs the same arithmetic on your export.</p>
       </div></section>
 
       <section id="sizing" className="sec" aria-labelledby="h-size"><div className="wrap max-w-[920px]">
@@ -70,6 +83,14 @@ export function Landing() {
         <p className="mx-auto mt-5 max-w-[60ch] text-center text-[14.5px] text-faint">Here, liquidity refuses the size. The terminal says so before the order, not after. Where each limit sits is yours to set, inside.</p>
       </div></section>
 
+      <section id="screens" className="sec" aria-labelledby="h-screens"><div className="wrap">
+        <h2 id="h-screens" className="mb-3">Fifteen screens. Each answers one question.</h2>
+        <p className="lede mb-8">The dashboard above is the real one, on a sample account. The rest are named here by the decision they exist for.</p>
+        <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[960px]:grid-cols-2 max-[600px]:grid-cols-1" role="list" aria-label="The screens and the question each answers">
+          {SCREENS.map(s => <div key={s.id} className="bg-panel p-5" role="listitem"><div className="mb-[6px] flex items-baseline justify-between gap-3"><h3 className="font-sans text-[15px] font-bold tracking-normal">{s.name}</h3>{s.still && <span className="font-mono text-[10.5px] uppercase tracking-[.08em] text-faint">shown above</span>}</div><p className="text-[14.5px] leading-[1.6] text-dim">{s.asks}</p></div>)}
+        </div>
+      </div></section>
+
       <section id="who" className="sec" aria-labelledby="h-who"><div className="wrap">
         <h2 id="h-who" className="mb-10 max-w-[14ch] text-[clamp(36px,4.6vw,60px)]">Who this is for, and who it is not.</h2>
         <div className="grid grid-cols-2 items-start gap-[clamp(32px,5vw,80px)] max-[780px]:grid-cols-1 max-[780px]:gap-8">
@@ -79,13 +100,22 @@ export function Landing() {
         </div>
       </div></section>
 
+      <section id="desk" className="sec" aria-labelledby="h-desk"><div className="wrap">
+        <h2 id="h-desk" className="mb-3">How a desk uses it.</h2>
+        <p className="lede mb-8">Three or more seats, one rulebook, one record, one statement.</p>
+        <div className="grid grid-cols-4 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[960px]:grid-cols-2 max-[600px]:grid-cols-1" role="list" aria-label="Business mode, in four parts">
+          {[['Three seats', 'Each analyst signs in with a seat of their own. Every call is stamped with the seat that made it; a reviewer seat reads everything and makes no calls.'], ['One rulebook', 'Whoever runs the desk sets the checks, the limits and the horizons once, and publishes. Every seat applies the same version, and every change is logged.'], ['One record', 'Every seat\u2019s calls and marks, chained, with the rulebook version each call was made under. The firm exports it as one evidence pack.'], ['One statement', 'A quarterly record statement per seat and for the firm: calls made, marks landed, expectancy with its interval, sizing refusals.']].map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-sans text-[15px] font-bold tracking-normal">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
+        </div>
+        <p className="mt-4 text-[14px] text-faint">Seats are by application: <Link to="/apply">request seats for a firm</Link>. The price is on the <Link to="/pricing">pricing page</Link>.</p>
+      </div></section>
+
       <section id="request" className="sec" aria-labelledby="h-access"><div className="wrap">
         <h2 id="h-access" className="mb-4">Ask for access by email.</h2>
         <p className="lede mb-8">The more you tell us, the faster the reply. This goes straight to NorthBridge's inbox; someone reads it and replies personally with a demo and your price. If it is not the right tool for your work, you will be told that plainly.</p>
         <div className="grid grid-cols-[minmax(0,560px)_1fr] items-start gap-[clamp(40px,6vw,96px)] min-[781px]:max-[960px]:gap-[clamp(56px,9vw,96px)] max-[780px]:grid-cols-1 max-[780px]:gap-12">
           <RequestForm />
           <dl className="mt-[6px]">
-            {[['Reviewed by a person', 'Not a queue and not an autoresponder. Every request is read by someone in the financial branch who can act on it, and you get a straight answer, including no.'], ['A demo, then a decision', `You see the terminal on your own positions before anyone asks you for anything. If it suits the work, it is $${PLANS.personal.monthly} a month or $${PLANS.personal.yearly.toLocaleString()} a year, and your code arrives by email.`], ['Bring your own data key', 'The terminal does not resell market data. You connect a free Finnhub key of your own. Two minutes, no card.'], ['Thesis before position', 'Any position taken through the terminal carries a written thesis, a stop and a deadline, recorded when it is opened. A reason invented after the price moves is not a reason.']].map(([t, d]) => <div key={t} className="border-b border-line pb-5 mb-5 last:mb-0 last:border-b-0 last:pb-0"><dt className="mb-[6px] font-display text-[16px] font-bold tracking-[-.01em]">{t}</dt><dd className="max-w-[48ch] text-[15px] leading-[1.6] text-dim">{d}</dd></div>)}
+            {[['Reviewed by a person', 'Not a queue and not an autoresponder. Every request is read by someone in the financial branch who can act on it, and you get a straight answer, including no.'], ['A demo, then a decision', `You see the terminal on your own positions before anyone asks you for anything. If it suits the work, it is $${PLANS.personal.monthly} a month or $${PLANS.personal.yearly.toLocaleString()} a year, and your code arrives by email.`], ['Market data, built in', 'Prices, fundamentals and news for US-listed stocks and ETFs come with your access, from Finnhub through our service; daily closes for the history. Each price on screen says whether it is a quote or a close, and from where. Prefer your own free Finnhub key? Connect it in Settings and it wins on that device.'], ['Thesis before position', 'Any position taken through the terminal carries a written thesis, a stop and a deadline, recorded when it is opened. A reason invented after the price moves is not a reason.']].map(([t, d]) => <div key={t} className="border-b border-line pb-5 mb-5 last:mb-0 last:border-b-0 last:pb-0"><dt className="mb-[6px] font-display text-[16px] font-bold tracking-[-.01em]">{t}</dt><dd className="max-w-[48ch] text-[15px] leading-[1.6] text-dim">{d}</dd></div>)}
           </dl>
         </div>
         <p className="mt-8 text-[15px] text-faint">Already convinced? <Link to="/pricing">See the plans</Link>.</p>

@@ -35,3 +35,6 @@ Nothing is hidden: every verdict shows which checks it passed. It grades itself:
 
 ## Accessibility & Inclusion
 WCAG 2.2 AA is verified, not assumed: Lighthouse accessibility is 100 on every public page and contrast is computed against the darkest surface each colour sits on. Full keyboard operation, visible focus, reduced-motion respected, landmarks on every screen including sign-in. Type must stay legible at a desk at the end of a long day.
+
+## If the first marks read flat (A2.7, written 2026-09-21, before any mark)
+What is measured is the rulebook as set, applied to public data, marked against the index on fixed horizons. A flat mark says that over this sample the bars did not beat the index by more than the noise, and the interval says how little that sample can say; it says nothing about the next sample. What holds either way: the sizing limits refused what they refused before the money moved; every thesis was written before the price moved; History shows how the person behaved. What we do: show it; headline the 180- and 365-day marks; show the 30-day mark below them; keep every mark; never restart a record. What we do not do: move the bars to flatter the past; hide a horizon; report a win rate; write a new history. The site carries this at /flat-quarter and the Command strip says the short form.

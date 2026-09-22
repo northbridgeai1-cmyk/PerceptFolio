@@ -9,6 +9,8 @@ import { Pricing } from '@/pages/Pricing';
 import { Apply } from '@/pages/Apply';
 import { Thanks } from '@/pages/Thanks';
 import { Terms, Privacy, Refunds, NotFound } from '@/pages/Legal';
+import { Security } from '@/pages/Security';
+import { FlatQuarter } from '@/pages/FlatQuarter';
 
 /* Hash links inside a client-routed page need a hand: on navigation, scroll to the hash if there
    is one, otherwise to the top. */
@@ -33,7 +35,8 @@ function App() {
       <Sprite /><Scroll /><Nav />
       <Routes>
         <Route path="/" element={<Landing />} /><Route path="/pricing" element={<Pricing />} /><Route path="/apply" element={<Apply />} /><Route path="/thanks" element={<Thanks />} />
-        <Route path="/terms" element={<Terms />} /><Route path="/privacy" element={<Privacy />} /><Route path="/refunds" element={<Refunds />} /><Route path="*" element={<NotFound />} />
+        <Route path="/terms" element={<Terms />} /><Route path="/privacy" element={<Privacy />} /><Route path="/refunds" element={<Refunds />} />
+        <Route path="/security" element={<Security />} /><Route path="/flat-quarter" element={<FlatQuarter />} /><Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />
     </BrowserRouter>

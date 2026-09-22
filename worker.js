@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-22.4';
+const WORKER_VERSION = '2026-09-22.5';
 
 /* ---- The site's own addresses ----
    ALLOWED_ORIGIN names the domain. The same deployment also answers at its Pages address, which is
@@ -226,7 +226,7 @@ export default {
      observable: every run stamps cron:last, which /version reports to an authenticated caller —
      "never" there means the trigger is missing, not that the code is. */
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runCronMarks(env));
+    ctx.waitUntil(runCronMarks(env).then(() => runReviewNotices(env)).catch(() => {}));
   },
   async fetch(request, env) {
     /* Everything is wrapped so that ANY failure still returns CORS headers. Without this an
@@ -326,6 +326,72 @@ async function dailyBars(env, sym, days) {
   return { feed, bars: out.filter(b => b.d >= from) };
 }
 function feedLabel(feed) { return feed.licensed ? feed.name : 'yahoo (interim, unlicensed; set PRICE_FEED and PRICE_FEED_KEY)'; }
+/* Which plan tiers ride the worker's own Finnhub key on /data (A2.1). Unset: all of them, the
+   owner's standing instruction. Set to a comma list ("employee,operator") once the licence
+   question is decided the other way, and every other tier is told to connect its own key. A grant
+   with no tier recorded is treated as personal. */
+function dataIncludedFor(env, tier) {
+  const tiers = String(env.DATA_TIERS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+  return !tiers.length || tiers.includes(String(tier || 'personal').toLowerCase());
+}
+
+/* ---- A4.3. Notices by email: a mark landed, a review is due ----
+   Opt-in, per identity, stored under notify:<ident> by PUT /notify. The address is the grant's
+   (or the operator's for a slot). One plain message, no numbers, no prices: what landed, and that
+   the terminal has the reading. A review notice goes once per due date, tracked in KV. */
+async function emailForIdent(env, ident) {
+  if (ident.startsWith('s:')) return env.OPERATOR_EMAIL || null;
+  const code = ident.slice(2);
+  const g = await env.PF_SYNC.get('grant:' + code);
+  if (!g) return null;
+  const rec = JSON.parse(g);
+  return rec.paused ? null : (rec.email || null);
+}
+async function notifyPrefs(env, ident) {
+  const raw = await env.PF_SYNC.get('notify:' + ident);
+  return raw ? JSON.parse(raw) : { marks: false, reviews: false };
+}
+async function sendPlainMail(env, to, subject, text) {
+  if (!env.RESEND_API_KEY || !env.MAIL_FROM || !to) return { attempted: false, ok: false };
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text })
+  });
+  return { attempted: true, ok: r.ok };
+}
+async function notifyMarks(env, ident, landed) {
+  if (!landed.length) return;
+  const prefs = await notifyPrefs(env, ident);
+  if (!prefs.marks) return;
+  const to = await emailForIdent(env, ident);
+  if (!to) return;
+  await sendPlainMail(env, to, 'PerceptFolio: ' + landed.length + ' mark' + (landed.length === 1 ? '' : 's') + ' landed',
+    'Marked today against the index:\n\n' + landed.map(x => '  ' + x).join('\n') + '\n\nThe reading is in the terminal: perceptfolio.com/terminal/ (Command, the record strip; History for every call).\n\nThis notice is sent because you turned it on under Settings. Turn it off there.');
+}
+/* Reviews due: the record copy carries each thesis's next review date (a date, never the text).
+   One notice per due date per identity. */
+async function runReviewNotices(env) {
+  if (!env.PF_SYNC) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const list = await env.PF_SYNC.list({ prefix: 'rec:', limit: 200 });
+  for (const k of list.keys) {
+    const ident = k.name.slice(4);
+    try {
+      const prefs = await notifyPrefs(env, ident);
+      if (!prefs.reviews) continue;
+      const rec = JSON.parse(await env.PF_SYNC.get(k.name) || '{}');
+      const due = (rec.due || []).filter(d => d && d.date && d.date <= today);
+      if (!due.length) continue;
+      const sentKey = 'notified:' + ident + ':' + today;
+      if (await env.PF_SYNC.get(sentKey)) continue;
+      const to = await emailForIdent(env, ident);
+      if (!to) continue;
+      const r = await sendPlainMail(env, to, 'PerceptFolio: ' + due.length + ' review' + (due.length === 1 ? '' : 's') + ' due',
+        'Due for review:\n\n' + due.map(d => '  ' + d.sym + (d.date < today ? ' (since ' + d.date + ')' : '')).join('\n') + '\n\nOpen the terminal, Portfolio, the holding, Review: what changed since you last looked, then mark each assumption.\n\nThis notice is sent because you turned it on under Settings. Turn it off there.');
+      if (r.ok) await env.PF_SYNC.put(sentKey, '1', { expirationTtl: 3 * 86400 });
+    } catch (e) { /* one identity's failure never stops the others */ }
+  }
+}
 
 async function runCronMarks(env) {
   const startedAt = Date.now();
@@ -392,7 +458,12 @@ async function runCronMarks(env) {
           };
           changed = true; note.marked++;
         }
-        if (changed) await env.PF_SYNC.put('cmarks:' + w.ident, JSON.stringify(w.marks));
+        if (changed) {
+          await env.PF_SYNC.put('cmarks:' + w.ident, JSON.stringify(w.marks));
+          /* A4.3. Tell the person a mark landed, if they asked to be told. Ticker and horizon only;
+             the reading is in the terminal. Never awaited into the marking loop's failure path. */
+          try { await notifyMarks(env, w.ident, w.due.filter(d => px[d.c.sym] > 0).map(d => d.c.sym + ' ' + d.h + '-day')); } catch (e) { note.errors.push('notify: ' + String(e && e.message || e)); }
+        }
       }
     }
   } catch (e) {
@@ -510,7 +581,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/map/prefill']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/org/keys', '/org/roles', '/org/records', '/org/status', '/holders']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -596,8 +667,17 @@ async function handle(request, env) {
      cap is Finnhub's own minute limit, so one client cannot spend the key for everyone else. */
   if (url.pathname === '/data' && request.method === 'GET') {
     const code = clean(url.searchParams.get('code'), 12).toUpperCase();
-    if (!(await activeGrant(code))) {
+    const grant = await activeGrant(code);
+    if (!grant) {
       return json({ error: 'Market data needs a live access code. If yours was paused, contact the person who issued it.' }, 401, env);
+    }
+    /* A2.1. The switch for the licence question. DATA_TIERS unset: every live code is served, the
+       owner's instruction above. DATA_TIERS set (e.g. "employee,operator"): only those tiers ride
+       the worker's key; everyone else is told, with a status the terminal reads as "connect your
+       own key" rather than "bad key", so the screens keep working on the subscriber's own plan.
+       One secret, no deploy, reversible. */
+    if (!dataIncludedFor(env, grant.tier)) {
+      return json({ error: 'Market data is not included on this plan yet. Connect your own free Finnhub key in Settings.', notIncluded: true }, 402, env);
     }
     if (await tooMany(env, request, 'data', 60)) return json({ error: 'Too many requests from this address; try again in a minute.' }, 429, env);
     return finnhubProxy(url, env);
@@ -645,7 +725,7 @@ async function handle(request, env) {
      a VIX reading.
 
      Opening it is safe here specifically because of the shape of this data:
-       - the series allowlist is four public, national statistics — nothing user-specific
+       - the series allowlist is a short list of public, national statistics — nothing user-specific
        - results are cached 12 hours, so repeated calls cost KV reads rather than FRED requests
        - the FRED key never leaves the worker
        - a paused grant fails activeGrant(), so suspending someone removes macro data too
@@ -659,6 +739,164 @@ async function handle(request, env) {
      to fourteen lines by fiscal year (10-K values only; a restated figure wins by filing date) and
      cached a week. The ticker becomes a CIK through the SEC's own ticker file. No door: this is
      public data, rate-limited by address like the listing. */
+  /* ---- A4.6. GET /share/<id> : one call, public, with its marks and its place in the chain ----
+     Made by POST /share (below, under the identity block) from the record's server copy. Carries
+     what a colleague or a client needs to check one call without an account: the call, its marks,
+     the hashes and sequence numbers, and the server-dated heads that name them. Nothing else from
+     the record, and no thesis text. */
+  if (/^\/share\/[a-z0-9]{12}$/.test(url.pathname) && request.method === 'GET') {
+    if (await tooMany(env, request, '/share', 60)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const raw = await env.PF_SYNC.get('share:' + url.pathname.slice(7));
+    if (!raw) return json({ error: 'No such shared call, or it was withdrawn.' }, 404, env);
+    const doc = JSON.parse(raw); delete doc.ident;
+    return json(doc, 200, env);
+  }
+  /* ---- A4.7. GET /me?token=...&format=json|csv : the account's own record, read-only ----
+     A token made by POST /token. What a spreadsheet wants: IMPORTDATA in Sheets, Power Query in
+     Excel, one URL. The token reads; it cannot write, cannot open the terminal, and is revoked by
+     DELETE /token. The record only: calls and marks; holdings are in the terminal's CSV. */
+  if (url.pathname === '/me' && request.method === 'GET') {
+    if (await tooMany(env, request, '/me', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const tok = clean(url.searchParams.get('token'), 64);
+    if (!/^[0-9a-f]{48}$/.test(tok)) return json({ error: 'A token is 48 hex characters.' }, 400, env);
+    const ident = await env.PF_SYNC.get('tok:' + tok);
+    if (!ident) return json({ error: 'That token is not live.' }, 401, env);
+    if (ident.startsWith('c:') && !(await activeGrant(ident.slice(2)))) return json({ error: 'The access behind this token is paused.' }, 401, env);
+    const rec = JSON.parse(await env.PF_SYNC.get('rec:' + ident) || '{"calls":[],"reviews":[],"chain":null}');
+    if ((url.searchParams.get('format') || 'json') === 'csv') {
+      const H = [30, 90, 180, 365];
+      const cell = v => { if (v == null) return ''; const t = String(v); return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+      const head = ['id', 'date', 'ticker', 'track', 'verdict', 'label', 'price', 'spy', 'quality', 'value', 'momentum', 'seat', 'name', 'rulebook'];
+      H.forEach(h => head.push('mark' + h + '_date', 'mark' + h + '_price', 'mark' + h + '_spy', 'mark' + h + '_excess_pct', 'mark' + h + '_missed', 'mark' + h + '_seq', 'mark' + h + '_hash'));
+      const lines = [head.map(cell).join(',')];
+      for (const c of rec.calls || []) {
+        const r = [c.id, c.date, c.sym, c.track, c.verdict, c.label, c.price, c.spy, c.q, c.p, c.m, c.by ? c.by.seat : '', c.by ? c.by.name : '', c.rbv || ''];
+        for (const h of H) {
+          const m = (c.marks || {})[h];
+          if (!m) { r.push('', '', '', '', '', '', ''); continue; }
+          if (m.missed) { r.push(m.intended || '', '', '', '', 'yes', '', ''); continue; }
+          const ok = m.price > 0 && c.price > 0 && m.spy > 0 && c.spy > 0;
+          r.push(m.actual || (m.at ? new Date(m.at).toISOString().slice(0, 10) : ''), m.price, m.spy, ok ? (((m.price - c.price) / c.price - (m.spy - c.spy) / c.spy) * 100).toFixed(3) : '', 'no', m.seq == null ? '' : m.seq, m.hash || '');
+        }
+        lines.push(r.map(cell).join(','));
+      }
+      return new Response(lines.join('\r\n') + '\r\n', { status: 200, headers: Object.assign({ 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store' }, corsHeaders(env)) });
+    }
+    return json({ calls: rec.calls || [], reviews: rec.reviews || [], chain: rec.chain || null, updatedAt: rec.updatedAt || null, readOnly: true }, 200, env);
+  }
+
+  /* ---- GET /holders?symbol=AAPL -> institutional holders from 13F-HR filings (A6.2) ----
+     EDGAR full-text search over 13F-HR information tables, keyless. The free data tier has no
+     CUSIP, so the search is on the issuer's name as 13F tables print it (APPLE INC, NVIDIA CORP),
+     derived from the SEC's own ticker file. Two windows: the latest completed 13F quarter and the
+     one before, each a count of filers naming the issuer plus the first page of names as EDGAR
+     returns them (not ranked by size: sizes live inside each filer's table). Display only, dated,
+     cached a week; the source line names the overcount risk of a shared name. */
+  if (url.pathname === '/holders' && request.method === 'GET') {
+    if (await tooMany(env, request, '/holders', 20)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const sym = clean(url.searchParams.get('symbol'), 10).toUpperCase();
+    if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
+    const ck = 'holders:' + sym;
+    const hit = await env.PF_SYNC.get(ck); if (hit) return json(Object.assign(JSON.parse(hit), { cached: true }), 200, env);
+    const ua = { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)', 'Accept': 'application/json' };
+    let names = null;
+    const nKey = 'cikname:' + new Date().toISOString().slice(0, 10);
+    const nHit = await env.PF_SYNC.get(nKey);
+    if (nHit) names = JSON.parse(nHit);
+    else {
+      try {
+        const r = await fetch('https://www.sec.gov/files/company_tickers_exchange.json', { headers: ua });
+        if (r.ok) { const list = await r.json(); names = {}; for (const row of list.data || []) if (row && row[2]) names[String(row[2]).toUpperCase()] = String(row[1] || ''); await env.PF_SYNC.put(nKey, JSON.stringify(names), { expirationTtl: 2 * 86400 }); }
+      } catch (e) { names = null; }
+    }
+    const issuer = names && (names[sym.replace(/\./g, '-')] || names[sym]);
+    if (!issuer) return json({ error: 'No SEC filer with the ticker ' + sym + '.' }, 404, env);
+    const q13 = issuer.toUpperCase().replace(/[.,]/g, '').replace(/\s+/g, ' ').trim();
+    /* Filers spell the suffix both ways (NVIDIA CORP, NVIDIA CORPORATION); the search takes both. */
+    const variants = [...new Set([q13, q13.replace(/ CORP$/, ' CORPORATION'), q13.replace(/ CORPORATION$/, ' CORP'), q13.replace(/ INC$/, ' INCORPORATED'), q13.replace(/ CO$/, ' COMPANY')])];
+    const qOr = variants.map(v => '"' + v + '"').join(' OR ');
+    /* The latest quarter whose 13F window (45 days) has closed, and the one before. */
+    const now = new Date(); const qEnd = d => new Date(Date.UTC(d.getUTCFullYear(), Math.floor(d.getUTCMonth() / 3) * 3, 0));
+    let latest = qEnd(now); if ((now - latest) / 86400000 < 46) latest = qEnd(new Date(latest.getTime() - 86400000));
+    const prior = qEnd(new Date(latest.getTime() - 86400000));
+    const iso = d => d.toISOString().slice(0, 10), plus = (d, n) => new Date(d.getTime() + n * 86400000);
+    const ask = async (pe) => {
+      const u = 'https://efts.sec.gov/LATEST/search-index?q=' + encodeURIComponent(qOr) + '&forms=13F-HR&dateRange=custom&startdt=' + iso(plus(pe, 1)) + '&enddt=' + iso(plus(pe, 75));
+      const r = await fetch(u, { headers: ua });
+      if (!r.ok) throw new Error('EDGAR search answered ' + r.status + (r.status === 429 ? ' (rate limited; try again in a minute)' : ''));
+      const j = await r.json(); if (!j.hits) throw new Error('EDGAR search gave no hits object'); const h = (j.hits && j.hits.hits) || [];
+      return { period: iso(pe), filers: (j.hits && j.hits.total && j.hits.total.value) || 0, names: h.slice(0, 12).map(x => ({ name: String((x._source.display_names || [''])[0]).replace(/\s*\(CIK[^)]*\)\s*$/, '').trim(), filed: x._source.file_date || '', id: x._id || '' })) };
+    };
+    let a, b;
+    try { a = await ask(latest); b = await ask(prior); } catch (e) { return json({ error: String(e.message || e) }, 502, env); }
+    const doc = { symbol: sym, issuer: q13, variants, latest: a, prior: b, change: a.filers - b.filers, source: 'SEC EDGAR full-text search over 13F-HR information tables naming ' + variants.map(v => '"' + v + '"').join(' or ') + '; counts of filers, not shares; a name shared by two issuers overcounts; names are the first page as EDGAR returns them, not the largest holders', asOf: iso(now) };
+    await env.PF_SYNC.put(ck, JSON.stringify(doc), { expirationTtl: 7 * 86400 });
+    return json(doc, 200, env);
+  }
+
+  /* ---- GET /filings?symbol=AAPL&since=YYYY-MM-DD -> the filings since a date, from EDGAR (A6.1) ----
+     The single richest "what changed" source there is, and free: the SEC's submissions index for
+     a filer lists every form with its date, accession and primary document, and for an 8-K the
+     item numbers (2.02 results, 5.02 an officer or director change, 1.01 a material agreement,
+     8.01 other). Reduced here to the forms that matter to a holder (10-K, 10-Q, 8-K, 20-F, 6-K,
+     S-1, DEF 14A, SC 13D/G, 4 is left out: insiders come from Finnhub already), with a link into
+     EDGAR for each, cached six hours a filer. Keyless and public like /edgar, rate-limited by
+     address. */
+  if (url.pathname === '/filings' && request.method === 'GET') {
+    if (await tooMany(env, request, '/filings', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const sym = clean(url.searchParams.get('symbol'), 10).toUpperCase();
+    if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
+    const since = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('since') || '') ? url.searchParams.get('since') : new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10);
+    const ck = 'filings:' + sym;
+    let doc = null;
+    const hit = await env.PF_SYNC.get(ck);
+    if (hit) doc = JSON.parse(hit);
+    else {
+      const ua = { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)', 'Accept': 'application/json' };
+      let ciks = null;
+      const cikKey = 'cik:' + new Date().toISOString().slice(0, 10);
+      const cikHit = await env.PF_SYNC.get(cikKey);
+      if (cikHit) ciks = JSON.parse(cikHit);
+      else {
+        try {
+          const r = await fetch('https://www.sec.gov/files/company_tickers_exchange.json', { headers: ua });
+          if (r.ok) { const list = await r.json(); ciks = {}; for (const row of list.data || []) if (row && row[2]) ciks[String(row[2]).toUpperCase()] = row[0]; await env.PF_SYNC.put(cikKey, JSON.stringify(ciks), { expirationTtl: 2 * 86400 }); }
+        } catch (e) { ciks = null; }
+      }
+      const cik = ciks && ciks[sym.replace(/\./g, '-')] || ciks && ciks[sym];
+      if (!cik) return json({ error: 'No SEC filer with the ticker ' + sym + '.' }, 404, env);
+      const cik10 = String(cik).padStart(10, '0');
+      let sub;
+      try {
+        const r = await fetch('https://data.sec.gov/submissions/CIK' + cik10 + '.json', { headers: ua });
+        if (!r.ok) return json({ error: 'EDGAR answered ' + r.status + ' for ' + sym + '.' }, 502, env);
+        sub = await r.json();
+      } catch (e) { return json({ error: 'Could not reach EDGAR.' }, 502, env); }
+      const f = (sub.filings && sub.filings.recent) || {};
+      const KEEP = /^(10-K|10-K\/A|10-Q|10-Q\/A|8-K|8-K\/A|20-F|6-K|S-1|S-1\/A|DEF 14A|SC 13D|SC 13D\/A|SC 13G|SC 13G\/A|424B[0-9]|10-KT|10-QT)$/;
+      const ITEMS = { '1.01': 'material agreement', '1.02': 'agreement ended', '1.03': 'bankruptcy', '2.01': 'acquisition or disposal', '2.02': 'results', '2.03': 'new debt', '2.04': 'debt accelerated', '2.05': 'exit or disposal costs', '2.06': 'impairment', '3.01': 'listing notice', '3.02': 'unregistered sales', '4.01': 'auditor change', '4.02': 'non-reliance on past financials', '5.01': 'change of control', '5.02': 'officer or director change', '5.03': 'charter or bylaw change', '5.07': 'shareholder vote', '7.01': 'Reg FD disclosure', '8.01': 'other event', '9.01': 'exhibits' };
+      const out = [];
+      const n = (f.form || []).length;
+      for (let i = 0; i < n && out.length < 200; i++) {
+        const form = String(f.form[i] || '');
+        if (!KEEP.test(form)) continue;
+        const items = String(f.items && f.items[i] || '').split(',').map(x => x.trim()).filter(Boolean);
+        const acc = String(f.accessionNumber[i] || '');
+        const doc1 = String(f.primaryDocument && f.primaryDocument[i] || '');
+        out.push({
+          form, date: String(f.filingDate[i] || ''), report: String(f.reportDate && f.reportDate[i] || ''),
+          items: items.map(k => ({ k, what: ITEMS[k] || '' })),
+          accession: acc,
+          url: acc ? 'https://www.sec.gov/Archives/edgar/data/' + Number(cik) + '/' + acc.replace(/-/g, '') + '/' + (doc1 || '') : '',
+          index: acc ? 'https://www.sec.gov/Archives/edgar/data/' + Number(cik) + '/' + acc.replace(/-/g, '') + '/' : ''
+        });
+      }
+      doc = { symbol: sym, cik: Number(cik), name: sub.name || '', fetchedAt: Date.now(), filings: out, source: 'SEC EDGAR submissions, public domain' };
+      await env.PF_SYNC.put(ck, JSON.stringify(doc), { expirationTtl: 6 * 3600 });
+    }
+    return json(Object.assign({}, doc, { since, filings: doc.filings.filter(x => x.date >= since), cached: !!hit }), 200, env);
+  }
+
   if (url.pathname === '/edgar' && request.method === 'GET') {
     if (await tooMany(env, request, '/edgar', 20)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
     const sym = clean(url.searchParams.get('symbol'), 10).toUpperCase();
@@ -838,13 +1076,44 @@ async function handle(request, env) {
     return json(out, 200, env);
   }
 
+  /* ---- GET /calendar?code= : the next thirty days of economic releases, from FRED (A6.3) ----
+     FRED's release calendar, filtered to the releases a holder watches: CPI, the jobs report, GDP,
+     PCE (Personal Income and Outlays), PPI, retail sales, the Fed's H.15 is daily so it is left
+     out. The FOMC's meeting dates are not a FRED release and are not here; the source line says
+     so. Dated context on Command, never a signal. Cached a day; same door as /fred. */
+  if (url.pathname === '/calendar' && request.method === 'GET') {
+    const authC = request.headers.get('Authorization') || '';
+    const tokC = authC.startsWith('Bearer ') ? authC.slice(7) : '';
+    let okC = safeEqual(tokC, env.SYNC_SECRET);
+    if (!okC) okC = !!(await activeGrant(clean(url.searchParams.get('code'), 12).toUpperCase()));
+    if (!okC) return json({ error: 'The calendar needs a live invite code, or the sync key.' }, 401, env);
+    if (!env.FRED_API_KEY) return json({ error: 'Worker is missing FRED_API_KEY.' }, 500, env);
+    const day = new Date().toISOString().slice(0, 10), ck = 'calendar:' + day;
+    const hit = await env.PF_SYNC.get(ck); if (hit) return json(Object.assign(JSON.parse(hit), { cached: true }), 200, env);
+    /* Matched on the release's own name, which the calendar carries; ids drift, names do not. */
+    const WATCH = [[/^Consumer Price Index$/, 'CPI'], [/^Employment Situation$/, 'Jobs report'], [/^Gross Domestic Product$/, 'GDP'], [/^Personal Income and Outlays$/, 'PCE, income and spending'], [/^Producer Price Index$/, 'PPI'], [/^Advance Monthly Sales for Retail/, 'Retail sales'], [/^Industrial Production and Capacity Utilization$/, 'Industrial production'], [/^New Residential Construction$/, 'Housing starts'], [/^Consumer Credit$/, 'Consumer credit'], [/^Job Openings and Labor Turnover/, 'JOLTS']];
+    const label = name => { for (const [re, l] of WATCH) if (re.test(name || '')) return l; return null; };
+    const end = new Date(Date.now() + 31 * 86400000).toISOString().slice(0, 10);
+    let out = [];
+    try {
+      const r = await fetch('https://api.stlouisfed.org/fred/releases/dates?api_key=' + encodeURIComponent(env.FRED_API_KEY) + '&file_type=json&realtime_start=' + day + '&realtime_end=' + end + '&include_release_dates_with_no_data=true&limit=1000&sort_order=asc');
+      if (!r.ok) return json({ error: 'FRED answered ' + r.status + '.' }, 502, env);
+      const j = await r.json();
+      out = (j.release_dates || []).map(x => ({ date: x.date, id: x.release_id, name: label(x.release_name), release: x.release_name })).filter(x => x.name && x.date >= day && x.date <= end);
+    } catch (e) { return json({ error: 'Could not reach FRED.' }, 502, env); }
+    const doc = { from: day, to: end, releases: out, source: 'FRED release calendar (St. Louis Fed). FOMC meeting dates are not a FRED release and are not listed.' };
+    await env.PF_SYNC.put(ck, JSON.stringify(doc), { expirationTtl: 86400 });
+    return json(doc, 200, env);
+  }
+
   if (url.pathname === '/fred') {
-    /* Four market statistics, and three rates: the Fed funds effective rate, the two-year and the
-       ten-year Treasury yields, so the Market tab can print the curve beside the valuation figures. */
-    /* Four statistics; the policy rate and its target range; the two- and ten-year yields; and the
-       Fed's balance sheet (WALCL, weekly, $m), whose direction is the Fed buying or selling bonds.
-       WILL5000PR was withdrawn from FRED in 2024. */
-    const FRED_ALLOWED = new Set(['VIXCLS', 'SP500', 'GDP', 'DFF', 'DFEDTARU', 'DFEDTARL', 'DGS2', 'DGS10', 'WALCL']);
+    /* The Market tab's rates and economy card. The policy rate and its target range; the curve at
+       three months, two, ten and thirty years; the thirty-year mortgage (weekly); the price level
+       (CPIAUCSL, monthly, read as a year-over-year rate); the ten-year breakeven (T10YIE, the
+       market's expected inflation); unemployment (UNRATE, monthly); and the Fed's balance sheet
+       (WALCL, weekly, $m), whose direction is the Fed buying or selling bonds. Plus the VIX, the
+       index and GDP for the panels above it. WILL5000PR was withdrawn from FRED in 2024. */
+    const FRED_ALLOWED = new Set(['VIXCLS', 'SP500', 'GDP', 'DFF', 'DFEDTARU', 'DFEDTARL', 'DGS3MO', 'DGS2', 'DGS10', 'DGS30', 'MORTGAGE30US', 'CPIAUCSL', 'T10YIE', 'UNRATE', 'WALCL']);
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
     let allowed = safeEqual(tok0, env.SYNC_SECRET);
@@ -923,6 +1192,9 @@ async function handle(request, env) {
       active: !rec.paused && !lapsed,
       reason: rec.paused ? 'paused' : lapsed ? 'lapsed' : 'active',
       tier: rec.tier || null,
+      /* A2.1: whether /data will answer this plan on the worker's key, so the terminal's Settings
+         card can say "built in" or "connect your own key" before the first request. */
+      dataIncluded: dataIncludedFor(env, rec.tier),
       sub: rec.subStatus ? { status: rec.subStatus, currentPeriodEnd: rec.currentPeriodEnd || null, graceUntil: rec.graceUntil || null } : null
     }, 200, env);
   }
@@ -931,7 +1203,7 @@ async function handle(request, env) {
      Dual-auth like /fred: the operator authenticates with the sync key and a slot, an invited user
      with a live invite code. Each identity's registry and marks live under their own KV keys, so
      nobody can read or write anyone else's. */
-  if (url.pathname === '/callreg' || url.pathname === '/marks' || url.pathname === '/chain') {
+  if (url.pathname === '/callreg' || url.pathname === '/marks' || url.pathname === '/chain' || url.pathname === '/record' || url.pathname === '/notify' || url.pathname === '/share' || /^\/share\/[a-z0-9]{12}$/.test(url.pathname) || url.pathname === '/token') {
     const auth1 = request.headers.get('Authorization') || '';
     const tok1 = auth1.startsWith('Bearer ') ? auth1.slice(7) : '';
     let ident = null;
@@ -962,6 +1234,107 @@ async function handle(request, env) {
     if (url.pathname === '/marks' && request.method === 'GET') {
       const m = await env.PF_SYNC.get('cmarks:' + ident);
       return json({ marks: m ? JSON.parse(m) : {} }, 200, env);
+    }
+
+    /* ---- A4.6. POST /share {callId} -> a public page for one call; DELETE /share/<id> withdraws it ---- */
+    if (url.pathname === '/share' && request.method === 'POST') {
+      let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+      const callId = clean(body.callId, 80);
+      const rec = JSON.parse(await env.PF_SYNC.get('rec:' + ident) || 'null');
+      if (!rec) return json({ error: 'No server copy of the record yet. Turn it on under Settings and copy now, then share.' }, 409, env);
+      const c = (rec.calls || []).find(x => x.id === callId);
+      if (!c) return json({ error: 'That call is not in the server copy yet. Copy now under Settings, then share.' }, 404, env);
+      const heads = JSON.parse(await env.PF_SYNC.get('chain:' + ident) || '[]');
+      const id = Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
+      const doc = { id, ident, createdAt: Date.now(), call: c, by: c.by ? { name: c.by.name || null, seat: c.by.seat == null ? null : c.by.seat } : null, chain: rec.chain || null, serverHeads: heads.slice(-60), name: clean(body.name, 80) || null,
+        note: 'One call from a PerceptFolio record, shared by its author. The hashes and sequence numbers place it in a chain whose head is posted daily to a clock the author does not control. It is a record of what was said, not a recommendation.' };
+      await env.PF_SYNC.put('share:' + id, JSON.stringify(doc));
+      const mine = JSON.parse(await env.PF_SYNC.get('shares:' + ident) || '[]'); mine.push({ id, callId, at: doc.createdAt }); await env.PF_SYNC.put('shares:' + ident, JSON.stringify(mine.slice(-200)));
+      return json({ ok: true, id, url: (env.SITE_URL || 'https://perceptfolio.com').replace(/\/+$/, '') + '/call/?id=' + id }, 200, env);
+    }
+    if (/^\/share\/[a-z0-9]{12}$/.test(url.pathname) && request.method === 'DELETE') {
+      const id = url.pathname.slice(7);
+      const raw = await env.PF_SYNC.get('share:' + id);
+      if (!raw || JSON.parse(raw).ident !== ident) return json({ error: 'Not yours, or already withdrawn.' }, 404, env);
+      await env.PF_SYNC.delete('share:' + id);
+      return json({ ok: true }, 200, env);
+    }
+    /* ---- A4.7. POST /token -> a read-only token for /me; DELETE /token revokes every token ---- */
+    if (url.pathname === '/token' && request.method === 'POST') {
+      const tok = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('');
+      await env.PF_SYNC.put('tok:' + tok, ident);
+      const list = JSON.parse(await env.PF_SYNC.get('tokens:' + ident) || '[]'); list.push({ tok, at: Date.now() }); await env.PF_SYNC.put('tokens:' + ident, JSON.stringify(list.slice(-10)));
+      return json({ ok: true, token: tok, url: (url.origin) + '/me?token=' + tok, csv: (url.origin) + '/me?token=' + tok + '&format=csv' }, 200, env);
+    }
+    if (url.pathname === '/token' && request.method === 'DELETE') {
+      const list = JSON.parse(await env.PF_SYNC.get('tokens:' + ident) || '[]');
+      for (const t of list) await env.PF_SYNC.delete('tok:' + t.tok);
+      await env.PF_SYNC.delete('tokens:' + ident);
+      return json({ ok: true, revoked: list.length }, 200, env);
+    }
+    if (url.pathname === '/token' && request.method === 'GET') {
+      const list = JSON.parse(await env.PF_SYNC.get('tokens:' + ident) || '[]');
+      return json({ tokens: list.map(t => ({ at: t.at, tail: t.tok.slice(-6) })) }, 200, env);
+    }
+
+    /* ---- /notify — A4.3. What this identity wants to be told by email. ---- */
+    if (url.pathname === '/notify') {
+      const key = 'notify:' + ident;
+      if (request.method === 'GET') return json(await notifyPrefs(env, ident), 200, env);
+      if (request.method === 'PUT') {
+        let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+        const prefs = { marks: !!body.marks, reviews: !!body.reviews };
+        await env.PF_SYNC.put(key, JSON.stringify(prefs));
+        return json(Object.assign({ ok: true, address: !!(await emailForIdent(env, ident)) }, prefs), 200, env);
+      }
+      return json({ error: 'Method not allowed.' }, 405, env);
+    }
+
+    /* ---- /record — A2.3. The record's server copy: calls, their marks with hashes, the chain
+       state, the review marks. A projection, not the profile: no thesis text, no holdings, no
+       notes, nothing the terminal's sync already carries. Its job is two things the browser
+       cannot do for itself: survive the loss of the device, and be the copy a third party reads
+       beside the daily head log. Last write wins; the heads log (/chain) is what makes a rewrite
+       visible, so this store need not referee. Opt-in for Personal, always on for Business seats
+       (the terminal decides; the worker stores what a live identity sends). */
+    if (url.pathname === '/record') {
+      const key = 'rec:' + ident;
+      if (request.method === 'GET') {
+        const raw = await env.PF_SYNC.get(key);
+        return json(raw ? JSON.parse(raw) : { calls: [], reviews: [], chain: null, updatedAt: null }, 200, env);
+      }
+      if (request.method === 'PUT') {
+        const raw = await request.text();
+        if (raw.length > 1024 * 1024) return json({ error: 'Record too large.' }, 413, env);
+        let body; try { body = JSON.parse(raw); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+        const num = v => (v == null || v === '' || !isFinite(Number(v))) ? null : Number(v);
+        const mark = m => (m && typeof m === 'object') ? {
+          price: num(m.price), spy: num(m.spy), beta: num(m.beta), at: num(m.at), lag: num(m.lag),
+          missed: !!m.missed, intended: clean(m.intended, 10) || null, actual: clean(m.actual, 10) || null, due: clean(m.due, 10) || null,
+          hash: /^[0-9a-f]{64}$/.test(String(m.hash || '')) ? m.hash : null, seq: num(m.seq), cron: !!m.cron
+        } : null;
+        const calls = (Array.isArray(body.calls) ? body.calls : []).slice(0, 2000).map(c => ({
+          id: clean(c.id, 80), sym: clean(c.sym, 10).toUpperCase(), track: clean(c.track || 'checklist', 24),
+          verdict: clean(c.verdict, 12), label: clean(c.label, 40), ts: num(c.ts), date: clean(c.date, 10),
+          price: num(c.price), spy: num(c.spy), q: num(c.q), p: num(c.p), m: num(c.m),
+          conviction: clean(c.conviction, 16), checks: clean(c.checks, 64) || null, scorecard: clean(c.scorecard, 16) || null,
+          rbv: clean(c.rbv, 64) || null,
+          by: (c.by && typeof c.by === 'object') ? { seat: num(c.by.seat), name: clean(c.by.name, 80), sig: clean(c.by.sig, 200) || null, key: clean(c.by.key, 200) || null } : null,
+          marks: Object.fromEntries(Object.entries(c.marks || {}).filter(([h]) => /^\d{1,4}$/.test(h)).map(([h, m]) => [h, mark(m)]).filter(([, m]) => m))
+        })).filter(c => c.id && c.sym && c.ts > 0);
+        const reviews = (Array.isArray(body.reviews) ? body.reviews : []).slice(0, 4000).map(r => ({
+          sym: clean(r.sym, 10).toUpperCase(), at: num(r.at), by: r.by ? { seat: num(r.by.seat), name: clean(r.by.name, 80) } : null,
+          marks: (Array.isArray(r.marks) ? r.marks : []).slice(0, 12).map(x => ({ n: num(x.n), mark: /^(supported|broken|uncertain)$/.test(String(x.mark)) ? x.mark : null })).filter(x => x.n != null && x.mark),
+          hash: /^[0-9a-f]{64}$/.test(String(r.hash || '')) ? r.hash : null, seq: num(r.seq)
+        })).filter(r => r.sym && r.at > 0);
+        const chain = (body.chain && typeof body.chain === 'object') ? { head: /^[0-9a-f]{64}$/.test(String(body.chain.head || '')) ? body.chain.head : '', n: num(body.chain.n) || 0 } : null;
+        /* Next review dates, for the notice (A4.3): a ticker and a date, never the thesis. */
+        const due = (Array.isArray(body.due) ? body.due : []).slice(0, 400).map(d => ({ sym: clean(d.sym, 10).toUpperCase(), date: /^\d{4}-\d{2}-\d{2}$/.test(String(d.date || '')) ? d.date : '' })).filter(d => d.sym && d.date);
+        const rec = { updatedAt: Date.now(), calls, reviews, chain, due, rulebook: clean(body.rulebook, 64) || null };
+        await env.PF_SYNC.put(key, JSON.stringify(rec));
+        return json({ ok: true, calls: calls.length, reviews: reviews.length }, 200, env);
+      }
+      return json({ error: 'Method not allowed.' }, 405, env);
     }
 
     /* ---- /chain — E2. An append-only log of the client's chain head, under THIS server's clock.
@@ -1508,21 +1881,23 @@ const PLANS = {
 };
 const GRACE_DAYS = 7;
 
-/* List prices, the same numbers the site shows. Business discount applies from BUSINESS_DISCOUNT
-   seats and must be stated in the quote email. The operator's reply is the binding price. */
-const PRICES = { personal: { monthly: 149, yearly: 1490 }, business: { monthly: 119, yearly: 1190 } };
-const BUSINESS_DISCOUNT = { minSeats: 8, pct: 15 };
+/* List prices, the same numbers the site shows (site/src/lib/config.ts must agree; the suite
+   checks). A2.8, 2026-09-21: Personal is the Founding price, held for whoever paid it, and rises
+   on FOUNDING_UNTIL. Business is a desk price: $760 a month for three seats, $8,360 a year (one
+   month free), further seats quoted in the reply because the per-seat figure above three is
+   OPEN. The operator's reply is the binding price. */
+const PRICES = { personal: { monthly: 149, yearly: 1490 }, business: { monthly: 760, yearly: 8360, seatsIncluded: 3 } };
+const FOUNDING_UNTIL = '2027-03-31';
 function quoteFor(plan, seats) {
   if (plan !== 'business') {
-    return { plan, seats: 1, monthly: PRICES.personal.monthly, yearly: PRICES.personal.yearly, discountPct: 0,
-      text: `Personal: $${PRICES.personal.monthly} a month, or $${PRICES.personal.yearly.toLocaleString()} a year (two months free).` };
+    return { plan, seats: 1, monthly: PRICES.personal.monthly, yearly: PRICES.personal.yearly, discountPct: 0, foundingUntil: FOUNDING_UNTIL,
+      text: `Personal, Founding price: $${PRICES.personal.monthly} a month, or $${PRICES.personal.yearly.toLocaleString()} a year (two months free). The Founding price is held for anyone who has paid it; it rises for new accounts after ${FOUNDING_UNTIL}.` };
   }
-  const n = Math.max(1, seats || 1);
-  const disc = n >= BUSINESS_DISCOUNT.minSeats ? BUSINESS_DISCOUNT.pct : 0;
-  const m = Math.round(PRICES.business.monthly * (1 - disc / 100)), y = Math.round(PRICES.business.yearly * (1 - disc / 100));
-  const line = disc ? `\nBecause the firm has ${n} members, each seat is ${disc}% off the list price of $${PRICES.business.monthly} a month or $${PRICES.business.yearly.toLocaleString()} a year.` : '';
-  return { plan, seats: n, monthly: m, yearly: y, discountPct: disc,
-    text: `Business, ${n} seats: $${m} per seat a month ($${(m * n).toLocaleString()} for the firm), or $${y.toLocaleString()} per seat a year ($${(y * n).toLocaleString()} for the firm).${line}` };
+  const n = Math.max(PRICES.business.seatsIncluded, seats || PRICES.business.seatsIncluded);
+  const extra = n - PRICES.business.seatsIncluded;
+  const line = extra ? `\nThe firm asked for ${n} seats: ${PRICES.business.seatsIncluded} are included; the ${extra} further seat${extra === 1 ? '' : 's'} are quoted in this reply.` : '';
+  return { plan, seats: n, monthly: PRICES.business.monthly, yearly: PRICES.business.yearly, discountPct: 0, seatsIncluded: PRICES.business.seatsIncluded, extraSeats: extra,
+    text: `Business: $${PRICES.business.monthly} a month for ${PRICES.business.seatsIncluded} seats, or $${PRICES.business.yearly.toLocaleString()} a year (one month free). One rulebook for the desk, every call signed by the seat that made it, the firm's record exportable.${line}\nSupport by email on weekdays, US Eastern, answered the same or the next business day. The site and the service run on Cloudflare's network; the footer of the site measures whether the service is answering; an incident is told to the firm's contact by email.` };
 }
 
 function billingConfigured(env) {
@@ -2327,6 +2702,73 @@ async function handleBilling(request, env, url) {
     return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600', ...corsHeaders(env) } });
   }
 
+  /* ---- GET /popular : the market's most traded names, with their returns, refreshed daily ----
+     Hindsight used to rank only what a person had typed, because ranking the whole listing means
+     six thousand quotes per window against a sixty-a-minute key. The market ranks itself instead.
+     The most-actives pool is the whole listing sorted by the day's share volume (a few hundred
+     names, three pages of a hundred); that pool is re-ranked here by THREE-MONTH AVERAGE DOLLAR
+     VOLUME, so a penny stock that printed a billion shares one afternoon does not outrank Apple,
+     and one day's news does not decide the list. Common stock on Nasdaq and NYSE only, five
+     dollars and two billion up, one share class per company. Thirty names.
+
+     Their returns over a month, six months, a year and five years come from five years of daily
+     closes, ten symbols to a request on the same public chart feed /history reads, and are worked
+     out here once, so a device reads one small document rather than thirty histories. Cached for
+     the day. Public data behind a rate limit, no door, like /universe and /history. The feed is
+     Yahoo's until a licensed one is set (see priceFeed), and the document says so. */
+  if (url.pathname === '/popular' && request.method === 'GET') {
+    if (await tooMany(env, request, '/popular', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const day = new Date().toISOString().slice(0, 10), ck = 'popular:' + day;
+    const cached = await env.PF_SYNC.get(ck); if (cached) return new Response(cached, { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600', ...corsHeaders(env) } });
+    const ua = { 'User-Agent': 'Mozilla/5.0 PerceptFolio' };
+    /* the three pages side by side; a page that fails leaves the pool shorter, not the route dead */
+    const pages = await Promise.all([0, 100, 200].map(off => fetch('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?scrIds=most_actives&count=100&offset=' + off + '&lang=en-US&region=US', { headers: ua })
+      .then(r => r.ok ? r.json() : null).then(j => { const qs = j && j.finance && j.finance.result && j.finance.result[0] && j.finance.result[0].quotes; return Array.isArray(qs) ? qs : []; }).catch(() => [])));
+    const pool = [].concat(...pages);
+    if (pool.length < 50) return json({ error: 'The market list did not answer.' }, 502, env);
+    const seen = {}, picked = [];
+    pool.filter(q => q && q.quoteType === 'EQUITY' && /^[A-Z]{1,5}$/.test(String(q.symbol || '')) && /^(Nasdaq|NYSE)/.test(String(q.fullExchangeName || '')) && q.regularMarketPrice >= 5 && q.marketCap >= 2e9)
+      .map(q => ({ symbol: q.symbol, name: clean(q.longName || q.shortName || q.symbol, 60), cap: Math.round(q.marketCap), price: q.regularMarketPrice, dollarVol: Math.round((q.averageDailyVolume3Month || q.regularMarketVolume || 0) * q.regularMarketPrice) }))
+      .filter(q => q.dollarVol > 0)
+      .sort((a, b) => b.dollarVol - a.dollarVol)
+      .forEach(q => {
+        /* one share class per company: GOOG and GOOGL are one business */
+        const k = q.name.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/(incorporated|corporation|company|holdings|inc|corp|plc|ltd|co)$/, '');
+        if (seen[k] || picked.length >= 30) return; seen[k] = 1; picked.push(q);
+      });
+    if (picked.length < 10) return json({ error: 'The market list came back too short to trust (' + picked.length + ').' }, 502, env);
+    const hist = {}, batches = [];
+    for (let i = 0; i < picked.length; i += 10) batches.push(picked.slice(i, i + 10).map(q => q.symbol));
+    await Promise.all(batches.map(syms => fetch('https://query1.finance.yahoo.com/v8/finance/spark?symbols=' + syms.join(',') + '&range=5y&interval=1d', { headers: ua })
+      .then(r => r.ok ? r.json() : null).then(j => { for (const s of syms) { const x = j && j[s]; if (x && Array.isArray(x.timestamp) && Array.isArray(x.close)) hist[s] = x; } })
+      .catch(() => { /* that batch stays unmeasured; the rows still carry the name */ })));
+    /* Return over a window: the last close against the close nearest the date that many calendar
+       months or years back (the five-year range begins the day after that date, so "on or before"
+       alone would find nothing). A start more than twelve days off the mark, a listing younger than
+       the window, leaves that window empty rather than measuring a shorter one under its name. */
+    const WIN = { m1: [0, 1], m6: [0, 6], y1: [1, 0], y5: [5, 0] };
+    const rows = picked.map(q => {
+      const h = hist[q.symbol]; const out = { symbol: q.symbol, name: q.name, cap: q.cap, price: q.price, dollarVol: q.dollarVol, returns: {}, from: {} };
+      if (!h) return out;
+      const d = [], p = []; for (let i = 0; i < h.timestamp.length; i++) if (isFinite(h.close[i]) && h.close[i] > 0) { d.push(new Date(h.timestamp[i] * 1000).toISOString().slice(0, 10)); p.push(h.close[i]); }
+      if (d.length < 20) return out;
+      const last = p[p.length - 1], lastDate = new Date(d[d.length - 1] + 'T12:00:00Z');
+      out.last = last; out.lastDate = d[d.length - 1];
+      for (const k of Object.keys(WIN)) {
+        const t = new Date(lastDate); t.setUTCFullYear(t.getUTCFullYear() - WIN[k][0]); t.setUTCMonth(t.getUTCMonth() - WIN[k][1]);
+        const ts = t.toISOString().slice(0, 10);
+        let i = -1, best = Infinity;
+        for (let j = 0; j < d.length; j++) { const off = Math.abs(Date.parse(d[j]) - Date.parse(ts)) / 86400000; if (off < best) { best = off; i = j; } if (d[j] > ts) break; }
+        if (i < 0 || best > 12) continue;
+        out.returns[k] = Math.round((last / p[i] - 1) * 10000) / 100; out.from[k] = d[i];
+      }
+      return out;
+    });
+    const body = JSON.stringify({ asOf: day, count: rows.length, basis: 'three-month average dollar volume, from the whole most-actives pool', source: 'Yahoo Finance (interim, unlicensed): the most-actives pool and five-year closes.', rows });
+    await env.PF_SYNC.put(ck, body, { expirationTtl: 2 * 86400 });
+    return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600', ...corsHeaders(env) } });
+  }
+
   /* ---- POST /map/prefill {code, symbol} : a company's principal suppliers and customers ----
      No free feed publishes supply chains (Finnhub's is paid). The model the Worker already uses for
      the six lenses knows the well-documented ones (TSMC makes NVIDIA's chips; Apple buys from
@@ -2419,7 +2861,8 @@ async function handleBilling(request, env, url) {
     if (!rec) return json({ org: null }, 200, env);
     const seat = c.seat || 1, seats = rec.seats || (rec.seatCodes ? rec.seatCodes.length : 1);
     return json({ org: { id: rec.id, firm: rec.firm || null, contact: rec.email, seats, seat, isAdmin: seat === 1, paused: !!c.paused,
-      rulebook: rec.rulebook || null, rulebookAt: rec.rulebookAt || null } }, 200, env);
+      role: (rec.roles || {})[String(seat)] || (seat === 1 ? 'admin' : 'analyst'),
+      rulebook: rec.rulebook || null, rulebookAt: rec.rulebookAt || null, rulebookVersion: rec.rulebookVersion || null } }, 200, env);
   }
 
   /* ---- PUT /org/rulebook {code, rulebook} : the admin seat publishes the firm's rules ---- */
@@ -2433,9 +2876,108 @@ async function handleBilling(request, env, url) {
     const rulebook = { qBuy: num(rb.qBuy, 1, 12, 8), pBuy: num(rb.pBuy, 0, 6, 3), qSell: num(rb.qSell, 0, 12, 4), mBuy: num(rb.mBuy, 0, 4, 0) };
     const rec = JSON.parse(await env.PF_SYNC.get('req:' + c.requestId) || 'null');
     if (!rec) return json({ error: 'No such firm.' }, 404, env);
-    rec.rulebook = rulebook; rec.rulebookAt = Date.now();
+    /* A7.2. Every publish is a version, chained to the one before: a call is judged against the
+       rules that stood when it was made, so the rules must be as unforgeable as the calls. */
+    const log = Array.isArray(rec.rulebookLog) ? rec.rulebookLog : [];
+    const prev = log.length ? log[log.length - 1].hash : '';
+    const at = Date.now();
+    const canon = JSON.stringify({ at, prevHash: prev, rulebook: { mBuy: rulebook.mBuy, pBuy: rulebook.pBuy, qBuy: rulebook.qBuy, qSell: rulebook.qSell }, seat: 1 });
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canon)))).map(b => b.toString(16).padStart(2, '0')).join('');
+    const version = 'f:' + hash.slice(0, 12);
+    log.push({ version, hash, prevHash: prev, at, rulebook, seat: 1 });
+    rec.rulebook = rulebook; rec.rulebookAt = at; rec.rulebookVersion = version; rec.rulebookLog = log.slice(-200);
     await env.PF_SYNC.put('req:' + c.requestId, JSON.stringify(rec));
-    return json({ ok: true, rulebook, rulebookAt: rec.rulebookAt }, 200, env);
+    return json({ ok: true, rulebook, rulebookAt: rec.rulebookAt, version }, 200, env);
+  }
+
+  /* ---- A7.1. PUT /org/keys {code, key, device} : a seat registers a device's public key ----
+     A seat's device makes an ECDSA P-256 key pair and keeps the private half where scripts cannot
+     read it; the public half is registered here under the seat. Every call the seat makes is
+     signed with it, so attribution is a signature a compliance reader can check, not a name in a
+     field. GET /org/keys?code= returns every seat's keys, for the firm's evidence pack. */
+  if (url.pathname === '/org/keys') {
+    let body = {}; if (request.method === 'PUT') { try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); } }
+    const code = clean(url.searchParams.get('code') || body.code, 12).toUpperCase();
+    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
+    if (!c || c.tier !== 'business' || !c.requestId || c.paused) return json({ error: 'A live seat of a firm is required.' }, 403, env);
+    const kk = 'seatkeys:' + c.requestId;
+    const keys = JSON.parse(await env.PF_SYNC.get(kk) || '[]');
+    if (request.method === 'GET') return json({ keys }, 200, env);
+    if (request.method === 'PUT') {
+      const k = body.key;
+      if (!k || k.kty !== 'EC' || k.crv !== 'P-256' || typeof k.x !== 'string' || typeof k.y !== 'string' || k.d) return json({ error: 'key must be a public P-256 JWK (kty EC, crv P-256, x, y, no d).' }, 400, env);
+      const jwk = { kty: 'EC', crv: 'P-256', x: clean(k.x, 64), y: clean(k.y, 64) };
+      const kid = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(jwk.x + '.' + jwk.y)))).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+      if (!keys.some(x => x.kid === kid)) { keys.push({ kid, seat: c.seat || 1, jwk, device: clean(body.device, 60) || null, at: Date.now() }); await env.PF_SYNC.put(kk, JSON.stringify(keys.slice(-100))); }
+      return json({ ok: true, kid, seat: c.seat || 1 }, 200, env);
+    }
+    return json({ error: 'Method not allowed.' }, 405, env);
+  }
+
+  /* ---- A7.3. PUT /org/roles {code(admin), seat, role} ; a reviewer seat reads, never calls ---- */
+  if (url.pathname === '/org/roles' && request.method === 'PUT') {
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
+    if (!c || c.tier !== 'business' || !c.requestId || c.seat !== 1) return json({ error: 'Only the firm\'s admin seat sets roles.' }, 403, env);
+    const seat = parseInt(body.seat, 10), role = String(body.role || '');
+    if (!(seat > 1) || !/^(analyst|reviewer)$/.test(role)) return json({ error: 'seat (2 or more) and role (analyst or reviewer).' }, 400, env);
+    const rec = JSON.parse(await env.PF_SYNC.get('req:' + c.requestId) || 'null');
+    if (!rec) return json({ error: 'No such firm.' }, 404, env);
+    rec.roles = rec.roles || {}; rec.roles[String(seat)] = role;
+    await env.PF_SYNC.put('req:' + c.requestId, JSON.stringify(rec));
+    return json({ ok: true, roles: rec.roles }, 200, env);
+  }
+
+  /* ---- A7.3, A7.4. GET /org/records?code= : every seat's record copy, for the admin or a reviewer ----
+     The firm's evidence: each seat's calls, marks, chain state, the heads log, and the seat keys,
+     in one answer. Only the admin seat (1) or a seat with the reviewer role may read it; an
+     analyst seat reads its own record through /record. */
+  if (url.pathname === '/org/records' && request.method === 'GET') {
+    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
+    if (!c || c.tier !== 'business' || !c.requestId || c.paused) return json({ error: 'A live seat of a firm is required.' }, 403, env);
+    const rec = JSON.parse(await env.PF_SYNC.get('req:' + c.requestId) || 'null');
+    if (!rec) return json({ error: 'No such firm.' }, 404, env);
+    const role = (rec.roles || {})[String(c.seat || 1)] || (c.seat === 1 ? 'admin' : 'analyst');
+    if (!(c.seat === 1 || role === 'reviewer')) return json({ error: 'The firm\'s records are read by the admin seat or a reviewer seat.' }, 403, env);
+    const codes = Array.isArray(rec.seatCodes) ? rec.seatCodes : [];
+    const seats = [];
+    for (let i = 0; i < codes.length; i++) {
+      const sc = codes[i];
+      const cr = JSON.parse(await env.PF_SYNC.get('code:' + sc) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + sc) || 'null') || {};
+      const r = JSON.parse(await env.PF_SYNC.get('rec:c:' + sc) || 'null');
+      const heads = JSON.parse(await env.PF_SYNC.get('chain:c:' + sc) || '[]');
+      seats.push({ seat: cr.seat || (i + 1), email: cr.email || null, role: (rec.roles || {})[String(cr.seat || (i + 1))] || ((cr.seat || (i + 1)) === 1 ? 'admin' : 'analyst'), paused: !!cr.paused, record: r ? { updatedAt: r.updatedAt, calls: r.calls || [], reviews: r.reviews || [], chain: r.chain || null, rulebook: r.rulebook || null } : null, serverHeads: heads.slice(-120) });
+    }
+    const keys = JSON.parse(await env.PF_SYNC.get('seatkeys:' + c.requestId) || '[]');
+    return json({ firm: rec.firm || null, id: rec.id, seats, keys, rulebook: rec.rulebook || null, rulebookVersion: rec.rulebookVersion || null, rulebookLog: (rec.rulebookLog || []).map(x => ({ version: x.version, at: x.at, rulebook: x.rulebook, hash: x.hash, prevHash: x.prevHash })), asOf: Date.now() }, 200, env);
+  }
+
+  /* ---- A7.5. GET /org/status?id= (operator) : one line per seat, for admin.html ---- */
+  if (url.pathname === '/org/status' && request.method === 'GET') {
+    const auth = request.headers.get('Authorization') || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!env.SYNC_SECRET || !safeEqual(tok, env.SYNC_SECRET)) return json({ error: 'Unauthorized.' }, 401, env);
+    const id = clean(url.searchParams.get('id'), 40);
+    const rec = JSON.parse(await env.PF_SYNC.get('req:' + id) || 'null');
+    if (!rec) return json({ error: 'No such firm.' }, 404, env);
+    const codes = Array.isArray(rec.seatCodes) ? rec.seatCodes : [];
+    const keys = JSON.parse(await env.PF_SYNC.get('seatkeys:' + id) || '[]');
+    const seats = [];
+    for (let i = 0; i < codes.length; i++) {
+      const sc = codes[i];
+      const cr = JSON.parse(await env.PF_SYNC.get('code:' + sc) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + sc) || 'null') || {};
+      const devs = JSON.parse(await env.PF_SYNC.get('udev:' + sc) || '[]');
+      const heads = JSON.parse(await env.PF_SYNC.get('chain:c:' + sc) || '[]');
+      const r = JSON.parse(await env.PF_SYNC.get('rec:c:' + sc) || 'null');
+      const seat = cr.seat || (i + 1);
+      seats.push({ seat, code: sc, tail: sc.slice(-5), email: cr.email || null, paused: !!cr.paused, role: (rec.roles || {})[String(seat)] || (seat === 1 ? 'admin' : 'analyst'),
+        devices: devs.length, lastSync: devs.reduce((a, d) => Math.max(a, d.at || d.lastSeen || 0), 0) || null,
+        lastHead: heads.length ? { day: heads[heads.length - 1].day, n: heads[heads.length - 1].n } : null,
+        recordAt: r ? r.updatedAt : null, calls: r ? (r.calls || []).length : 0, keys: keys.filter(k => k.seat === seat).length });
+    }
+    return json({ id, firm: rec.firm || null, seats, rulebookVersion: rec.rulebookVersion || null }, 200, env);
   }
 
   /* ---- POST /pause/code {code, paused}  (operator) : pause one seat, not the whole firm ---- */

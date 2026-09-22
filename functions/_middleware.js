@@ -46,22 +46,33 @@ const HEADERS = {
    lets Cesium compile the mesh decoders it instantiates at load (unused here, noisy if refused);
    it permits WebAssembly compilation only, never string evaluation, which stays forbidden. The public site, built by Vite,
    gets the strict policy: no inline script, no inline style, nothing from anywhere but here and
-   the worker. Stripe's hosted Checkout is a redirect, not an embed, so it needs no allowance. */
+   the worker. Stripe's hosted Checkout is a redirect, not an embed, so it needs no allowance.
+   The preview under /preview/ is a snapshot of the terminal's own markup: no script of its own,
+   but three <style> blocks and a few hundred style attributes, because that is what the terminal
+   is. Under the public policy those were refused and the hero on the landing page rendered as
+   unstyled HTML. So the preview gets the public policy with inline STYLE allowed and nothing else
+   relaxed: script-src stays 'self', and it may be framed only by this origin (A1.1).
+   The two cloudflareinsights hosts are Cloudflare Web Analytics, which Pages injects on every
+   page; refused, there is no funnel data at all (A1.2). */
 function csp(path, env) {
   const worker = (env.WORKER_URL || '').replace(/\/+$/, '');
   const connect = ["'self'", worker, 'https://*.workers.dev', 'https://finnhub.io', 'https://formsubmit.co'].filter(Boolean).join(' ');
   if (GATED.some(re => re.test(path))) {
     return `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://services.arcgisonline.com https://server.arcgisonline.com; font-src 'self' data:; connect-src ${connect} https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
   }
-  return `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect}; form-action 'self' https://checkout.stripe.com; base-uri 'self'; object-src 'none'; frame-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests`;
+  if (FRAMEABLE.test(path)) {
+    return `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'self'`;
+  }
+  return `default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src ${connect} https://cloudflareinsights.com; form-action 'self' https://checkout.stripe.com; base-uri 'self'; object-src 'none'; frame-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests`;
 }
 
 function withHeaders(res, path, env, extraCookie) {
   const h = new Headers(res.headers);
   for (const [k, v] of Object.entries(HEADERS)) h.set(k, v);
   h.set('Content-Security-Policy', csp(path, env));
-  /* The dashboard snapshot is framed by our own landing page and by nothing else. */
-  if (FRAMEABLE.test(path)) { h.set('X-Frame-Options', 'SAMEORIGIN'); h.set('Content-Security-Policy', csp(path, env).replace("frame-ancestors 'none'", "frame-ancestors 'self'")); }
+  /* The dashboard snapshot is framed by our own landing page and by nothing else; its policy in
+     csp() already says frame-ancestors 'self', this is the legacy header saying the same. */
+  if (FRAMEABLE.test(path)) h.set('X-Frame-Options', 'SAMEORIGIN');
   /* Nothing on this origin is a cross-origin API. The worker sets its own CORS; the site never
      answers a cross-origin request with anything but the browser's default refusal. */
   h.delete('Access-Control-Allow-Origin'); h.delete('Access-Control-Allow-Credentials');

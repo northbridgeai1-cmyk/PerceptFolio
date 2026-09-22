@@ -1245,6 +1245,8 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <!-- The schedule sits beside the record because it is the thing that keeps the record
        honest: a mark not taken on the day cannot be taken later. -->
   <div id="marksDue" class="md"></div>
+  <!-- A6.3. Release dates in the next thirty days: context beside the queue, never a signal. -->
+  <div id="econCal" class="md"></div>
   <div id="commandQueue"></div>
 </div>
 
@@ -1367,7 +1369,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </label>
       <span class="muted" id="buyPreview" style="font-size:13px"></span>
     </div>
-    <p class="muted" style="margin-top:8px">Switch to <b>Enter dollars</b> to buy by amount instead of share count. PerceptFolio works out the fractional shares from the price. Mutual funds (e.g. FSKAX, FXAIX, FZILX) don't have a live exchange quote, so add them as <b>Mutual Fund</b> and enter the NAV yourself in the table below.</p>
   </div>
   </div>
   <!-- TRADE IMPACT — the sizing step the app never had -->
@@ -1396,6 +1397,24 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <button class="btn btn-ghost" onclick="setCash()">Update cash</button>
     </div>
   </div>
+  <!-- A3.1 to A3.5. The review sheet: what changed since the last review, each line with its source
+       and date, then the assumptions marked by hand. The terminal never marks an assumption. -->
+  <div class="addwrap" id="reviewWrap">
+  <div class="card" style="position:relative;max-width:820px">
+    <button class="add-close" onclick="closeAddModal()" title="Close">✕</button>
+    <h3 id="reviewTitle">Review</h3>
+    <div class="muted" id="reviewSince" style="font-size:12.5px;margin-bottom:10px"></div>
+    <table class="tbl" style="width:100%;font-size:13px" aria-label="Since your last review"><thead><tr><th style="width:120px">Source</th><th>What changed</th><th style="width:110px">When</th></tr></thead><tbody id="reviewDigest"><tr><td colspan="3" class="muted">Checking…</td></tr></tbody></table>
+    <div class="muted" id="reviewChecked" style="font-size:12px;margin-top:8px"></div>
+    <div class="section-title" style="margin-top:16px">The assumptions</div>
+    <table class="tbl" style="width:100%;font-size:13px" aria-label="Assumptions"><thead><tr><th style="width:36px">#</th><th>Assumption</th><th style="width:270px">Mark</th></tr></thead><tbody id="reviewAssumptions"></tbody></table>
+    <div class="row" style="margin-top:14px;gap:8px;align-items:center">
+      <button class="btn" onclick="submitReview()">Close the review</button>
+      <button class="btn btn-ghost" onclick="closeAddModal()">Later</button>
+      <span class="muted" id="reviewNote" style="font-size:12.5px"></span>
+    </div>
+  </div>
+  </div>
   <!-- The thesis is a sheet, opened from a holding's menu (⋮ → Thesis). The form, its ids and its
        functions are unchanged; only where it lives did. -->
   <div class="addwrap" id="thesisWrap">
@@ -1408,6 +1427,10 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     </div>
     <div class="field"><label>Why do we own it?</label><textarea id="thesisWhy" rows="2" placeholder="Durable advantage in X, strong free cash flow, reasonable price…" style="width:100%;background:var(--panel2);border:0;border-radius:12px;color:var(--text);padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
     <div class="field"><label>What must stay true?</label><textarea id="thesisMust" rows="2" placeholder="Margins stay above X. Revenue growth stays above Y. No major competitor displacement." style="width:100%;background:var(--panel2);border:0;border-radius:12px;color:var(--text);padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
+    <!-- A3.3. The thesis as numbered assumptions: one per line, up to six, each something a later
+         review can call supported, broken or uncertain. The free text above stays; this is the
+         part of it that can be checked. -->
+    <div class="field"><label>Assumptions, one per line, up to six. Each is marked at every review</label><textarea id="thesisAssumptions" rows="3" placeholder="1. Gross margin stays above 40%&#10;2. Revenue grows faster than 10% a year&#10;3. No share loss to the second player" style="width:100%;background:var(--panel2);border:0;border-radius:12px;color:var(--text);padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
     <div class="field"><label>What would make us sell?</label><textarea id="thesisInvalid" rows="2" placeholder="Quality score drops below 8. Margins compress two quarters running. Valuation exceeds X." style="width:100%;background:var(--panel2);border:0;border-radius:12px;color:var(--text);padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical"></textarea></div>
     <div class="row">
       <div class="field" style="max-width:200px;margin-bottom:0"><label>Target price ($)</label><input id="thesisTarget" type="number" step="any" min="0" placeholder="where you think it goes" oninput="updatePlannedRR()"></div>
@@ -1454,6 +1477,8 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="row">
       <div class="field" style="max-width:250px;margin-bottom:0"><label>Sell if quality drops below (of 12)</label><input id="thesisSellBelow" type="number" min="0" max="12" step="1" placeholder="e.g. 8"></div>
       <div class="field" style="max-width:220px;margin-bottom:0"><label>Next review</label><input id="thesisReview" type="date"></div>
+      <!-- A3.5. A cadence, so a review is due again after each one closes, not only on one date. -->
+      <div class="field" style="max-width:200px;margin-bottom:0"><label>Then every</label><select id="thesisEvery"><option value="">only that date</option><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="180">180 days</option></select></div>
       <button class="btn" style="align-self:flex-end" onclick="saveThesis()">Save thesis</button>
       <button class="btn-danger btn btn-ghost" style="align-self:flex-end" onclick="deleteThesis()">Delete</button>
     </div>
@@ -1635,6 +1660,15 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
 
   <!-- HOW YOU BEHAVE -->
+  <!-- A4.4. The quarterly record statement: a brokerage sends one; a record should too. -->
+  <div class="card" style="margin-bottom:16px">
+    <h3>Record statement</h3>
+    <div class="row" style="align-items:center;gap:8px">
+      <select id="stmtQuarter" style="max-width:180px"></select>
+      <button class="btn btn-sm" onclick="openStatement()">Open</button>
+      <span class="muted" style="font-size:12.5px">Calls made, marks landed, expectancy with its interval, sizing refusals, reviews closed. Printable.</span>
+    </div>
+  </div>
   <div class="section-title">How you behave, the pattern in your own trading</div>
   <div class="card">
     <details class="aside"><summary>Why this one analyses you</summary><div>Everything else in PerceptFolio analyses companies. This analyses <b>you</b>. Anyone can get price history; nobody else has yours. These are the four questions the ledger can answer about your habits. How long you actually hold, whether you sell too early, whether you keep to your own cash rule, and whether you trade more when things get loud.</div></details>
@@ -1729,6 +1763,19 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <details class="aside"><summary>How the ruler works</summary><div>The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b>, it's a ruler, not a forecast.</div></details>
   </div>
 
+  <!-- 1a. Rates and the economy. The price of money and the economy it is priced in, from FRED
+       through the worker. Context beside everything else on this tab and never an input to a
+       verdict; every tile carries its own date, because a monthly statistic sitting beside a daily
+       one must say so before anything else. -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Rates and the economy</h3>
+      <span class="pill pill-na" style="font-size:10px">context, not a verdict</span>
+    </div>
+    <div id="ratesLine" style="margin-top:12px" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
+    <details class="aside"><summary>Reading the card</summary><div><b>Fed funds</b> is the overnight rate the Fed sets, inside its target range; the <b>3-month</b> bill tracks it. The <b>2-year</b> is the market's bet on where that rate goes next; the <b>10-</b> and <b>30-year</b> price growth and inflation for decades ahead, and the <b>mortgage</b> rate is what the 10-year costs a household. When the 2-year sits above the 10-year (a negative <b>2s10s</b>) the curve is inverted, which has preceded most US recessions by a year or so and has also sent false alarms. <b>Inflation</b> is the CPI over the past twelve months, realised; the <b>breakeven</b> is the inflation the bond market expects over the next ten. <b>Unemployment</b> is the labour market as of last month. The <b>balance sheet</b> rising is the Fed buying bonds, falling is the Fed letting them run off. None of it feeds a score or a verdict here. It is the weather the businesses you rate are operating in.</div></details>
+  </div>
+
   <!-- 1b. Calendar effects — CONTEXT ONLY, and the panel says so twice.
        This exists because on the fourth of September somebody publishes "September is the worst
        month for stocks" and does not divide by the standard deviation. The defence against a bad
@@ -1761,7 +1808,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 
   <div class="section-title">Market weather. Long-run valuation</div>
   <div id="weatherVerdict" style="margin-bottom:14px"></div>
-  <div id="ratesLine" style="margin:0 0 16px"></div>
   <div class="section-title">Business cycle</div>
   <div class="card">
     <div class="row" style="margin-bottom:8px">
@@ -2054,7 +2100,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <div class="section-title">Herizen momentum score</div>
   <div class="card">
     <div class="row" style="margin-bottom:12px">
-      <input id="hzTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')renderHerizen()">
+      <input id="hzTicker" placeholder="Ticker or company (e.g. NVDA)" style="max-width:220px" autocomplete="off" onkeydown="if(event.key==='Enter')renderHerizen()">
       <button class="btn" onclick="renderHerizen()">Score it</button>
       <div class="spacer"></div>
       <span class="muted" id="hzCount" style="font-size:12px"></span>
@@ -2272,10 +2318,51 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div id="connCheck" style="display:none;margin-top:12px"></div>
     <details class="aside"><summary>How sync behaves</summary><div>Once connected it syncs automatically, when you open the app, a few seconds after you make changes, and when you close the tab. <b>This is whole-account last-write-wins, not a merge.</b> If you edit on your phone and your laptop without letting them sync in between, the device that saves last overwrites the other. It warns you before clobbering something newer, but the safe habit is to open the app on a device and let it sync before you start editing there.</div></details>
   </div>
+  <!-- A5.3. Snapshot this screen: for the sandbox account on an operator device, serialise the
+       current tab the way /preview/dashboard.html was made (styles kept, scripts dropped,
+       interaction off), so the site's tour gains a still without engineering. The file is saved
+       as preview/<tab>.html; the site lists which stills exist in its config. -->
+  <div class="card" style="margin-top:16px" id="snapshotCard">
+    <h3>Snapshot this screen, for the site</h3>
+    <div class="row" style="align-items:center;gap:8px">
+      <select id="snapTab" style="max-width:180px"></select>
+      <button class="btn btn-ghost btn-sm" onclick="snapshotScreen()">Save preview/&lt;tab&gt;.html</button>
+      <span class="muted" style="font-size:12px">Sandbox account only. Scripts dropped, styles kept, pointer events off, marked illustrative.</span>
+    </div>
+  </div>
+  <!-- A2.3. The record's server copy. A legend and a switch; the reasoning is in the source above
+       recordCopyOn(). Hidden where sync is blocked (client books, the sandbox). -->
+  <div class="card" style="margin-top:16px" id="recordCopyCard">
+    <h3>The record's server copy</h3>
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:13.5px;cursor:pointer"><input type="checkbox" id="recordCopyToggle" onchange="setRecordCopy(this.checked)" style="margin-top:3px"><span>Calls, marks and the chain, kept under your code. No thesis text, no holdings.</span></label>
+    <p class="muted" id="recordCopyStatus" style="font-size:12.5px;margin-top:8px"></p>
+    <div class="row" style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="pushRecordCopy(true)">Copy now</button></div>
+    <!-- A4.3. Two notices, off by default. Ticker and horizon only; the reading stays in here. -->
+    <div style="margin-top:12px;display:grid;gap:6px;font-size:13.5px">
+      <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="notifyMarks" onchange="setNotify('marks',this.checked)"><span>Email when a mark lands</span></label>
+      <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="notifyReviews" onchange="setNotify('reviews',this.checked)"><span>Email when a review is due</span></label>
+      <span class="muted" id="notifyStatus" style="font-size:12px"></span>
+    </div>
+  </div>
+  <!-- A4.6, A4.7. Shared calls and the read-only token. Both read the server copy. -->
+  <div class="card" style="margin-top:16px" id="sharesCard">
+    <h3>Shared calls</h3>
+    <div id="sharesBody"></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Read-only token, for a spreadsheet</h3>
+    <div class="row"><button class="btn btn-ghost btn-sm" onclick="makeToken()">Make a token</button><button class="btn btn-ghost btn-sm" onclick="revokeTokens()">Revoke all</button></div>
+    <div class="muted" id="tokenStatus" style="font-size:12.5px;margin-top:8px">One URL returns your record as JSON or CSV: Sheets IMPORTDATA, Excel Power Query. It reads only.</div>
+  </div>
   <div class="card" style="margin-top:16px">
     <h3>Backup / Restore</h3>
     <div class="row">
       <button class="btn btn-ghost" onclick="exportData()">Export All Data (JSON)</button>
+      <!-- A2.4, A4.2. The pack is for a reader who does not trust the exporter; the CSVs are for a
+           spreadsheet. Both are projections of the record, not the profile. -->
+      <button class="btn btn-ghost" onclick="exportEvidencePack()">Evidence pack (JSON)</button>
+      <button class="btn btn-ghost" onclick="exportCallsCsv()">Calls and marks (CSV)</button>
+      <button class="btn btn-ghost" onclick="exportHoldingsCsv()">Holdings (CSV)</button>
       <!-- Deliberately permissive: iOS matches by UTI rather than file extension, so a bare
            accept=".json" greys the backup file out in the Files picker and makes import impossible. -->
       <label class="btn btn-ghost" style="display:inline-block">Import JSON<input type="file" accept=".json,application/json,text/json,text/plain" style="display:none" onchange="importData(event)"></label>
@@ -3814,7 +3901,7 @@ function showTab(t){
   if(t==='risk'){renderBenchmarks();renderRiskContrib();renderCounterfactual();renderSharpe();renderVaR();}
   /* refreshMarketDataCard on every open, not just at login: whether the worker answers changes
      when sync is configured or a custom domain starts resolving, and the card must follow. */
-  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();renderAudit();}
+  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();renderAudit();renderRecordCopyCard();renderSharesCard();fillSnapshotTabs();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -3995,8 +4082,13 @@ async function fh(path){
     const r=syncConfigured()
       ? await fetch(workerUrl('finnhub',q),{headers:{'Authorization':'Bearer '+syncCfg.key}})
       : await fetch(INVITE_WORKER+'/data?'+new URLSearchParams(Object.assign({code:code},q)).toString());
+    /* 402 from /data: this plan does not ride the worker's key (DATA_TIERS on the worker, A2.1).
+       Remembered on the profile so the Settings card asks for a key instead of saying "built in",
+       and surfaced as NO_KEY so every existing "add your key" prompt applies unchanged. */
+    if(r.status===402){ if(!D.dataNotIncluded){ D.dataNotIncluded=true; saveDB(); } throw new Error('NO_KEY'); }
     if(r.status===401||r.status===403)throw new Error('BAD_KEY');
     if(r.status===429)throw new Error('RATE_LIMIT');
+    if(r.ok&&D.dataNotIncluded){ D.dataNotIncluded=false; saveDB(); }
     if(!r.ok){
       /* A worker with no FINNHUB_API_KEY set answers 500 with a message worth showing, rather than
          letting this surface as a generic failure the operator cannot act on. */
@@ -5012,25 +5104,26 @@ document.addEventListener('keydown',e=>{
 
 /* ============================ HINDSIGHT ============================
    The request was the best stock in the whole market over one month, one year and five years.
-   Neither half of that is available here, and the second half should not be built even if it were.
 
-   WHY THE WHOLE MARKET IS NOT AVAILABLE. Ranking every US listed equity means quoting roughly four
-   thousand tickers. At the free tier's sixty calls a minute that is about sixty-seven minutes of
-   continuous calling per window, and it would have to run again on every refresh. The five-year
-   window is worse than slow: it needs historical candles, which the free tier does not serve at
-   all, so no amount of patience produces it. That is invariant I10, which says a feature assuming
-   otherwise cannot work at any effort.
+   HOW THE WHOLE MARKET IS REACHED. Ranking every US listed equity from a device means quoting
+   roughly six thousand tickers per window against a sixty-a-minute key, and the free tier serves
+   no historical candles at all. So the market ranks itself, once a day, on the worker: the
+   most-actives pool (the whole listing sorted by the day's share volume) is re-ranked by
+   three-month average dollar volume, penny stocks and micro caps filtered out, one share class a
+   company, and the thirty names that come out are measured over each window from five years of
+   daily closes. A device reads that one small document (/popular). Thirty is the point: a small
+   list of the names the market is actually trading, not a leaderboard of six thousand survivors.
 
-   WHY THE FIGURE IS DANGEROUS EVEN WHERE IT IS AVAILABLE. "Best performer last year" is the purest
-   hindsight number in finance. It is selected after the fact, by definition, from the survivors,
-   and reading it is how a book ends up chasing whatever already ran. A terminal built to stop its
-   owner fooling themselves should not open with a leaderboard of things they did not own.
+   WHY THE FIGURE IS DANGEROUS EVEN NOW THAT IT IS AVAILABLE. "Best performer last year" is the
+   purest hindsight number in finance. It is selected after the fact, by definition, from the
+   survivors, and reading it is how a book ends up chasing whatever already ran. A terminal built to
+   stop its owner fooling themselves should not open with a shopping list.
 
-   SO THIS IS THE HONEST VERSION. It ranks the tickers THIS OPERATOR ACTUALLY TRACKS, over windows
-   the logged prices genuinely cover, and it puts the ranking next to the only question worth
-   asking about it: at the time, did the checklist see it? That turns a shopping list into a test
-   of the system, which is the one use for a hindsight ranking that is not a trap. */
-/* Windows the vendor already computes. `days` is used only by the fallback path. */
+   SO THE RANKING SITS NEXT TO THE ONLY QUESTION WORTH ASKING ABOUT IT: at the time, did the
+   checklist see it? The operator's own tracked names are folded in beside the market's thirty,
+   and the last column says what the system said before the window opened. That turns a
+   leaderboard into a test of the system, which is the one use for a hindsight ranking that is
+   not a trap. */
 const HS_WINDOWS=[
   {k:'m1',days:21,  label:'month'},
   {k:'m6',days:126, label:'six months'},
@@ -5041,31 +5134,57 @@ let hindsightWin='y1';
 function setHindsight(k){hindsightWin=k;renderHindsight();}
 function hsWindow(){return HS_WINDOWS.find(w=>w.k===hindsightWin)||HS_WINDOWS[2];}
 
-/* TWO SOURCES, IN ORDER OF PREFERENCE.
+/* The market's most traded names, from the worker's /popular: thirty of them, chosen by
+   three-month average dollar volume from the whole most-actives pool, with their returns over
+   each window already worked out from five years of daily closes. Refreshed daily on the worker,
+   kept for the day on this device. */
+let POPULAR=null, popularLoading=null, popularTried=false;
+function loadPopular(){
+  if(POPULAR)return Promise.resolve(POPULAR);
+  const today=new Date().toISOString().slice(0,10);
+  try{ const c=JSON.parse(localStorage.getItem('pf_popular_v1')||'null'); if(c&&c.fetchedOn===today&&Array.isArray(c.rows)&&c.rows.length>=10){ POPULAR=c; return Promise.resolve(POPULAR); } }catch(e){}
+  if(popularLoading)return popularLoading;
+  if(typeof INVITE_WORKER!=='string')return Promise.resolve(null);
+  popularLoading=fetch(INVITE_WORKER+'/popular',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
+    popularLoading=null; if(!j||!Array.isArray(j.rows)||j.rows.length<10)return null;
+    j.fetchedOn=today; POPULAR=j; try{ localStorage.setItem('pf_popular_v1',JSON.stringify(j)); }catch(e){} return POPULAR;
+  }).catch(()=>{ popularLoading=null; return null; });
+  return popularLoading;
+}
 
-   VENDOR is the price return Finnhub already computed over the real window, captured onto the
-   analysis during scoring at no extra call. It is available the first time a ticker is scored,
-   which is what makes a one-year or five-year view possible today instead of next year. Two of
-   these fields were already being read for the momentum checks; the rest were arriving in the
-   same response and being discarded.
+/* THREE SOURCES, IN ORDER.
 
-   LOGGED is this app's own closes, used only where the vendor did not supply that window. It is
-   clipped to what was actually recorded and labelled as such, so a short span is never presented
-   as a full one. A missing window stays missing rather than being inferred from a shorter one. */
+   MARKET is the worker's daily document: the thirty most traded names and their returns over the
+   real window, from five years of daily closes. It is what makes this a view of the market rather
+   than of one book.
+
+   VENDOR is the price return Finnhub already computed over the real window for a name this
+   operator has scored, captured onto the analysis at no extra call.
+
+   LOGGED is this app's own closes, used only where neither of the above supplies that window. It
+   is clipped to what was actually recorded and labelled as such, so a short span is never
+   presented as a full one. A missing window stays missing rather than being inferred. */
 function hindsightRows(){
   const w=hsWindow();
-  const out=[];
+  const out=[], seen={};
+  const held=sym=>(D.holdings||[]).some(h=>h.sym===sym);
+  ((POPULAR&&POPULAR.rows)||[]).forEach(r=>{
+    const ret=r.returns?r.returns[w.k]:null;
+    if(ret==null||!isFinite(ret))return;
+    seen[r.symbol]=1;
+    out.push({sym:r.symbol,name:r.name||'',ret,source:'market',obs:null,from:(r.from&&r.from[w.k])||null,held:held(r.symbol),popular:true});
+  });
   const syms=new Set([].concat(
     Object.keys(D.priceLog||{}),
     (D.holdings||[]).map(h=>h.sym),
     (D.watchlist||[])
   ).filter(Boolean));
   syms.forEach(sym=>{
+    if(seen[sym])return;
     const sc=(D.analyses||{})[sym];
     const vend=sc&&sc.returns?sc.returns[w.k]:null;
-    const held=(D.holdings||[]).some(h=>h.sym===sym);
     if(vend!=null&&isFinite(vend)){
-      out.push({sym,ret:vend,source:'vendor',obs:null,from:null,held});
+      out.push({sym,name:(typeof universeName==='function'&&universeName(sym))||'',ret:vend,source:'vendor',obs:null,from:null,held:held(sym),popular:false});
       return;
     }
     /* THE FALLBACK MUST BE ABLE TO COVER THE WINDOW IT IS LABELLED WITH. Accepting any log with
@@ -5082,7 +5201,7 @@ function hindsightRows(){
     const slice=rows.slice(-(w.days+1));
     const a=slice[0],b=slice[slice.length-1];
     if(!(a&&b&&a.p>0&&b.p>0))return;
-    out.push({sym,ret:(b.p-a.p)/a.p*100,source:'logged',obs:slice.length-1,from:a.d,held});
+    out.push({sym,name:(typeof universeName==='function'&&universeName(sym))||'',ret:(b.p-a.p)/a.p*100,source:'logged',obs:slice.length-1,from:a.d,held:held(sym),popular:false});
   });
   return out.sort((x,y)=>y.ret-x.ret);
 }
@@ -5101,30 +5220,43 @@ function renderHindsight(){
     const b=document.getElementById('hsBtn_'+x.k);
     if(b)b.classList.toggle('on',x.k===hindsightWin);
   });
+  /* The market list is fetched once, on first sight of the panel; the panel draws itself again
+     when it lands, and falls back to the book alone if it never does. */
+  if(!POPULAR&&!popularTried){
+    popularTried=true;
+    el.innerHTML='<div aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>';
+    loadPopular().then(()=>renderHindsight());
+    return;
+  }
   const rows=hindsightRows();
+  const marketN=rows.filter(r=>r.popular).length;
   if(rows.length<2){
     el.innerHTML='<div class="empty" style="text-align:left;line-height:1.7">'+
-      '<b>Nothing to rank over a '+esc(w.label)+' yet.</b></div>';
+      '<b>Nothing to rank over a '+esc(w.label)+' yet.</b>'+
+      (POPULAR?'':'<br>The market list did not load, and the book has no closes covering that span. Try again in a minute.')+'</div>';
     return;
   }
   const vendorN=rows.filter(r=>r.source==='vendor').length;
-  const loggedN=rows.length-vendorN;
-  const split=rows.length>=6;
-  const best=split?rows.slice(0,3):rows, worst=split?rows.slice(-3).reverse():[];
+  const loggedN=rows.filter(r=>r.source==='logged').length;
+  const split=rows.length>=10;
+  const best=split?rows.slice(0,5):rows, worst=split?rows.slice(-5).reverse():[];
+  const cutFor=r=>r.from||etDate(Date.now()-w.days*864e5);
   const line=r=>{
     /* The date the window opened, for the "did the checklist see it" column. The vendor gives a
        return, not a start date, so it is derived from the window length. */
-    const cut=r.from||etDate(Date.now()-w.days*864e5);
-    const v=verdictBefore(r.sym,cut);
-    return '<tr><td><b>'+esc(r.sym)+'</b>'+(r.held?' <span class="muted" style="font-size:var(--fs-caption)">held</span>':'')+'</td>'+
+    const v=verdictBefore(r.sym,cutFor(r));
+    return '<tr><td><b>'+esc(r.sym)+'</b>'+(r.name?' <span class="muted" style="font-size:var(--fs-caption)">'+esc(r.name.length>28?r.name.slice(0,27)+'…':r.name)+'</span>':'')+(r.held?' <span class="pill pill-na" style="font-size:9.5px;padding:1px 6px">held</span>':'')+'</td>'+
       '<td class="'+(r.ret>=0?'pos':'neg')+'"><b>'+(r.ret>=0?'+':'')+r.ret.toFixed(1)+'%</b></td>'+
-      '<td class="muted">'+(r.source==='vendor'?'market history':r.obs+' logged sessions')+'</td>'+
+      '<td class="muted">'+(r.source==='market'?'most traded':r.source==='vendor'?'market history':r.obs+' logged sessions')+'</td>'+
       '<td class="'+(v?'':'muted')+'">'+(v?esc((v.verdict||'').toUpperCase())+' on '+esc(v.date):'no call on file')+'</td></tr>';
   };
-  const called=rows.filter(r=>verdictBefore(r.sym,r.from||etDate(Date.now()-w.days*864e5)));
-  const topCalled=best.filter(r=>{const v=verdictBefore(r.sym,r.from||etDate(Date.now()-w.days*864e5));return v&&v.verdict==='buy';}).length;
+  const called=rows.filter(r=>verdictBefore(r.sym,cutFor(r)));
+  const topCalled=best.filter(r=>{const v=verdictBefore(r.sym,cutFor(r));return v&&v.verdict==='buy';}).length;
   const hd='style="text-align:left;font-size:var(--fs-caption);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)"';
+  /* No caption: the operator's rule is no paragraphs on screen (see .aside). The Source column
+     says which rows are the market's; only a failed market list gets a line, as a status. */
   el.innerHTML=
+    (marketN?'':'<div class="muted" style="font-size:12px;margin-bottom:10px">The market list did not load; this ranks only what you track.</div>')+
     '<div style="overflow-x:auto"><table><thead><tr>'+
       '<th>Ticker</th><th>Return over the '+esc(w.label)+'</th><th>Source</th><th>What the checklist said first</th>'+
     '</tr></thead><tbody>'+
@@ -5133,9 +5265,11 @@ function renderHindsight(){
       (split?'<tr><th colspan="4" '+hd+'>Worst</th></tr>'+worst.map(line).join(''):'')+
     '</tbody></table></div>'+
     aside('How this is measured',
+      (marketN?marketN+' from the market list the worker builds once a day: the whole most-actives pool re-ranked by three-month average dollar volume, five dollars and two billion up, one share class a company, thirty names, each measured over the real window from five years of daily closes'+(POPULAR&&POPULAR.asOf?' (as of '+esc(POPULAR.asOf)+')':'')+'. ':'')+
       (vendorN?vendorN+' from the vendor calculation over the real window, at no extra quota. ':'')+
       (loggedN?loggedN+' from closes this app logged itself, covering a shorter span. ':'')+
-      'The whole market is out of reach: ranking every US equity needs about four thousand quotes per window against a sixty-per-minute limit.')+
+      'Thirty is deliberate: the names the market is actually trading, not a leaderboard of six thousand survivors.'+
+      (POPULAR&&POPULAR.source?' Market list and closes: '+esc(POPULAR.source):''))+
     aside('Why the last column is the one that matters',
       'A best-performer list is chosen after the fact and always looks like a missed opportunity. '+
       (called.length
@@ -5412,6 +5546,8 @@ function holdingMenu(btn,sym,idx){
   openMenu(btn,[
     {label:'Analyze '+sym, run:"analyzeStock('"+sym+"')"},
     {label:(D.theses&&D.theses[sym])?'Thesis':'Write a thesis', run:"openThesis('"+sym+"')"},
+    {label:'Review'+(thesisFor(sym)&&thesisFor(sym).reviewedAt?' (last '+new Date(thesisFor(sym).reviewedAt).toISOString().slice(0,10)+')':' (never)'), run:"openReview('"+sym+"')"},
+    {label:'Company sheet', run:"openCompanySheet('"+sym+"')"},
     {label:'Sell / trim',  run:"toggleSellRow("+idx+")"},
     {label:isFavorite(sym)?'Remove from favourites':'Add to favourites', run:"toggleFavorite('"+sym+"')"},
     {label:'Remove holding', run:"removeHolding("+idx+")", danger:true}
@@ -5850,7 +5986,7 @@ async function refreshAll(){
     markSells(markPrices);
     /* Sealed after stamping, not during: crypto.subtle is async and markCalls must stay
        synchronous so a mark is never half-written. */
-    sealNewMarks().then(n=>{if(n)pushChainHead();}).catch(()=>{});
+    sealNewMarks().then(n=>{if(n)pushChainHead(); pushRecordCopy();}).catch(()=>{});
     pushCallRegistry();                      // keep the worker's registry current; not awaited
     checkPriceAlerts();
     D.lastRefresh=Date.now();
@@ -5918,8 +6054,23 @@ function bypassesHysteresis(sc,verdictKey,sym){
   return !!(th&&isFinite(th.sellBelow)&&th.sellBelow>0&&sc&&sc.qScore<th.sellBelow);
 }
 
+/* A7.2. The version of the bars a call was made under. A firm seat carries the published
+   rulebook's version from the worker (f:…, chained there); a personal account carries a short
+   digest of its own four bars (p:…), so a call can be read against the rules that stood when it
+   was made even after the rules move. Synchronous on purpose: recordCall is. */
+function fnv1a(str){ let h=0x811c9dc5; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h.toString(16).padStart(8,'0'); }
+function rulebookVersion(){
+  try{
+    const o=(typeof window!=='undefined')?window.PF_ORG:null;
+    if(o&&o.rulebook&&o.rulebookVersion)return o.rulebookVersion;
+    const r=D.rules||{};
+    return 'p:'+fnv1a(canonicalJson({qBuy:r.qBuy==null?null:+r.qBuy,pBuy:r.pBuy==null?null:+r.pBuy,qSell:r.qSell==null?null:+r.qSell,mBuy:r.mBuy==null?null:+r.mBuy}));
+  }catch(e){ return null; }
+}
 function recordCall(sym,sc,verdictKey,verdictLabel,track){
   if(!D.calls)D.calls=[];
+  /* A7.3. A reviewer seat reads; it never makes a call. */
+  if(typeof window!=='undefined'&&window.PF_ORG&&window.PF_ORG.role==='reviewer')return;
   if(!D.pendingCalls)D.pendingCalls={};
   track=track||'checklist';
   /* THE CAP IS ENFORCED HERE, not in the UI. A retired strategy stops recording immediately, and a
@@ -5961,7 +6112,8 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
          call logged the week before a print is a different bet from one logged the week after,
          and the record should be able to say which it was. */
       earningsAt:(typeof nextEarnings==='function'&&nextEarnings(sym))?nextEarnings(sym).d:null,
-      scorecard:SCORECARD_VERSION
+      scorecard:SCORECARD_VERSION,
+      rbv:rulebookVersion()
     });
     if(D.calls.length>2000)D.calls=D.calls.slice(D.calls.length-2000);
   };
@@ -8660,7 +8812,9 @@ function priceAt(arr,daysAgo){
   return drift>12?null:best;
 }
 function herizen(sym){
-  const arr=(D.priceLog||{})[sym];
+  /* The five-year history when this device holds it, the synced log otherwise, so any listed
+     name scores, not only the ones this book has been refreshing. */
+  const arr=(typeof longSeries==='function'&&longSeries(sym))||(D.priceLog||{})[sym];
   if(!arr||arr.length<8)return null;
   const legs=[];
   for(const [from,to,label] of HZ_LEGS){
@@ -8916,6 +9070,7 @@ async function backfillPrices(sym){
     try{
       const r=await fetch(INVITE_WORKER+'/history?symbol='+encodeURIComponent(sym),{cache:'no-store'});
       const h=r.ok?await r.json():null;
+      if(h&&h.source)D.historySource=String(h.source).replace(/ \(interim, unlicensed;.*\)$/,' (interim)').slice(0,60);
       if(h&&Array.isArray(h.closes)&&h.closes.length>=20){
         const merged={};(D.priceLog[sym]||[]).forEach(r=>merged[r.d]=r.p);
         h.dates.forEach((d,i)=>{ if(isFinite(h.closes[i])&&h.closes[i]>0&&merged[d]==null)merged[d]=h.closes[i]; });
@@ -8989,23 +9144,49 @@ function drawPriceChart(canvasId,sym,opts){
   });
   return true;
 }
+/* Names whose five-year history this session has asked the worker for, so a failed fetch is
+   reported once and retried on the next click rather than looping. */
+const hzFetched={};
 function renderHerizen(){
   const el=document.getElementById('herizenBody');
   if(!el||!D)return;
-  const sym=((document.getElementById('hzTicker')||{}).value||'').trim().toUpperCase();
+  let sym=((document.getElementById('hzTicker')||{}).value||'').trim().toUpperCase();
   const cnt=document.getElementById('hzCount');
+  const universeN=typeof universeSize==='function'?universeSize():0;
   const logged=Object.keys(D.priceLog||{}).length;
-  if(cnt)cnt.textContent=logged?logged+' ticker'+(logged===1?'':'s')+' with price history':'';
+  if(cnt)cnt.textContent=universeN?'any of '+universeN.toLocaleString()+' US-listed stocks':(logged?logged+' ticker'+(logged===1?'':'s')+' with price history':'');
   if(!sym){
-    el.innerHTML='<div class="empty">Enter a ticker. It needs about two months of daily closes, the app backfills from Finnhub where the endpoint allows and otherwise builds the history forward from your refreshes.</div>';
+    el.innerHTML='<div class="empty">Enter any US-listed ticker or company name.</div>';
     return;
+  }
+  /* A company name resolves to its ticker through the listing. */
+  if(!/^[A-Z.\-]{1,10}$/.test(sym)&&typeof universeMatches==='function'){
+    const m=universeMatches(sym,1)[0];
+    if(m){ sym=m[0]; const t=document.getElementById('hzTicker'); if(t)t.value=sym; }
   }
   const h=herizen(sym);
   if(!h){
-    const arr=(D.priceLog||{})[sym];
+    /* Not scored yet: the whole market is one fetch away. The worker's /history carries five
+       years of daily closes for any listed name; it is asked once, and the panel draws itself
+       again when the history lands. */
+    if(typeof histFill==='function'&&!(typeof histHas==='function'&&histHas(sym))&&!hzFetched[sym]){
+      hzFetched[sym]=true;
+      el.innerHTML='<div class="empty" aria-busy="true">Fetching five years of daily closes for '+esc(sym)+'\u2026</div>';
+      histFill(sym).then(ok=>{
+        const cur=((document.getElementById('hzTicker')||{}).value||'').trim().toUpperCase();
+        if(cur!==sym)return;   /* the person has moved on */
+        if(ok){renderHerizen();return;}
+        /* A miss is reported here, not by drawing the panel again: that would ask again at once
+           and loop. The flag is cleared so the next click asks again. */
+        delete hzFetched[sym];
+        el.innerHTML='<div class="empty">No price history found for '+esc(sym)+'. Check the ticker: the market history covers US-listed stocks, and the worker has to be reachable.</div>';
+      });
+      return;
+    }
+    const arr=(typeof longSeries==='function'&&longSeries(sym))||(D.priceLog||{})[sym];
     el.innerHTML='<div class="empty">'+(arr&&arr.length
-      ? 'Only '+arr.length+' day'+(arr.length===1?'':'s')+' of history for '+esc(sym)+', going back to '+esc(arr[0].d)+'. The two-month segment needs more. Keep running refreshes and this fills in.'
-      : 'No price history for '+esc(sym)+' yet. Add it to your Watchlist or Portfolio and run <b>Refresh data</b>.')+'</div>';
+      ? 'Only '+arr.length+' day'+(arr.length===1?'':'s')+' of history for '+esc(sym)+', going back to '+esc(arr[0].d)+'. The two-month segment needs more; a listing this young cannot be scored yet.'
+      : 'No price history found for '+esc(sym)+'. Check the ticker: the market history covers US-listed stocks, and the worker has to be reachable.')+'</div>';
     return;
   }
   const band=h.score>=2?'pos':h.score<=0?'neg':'warn';
@@ -9187,6 +9368,7 @@ function renderAnalysis(sym,sc){
   el.innerHTML=
   '<div class="card" style="margin-top:16px">'+
     '<div class="row"><div class="big">'+esc(sym)+', $'+sc.price.toFixed(2)+'</div><div class="spacer"></div>'+
+    '<button class="btn btn-ghost btn-sm" onclick="openCompanySheet(\''+sym+'\')" title="One printable page: the checks, the statements, insiders, analysts, headlines, the model, the thesis, the record">Company sheet</button> '+
     '<button class="btn btn-ghost btn-sm" onclick="toggleFavorite(\''+sym+'\');renderAnalysis(\''+sym+'\',D.analyses[\''+sym+'\'])" title="'+(isFavorite(sym)?'Remove from Favorites':'Add to Favorites')+'">'+(isFavorite(sym)?'★ Favorited':'☆ Favorite')+'</button> '+
     '<span class="pill '+v.cls+'">'+v.label+'</span> '+
     '<span class="muted" style="font-size:12px">Your call:</span> '+myTagSelect(sym)+'</div>'+
@@ -10473,6 +10655,7 @@ function renderAll(){
   renderDrift();
   renderTradeImpact();
   renderBehaviour();
+  fillStatementQuarters();
   renderRuleLog();
   /* The scorecard used to redraw only on tab entry, so a refresh that landed new marks while you were
      sitting on the Market tab left a stale table on screen. */
@@ -10565,13 +10748,13 @@ function renderHeroStats(){
     const d=liveHero.dayChange;
     const pct=d/liveHero.dayBase*100;
     dc.textContent=(d>=0?'▲ ':'▼ ')+pmask(fmt$(Math.abs(d)))+' ('+pmask(fmtP(pct))+') today'
-      +(liveHero.dayMissing?' · '+liveHero.dayMissing+' not priced':'');
+      +(liveHero.dayMissing?' · '+liveHero.dayMissing+' not priced':'')+' · '+priceSourceLine();
     dc.className='hero-change '+(d>=0?'pos':'neg');
     dc.title=liveHero.dayMissing
       ? liveHero.dayMissing+' holding'+(liveHero.dayMissing===1?' has':'s have')+' no live quote today (manually priced, a mutual fund, or not refreshed yet) and are left out of this figure.'
       : 'Change since yesterday\'s close, across every holding with a live quote.';
   }else{
-    dc.textContent=D.holdings.length?'No live prices yet. Hit Refresh data':'No change data yet';
+    dc.textContent=D.holdings.length?'No live prices yet. Hit Refresh data · '+priceSourceLine():'No change data yet';
     dc.className='hero-change flat';
     dc.title='';
   }
@@ -11003,7 +11186,14 @@ function refreshMarketDataCard(){
   const a=document.getElementById('apiKeyInput'), b=document.getElementById('apiKeyInputAdv');
   if(a)a.value=D.apiKey||''; if(b)b.value=D.apiKey||'';
 
-  if((syncConfigured()||accessCodeFor(USER))&&!D.apiKey){
+  if(!syncConfigured()&&accessCodeFor(USER)&&D.dataNotIncluded&&!D.apiKey){
+    /* A2.1. The worker said this plan does not ride its key (402). Ask for one, plainly. */
+    title.textContent='Market data, your own key';
+    via.style.display='block';
+    via.innerHTML='Market data is not included on this plan yet. Connect your own free Finnhub key below: <a href="https://finnhub.io" target="_blank" rel="noopener">finnhub.io</a>, two minutes, no card.';
+    manual.style.display='block';
+    adv.style.display='none';
+  }else if((syncConfigured()||accessCodeFor(USER))&&!D.apiKey){
     // The worker holds the key. Nothing is required here, so nothing is asked for.
     title.textContent='Market data, built in';
     via.style.display='block';
@@ -11520,6 +11710,8 @@ function loadThesis(){
   set('thesisStop',isFinite(t.stop)?t.stop:'');
   set('thesisDeadline',t.deadline);
   set('thesisPrior',(t.prob&&t.prob.own!=null)?t.prob.own:'');
+  set('thesisAssumptions',(t.assumptions||[]).map(a=>a.n+'. '+a.text).join('\n'));
+  set('thesisEvery',t.reviewEvery?String(t.reviewEvery):'');
   updatePlannedRR();
   const st=document.getElementById('thesisStatus');
   if(st){
@@ -11528,6 +11720,7 @@ function loadThesis(){
     else{
       const due=t.reviewDate&&Date.parse(t.reviewDate)<Date.now();
       st.innerHTML='Written '+esc(t.created)+(t.scoreAtEntry?' at '+esc(t.scoreAtEntry):'')+
+        (t.reviewedAt?' · last reviewed '+esc(new Date(t.reviewedAt).toISOString().slice(0,10)):' · never reviewed')+
         (due?' · <span class="neg">review overdue</span>':(t.reviewDate?' · review '+esc(t.reviewDate):''));
     }
   }
@@ -11569,7 +11762,13 @@ function saveThesis(){
     })(),
     created:(existing&&existing.created)||new Date().toISOString().slice(0,10),
     // Snapshot the score at the time of writing, so drift since is visible later.
-    scoreAtEntry:(existing&&existing.scoreAtEntry)||(tot?tot.got+'/'+tot.max:'')
+    scoreAtEntry:(existing&&existing.scoreAtEntry)||(tot?tot.got+'/'+tot.max:''),
+    /* A3.3, A3.5. Numbered assumptions (the number is stable: editing the wording keeps the number,
+       so earlier review marks still point at the same line), the cadence, and the review history
+       carried over untouched. */
+    assumptions:parseAssumptions(val('thesisAssumptions'),existing&&existing.assumptions),
+    reviewEvery:parseInt(val('thesisEvery'),10)||null,
+    reviewedAt:(existing&&existing.reviewedAt)||null
   };
   saveDB();fillThesisPicker();renderCommand();
   toast('Thesis saved for '+sym+'.');
@@ -11580,6 +11779,157 @@ function deleteThesis(){
   if(!confirm('Delete the thesis for '+sym+'?'))return;
   delete D.theses[sym];
   saveDB();fillThesisPicker();renderCommand();
+}
+
+/* ============================ A3. THE REVIEW ============================
+   What changed since you last looked, then the assumptions marked by hand.
+
+   The digest is composition, not analysis: every line comes from something the terminal already
+   fetches (the verdict log, the thesis, EDGAR, insiders, analyst counts, headlines, the model,
+   the Map), filtered to "since the last review", each with its source and its date. No line says
+   what it means. "Nothing changed" is a line too, with the date and the list of what was checked,
+   because an empty box reads as broken and a dated "checked, unchanged" reads as diligence.
+
+   The marks are the person's. A machine verdict of "assumption broken, review required" on a
+   named holding is where "software, never advice" stops holding; a hand mark in a chained record
+   is a diary entry. The marks enter the same hash chain as the record's marks (reviewRecord). */
+const ASSUMPTION_KINDS=[['growth',/grow|revenue|sales|volume|unit|subscriber|user/i],['margin',/margin|cost|pricing|price power|profitab|opex|capex/i],['multiple',/multiple|valuation|p\/e|pe |ev\/|yield|discount|cheap|expensive|re-?rat/i],['management',/management|ceo|cfo|founder|board|capital allocation|buyback|dividend|execut/i],['macro',/macro|rate|inflation|fx|currency|tariff|regulat|econom|cycle|recession|china|oil|\bfed\b|central bank|interest/i],['competition',/compet|share|moat|entrant|substitut|switching/i]];
+function assumptionKind(text){ for(const [k,re] of ASSUMPTION_KINDS){ if(re.test(text||''))return k; } return 'other'; }
+function parseAssumptions(text,existing){
+  const lines=String(text||'').split(/\r?\n/).map(l=>l.replace(/^\s*\d+[.)]\s*/,'').trim()).filter(Boolean).slice(0,6);
+  return lines.map((t,i)=>({n:i+1,text:t.slice(0,200),kind:assumptionKind(t)}));
+}
+function reviewDue(th,today){
+  if(!th)return null;
+  if(th.reviewDate&&th.reviewDate<=today)return 'date';
+  if(th.reviewEvery>0){
+    const base=th.reviewedAt||(th.created?Date.parse(th.created):0);
+    if(base&&Date.now()-base>=th.reviewEvery*86400000)return 'cadence';
+  }
+  return null;
+}
+function reviewSinceTs(sym){
+  const th=thesisFor(sym)||{}; const snap=(D.reviewSnap||{})[sym];
+  return (snap&&snap.at)||th.reviewedAt||(th.created?Date.parse(th.created):0)||0;
+}
+/* The state of everything the digest compares against, taken when a review closes. */
+async function reviewSnapshot(sym){
+  const snap={at:Date.now(),price:null,verdict:null,checks:null,rec:null,insiders:null,filings:null,kronos:null};
+  try{ const sc=D.analyses&&D.analyses[sym]; if(sc&&!sc.error){ snap.price=sc.price; snap.checks=checkBitmap(sc); } }catch(e){}
+  try{ const last=(D.calls||[]).filter(c=>c.sym===sym&&(c.track||'checklist')==='checklist'&&c.conviction!=='flickering').pop(); if(last)snap.verdict=last.verdict; }catch(e){}
+  if(hasMarketData()){
+    try{ const recs=await fh('/stock/recommendation?symbol='+sym); if(Array.isArray(recs)&&recs[0])snap.rec={period:recs[0].period,strongBuy:recs[0].strongBuy||0,buy:recs[0].buy||0,hold:recs[0].hold||0,sell:recs[0].sell||0,strongSell:recs[0].strongSell||0}; }catch(e){}
+    try{ const ins=await getInsiders(sym); snap.insiders=insiderSummary(ins,Date.now()-183*864e5); }catch(e){}
+  }
+  try{ const r=await fetch(INVITE_WORKER+'/filings?symbol='+encodeURIComponent(sym)); if(r.ok){ const j=await r.json(); snap.filings=(j.filings||[]).slice(0,1).map(f=>f.accession)[0]||null; } }catch(e){}
+  try{ const r=await fetch(INVITE_WORKER+'/holders?symbol='+encodeURIComponent(sym)); if(r.ok){ const j=await r.json(); if(j.latest)snap.holders={period:j.latest.period,filers:j.latest.filers}; } }catch(e){}
+  try{ const code=accessCodeFor(USER); if(code){ const r=await fetch(INVITE_WORKER+'/kronos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,symbol:sym,horizon:30})}); if(r.ok){ const j=await r.json(); snap.kronos={last:j.last,end:j.path[j.path.length-1],asOf:j.asOf}; } } }catch(e){}
+  return snap;
+}
+function insiderSummary(ins,sinceTs){
+  const rows=(ins&&Array.isArray(ins.data))?ins.data:[];
+  const buyers=new Set(),sellers=new Set(); let bought=0,sold=0;
+  rows.forEach(r=>{ const t=Date.parse(r.transactionDate||r.filingDate||''); if(!(t>=sinceTs))return; const ch=Number(r.change)||0; const code=String(r.transactionCode||''); if(ch>0&&(code==='P'||code==='')){buyers.add(r.name);bought+=ch;} else if(ch<0&&(code==='S'||code==='')){sellers.add(r.name);sold+=-ch;} });
+  return{buyers:[...buyers],sellers:[...sellers],bought,sold};
+}
+function digestRow(src,what,when,href){
+  return '<tr><td class="muted" style="white-space:nowrap">'+esc(src)+'</td><td>'+(href?'<a href="'+esc(href)+'" target="_blank" rel="noopener">'+esc(what)+'</a>':esc(what))+'</td><td class="muted" style="white-space:nowrap">'+esc(when||'')+'</td></tr>';
+}
+/* The digest: rows of [source, what changed, when]. Empty means nothing changed. */
+async function reviewDigest(sym){
+  const since=reviewSinceTs(sym), sinceDay=since?new Date(since).toISOString().slice(0,10):null;
+  const snap=(D.reviewSnap||{})[sym]||{};
+  const th=thesisFor(sym)||{};
+  const rows=[], checked=[];
+  const day=ts=>ts?new Date(ts).toISOString().slice(0,10):'';
+  /* verdict and check flips since */
+  checked.push('verdicts');
+  const calls=(D.calls||[]).filter(c=>c.sym===sym&&c.ts>since&&c.conviction!=='flickering');
+  calls.forEach(c=>rows.push(digestRow('Verdict',(c.track&&c.track!=='checklist'?c.track+': ':'')+(c.label||c.verdict).toString().toUpperCase()+(c.price?' at '+fmt$(c.price):''),c.date)));
+  try{
+    const sc=D.analyses&&D.analyses[sym]; const now=sc&&!sc.error?checkBitmap(sc):null;
+    if(now&&snap.checks&&now.length===snap.checks.length){
+      checked.push('the 22 checks');
+      for(let i=0;i<now.length;i++){ if(now[i]!==snap.checks[i]&&now[i]!=='-'&&snap.checks[i]!=='-')rows.push(digestRow('Check',CHECK_ORDER[i]+': '+(now[i]==='1'?'now passes':'now fails')+' (was '+(snap.checks[i]==='1'?'pass':'fail')+')',day(D.lastRefresh))); }
+    }
+  }catch(e){}
+  /* price against the stop and the deadline */
+  try{
+    const sc=D.analyses&&D.analyses[sym]; const px=sc&&isFinite(sc.price)?sc.price:null;
+    checked.push('the stop','the deadline');
+    if(px!=null&&isFinite(th.stop)&&th.stop>0){ const d=(px-th.stop)/th.stop*100; if(px<=th.stop)rows.push(digestRow('Stop','Through the stop: '+fmt$(px)+' vs '+fmt$(th.stop),day(D.lastRefresh))); else if(d<5)rows.push(digestRow('Stop',d.toFixed(1)+'% above the stop of '+fmt$(th.stop),day(D.lastRefresh))); }
+    if(th.deadline){ const left=Math.round((Date.parse(th.deadline)-Date.now())/864e5); if(left<=0)rows.push(digestRow('Deadline','Past the deadline of '+th.deadline,th.deadline)); else if(left<=45)rows.push(digestRow('Deadline',left+' days to the deadline of '+th.deadline,th.deadline)); }
+    if(snap.price>0&&px>0){ const m=(px-snap.price)/snap.price*100; if(Math.abs(m)>=10)rows.push(digestRow('Price',(m>0?'+':'')+m.toFixed(1)+'% since the last review ('+fmt$(snap.price)+' to '+fmt$(px)+')',day(D.lastRefresh))); }
+  }catch(e){}
+  /* filings since (A6.1) */
+  try{
+    const r=await fetch(INVITE_WORKER+'/filings?symbol='+encodeURIComponent(sym)+(sinceDay?'&since='+sinceDay:''));
+    if(r.ok){ const j=await r.json(); checked.push('SEC filings'); (j.filings||[]).slice(0,8).forEach(f=>rows.push(digestRow('Filing',f.form+(f.items&&f.items.length?': '+f.items.filter(x=>x.k!=='9.01').map(x=>x.what||x.k).join(', '):''),f.date,f.url||f.index))); }
+  }catch(e){}
+  if(hasMarketData()){
+    /* insiders */
+    try{ const ins=await getInsiders(sym); const now=insiderSummary(ins,since||Date.now()-183*864e5); checked.push('insider filings'); if(now.buyers.length)rows.push(digestRow('Insiders',now.buyers.length+' insider'+(now.buyers.length===1?'':'s')+' bought, '+now.bought.toLocaleString()+' shares'+(now.buyers.length<=3?' ('+now.buyers.join(', ')+')':''),sinceDay?'since '+sinceDay:'')); if(now.sellers.length)rows.push(digestRow('Insiders',now.sellers.length+' insider'+(now.sellers.length===1?'':'s')+' sold, '+now.sold.toLocaleString()+' shares'+(now.sellers.length<=3?' ('+now.sellers.join(', ')+')':''),sinceDay?'since '+sinceDay:'')); }catch(e){}
+    /* analyst counts against the snapshot */
+    try{ const recs=await fh('/stock/recommendation?symbol='+sym); if(Array.isArray(recs)&&recs[0]){ checked.push('analyst counts'); const r=recs[0]; if(snap.rec){ const d=k=>(r[k]||0)-(snap.rec[k]||0); const parts=['strongBuy','buy','hold','sell','strongSell'].filter(k=>d(k)).map(k=>k.replace(/([A-Z])/g,' $1').toLowerCase()+' '+(d(k)>0?'+':'')+d(k)); if(parts.length)rows.push(digestRow('Analysts',parts.join(', ')+' (now '+(r.strongBuy||0)+'/'+(r.buy||0)+'/'+(r.hold||0)+'/'+(r.sell||0)+'/'+(r.strongSell||0)+')',r.period)); } } }catch(e){}
+    /* headlines since, each cited */
+    try{ const days=since?Math.min(60,Math.max(2,Math.ceil((Date.now()-since)/864e5))):14; const items=await fhNews(sym,days); checked.push('headlines'); const rel=(D.relations||{})[sym]||{suppliers:[],customers:[]}; const names=[].concat(rel.suppliers||[],rel.customers||[]).map(x=>x&&x.name).filter(n=>n&&n.length>3); (items||[]).filter(it=>!since||(it.datetime*1000)>=since).slice(0,6).forEach(it=>{ const touched=names.filter(n=>new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(it.headline||'')); rows.push(digestRow(touched.length?'Headline, touches '+touched[0]:'Headline',(it.source?it.source+': ':'')+(it.headline||''),day(it.datetime*1000),it.url)); }); }catch(e){}
+  }
+  /* institutional filers against the count at the last review (A6.2) */
+  try{ const r=await fetch(INVITE_WORKER+'/holders?symbol='+encodeURIComponent(sym)); if(r.ok){ const j=await r.json(); if(j.latest){ checked.push('13F filers'); if(snap.holders&&snap.holders.period!==j.latest.period)rows.push(digestRow('13F filers',j.latest.filers.toLocaleString()+' filers for the quarter ended '+j.latest.period+' ('+(j.change>=0?'+':'')+j.change+' on the quarter before)',j.latest.period)); } } }catch(e){}
+  /* the model against the path recorded at the last review */
+  try{ const code=accessCodeFor(USER); if(code&&snap.kronos){ const r=await fetch(INVITE_WORKER+'/kronos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,symbol:sym,horizon:30})}); if(r.ok){ const j=await r.json(); checked.push('the model'); const end=j.path[j.path.length-1]; const was=(snap.kronos.end-snap.kronos.last)/snap.kronos.last*100, now=(end-j.last)/j.last*100; if(Math.sign(was)!==Math.sign(now)||Math.abs(now-was)>=5)rows.push(digestRow('Model','30-day median now '+(now>=0?'+':'')+now.toFixed(1)+'% (was '+(was>=0?'+':'')+was.toFixed(1)+'% on '+snap.kronos.asOf+')',j.asOf)); } } }catch(e){}
+  return{rows,checked,sinceDay};
+}
+async function fillDigestInto(sym,tbody){
+  if(!tbody)return;
+  try{
+    const d=await reviewDigest(sym);
+    tbody.innerHTML=d.rows.length?d.rows.join(''):digestRow('Nothing changed','since '+(d.sinceDay||'the thesis was written')+'. Checked: '+d.checked.join(', ')+'.',new Date().toISOString().slice(0,10));
+    const c=document.getElementById('reviewChecked'); if(c&&tbody.id==='reviewDigest')c.textContent=d.rows.length?'Checked: '+d.checked.join(', ')+'. No line above says what it means; that is yours.':'';
+  }catch(e){ tbody.innerHTML=digestRow('Digest','did not load: '+(e.message||e),''); }
+}
+let _reviewSym=null;
+function openReview(sym){
+  closeAddModal();
+  _reviewSym=sym;
+  const th=thesisFor(sym);
+  document.getElementById('reviewTitle').textContent='Review · '+sym;
+  const since=reviewSinceTs(sym);
+  document.getElementById('reviewSince').textContent=(th?(th.reviewedAt?'Last reviewed '+new Date(th.reviewedAt).toISOString().slice(0,10):'Never reviewed; thesis written '+(th.created||'?')):'No thesis yet: write one first for the assumptions to mark.')+(th&&th.reviewEvery?' · every '+th.reviewEvery+' days':'');
+  const tb=document.getElementById('reviewDigest'); tb.innerHTML='<tr><td colspan="3" class="muted">Checking…</td></tr>';
+  const ab=document.getElementById('reviewAssumptions');
+  const as=(th&&th.assumptions)||[];
+  ab.innerHTML=as.length?as.map(a=>'<tr><td>'+a.n+'</td><td>'+esc(a.text)+'</td><td>'+['supported','broken','uncertain'].map(m=>'<label style="margin-right:10px;white-space:nowrap"><input type="radio" name="asm'+a.n+'" value="'+m+'"> '+m+'</label>').join('')+'</td></tr>').join(''):'<tr><td colspan="3" class="muted">No assumptions on the thesis. Add them in the thesis, one per line; a review can still be closed without any.</td></tr>';
+  document.getElementById('reviewNote').textContent='';
+  const el=document.getElementById('reviewWrap'); if(el){ el.classList.add('open'); _addOpen='reviewWrap'; }
+  fillDigestInto(sym,tb);
+}
+async function submitReview(){
+  const sym=_reviewSym; if(!sym)return;
+  const th=thesisFor(sym);
+  const marks=[];
+  ((th&&th.assumptions)||[]).forEach(a=>{ const r=document.querySelector('input[name="asm'+a.n+'"]:checked'); if(r)marks.push({n:a.n,mark:r.value,kind:a.kind||assumptionKind(a.text)}); });
+  const missing=((th&&th.assumptions)||[]).length-marks.length;
+  if(missing>0){ document.getElementById('reviewNote').textContent=missing+' assumption'+(missing===1?'':'s')+' unmarked. Mark each one, or choose uncertain.'; return; }
+  const note=document.getElementById('reviewNote'); note.textContent='Closing…';
+  if(!D.reviews)D.reviews=[];
+  if(!D.reviewSnap)D.reviewSnap={};
+  const at=Date.now();
+  const p=(DB.profiles||{})[USER]||{};
+  const rec={sym,at,marks,by:(typeof ORG!=='undefined'&&ORG)?{seat:ORG.seat,name:(D.displayName||'').trim()||null}:null};
+  if(marks.length)D.reviews.push(rec);          // only a review with marks enters the chain; an empty one is a visit, not a record
+  if(th){ th.reviewedAt=at; if(th.reviewEvery>0)th.reviewDate=new Date(at+th.reviewEvery*86400000).toISOString().slice(0,10); else if(th.reviewDate&&th.reviewDate<=new Date().toISOString().slice(0,10))th.reviewDate=''; }
+  D.reviewSnap[sym]=await reviewSnapshot(sym);
+  saveDB();
+  try{ const n=await sealNewMarks(); if(n){ pushChainHead(); } pushRecordCopy(); }catch(e){}
+  closeAddModal(); renderCommand(); if(typeof renderBehaviour==='function')renderBehaviour(); renderAll();
+  toast('Review closed for '+sym+(marks.length?': '+marks.length+' assumption'+(marks.length===1?'':'s')+' marked and sealed into the record.':'.'));
+}
+function assumptionFailures(){
+  const by={}; let total=0, reviews=0;
+  (D.reviews||[]).forEach(r=>{ reviews++; (r.marks||[]).forEach(m=>{ const k=m.kind||'other'; by[k]=by[k]||{kind:k,n:0,broken:0,uncertain:0}; by[k].n++; total++; if(m.mark==='broken')by[k].broken++; if(m.mark==='uncertain')by[k].uncertain++; }); });
+  const rows=Object.values(by).sort((a,b)=>b.broken/b.n-a.broken/a.n||b.n-a.n);
+  return{rows,total,reviews};
 }
 
 /* ================= INVESTMENT POLICY ================= */
@@ -11810,6 +12160,17 @@ function renderBehaviour(){
     blocks.push(box('Whether you trade in bursts','Needs trades recorded across at least three different months.'));
   }
 
+  /* A3.6, A8.4. Which kinds of assumption break most often. A behavioural fact, not a prediction. */
+  const aw=assumptionFailures();
+  if(aw.total>=1){
+    blocks.push(box('The assumptions you get wrong',
+      '<table class="tbl" style="width:100%;font-size:13px"><thead><tr><th>Kind</th><th>Marked</th><th>Broken</th><th>Uncertain</th><th>Share broken</th></tr></thead><tbody>'+
+      aw.rows.map(r=>'<tr><td>'+esc(r.kind)+'</td><td>'+r.n+'</td><td>'+r.broken+'</td><td>'+r.uncertain+'</td><td>'+(r.n>=5?(r.broken/r.n*100).toFixed(0)+'%':'too few')+'</td></tr>').join('')+
+      '</tbody></table><div class="muted" style="font-size:12px;margin-top:6px">'+aw.total+' assumption mark'+(aw.total===1?'':'s')+' across '+aw.reviews+' review'+(aw.reviews===1?'':'s')+'. A share is shown from five marks of a kind.</div>'));
+  }else{
+    blocks.push(box('The assumptions you get wrong','Needs a closed review with its assumptions marked. Portfolio → a holding → Review.'));
+  }
+
   el.innerHTML=blocks.join('')+
     '<details class="aside"><summary>Read the limits</summary><div>All of this measures only what is in the ledger, which starts when you began recording trades here. Positions carried in from before are invisible to it. Sample sizes will be small for a long time, and a handful of trades cannot distinguish a habit from a coincidence. Nothing here is advice; it is a mirror.</div></details>';
 }
@@ -11995,6 +12356,19 @@ function tiPrefill(sym){
   const card=document.getElementById('tradeImpact');
   if(card&&card.scrollIntoView)card.scrollIntoView({behavior:'smooth',block:'center'});
 }
+/* A4.4. A refusal is part of the record: the quarterly statement lists what the limits said no to.
+   One entry per ticker per day, the last amount typed, so tapping through amounts does not fill
+   the log with keystrokes. */
+function logSizingRefusal(sym,proposed,L){
+  if(!D)return;
+  if(!D.sizingLog)D.sizingLog=[];
+  const day=new Date().toISOString().slice(0,10);
+  const i=D.sizingLog.findIndex(x=>x.sym===sym&&x.day===day);
+  const rec={at:Date.now(),day,sym,proposed:+proposed.toFixed(2),limit:+L.limit.toFixed(2),binding:L.binding};
+  if(i>=0)D.sizingLog[i]=rec; else D.sizingLog.push(rec);
+  if(D.sizingLog.length>500)D.sizingLog=D.sizingLog.slice(-500);
+  saveDB();
+}
 /* The three limits, side by side, with the binding one marked. Showing all three is the point: if
    the volatility budget is what's stopping you, the answer is a smaller position or a calmer stock,
    not a bigger cap. */
@@ -12010,6 +12384,7 @@ function sizingPanel(sym,fromCash,proposed){
       '<td class="muted" style="font-size:12px">'+note+'</td></tr>';
   };
   const over=isFinite(L.limit)&&proposed>L.limit+0.005;
+  if(over)logSizingRefusal(sym,proposed,L);
   return '<div style="margin-top:16px;border-top:1px solid var(--border);overflow:hidden">'+
     '<div style="padding:11px 16px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
       'How big should this be? <span class="muted" style="font-weight:400">Risk budget '+pol.riskPerTrade+'% of '+fmt$(L.total)+' = '+fmt$(L.budget)+'</span></div>'+
@@ -12258,14 +12633,17 @@ function buildActionQueue(){
         evidence:'over cap',
         action:'showTab(\'portfolio\')',actionLabel:'Open Portfolio'});
     }
-    // 3. Thesis review overdue
-    if(th&&th.reviewDate&&th.reviewDate<=today){
+    // 3. Thesis review due: on the date, or on the cadence since the last one closed (A3.5).
+    if(th&&reviewDue(th,today)){
+      const why=reviewDue(th,today);
       A.push({pri:3,kind:'REVIEW',sym:h.sym,
-        summary:'Thesis review was due '+th.reviewDate,
-        detail:(th.why?'You wrote: "'+th.why.slice(0,200)+(th.why.length>200?'…':'')+'" ':'')+'The review you scheduled for '+th.reviewDate+' has passed.'+
+        summary:why==='date'?'Thesis review was due '+th.reviewDate:'Review due: '+th.reviewEvery+' days since the last one',
+        detail:'Open the review to see what changed since '+(th.reviewedAt?new Date(th.reviewedAt).toISOString().slice(0,10):(th.created||'the thesis was written'))+', then mark each assumption.'+
           (th.scoreAtEntry&&tot?' Score was '+th.scoreAtEntry+' when you wrote it, now '+tot.got+'/'+tot.max+'.':''),
         evidence:th.scoreAtEntry&&tot?th.scoreAtEntry+'→'+tot.got+'/'+tot.max:'',
-        action:'showTab(\'portfolio\')',actionLabel:'Open thesis'});
+        action:'openReview(\''+esc(h.sym)+'\')',actionLabel:'Open the review',
+        action2:'openThesis(\''+esc(h.sym)+'\')',actionLabel2:'Open thesis',
+        digest:h.sym});
     }
     /* 3b — the checklist score is falling, even though it hasn't hit the sell bar.
        This is the only leading indicator in the app. A sell rule fires when a company is already bad;
@@ -12402,6 +12780,7 @@ function renderCommand(){
       '</div>'+
       (open?'<div class="cmd-detail">'+
         '<p style="color:var(--muted)">'+esc(a.detail)+'</p>'+
+        (a.digest?'<table class="tbl" style="width:100%;font-size:12.5px;margin-top:8px" aria-label="Since your last review"><tbody id="cmdDigest-'+esc(a.digest)+'"><tr><td class="muted">Checking what changed…</td></tr></tbody></table>':'')+
         '<div class="row" style="margin-top:10px;gap:8px">'+
           '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();'+a.action+'">'+esc(a.actionLabel)+'</button>'+
           (a.action2?'<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();'+a.action2+'">'+esc(a.actionLabel2)+'</button>':'')+
@@ -12409,6 +12788,9 @@ function renderCommand(){
       '</div>':'');
   }).join('')+'</div>'+
   '';
+  renderEconCal();
+  /* A3.1. The open REVIEW row carries the digest; it is fetched after the row is drawn. */
+  if(cmdOpen!=null&&q[cmdOpen]&&q[cmdOpen].digest)fillDigestInto(q[cmdOpen].digest,document.getElementById('cmdDigest-'+q[cmdOpen].digest));
 }
 async function runDailyReview(){
   const btn=document.getElementById('cmdRunBtn'),st=document.getElementById('cmdStatus');
@@ -12946,19 +13328,23 @@ async function loadMarketData(force){
       return;
     }
     if(force)macroCache={};
-    const need=['VIXCLS','SP500','GDP','DFF','DFEDTARU','DFEDTARL','DGS2','DGS10','WALCL'];   /* WILL5000PR is gone from FRED (Wilshire withdrew it); the Buffett figure is typed in */
+    /* WILL5000PR is gone from FRED (Wilshire withdrew it); the Buffett figure is typed in. */
+    const need=['VIXCLS','SP500','GDP','DFF','DFEDTARU','DFEDTARL','DGS3MO','DGS2','DGS10','DGS30','MORTGAGE30US','CPIAUCSL','T10YIE','UNRATE','WALCL'];
     const out={};
-    for(const s of need){
-      if(macroCache[s]&&!force){out[s]=macroCache[s];continue;}
-      try{
-        /* SP500 needs enough history for the regime detector (20 recent + 60 prior + 1); 120 gives
-           headroom for holidays and gaps. VIX only needs a few readings for the day toggle. The
-           three rates want a recent row and one from roughly three months back, for the change. */
-        const limit=s==='SP500'?120:(s==='VIXCLS'?5:(/^(DFF|DGS2|DGS10)$/.test(s)?70:(s==='WALCL'?16:2)));
-        out[s]=await fredSeries(s,limit);
-        macroCache[s]=out[s];
-      }catch(e){out[s]={error:e.message};}
-    }
+    /* SP500 needs enough history for the regime detector (20 recent + 60 prior + 1); 120 gives
+       headroom for holidays and gaps. VIX only needs a few readings for the day toggle. The daily
+       rates want a recent row and one from roughly three months back, for the change (DFF counts
+       weekends, so it needs a hundred rows where the yields need seventy); the weekly mortgage
+       rate and balance sheet the same span in weeks. CPI is monthly and read year over
+       year, so fourteen months; unemployment four months for its change; the rest two rows. */
+    const limitFor=s=>s==='SP500'?120:s==='VIXCLS'?5:s==='DFF'?100:/^(DGS3MO|DGS2|DGS10|DGS30|T10YIE)$/.test(s)?70:/^(WALCL|MORTGAGE30US)$/.test(s)?16:s==='CPIAUCSL'?14:s==='UNRATE'?4:2;
+    /* Fifteen series side by side rather than one after another: once the worker has cached a
+       series each call is a KV read, and the tab should not wait fifteen round trips for it. */
+    await Promise.all(need.map(async s=>{
+      if(macroCache[s]&&!force){out[s]=macroCache[s];return;}
+      try{ out[s]=await fredSeries(s,limitFor(s)); macroCache[s]=out[s]; }
+      catch(e){ out[s]={error:e.message}; }
+    }));
     /* FRED publishes SP500 end-of-day and roughly a day in arrears, so its newest row is yesterday's
        close, not today's. Finnhub's SPY quote IS live on the free tier and carries the previous
        close, so today's move is taken from there. Using FRED for "today" was simply wrong. */
@@ -13000,29 +13386,81 @@ function accessCodeFor(user){
   if(!c){ try{ c=localStorage.getItem('pf_door_code')||''; }catch(e){} }
   return c;
 }
-/* ---- Rates: Fed funds, the two-year and the ten-year, with the three-month change ----
-   Context beside the valuation figures, never an input to a verdict. FRED's DFF is daily; DGS2
-   and DGS10 skip holidays, so "three months ago" is the nearest row at or before that date. */
+/* ---- Rates and the economy: the price of money, and the economy it is priced in ----
+   Context beside the valuation figures, never an input to a verdict. FRED's DFF is daily; the
+   Treasury yields skip holidays; the mortgage rate and the balance sheet are weekly; CPI and
+   unemployment are monthly. "Three months ago" is the nearest row at or before that date, and
+   every tile carries its own date. */
 function renderRates(data){
   const el=document.getElementById('ratesLine'); if(!el)return;
-  const pick=(s,months)=>{ const o=(data&&data[s])||null; if(!o||o.error||!Array.isArray(o)||!o.length)return null;
+  el.removeAttribute('aria-busy');
+  const rowsOf=s=>{ const o=(data&&data[s])||null; if(!o||o.error||!Array.isArray(o)||!o.length)return null;
     const rows=o.filter(r=>r&&r.value!=='.'&&isFinite(parseFloat(r.value))).map(r=>({d:r.date,v:parseFloat(r.value)})).sort((a,b)=>a.d<b.d?1:-1);
-    if(!rows.length)return null; const last=rows[0]; const ago=new Date(Date.parse(last.d)-(months||3)*30.4*86400000).toISOString().slice(0,10);
+    return rows.length?rows:null; };
+  const pick=(s,months)=>{ const rows=rowsOf(s); if(!rows)return null; const last=rows[0];
+    const ago=new Date(Date.parse(last.d)-(months||3)*30.4*86400000).toISOString().slice(0,10);
     const prev=rows.find(r=>r.d<=ago)||null; return {v:last.v,d:last.d,chg:prev?last.v-prev.v:null}; };
-  const ff=pick('DFF'), tu=pick('DFEDTARU'), tl=pick('DFEDTARL'), y2=pick('DGS2'), y10=pick('DGS10'), bs=pick('WALCL');
-  if(!ff&&!y2&&!y10&&!bs){
-    const err=data&&(data.error||(data.DFF&&data.DFF.error))||'';
-    el.innerHTML='<span class="muted">'+(err==='NEEDS_WORKER'?'Rates need an access code: Settings \u2192 Access code.':/FRED|key/i.test(err)?'Rates need the FRED key on the worker.':/sync key/i.test(err)?'Rates: the sync key was rejected. Settings \u2192 Sync.':err?esc(err):'')+'</span>';
+  /* CPI is a price level; the figure people mean by "inflation" is its change over twelve months,
+     so the tile is the latest month against the same month a year earlier, and the change is that
+     rate against the month before. */
+  const cpiRows=rowsOf('CPIAUCSL'); let cpi=null;
+  if(cpiRows&&cpiRows.length>=13){
+    const yoyAt=i=>{ const a=cpiRows[i]; if(!a)return null; const want=(parseInt(a.d.slice(0,4),10)-1)+a.d.slice(4,7);
+      const b=cpiRows.find(r=>r.d.slice(0,7)===want); return b?{v:(a.v/b.v-1)*100,d:a.d}:null; };
+    const now=yoyAt(0), prev=yoyAt(1);
+    if(now)cpi={v:now.v,d:now.d,chg:prev?now.v-prev.v:null};
+  }
+  const ff=pick('DFF'), tu=pick('DFEDTARU'), tl=pick('DFEDTARL'), m3=pick('DGS3MO'), y2=pick('DGS2'), y10=pick('DGS10'), y30=pick('DGS30'),
+        mort=pick('MORTGAGE30US'), be=pick('T10YIE'), un=pick('UNRATE'), bs=pick('WALCL');
+  if(!ff&&!y2&&!y10&&!bs&&!cpi){
+    const err=data&&(data.error||(data.DFF&&data.DFF.error)||(data.DGS10&&data.DGS10.error))||'';
+    el.innerHTML='<div class="empty" style="text-align:left">'+(err==='NEEDS_WORKER'?'Rates need an access code: Settings → Access code.':/FRED|key/i.test(err)?'Rates need the FRED key on the worker.':/sync key/i.test(err)?'Rates: the sync key was rejected. Settings → Sync.':err?esc(err):'Rates have not loaded yet.')+'</div>';
     return;
   }
-  const bp=(x)=>x==null?'':' <span class="muted">('+(x>=0?'+':'\u2212')+Math.abs(Math.round(x*100))+'bp in 3 months)</span>';
-  const cell=(label,html)=>html?'<span><span class="muted">'+label+'</span> '+html+'</span>':'';
-  const ffHtml=ff?'<b>'+ff.v.toFixed(2)+'%</b>'+(tl&&tu?' <span class="muted">(target '+tl.v.toFixed(2)+'\u2013'+tu.v.toFixed(2)+'%)</span>':'')+bp(ff.chg):'';
-  const curve=(y2&&y10)?'<b>'+((y10.v-y2.v)>=0?'+':'\u2212')+Math.abs(Math.round((y10.v-y2.v)*100))+'bp</b>':'';
-  /* WALCL is in $ millions, weekly. Its direction is the Fed buying or selling bonds. */
-  const bsHtml=bs?'<b>$'+(bs.v/1e6).toFixed(2)+'tn</b>'+(bs.chg!=null?' <span class="muted">('+(bs.chg>=0?'+':'\u2212')+'$'+Math.abs(Math.round(bs.chg/1000))+'bn in 3 months, '+(bs.chg>=0?'buying':'selling')+' bonds)</span>':''):'';
-  const asOf=(y10||y2||ff||bs).d;
-  el.innerHTML='<div class="rates">'+[cell('Fed funds',ffHtml),cell('2-year',y2?'<b>'+y2.v.toFixed(2)+'%</b>'+bp(y2.chg):''),cell('10-year',y10?'<b>'+y10.v.toFixed(2)+'%</b>'+bp(y10.chg):''),cell('2s10s',curve),cell('Fed balance sheet',bsHtml)].filter(Boolean).join('<i></i>')+'</div><div class="muted" style="font-size:11.5px;margin-top:4px">FRED, as of '+esc(asOf)+'</div>';
+  const day=d=>{ if(!d)return ''; const t=new Date(d+'T12:00:00'); return isNaN(t)?d:t.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}); };
+  const month=d=>{ if(!d)return ''; const t=new Date(d+'T12:00:00'); return isNaN(t)?d:t.toLocaleDateString(undefined,{month:'short',year:'numeric'}); };
+  const sgn=x=>x>0?'+':x<0?'−':'';
+  const bp=(x,span)=>{ if(x==null)return ''; const r=Math.round(x*100); return r===0?'<span class="muted">unchanged '+(span||'in 3 months')+'</span>':'<span class="'+(r>0?'pos':'neg')+'">'+sgn(r)+Math.abs(r)+'bp</span> <span class="muted">'+(span||'in 3 months')+'</span>'; };
+  const pt=(x,span)=>{ if(x==null)return ''; const r=Math.round(x*10)/10; return r===0?'<span class="muted">unchanged '+(span||'in 3 months')+'</span>':'<span class="'+(r>0?'pos':'neg')+'">'+sgn(r)+Math.abs(r).toFixed(1)+' pt</span> <span class="muted">'+(span||'in 3 months')+'</span>'; };
+  const tile=(label,value,chg,asOf,cls)=>'<div class="rate-tile"><div class="rl">'+label+'</div><div class="rv '+(cls||'')+'">'+value+'</div><div class="rc">'+(chg||'&nbsp;')+'</div><div class="rd">'+asOf+'</div></div>';
+  const rates=[
+    ff?tile('Fed funds',ff.v.toFixed(2)+'%',(tl&&tu?'<span class="muted">target '+tl.v.toFixed(2)+'–'+tu.v.toFixed(2)+'%</span>'+(ff.chg!=null?' · ':''):'')+bp(ff.chg),day(ff.d)):'',
+    m3?tile('3-month bill',m3.v.toFixed(2)+'%',bp(m3.chg),day(m3.d)):'',
+    y2?tile('2-year',y2.v.toFixed(2)+'%',bp(y2.chg),day(y2.d)):'',
+    y10?tile('10-year',y10.v.toFixed(2)+'%',bp(y10.chg),day(y10.d)):'',
+    y30?tile('30-year',y30.v.toFixed(2)+'%',bp(y30.chg),day(y30.d)):'',
+    mort?tile('30-year mortgage',mort.v.toFixed(2)+'%',bp(mort.chg),'week of '+day(mort.d)):''
+  ].filter(Boolean);
+  /* The curve, now and three months ago: four maturities, evenly spaced (it is a shape, not a
+     timeline), the slope between the two-year and the ten-year printed beside it. */
+  let curve='';
+  const pts=[['3m',m3],['2y',y2],['10y',y10],['30y',y30]].filter(p=>p[1]);
+  if(pts.length>=3){
+    const now=pts.map(p=>p[1].v), before=pts.map(p=>p[1].chg!=null?p[1].v-p[1].chg:null);
+    const all=now.concat(before.filter(v=>v!=null)); const lo=Math.min.apply(null,all)-0.15, hi=Math.max.apply(null,all)+0.15;
+    const W=300,H=96,PL=34,PR=12,PT=10,PB=22; const X=i=>PL+i*(W-PL-PR)/(pts.length-1), Y=v=>PT+(hi-v)/(hi-lo)*(H-PT-PB);
+    const path=vals=>vals.map((v,i)=>v==null?null:(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)).filter(Boolean).join(' ');
+    const slope=(y2&&y10)?(y10.v-y2.v):null;
+    curve='<div class="rates-curve"><svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" role="img" aria-label="The Treasury curve">'+
+      '<text x="'+(PL-6)+'" y="'+(PT+4)+'" text-anchor="end" class="ax">'+hi.toFixed(1)+'</text><text x="'+(PL-6)+'" y="'+(H-PB)+'" text-anchor="end" class="ax">'+lo.toFixed(1)+'</text>'+
+      (before.every(v=>v!=null)?'<path d="'+path(before)+'" class="was"/>':'')+
+      '<path d="'+path(now)+'" class="now"/>'+
+      pts.map((p,i)=>'<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(now[i]).toFixed(1)+'" r="3" class="dot"/><text x="'+X(i).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" class="ax">'+p[0]+'</text>').join('')+
+      '</svg><div class="rates-curve-note">'+(slope==null?'':'<div><span class="rl">2s10s</span> <b class="'+(slope<0?'neg':'pos')+'">'+sgn(slope)+Math.abs(Math.round(slope*100))+'bp</b> <span class="muted">'+(slope<0?'inverted':slope<0.25?'flat':'normal')+'</span></div>')+
+      '<div class="muted rates-legend"><span><i class="now"></i>now</span>'+(before.every(v=>v!=null)?'<span><i class="was"></i>3 months ago</span>':'')+'</div></div></div>';
+  }
+  const econ=[
+    cpi?tile('Inflation, CPI',cpi.v.toFixed(1)+'%',pt(cpi.chg,'vs the month before'),month(cpi.d)+', over 12 months',cpi.v>=4?'neg':cpi.v>=3?'warn':''):'',
+    be?tile('Expected inflation',be.v.toFixed(2)+'%',bp(be.chg),day(be.d)+', 10-year breakeven'):'',
+    un?tile('Unemployment',un.v.toFixed(1)+'%',pt(un.chg),month(un.d)):'',
+    /* WALCL is in $ millions, weekly. Its direction is the Fed buying or selling bonds. */
+    bs?tile('Fed balance sheet','$'+(bs.v/1e6).toFixed(2)+'tn',bs.chg!=null?'<span class="'+(bs.chg>0?'pos':bs.chg<0?'neg':'muted')+'">'+sgn(bs.chg)+'$'+Math.abs(Math.round(bs.chg/1000))+'bn</span> <span class="muted">in 3 months, '+(bs.chg>=0?'buying':'letting bonds run off')+'</span>':'','week of '+day(bs.d)):''
+  ].filter(Boolean);
+  const asOf=(y10||y2||ff||bs||cpi).d;
+  el.innerHTML=
+    '<div class="rates-sec">The price of money</div><div class="rates-grid">'+rates.join('')+'</div>'+curve+
+    (econ.length?'<div class="rates-sec" style="margin-top:14px">The economy</div><div class="rates-grid">'+econ.join('')+'</div>':'')+
+    '<div class="muted" style="font-size:11.5px;margin-top:10px">FRED, as of '+esc(day(asOf))+'</div>';
 }
 
 /* ---- The business cycle: the OECD's composite leading indicator, placed on the cycle ----
@@ -14101,6 +14539,58 @@ function callsAwaiting(days){
   return{waiting,unmarkable};
 }
 
+/* A6.6. Which market each price is looking at, stated where the price is. Quotes come from
+   Finnhub, through the worker's key or this device's own; the history is daily closes from the
+   feed the worker names on every /history answer (Yahoo, labelled interim, until a licensed feed
+   is set). The latency of a Finnhub quote is whatever the plan behind the key delivers; the line
+   names the plan holder rather than asserting a number nobody here can verify. */
+function priceSourceLine(){
+  const q=D.apiKey?'quotes: Finnhub, your key':(syncConfigured()||accessCodeFor(USER))?'quotes: Finnhub, built in':'quotes: none';
+  const h=D.historySource?('closes: '+D.historySource):'closes: refreshed at the last review';
+  return q+' · '+h;
+}
+/* A6.3. The economic release calendar, from FRED through the worker, cached a day here too.
+   Dates and names only. Nothing reads it; a person does. */
+let _econCal=null;
+async function renderEconCal(){
+  const el=document.getElementById('econCal'); if(!el)return;
+  try{
+    if(!_econCal||Date.now()-_econCal.at>6*3600*1000){
+      const t=await cronUrl('/calendar'); if(!t){ el.innerHTML=''; return; }
+      const r=await fetch(t.url,{headers:t.headers}); if(!r.ok){ el.innerHTML=''; return; }
+      _econCal={at:Date.now(),doc:await r.json()};
+    }
+    const rel=(_econCal.doc.releases||[]).slice(0,10);
+    if(!rel.length){ el.innerHTML=''; return; }
+    el.innerHTML='<table style="font-size:12.5px"><thead><tr><th>Release</th><th>Date</th></tr></thead><tbody>'+rel.map(x=>'<tr><td>'+esc(x.name)+'</td><td class="muted" style="white-space:nowrap">'+esc(x.date)+'</td></tr>').join('')+'</tbody></table><div class="muted" style="font-size:11px;margin-top:4px">'+esc(_econCal.doc.source||'')+'</div>';
+  }catch(e){ el.innerHTML=''; }
+}
+/* A4.1. The calls-per-quarter meter. The record fills from every verdict change across the whole
+   watchlist and from the model, not only from trades; a five-trades-a-year investor still logs
+   dozens of verdict changes. Say it with the person's own number: calls in the last ninety days,
+   scaled to a quarter if the record is younger than that, against the ~138 the interval needs. */
+function callsPerQuarter(){
+  const calls=(D.calls||[]).filter(c=>c.conviction!=='flickering'&&(c.verdict==='buy'||c.verdict==='sell'));
+  if(!calls.length)return{n:0,rate:0,watched:watchedCount(),since:0};
+  const first=Math.min.apply(null,calls.map(c=>c.ts));
+  const since=Math.max(1,Math.min(90,(Date.now()-first)/864e5));
+  const cut=Date.now()-90*864e5;
+  const n=calls.filter(c=>c.ts>=cut).length;
+  return{n,rate:n*(90/since),watched:watchedCount(),since:Math.round(since)};
+}
+function watchedCount(){
+  const set=new Set((D.holdings||[]).map(h=>h.sym));
+  try{ allLists().forEach(l=>(l.syms||[]).forEach(t=>set.add(t))); }catch(e){}
+  return set.size;
+}
+function meterHTML(marked,need){
+  const m=callsPerQuarter();
+  if(!m.n)return '<div class="rec-meter muted" style="font-size:12px;margin-top:6px">No calls yet. Watch names in a list and run a review: the record fills from every verdict change, not only from your trades.</div>';
+  const left=Math.max(0,(need||138)-(marked||0));
+  const q=m.rate>0?left/m.rate:null;
+  return '<div class="rec-meter muted" style="font-size:12px;margin-top:6px">About <b>'+Math.round(m.rate)+'</b> call'+(Math.round(m.rate)===1?'':'s')+' a quarter at '+m.watched+' watched name'+(m.watched===1?'':'s')+(m.since<90?' (from '+m.since+' day'+(m.since===1?'':'s')+' so far)':'')+
+    (q!=null&&left>0?' · ~'+(need||138)+' marked calls in about '+(q<1?'a quarter':Math.ceil(q)+' quarters'):'')+'.</div>';
+}
 function recordStripHTML(){
   const days=90;
   const rec=callRecord(days);
@@ -14116,7 +14606,8 @@ function recordStripHTML(){
       '<div class="rec-bar"><i style="width:'+pct+'%"></i></div>'+
       '<div class="rec-foot"><span><b>0</b> of ~'+(requiredSample(null).n||'-')+' marked calls</span>'+
         '<span>'+(aw.waiting?'<b>'+aw.waiting+'</b> logged, waiting on an anniversary':'nothing logged yet')+
-        (aw.unmarkable?' · <b>'+aw.unmarkable+'</b> unmarkable':'')+dueSoonNote()+' · '+scorecardLink+'</span></div>';
+        (aw.unmarkable?' · <b>'+aw.unmarkable+'</b> unmarkable':'')+dueSoonNote()+' · '+scorecardLink+'</span></div>'+
+      meterHTML(0,requiredSample(null).n);
   }
 
   const st=rec.st;
@@ -14133,8 +14624,12 @@ function recordStripHTML(){
      straddling interval is not a small edge; it is a coin toss with a decimal place. */
   let read,cls;
   if(straddles){
+    /* A2.7. The flat reading, decided before the first mark: the bars did not beat the index by
+       more than the noise on this sample; the sizing limits, the thesis dates and History hold
+       either way; the 180- and 365-day marks are the ones to headline. */
     read='The 95% interval crosses zero, <b>no measurable edge yet</b>. On this evidence the system '+
-         'is indistinguishable from picking at random, whatever the point estimate above says.';
+         'is indistinguishable from picking at random, whatever the point estimate above says. '+
+         'The sizing limits, the thesis dates and History hold either way; the 180- and 365-day marks are the ones that will say more.';
     cls='thin';
   }else if(e>0){
     read='The interval sits <b>entirely above zero</b>. On '+rec.n+' marked call'+(rec.n===1?'':'s')+
@@ -14161,7 +14656,7 @@ function recordStripHTML(){
       '<span>hit rate <b>'+st.hitRate.toFixed(0)+'%</b> ('+st.wins+'/'+st.n+')'+
         (st.payoff!=null?' · payoff <b>'+st.payoff.toFixed(2)+'×</b>':'')+
         (aw.waiting?' · <b>'+aw.waiting+'</b> waiting':'')+dueSoonNote()+' · '+scorecardLink+'</span>'+
-    '</div>';
+    '</div>'+meterHTML(rec.n,need);
 }
 
 /* Rendered into BOTH mounts. It was previously on Command only, which meant the screen everyone
@@ -14735,7 +15230,7 @@ function dueSoonNote(){
 }
 /* THE HEAD-TO-HEAD. Three systems, same tickers, same dates, same marking — the only honest way to
    answer whether the momentum rule adds anything. Argument does not settle this. Error bars do. */
-const TRACK_NAMES={checklist:'Checklist alone',herizen:'Herizen alone',gated:'Checklist + momentum',ewma:'EWMA 50/200'};
+const TRACK_NAMES={checklist:'Checklist alone',herizen:'Herizen alone',gated:'Checklist + momentum',ewma:'EWMA 50/200',kronos:'Kronos, the model'};
 function trackStats(track,winRaw){
   const open=winRaw==='since';
   const days=open?null:parseInt(winRaw,10);
@@ -14903,14 +15398,32 @@ function operatorMatrixHTML(winRaw){
     '</div></div>';
 }
 
+/* A8.2. Expectancy by horizon, side by side, so the reader sees where the rulebook's marks say
+   something and where they are noise. Each cell is the same arithmetic as the strip, at its own
+   horizon; "too few" where the interval cannot be formed. */
+function horizonEvidenceHTML(){
+  const rows=CALL_HORIZONS.map(h=>({h,rec:callRecord(h)}));
+  if(!rows.some(r=>r.rec))return '';
+  const pts=x=>(x>=0?'+':'')+x.toFixed(2);
+  return '<div style="margin-top:16px;border-top:1px solid var(--border);overflow:hidden">'+
+    '<div style="padding:11px 15px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">By horizon, same calls</div>'+
+    '<div style="overflow-x:auto"><table><thead><tr><th>Horizon</th><th>Marked</th><th>Expectancy</th><th>95% range</th><th>Reading</th></tr></thead><tbody>'+rows.map(({h,rec})=>{
+      if(!rec)return '<tr><td>'+h+' d</td><td colspan="4" class="muted">nothing marked yet</td></tr>';
+      const st=rec.st, straddles=st.lo!=null&&st.lo<0&&st.hi>0, thin=rec.n<20;
+      return '<tr><td><b>'+h+' d</b></td><td class="muted">'+rec.n+'</td><td class="'+(st.expectancy>=0?'pos':'neg')+'"><b>'+pts(st.expectancy)+'</b></td><td class="muted" style="font-size:12px">'+(st.lo!=null?pts(st.lo)+' to '+pts(st.hi):'needs 2+')+'</td><td class="muted" style="font-size:12.5px">'+(thin?'too few to read':straddles?'crosses zero':st.expectancy>0?'entirely above zero':'entirely below zero')+'</td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<div style="padding:10px 15px;border-top:1px solid var(--border);background:var(--bg);font-size:12px;color:var(--muted)">The 30-day mark is mostly noise at any sample; the 180- and 365-day marks are the ones to headline, and this table is where that shows or does not.</div></div>';
+}
 function trackComparison(winRaw){
-  const rows=['checklist','herizen','gated'].map(t=>({t,s:trackStats(t,winRaw)}));
+  /* A8.3. The model rides in the same table as the rulebook: same tickers, same marks, same
+     interval. Grading it beside the checklist is the whole reason it was let in. */
+  const rows=['checklist','herizen','gated','kronos'].map(t=>({t,s:trackStats(t,winRaw)}));
   const any=rows.filter(r=>r.s);
   if(any.length<2)return '';   // nothing to compare against yet
   const best=any.slice().sort((a,b)=>b.s.expectancy-a.s.expectancy)[0];
   return '<div style="margin-top:16px;border-top:1px solid var(--border);overflow:hidden">'+
     '<div style="padding:11px 15px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
-      'Three systems, same calls, same marks</div>'+
+      'Four systems, same calls, same marks</div>'+
     '<div style="overflow-x:auto"><table><thead><tr>'+
       '<th>System</th><th>Calls</th><th>Expectancy</th><th>95% range</th><th>Reading</th>'+
     '</tr></thead><tbody>'+rows.map(({t,s})=>{
@@ -15054,6 +15567,7 @@ function renderScorecard(){
       shortfallHTML(st)+
       operatorMatrixHTML(winRaw)+
       checkAuditHTML(winRaw)+
+      horizonEvidenceHTML()+
       trackComparison(winRaw)+
       ruleChangeWarning()+
       (thin?'<p class="muted" style="font-size:12px;margin-top:8px"><b>'+scored.length+' scoreable call'+(scored.length===1?'':'s')+' is not evidence.</b> Under roughly 20, two lucky picks dominate every number above. Treat it as a running tally, not a verdict on the checklist.</p>':'')+
@@ -15063,7 +15577,7 @@ function renderScorecard(){
   tb.innerHTML=graded.map(({c,now,stockRet,spyRet,raw,beta,betaN,alpha,edge,heldDays,ungraded})=>{
     const pill=c.verdict==='buy'?'pill-buy':c.verdict==='sell'?'pill-sell':c.verdict==='watch'?'pill-watch':'pill-na';
     return '<tr>'+
-      '<td><b>'+esc(c.sym)+'</b></td>'+
+      '<td><b>'+esc(c.sym)+'</b>'+(recordCopyOn()?' <a href="#" class="muted" style="font-size:11px" title="A public page for this one call, with its marks and its place in the chain" onclick="shareCall(\''+esc(callId(c))+'\');return false">share</a>':'')+'</td>'+
       '<td class="muted" style="white-space:nowrap">'+esc(c.date)+'</td>'+
       '<td><span class="pill '+pill+'">'+esc((c.verdict||'').toUpperCase())+'</span>'+
         (c.conviction==='flickering'?'<span class="muted" style="font-size:11px;display:block;margin-top:2px" title="Appeared and reverted before holding for three refreshes. Graded separately.">flickering</span>':'')+'</td>'+
@@ -15313,6 +15827,15 @@ function chainRecord(id,h,mk,prevHash){
          beta:mk.beta==null?null:+mk.beta,
          prevHash:prevHash||''};
 }
+/* A3.4. A review's assumption marks enter the same chain, as their own record shape: the kind
+   field keeps a review from ever hashing like a mark. What is committed is the ticker, the moment,
+   and the marks (supported, broken, uncertain) by assumption number. The assumption text stays in
+   the thesis, unhashed and unsent; a diary entry's wording is the author's, its date is not. */
+function reviewRecord(r,prevHash){
+  return{kind:'review',sym:String(r.sym||''),at:+r.at,
+         marks:(r.marks||[]).map(x=>({n:+x.n,mark:String(x.mark)})),
+         prevHash:prevHash||''};
+}
 /* Deterministic order, or two devices sealing the same marks would build different chains. */
 function unsealedMarks(){
   const out=[];
@@ -15328,18 +15851,26 @@ function unsealedMarks(){
 }
 /* Split out so the self-test can exercise the real sealing logic against a scratch object without
    writing anything to storage. */
+function unsealedReviews(){
+  return (D.reviews||[]).filter(r=>r&&!r.hash&&r.at>0&&Array.isArray(r.marks)&&r.marks.length)
+    .sort((a,b)=>(a.at||0)-(b.at||0)||(a.sym<b.sym?-1:a.sym>b.sym?1:0)).map(r=>({review:r}));
+}
 async function sealInto(pending,chain){
-  for(const {id,h,mk} of pending){
-    const rec=chainRecord(id,h,mk,chain.head);
-    mk.hash=await sha(canonicalJson(rec));
-    mk.seq=chain.n;
-    chain.head=mk.hash;
+  for(const e of pending){
+    const rec=e.review?reviewRecord(e.review,chain.head):chainRecord(e.id,e.h,e.mk,chain.head);
+    const hash=await sha(canonicalJson(rec));
+    const target=e.review||e.mk;
+    target.hash=hash;
+    target.seq=chain.n;
+    chain.head=hash;
     chain.n++;
   }
   return pending.length;
 }
 async function sealNewMarks(){
-  const pending=unsealedMarks();
+  /* Marks first, then reviews, each in its own deterministic order, so two devices sealing the
+     same pending set build the same chain. */
+  const pending=unsealedMarks().concat(unsealedReviews());
   if(!pending.length)return 0;
   if(!D.chain)D.chain={head:'',n:0};
   const n=await sealInto(pending,D.chain);
@@ -15353,15 +15884,17 @@ async function verifyChain(){
     const id=callId(c);
     Object.keys(c.marks||{}).forEach(h=>{
       const mk=c.marks[h];
-      if(mk&&mk.hash&&mk.seq!=null)sealed.push({id,h:+h,mk});
+      if(mk&&mk.hash&&mk.seq!=null)sealed.push({seq:mk.seq,id,h:+h,mk});
     });
   });
-  sealed.sort((a,b)=>a.mk.seq-b.mk.seq);
+  (D.reviews||[]).forEach(r=>{ if(r&&r.hash&&r.seq!=null)sealed.push({seq:r.seq,review:r}); });
+  sealed.sort((a,b)=>a.seq-b.seq);
   let prev='';
-  for(const {id,h,mk} of sealed){
-    const want=await sha(canonicalJson(chainRecord(id,h,mk,prev)));
-    if(want!==mk.hash)return{ok:false,n:sealed.length,brokenAt:mk.seq,sym:id.split(':')[1]||id,horizon:h};
-    prev=mk.hash;
+  for(const e of sealed){
+    const have=e.review?e.review.hash:e.mk.hash;
+    const want=await sha(canonicalJson(e.review?reviewRecord(e.review,prev):chainRecord(e.id,e.h,e.mk,prev)));
+    if(want!==have)return{ok:false,n:sealed.length,brokenAt:e.seq,sym:e.review?e.review.sym:(e.id.split(':')[1]||e.id),horizon:e.review?null:e.h,kind:e.review?'review':'mark'};
+    prev=have;
   }
   return{ok:true,n:sealed.length,head:prev};
 }
@@ -15377,6 +15910,333 @@ async function pushChainHead(){
       headers:Object.assign({'Content-Type':'application/json'},t.headers),
       body:JSON.stringify({head:D.chain.head,n:D.chain.n})});
   }catch(e){}
+}
+
+/* ============================ A2.3. THE RECORD'S SERVER COPY ============================
+   The chain proves a mark was not altered since it was written; the daily head proves when it was
+   written. Neither survives the loss of the device the record lives in, and neither is a copy a
+   third party can read. This is that copy: calls, their marks with hashes and sequence numbers,
+   the chain state, the review marks. A PROJECTION, on purpose: no thesis text, no holdings, no
+   notes, nothing the account's sync already carries. Opt-in for a personal account (Settings), and
+   always on for a seat on a firm, whose record is the firm's evidence. Pushed a moment after the
+   record changes, never awaited, never blocking. */
+function recordCopyOn(){
+  if(typeof isDemoUser==='function'&&isDemoUser())return false;
+  if(syncBlockedReason())return false;
+  const p=(DB.profiles||{})[USER]||{};
+  if(p.invite&&p.inviteTier==='business')return true;
+  return !!D.recordCopy;
+}
+function recordProjection(){
+  const calls=(D.calls||[]).map(c=>{
+    const marks={};
+    Object.keys(c.marks||{}).forEach(h=>{ const m=c.marks[h]; if(!m)return; marks[h]={price:m.price==null?null:m.price,spy:m.spy==null?null:m.spy,beta:m.beta==null?null:m.beta,at:m.at||null,lag:m.lag||0,missed:!!m.missed,intended:m.intended||null,actual:m.actual||null,due:m.due||null,hash:m.hash||null,seq:m.seq==null?null:m.seq,cron:!!m.cron}; });
+    return{id:callId(c),sym:c.sym,track:c.track||'checklist',verdict:c.verdict,label:c.label,ts:c.ts,date:c.date,price:c.price,spy:c.spy,q:c.q,p:c.p,m:c.m,conviction:c.conviction,checks:c.checks||null,scorecard:c.scorecard||null,rbv:c.rbv||null,by:c.by?{seat:c.by.seat,name:c.by.name||null,sig:c.by.sig||null,key:c.by.key||null}:null,marks};
+  });
+  const reviews=(D.reviews||[]).map(r=>({sym:r.sym,at:r.at,by:r.by||null,marks:(r.marks||[]).map(x=>({n:x.n,mark:x.mark})),hash:r.hash||null,seq:r.seq==null?null:r.seq}));
+  /* Next review dates only (A4.3): a ticker and a date, so the worker can say "due", never why. */
+  const due=Object.keys(D.theses||{}).map(sym=>({sym,date:(D.theses[sym]||{}).reviewDate||''})).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d.date));
+  return{calls,reviews,chain:D.chain||null,due,rulebook:(typeof rulebookVersion==='function')?rulebookVersion():null};
+}
+let _recPushT=0;
+function pushRecordCopy(now){
+  if(!recordCopyOn())return;
+  clearTimeout(_recPushT);
+  _recPushT=setTimeout(async()=>{
+    try{
+      const t=await cronUrl('/record'); if(!t)return;
+      const r=await fetch(t.url,{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},t.headers),body:JSON.stringify(recordProjection())});
+      if(r.ok){ D.recordCopyAt=Date.now(); D.recordCopyErr=''; }
+      else { let m=''; try{ m=(await r.json()).error||''; }catch(e){} D.recordCopyErr=m||('HTTP '+r.status); }
+    }catch(e){ D.recordCopyErr='not reachable'; }
+    saveDB(); renderRecordCopyCard();
+  },now?0:1500);
+}
+function setRecordCopy(on){ D.recordCopy=!!on; saveDB(); renderRecordCopyCard(); if(on)pushRecordCopy(true); }
+/* A4.6. Share one call: the worker builds a public page from the server copy. The link is shown
+   once here and kept in Settings under Shared calls, where it can be withdrawn. */
+async function shareCall(id){
+  if(!recordCopyOn())return toast('Sharing needs the record\'s server copy: Settings → The record\'s server copy.');
+  try{
+    const t=await cronUrl('/share'); if(!t)return toast('Needs an access code.');
+    pushRecordCopy(true); await new Promise(r=>setTimeout(r,1200));
+    const r=await fetch(t.url,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},t.headers),body:JSON.stringify({callId:id,name:(D.displayName||'').trim()||null})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)return toast(j.error||('Could not share (HTTP '+r.status+').'));
+    if(!D.shares)D.shares=[]; D.shares.push({id:j.id,callId:id,url:j.url,at:Date.now()}); saveDB();
+    try{ await navigator.clipboard.writeText(j.url); toast('Shared. The link is on your clipboard: '+j.url); }catch(e){ toast('Shared: '+j.url); }
+    renderSharesCard();
+  }catch(e){ toast('Could not share: '+(e.message||e)); }
+}
+async function withdrawShare(id){
+  try{ const t=await cronUrl('/share/'+id); if(!t)return; const r=await fetch(t.url,{method:'DELETE',headers:t.headers}); if(r.ok){ D.shares=(D.shares||[]).filter(x=>x.id!==id); saveDB(); renderSharesCard(); toast('Withdrawn.'); } else toast('Could not withdraw.'); }catch(e){ toast('Not reachable.'); }
+}
+function renderSharesCard(){
+  const el=document.getElementById('sharesBody'); if(!el)return;
+  const list=D.shares||[];
+  el.innerHTML=list.length?'<table style="font-size:12.5px"><thead><tr><th>Call</th><th>Shared</th><th>Link</th><th></th></tr></thead><tbody>'+list.slice().reverse().map(x=>'<tr><td>'+esc((x.callId||'').split(':')[1]||x.callId)+'</td><td class="muted">'+esc(new Date(x.at).toISOString().slice(0,10))+'</td><td><a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.url.replace(/^https?:\/\//,''))+'</a></td><td><button class="btn btn-ghost btn-sm" onclick="withdrawShare(\''+esc(x.id)+'\')">Withdraw</button></td></tr>').join('')+'</tbody></table>':'<span class="muted" style="font-size:12.5px">None. History → a call → share.</span>';
+}
+/* A4.7. A read-only token for a spreadsheet. Shown once; revoke from here. */
+async function makeToken(){
+  const st=document.getElementById('tokenStatus');
+  try{
+    const t=await cronUrl('/token'); if(!t){ if(st)st.textContent='Needs an access code.'; return; }
+    const r=await fetch(t.url,{method:'POST',headers:t.headers}); const j=await r.json().catch(()=>({}));
+    if(!r.ok){ if(st)st.textContent=j.error||('HTTP '+r.status); return; }
+    if(st)st.innerHTML='<div style="font-size:12.5px;line-height:1.7">Shown once; copy it now.<br>JSON: <code style="user-select:all">'+esc(j.url)+'</code><br>CSV for Sheets or Excel: <code style="user-select:all">'+esc(j.csv)+'</code></div>';
+    pushRecordCopy(true);
+  }catch(e){ if(st)st.textContent='Not reachable.'; }
+}
+async function revokeTokens(){
+  const st=document.getElementById('tokenStatus');
+  try{ const t=await cronUrl('/token'); if(!t)return; const r=await fetch(t.url,{method:'DELETE',headers:t.headers}); const j=await r.json().catch(()=>({})); if(st)st.textContent=r.ok?('Revoked '+(j.revoked||0)+' token'+(j.revoked===1?'':'s')+'.'):'Could not revoke.'; }catch(e){ if(st)st.textContent='Not reachable.'; }
+}
+/* A4.3. Notices by email, kept on the worker under the code; the terminal only holds the mirror. */
+async function setNotify(kind,on){
+  const st=document.getElementById('notifyStatus');
+  try{
+    const t=await cronUrl('/notify'); if(!t){ if(st)st.textContent='Needs an access code: Settings → Access code.'; return; }
+    const cur=Object.assign({marks:!!(D.notify&&D.notify.marks),reviews:!!(D.notify&&D.notify.reviews)},{[kind]:!!on});
+    const r=await fetch(t.url,{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},t.headers),body:JSON.stringify(cur)});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok){ if(st)st.textContent='Not saved: '+(j.error||('HTTP '+r.status)); return; }
+    D.notify={marks:!!j.marks,reviews:!!j.reviews}; saveDB();
+    if(st)st.textContent=j.address?'Saved. Sent to the address on your access.':'Saved, but no email address is on record for this code; ask the operator.';
+    if(on&&kind==='reviews')pushRecordCopy(true);
+  }catch(e){ if(st)st.textContent='Not saved: not reachable.'; }
+}
+/* A5.3. The snapshot: the document as it stands, with the chosen tab shown and every other tab
+   hidden, scripts removed, the two lines the preview relies on prepended (no interaction, no
+   toasts), and a comment naming the date. Offered only on the sandbox account, because a still
+   of a real book would be a leak; the site's iframe is illustrative by definition. */
+function fillSnapshotTabs(){
+  const sel=document.getElementById('snapTab'), card=document.getElementById('snapshotCard'); if(!sel||!card)return;
+  const demo=(typeof isDemoUser==='function'&&isDemoUser());
+  card.style.display=demo?'':'none';
+  if(!sel.options.length)sel.innerHTML=[...document.querySelectorAll('[id^="tab-"]')].map(el=>el.id.slice(4)).filter(t=>t!=='settings').map(t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join('');
+}
+function snapshotScreen(){
+  if(!(typeof isDemoUser==='function'&&isDemoUser()))return toast('Snapshots are taken on the sandbox account only.');
+  const tab=(document.getElementById('snapTab')||{}).value; if(!tab)return;
+  const doc=document.documentElement.cloneNode(true);
+  doc.querySelectorAll('script').forEach(n=>n.remove());
+  doc.querySelectorAll('[id^="tab-"]').forEach(n=>{ if(n.id==='tab-'+tab)n.classList.remove('tabs-hidden'); else n.classList.add('tabs-hidden'); });
+  doc.querySelectorAll('nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.getAttribute('data-tab')===tab));
+  doc.querySelectorAll('.addwrap.open,.toast,#firstRunGate').forEach(n=>n.classList.remove('open'));
+  const head=doc.querySelector('head');
+  const t=head.querySelector('title'); if(t)t.textContent='PerceptFolio '+tab+', illustrative';
+  const extra=document.createElement('style'); extra.textContent='html,body{overflow:hidden!important;pointer-events:none}body.demo #app::before,body.is-demo #app::before{display:none!important}.toast,[class*="toast"]{display:none!important}';
+  head.appendChild(extra);
+  const note=document.createComment(' A static snapshot of the terminal\'s '+tab+' screen on the sandbox account, taken '+new Date().toISOString().slice(0,10)+' with scripts removed. Illustrative values; nothing here is live. Made with Settings \u2192 Snapshot this screen. ');
+  head.appendChild(note);
+  downloadText(tab+'.html','<!DOCTYPE html>\n'+doc.outerHTML,'text/html');
+  toast('Saved '+tab+'.html. Put it at preview/'+tab+'.html and site/public/preview/'+tab+'.html, then mark it in SCREENS.');
+}
+function renderRecordCopyCard(){
+  const card=document.getElementById('recordCopyCard'), tg=document.getElementById('recordCopyToggle'), st=document.getElementById('recordCopyStatus');
+  if(!card||!tg||!st)return;
+  const p=(DB.profiles||{})[USER]||{};
+  const seat=!!(p.invite&&p.inviteTier==='business');
+  const blocked=syncBlockedReason()||(typeof isDemoUser==='function'&&isDemoUser());
+  card.style.display=blocked?'none':'';
+  tg.checked=recordCopyOn(); tg.disabled=seat;
+  const nm=document.getElementById('notifyMarks'), nr=document.getElementById('notifyReviews');
+  if(nm)nm.checked=!!(D.notify&&D.notify.marks); if(nr)nr.checked=!!(D.notify&&D.notify.reviews);
+  const n=(D.calls||[]).length, sealed=(D.calls||[]).reduce((a,c)=>a+Object.values(c.marks||{}).filter(m=>m&&m.hash).length,0);
+  st.textContent=(seat?'On for every seat of a firm. ':(recordCopyOn()?'On. ':'Off. '))+n+' call'+(n===1?'':'s')+', '+sealed+' sealed mark'+(sealed===1?'':'s')+(D.recordCopyAt?' · last copy '+new Date(D.recordCopyAt).toLocaleString():' · no copy yet')+(D.recordCopyErr?' · last push failed: '+D.recordCopyErr:'');
+}
+
+/* ============================ A2.4. THE EVIDENCE PACK ============================
+   The backup is for the owner; this is for someone else. One file holding what a reader needs to
+   check the record without trusting the person who exported it: the calls and their marks with
+   hashes and sequence numbers, the chain state, the server's dated log of chain heads (fetched
+   live, so the pack carries what the server says, not what the device says the server said), and
+   this device's own verification result. /verify/ on the site recomputes all of it. */
+function downloadText(name,text,type){
+  const blob=new Blob([text],{type:type||'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+async function exportEvidencePack(){
+  let heads=[],headsSource='not fetched';
+  try{ const t=await cronUrl('/chain'); if(t){ const r=await fetch(t.url,{headers:t.headers}); if(r.ok){ heads=(await r.json()).heads||[]; headsSource='server'; } else headsSource='HTTP '+r.status; } }catch(e){ headsSource='not reachable'; }
+  const verified=await verifyChain();
+  const pr=recordProjection();
+  /* A7.1. A seat's pack carries the firm's registered public keys, so the verify page can check
+     each call's signature against the seat that made it. */
+  let keys=null; try{ const p0=(DB.profiles||{})[USER]||{}; if(p0.invite&&p0.inviteTier==='business'){ const r=await fetch(INVITE_WORKER+'/org/keys?code='+encodeURIComponent(p0.invite)); if(r.ok)keys=(await r.json()).keys||[]; } }catch(e){}
+  const pack={format:'perceptfolio-evidence/1',exportedAt:new Date().toISOString(),account:USER,name:(D.displayName||'').trim()||null,keys,
+    scorecard:(typeof SCORECARD_VERSION!=='undefined')?SCORECARD_VERSION:null,horizons:CALL_HORIZONS,
+    calls:pr.calls,reviews:pr.reviews,chain:pr.chain,rulebook:pr.rulebook,
+    serverHeads:heads,serverHeadsSource:headsSource,verifiedOnDevice:verified,
+    note:'A chain proves no mark was altered since it was written. The server heads prove when each head existed. Neither proves the prices were true on the day; that is what the cron marks and the price feed named in the record are for.'};
+  downloadText('perceptfolio-evidence-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(pack,null,2),'application/json');
+  D.lastExportAt=Date.now(); saveDB(); renderBackupBanner();
+  toast('Evidence pack exported. Check it at perceptfolio.com/verify/.');
+}
+/* A4.2. CSV, one row per call, the marks as columns: what a spreadsheet wants. */
+function csvCell(v){ if(v==null)return ''; const s=String(v); return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+function csvRows(rows){ return rows.map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n'; }
+function exportCallsCsv(){
+  const H=CALL_HORIZONS;
+  const head=['id','date','ticker','track','verdict','label','price','spy','quality','value','momentum','conviction','checks','seat','name','rulebook'];
+  H.forEach(h=>head.push('mark'+h+'_date','mark'+h+'_price','mark'+h+'_spy','mark'+h+'_stock_ret_pct','mark'+h+'_spy_ret_pct','mark'+h+'_excess_pct','mark'+h+'_edge','mark'+h+'_missed','mark'+h+'_seq','mark'+h+'_hash'));
+  const rows=[head];
+  (D.calls||[]).forEach(c=>{
+    const r=[callId(c),c.date,c.sym,c.track||'checklist',c.verdict,c.label,c.price,c.spy,c.q,c.p,c.m,c.conviction,c.checks||'',c.by?c.by.seat:'',c.by?c.by.name:'',c.rbv||''];
+    H.forEach(h=>{
+      const m=(c.marks||{})[h];
+      if(!m){ r.push('','','','','','','','','',''); return; }
+      if(m.missed){ r.push(m.intended||'','','','','','','','yes','',''); return; }
+      const ok=m.price>0&&c.price>0&&m.spy>0&&c.spy>0;
+      const sr=ok?(m.price-c.price)/c.price*100:null, pr=ok?(m.spy-c.spy)/c.spy*100:null;
+      let edge=null; try{ const held=markHeldDays(m,h); const bi=betaVsSpy(c.sym); edge=ok?callEdge(c,jensenAlpha(sr,pr,bi?bi.beta:null,held)):null; }catch(e){}
+      r.push(m.actual||(m.at?new Date(m.at).toISOString().slice(0,10):''),m.price,m.spy,sr==null?'':sr.toFixed(3),pr==null?'':pr.toFixed(3),(sr==null||pr==null)?'':(sr-pr).toFixed(3),edge==null?'':edge.toFixed(3),'no',m.seq==null?'':m.seq,m.hash||'');
+    });
+    rows.push(r);
+  });
+  downloadText('perceptfolio-calls-'+new Date().toISOString().slice(0,10)+'.csv',csvRows(rows),'text/csv');
+}
+/* ============================ A4.4. THE QUARTERLY RECORD STATEMENT ============================
+   One page a quarter, built from the record and nothing else: the calls made, the marks that
+   landed (with their edge and the interval over them), what the limits refused, the reviews
+   closed, and the chain's state so the page can be checked against an evidence pack. Opens in its
+   own window so it prints as a document rather than as a screen. Every number here is also in the
+   exports; the statement is the summary a person or a principal reads. */
+function quarterOf(ts){ const d=new Date(ts); return d.getUTCFullYear()+'-Q'+(Math.floor(d.getUTCMonth()/3)+1); }
+function quarterBounds(q){ const m=/^(\d{4})-Q([1-4])$/.exec(q); if(!m)return null; const y=+m[1],qq=+m[2]; const a=Date.UTC(y,(qq-1)*3,1), b=Date.UTC(qq===4?y+1:y,qq===4?0:qq*3,1); return{a,b}; }
+function fillStatementQuarters(){
+  const sel=document.getElementById('stmtQuarter'); if(!sel)return;
+  const qs=new Set([quarterOf(Date.now())]);
+  (D.calls||[]).forEach(c=>{ qs.add(quarterOf(c.ts)); Object.values(c.marks||{}).forEach(m=>{ if(m&&m.at)qs.add(quarterOf(m.at)); }); });
+  const list=[...qs].sort().reverse().slice(0,8);
+  sel.innerHTML=list.map(q=>'<option value="'+q+'">'+q+'</option>').join('');
+}
+async function statementHTML(q){
+  const b=quarterBounds(q); if(!b)return '';
+  const inQ=ts=>ts>=b.a&&ts<b.b;
+  const calls=(D.calls||[]).filter(c=>c.conviction!=='flickering'&&(c.verdict==='buy'||c.verdict==='sell'));
+  const made=calls.filter(c=>inQ(c.ts));
+  const landed=[]; const byH={};
+  calls.forEach(c=>Object.keys(c.marks||{}).forEach(h=>{ const m=c.marks[h]; if(!m||!m.at||!inQ(m.at))return; let edge=null; if(!m.missed&&m.price>0&&c.price>0&&m.spy>0&&c.spy>0){ const sr=(m.price-c.price)/c.price*100, pr=(m.spy-c.spy)/c.spy*100; try{ const held=markHeldDays(m,+h); const bi=betaVsSpy(c.sym); edge=callEdge(c,jensenAlpha(sr,pr,bi?bi.beta:null,held)); }catch(e){} } landed.push({c,h:+h,m,edge}); if(edge!=null){ (byH[h]=byH[h]||[]).push(edge); } }));
+  landed.sort((x,y)=>x.m.at-y.m.at);
+  const refusals=(D.sizingLog||[]).filter(x=>inQ(x.at));
+  const reviews=(D.reviews||[]).filter(r=>inQ(r.at));
+  const v=await verifyChain();
+  const sign=x=>(x>=0?'+':'−')+Math.abs(x).toFixed(2);
+  const esc2=s=>esc(s==null?'':s);
+  const dt=ts=>new Date(ts).toISOString().slice(0,10);
+  const p=(DB.profiles||{})[USER]||{};
+  const who=(D.displayName||'').trim()||USER; const seat=(typeof ORG!=='undefined'&&ORG)?' · seat '+ORG.seat+(ORG.name?' of '+ORG.name:''):'';
+  let h='<h1>Record statement · '+esc2(q)+'</h1><p class="m">'+esc2(who)+esc2(seat)+' · generated '+dt(Date.now())+' · scorecard '+esc2(typeof SCORECARD_VERSION!=='undefined'?SCORECARD_VERSION:'')+'</p>';
+  h+='<table><tbody><tr><th>Calls made</th><td>'+made.length+' ('+made.filter(c=>c.verdict==='buy').length+' buy, '+made.filter(c=>c.verdict==='sell').length+' sell)</td></tr>'+
+     '<tr><th>Marks landed</th><td>'+landed.length+' ('+landed.filter(x=>x.m.missed).length+' missed)</td></tr>'+
+     '<tr><th>Sizing refusals</th><td>'+refusals.length+'</td></tr><tr><th>Reviews closed</th><td>'+reviews.length+' ('+reviews.reduce((a,r)=>a+(r.marks||[]).length,0)+' assumption marks)</td></tr>'+
+     '<tr><th>Record integrity</th><td>'+(v.ok?'chain verifies, '+v.n+' sealed entries, head '+esc2((v.head||'').slice(0,16))+'…':'chain broken at entry '+v.brokenAt)+'</td></tr></tbody></table>';
+  h+='<h2>Expectancy of the marks that landed this quarter</h2><table><thead><tr><th>Horizon</th><th>Marks</th><th>Expectancy, pts per call</th><th>95% interval</th><th>Reading</th></tr></thead><tbody>';
+  CALL_HORIZONS.forEach(hz=>{ const st=expectancyStats(byH[hz]||[]); h+='<tr><td>'+hz+' d</td><td>'+(st?st.n:0)+'</td><td>'+(st?sign(st.expectancy):'-')+'</td><td>'+(st&&st.lo!=null?sign(st.lo)+' to '+sign(st.hi):'n too small')+'</td><td class="m">'+(!st?'nothing landed':st.lo==null?'one mark says nothing':(st.lo<0&&st.hi>0)?'crosses zero: no measurable edge on this sample':st.lo>0?'entirely above zero':'entirely below zero')+'</td></tr>'; });
+  h+='</tbody></table>';
+  h+='<h2>Marks landed</h2>'+(landed.length?'<table><thead><tr><th>Date</th><th>Ticker</th><th>Call</th><th>Horizon</th><th>At call</th><th>At mark</th><th>Edge</th></tr></thead><tbody>'+landed.map(x=>'<tr><td>'+dt(x.m.at)+'</td><td>'+esc2(x.c.sym)+'</td><td>'+esc2(String(x.c.verdict).toUpperCase())+' · '+esc2(x.c.date)+'</td><td>'+x.h+' d</td><td>'+(x.c.price?fmt$(x.c.price):'-')+'</td><td>'+(x.m.missed?'missed':fmt$(x.m.price))+'</td><td>'+(x.edge==null?'-':sign(x.edge))+'</td></tr>').join('')+'</tbody></table>':'<p class="m">None this quarter.</p>');
+  h+='<h2>Calls made</h2>'+(made.length?'<table><thead><tr><th>Date</th><th>Ticker</th><th>Call</th><th>Price</th><th>Quality</th><th>Value</th><th>Momentum</th><th>By</th></tr></thead><tbody>'+made.map(c=>'<tr><td>'+esc2(c.date)+'</td><td>'+esc2(c.sym)+'</td><td>'+esc2(c.label||c.verdict)+'</td><td>'+(c.price?fmt$(c.price):'-')+'</td><td>'+(c.q==null?'-':c.q)+'</td><td>'+(c.p==null?'-':c.p)+'</td><td>'+(c.m==null?'-':c.m)+'</td><td>'+esc2(c.by?(c.by.name||('seat '+c.by.seat)):'')+'</td></tr>').join('')+'</tbody></table>':'<p class="m">None this quarter.</p>');
+  h+='<h2>What the limits refused</h2>'+(refusals.length?'<table><thead><tr><th>Date</th><th>Ticker</th><th>Asked</th><th>Limit</th><th>Binding</th></tr></thead><tbody>'+refusals.map(x=>'<tr><td>'+esc2(x.day)+'</td><td>'+esc2(x.sym)+'</td><td>'+fmt$(x.proposed)+'</td><td>'+fmt$(x.limit)+'</td><td>'+esc2(x.binding)+'</td></tr>').join('')+'</tbody></table>':'<p class="m">None logged this quarter.</p>');
+  h+='<h2>Reviews closed</h2>'+(reviews.length?'<table><thead><tr><th>Date</th><th>Ticker</th><th>Supported</th><th>Broken</th><th>Uncertain</th></tr></thead><tbody>'+reviews.map(r=>'<tr><td>'+dt(r.at)+'</td><td>'+esc2(r.sym)+'</td><td>'+(r.marks||[]).filter(m=>m.mark==='supported').length+'</td><td>'+(r.marks||[]).filter(m=>m.mark==='broken').length+'</td><td>'+(r.marks||[]).filter(m=>m.mark==='uncertain').length+'</td></tr>').join('')+'</tbody></table>':'<p class="m">None this quarter.</p>');
+  h+='<p class="m">Source line: the record in this terminal; expectancy is Jensen\'s alpha per call, beta-adjusted, against the S&amp;P; the interval is ±1.96 standard errors; a mark is missed when the app was not open inside the tolerance of its anniversary. Research software, not advice.</p>';
+  return h;
+}
+async function openStatement(){
+  const q=(document.getElementById('stmtQuarter')||{}).value||quarterOf(Date.now());
+  const body=await statementHTML(q);
+  const w=window.open('','_blank');
+  if(!w)return toast('The browser blocked the window. Allow pop-ups for this site and try again.');
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>PerceptFolio record statement '+esc(q)+'</title><style>body{font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#111;margin:32px;max-width:900px}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}thead th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#555}tbody th{font-weight:600;width:180px}.m{color:#555}@media print{body{margin:0}}</style></head><body>'+body+'</body></html>');
+  w.document.close();
+}
+/* ============================ A4.5. THE COMPANY SHEET ============================
+   One printable page for one company: the twenty-two checks with their bars, ten years of
+   statements from EDGAR, insiders, analyst counts, the latest cited headlines, the model's
+   thirty-day median, the thesis with its assumptions, and this account's record on the name.
+   Nothing is computed here that is not computed elsewhere in the terminal; the sheet is the
+   stacking. It opens in its own window so it prints as a document. */
+async function openCompanySheet(sym){
+  sym=(sym||'').toUpperCase(); if(!sym)return;
+  let sc=(D.analyses||{})[sym];
+  if(!sc||sc.error||Date.now()-(sc.when||0)>36*3600*1000){
+    if(!hasMarketData()){toast('The sheet needs market data: Settings → Market data.');return;}
+    toast('Scoring '+sym+' first…');
+    try{ sc=await scoreStock(sym); D.analyses[sym]=sc; saveDB(); }catch(e){ toast('Could not score '+sym+': '+(e.message||e)); return; }
+    if(sc.error){ toast('Could not score '+sym+' ('+sc.error+').'); return; }
+  }
+  const w=window.open('','_blank');
+  if(!w)return toast('The browser blocked the window. Allow pop-ups for this site and try again.');
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>PerceptFolio company sheet '+esc(sym)+'</title><style>body{font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#111;margin:32px;max-width:960px}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{border-bottom:1px solid #ddd;padding:5px 8px;text-align:left;vertical-align:top}thead th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#555}.m{color:#555}.ok{color:#15803d;font-weight:600}.no{color:#b91c1c;font-weight:600}.na{color:#777}.num{text-align:right;font-variant-numeric:tabular-nums}@media print{body{margin:0}}</style></head><body><h1>'+esc(sym)+'</h1><p class="m">Building the sheet…</p></body></html>');
+  w.document.close();
+  try{ const html=await companySheetHTML(sym,sc); w.document.body.innerHTML=html; }
+  catch(e){ w.document.body.innerHTML='<h1>'+esc(sym)+'</h1><p class="m">The sheet did not build: '+esc(e.message||e)+'</p>'; }
+}
+async function companySheetHTML(sym,sc){
+  const esc2=x=>esc(x==null?'':x);
+  const dt=ts=>ts?new Date(ts).toISOString().slice(0,10):'';
+  const num=(v,d)=>v==null||!isFinite(v)?'-':(Math.abs(v)>=1e9?(v/1e9).toFixed(d==null?1:d)+' bn':Math.abs(v)>=1e6?(v/1e6).toFixed(0)+' m':(+v).toFixed(d==null?2:d));
+  let profile=null,edgar=null,ins=null,recs=null,news=[],kro=null;
+  const jobs=[];
+  if(hasMarketData()){
+    jobs.push(getProfile(sym).then(x=>profile=x).catch(()=>{}));
+    jobs.push(getInsiders(sym).then(x=>ins=x).catch(()=>{}));
+    jobs.push(fh('/stock/recommendation?symbol='+sym).then(x=>recs=x).catch(()=>{}));
+    jobs.push(fhNews(sym,14).then(x=>news=x||[]).catch(()=>{}));
+  }
+  jobs.push(fetch(INVITE_WORKER+'/edgar?symbol='+encodeURIComponent(sym)).then(r=>r.ok?r.json():null).then(x=>edgar=x).catch(()=>{}));
+  const code=accessCodeFor(USER);
+  if(code)jobs.push(fetch(INVITE_WORKER+'/kronos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,symbol:sym,horizon:30})}).then(r=>r.ok?r.json():null).then(x=>kro=x).catch(()=>{}));
+  await Promise.all(jobs);
+  const isHolding=(D.holdings||[]).some(h=>h.sym===sym&&h.type==='Stock');
+  const v=verdictOf(sc,isHolding,sym);
+  let h='<h1>'+esc2(sym)+(profile&&profile.name?' · '+esc2(profile.name):'')+'</h1><p class="m">'+(profile&&profile.finnhubIndustry?esc2(profile.finnhubIndustry)+' · ':'')+'price '+fmt$(sc.price)+' · scored '+dt(sc.when)+' · verdict under your bars: <b>'+esc2(v.label)+'</b> · generated '+dt(Date.now())+'</p>';
+  const rows=(list,title)=>'<h2>'+title+'</h2><table><thead><tr><th>Check</th><th>Bar</th><th>Value</th><th>Result</th></tr></thead><tbody>'+list.map(c=>'<tr><td>'+esc2(c.name)+'</td><td class="m">'+esc2(c.target)+'</td><td>'+(c.value==null?'<span class="na">no data</span>':esc2(c.value))+'</td><td class="'+(c.pass===true?'ok':c.pass===false?'no':'na')+'">'+(c.pass===true?'pass':c.pass===false?'fail':'n/a')+'</td></tr>').join('')+'</tbody></table>';
+  h+=rows(sc.quality||[],'Quality · '+sc.qScore+' of 12 ('+sc.qTotal+' had data)')+rows(sc.priceChecks||[],'Price · '+sc.pScore+' of 6 ('+sc.pTotal+' had data)')+rows(sc.momentum||[],'Momentum · '+sc.mScore+' of 4 ('+sc.mTotal+' had data)');
+  if(edgar&&edgar.lines&&edgar.years){
+    const ys=edgar.years; const keys=Object.keys(edgar.lines);
+    h+='<h2>Statements · '+ys.length+' fiscal years, from 10-K filings</h2><table><thead><tr><th></th>'+ys.map(y=>'<th class="num">'+y+'</th>').join('')+'</tr></thead><tbody>'+keys.map(k=>{ const L=edgar.lines[k]; const perShare=k==='eps'; const shares=k==='shares'; return '<tr><td>'+esc2(L.label)+'</td>'+ys.map(y=>{ const val=L.years[y]; return '<td class="num">'+(val==null?'-':perShare?(+val).toFixed(2):shares?num(val,0):num(val,1))+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody></table><p class="m">'+esc2(edgar.source||'')+'. USD, billions where marked bn.</p>';
+  }else h+='<h2>Statements</h2><p class="m">'+(edgar&&edgar.error?esc2(edgar.error):'Not loaded.')+'</p>';
+  if(ins){ const s6=insiderSummary(ins,Date.now()-183*864e5); h+='<h2>Insiders · last six months</h2><table><tbody><tr><th>Bought</th><td>'+s6.buyers.length+' insider'+(s6.buyers.length===1?'':'s')+', '+s6.bought.toLocaleString()+' shares'+(s6.buyers.length?' ('+esc2(s6.buyers.slice(0,6).join(', '))+')':'')+'</td></tr><tr><th>Sold</th><td>'+s6.sellers.length+' insider'+(s6.sellers.length===1?'':'s')+', '+s6.sold.toLocaleString()+' shares'+(s6.sellers.length?' ('+esc2(s6.sellers.slice(0,6).join(', '))+')':'')+'</td></tr></tbody></table><p class="m">Finnhub insider transactions (SEC Form 4).</p>'; }
+  /* A6.2. Institutional holders, from 13F-HR filings via EDGAR full-text search: filers, not shares. */
+  try{ const r=await fetch(INVITE_WORKER+'/holders?symbol='+encodeURIComponent(sym)); if(r.ok){ const j=await r.json(); if(j.latest){ h+='<h2>Institutional holders · 13F filings</h2><table><tbody><tr><th>Quarter ended '+esc2(j.latest.period)+'</th><td>'+j.latest.filers.toLocaleString()+' filers named the issuer</td></tr><tr><th>Quarter ended '+esc2(j.prior.period)+'</th><td>'+j.prior.filers.toLocaleString()+' filers</td></tr><tr><th>Change</th><td>'+(j.change>=0?'+':'')+j.change.toLocaleString()+' filers</td></tr>'+(j.latest.names&&j.latest.names.length?'<tr><th>Among them</th><td>'+esc2(j.latest.names.slice(0,8).map(x=>x.name).join(', '))+'</td></tr>':'')+'</tbody></table><p class="m">'+esc2(j.source)+'.</p>'; } } }catch(e){}
+  if(Array.isArray(recs)&&recs.length){ const r=recs[0]; h+='<h2>Analyst counts · '+esc2(r.period)+'</h2><table><thead><tr><th>Strong buy</th><th>Buy</th><th>Hold</th><th>Sell</th><th>Strong sell</th></tr></thead><tbody><tr><td>'+(r.strongBuy||0)+'</td><td>'+(r.buy||0)+'</td><td>'+(r.hold||0)+'</td><td>'+(r.sell||0)+'</td><td>'+(r.strongSell||0)+'</td></tr></tbody></table><p class="m">Counts of published ratings, Finnhub. Not a recommendation and not used by any check.</p>'; }
+  if(news&&news.length){ h+='<h2>Headlines · last fourteen days</h2><table><thead><tr><th>Date</th><th>Source</th><th>Headline</th></tr></thead><tbody>'+news.slice(0,10).map(it=>'<tr><td>'+dt(it.datetime*1000)+'</td><td>'+esc2(it.source)+'</td><td>'+(it.url?'<a href="'+esc2(it.url)+'">'+esc2(it.headline)+'</a>':esc2(it.headline))+'</td></tr>').join('')+'</tbody></table>'; }
+  if(kro&&kro.path){ const end=kro.path[kro.path.length-1], pct=(end-kro.last)/kro.last*100; h+='<h2>The model · thirty days</h2><table><tbody><tr><th>Median path ends</th><td>'+fmt$(end)+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'% from '+fmt$(kro.last)+')</td></tr><tr><th>Band</th><td>'+fmt$(kro.lo[kro.lo.length-1])+' to '+fmt$(kro.hi[kro.hi.length-1])+'</td></tr><tr><th>Model</th><td>'+esc2(kro.model)+' · prices '+esc2(kro.prices)+' · as of '+esc2(kro.asOf)+'</td></tr></tbody></table><p class="m">A range under stated assumptions, graded on its anniversary like every other call. Not a forecast to act on.</p>'; }
+  /* A6.5. Where the words are: the latest results filing (an 8-K item 2.02 carries the press
+     release as an exhibit) and the company's own site for the call and the transcript. Links,
+     not text; full transcripts are a licensed source, later. */
+  try{
+    const r=await fetch(INVITE_WORKER+'/filings?symbol='+encodeURIComponent(sym)); const j=r.ok?await r.json():null;
+    const results=j&&(j.filings||[]).find(f=>/^8-K/.test(f.form)&&(f.items||[]).some(x=>x.k==='2.02'));
+    const annual=j&&(j.filings||[]).find(f=>/^10-K/.test(f.form));
+    if(results||annual||(profile&&profile.weburl))h+='<h2>Results, transcripts, filings</h2><table><tbody>'+(results?'<tr><th>Latest results filing</th><td><a href="'+esc2(results.index||results.url)+'">8-K, '+esc2(results.date)+'</a> (the press release is the exhibit)</td></tr>':'')+(annual?'<tr><th>Latest annual report</th><td><a href="'+esc2(annual.url||annual.index)+'">10-K, '+esc2(annual.date)+'</a></td></tr>':'')+(profile&&profile.weburl?'<tr><th>Investor relations</th><td><a href="'+esc2(profile.weburl)+'">'+esc2(profile.weburl)+'</a> (the earnings call and its transcript are published there)</td></tr>':'')+'</tbody></table>';
+  }catch(e){}
+  /* A8.5. Peers, through the same checks, from the peers call the Map already makes. Five at
+     most: each peer is a full scoring fetch under the same minute limit. */
+  try{
+    if(hasMarketData()){
+      const peers=(await fh('/stock/peers?symbol='+encodeURIComponent(sym))||[]).filter(x=>x&&x!==sym).slice(0,5);
+      if(peers.length){
+        const scored=[];
+        for(const pz of peers){ try{ let psc=(D.analyses||{})[pz]; if(!psc||psc.error||Date.now()-(psc.when||0)>36*3600*1000){ psc=await scoreStock(pz); D.analyses[pz]=psc; } if(psc&&!psc.error)scored.push({pz,psc}); }catch(e){} }
+        if(scored.length){ saveDB(); h+='<h2>Peers, through the same bars</h2><table><thead><tr><th>Ticker</th><th>Price</th><th>Quality</th><th>Value</th><th>Momentum</th><th>Verdict under your bars</th></tr></thead><tbody>'+[{pz:sym,psc:sc}].concat(scored).map(({pz,psc})=>{ const vv=verdictOf(psc,(D.holdings||[]).some(x=>x.sym===pz&&x.type==='Stock'),pz); return '<tr><td><b>'+esc2(pz)+'</b></td><td>'+fmt$(psc.price)+'</td><td>'+psc.qScore+'/12</td><td>'+psc.pScore+'/6</td><td>'+psc.mScore+'/4</td><td>'+esc2(vv.label)+'</td></tr>'; }).join('')+'</tbody></table><p class="m">Peers as Finnhub lists them; the same twenty-two checks under the same bars. A comparison, not a ranking.</p>'; }
+      }
+    }
+  }catch(e){}
+  const th=thesisFor(sym);
+  if(th){ h+='<h2>The thesis · written '+esc2(th.created)+(th.reviewedAt?', last reviewed '+dt(th.reviewedAt):', never reviewed')+'</h2><table><tbody>'+(th.why?'<tr><th>Why</th><td>'+esc2(th.why)+'</td></tr>':'')+(th.assumptions&&th.assumptions.length?'<tr><th>Assumptions</th><td>'+th.assumptions.map(a=>a.n+'. '+esc2(a.text)).join('<br>')+'</td></tr>':'')+(th.invalidIf?'<tr><th>Sell if</th><td>'+esc2(th.invalidIf)+'</td></tr>':'')+'<tr><th>Stop · target · deadline</th><td>'+(th.stop?fmt$(th.stop):'-')+' · '+(th.target?fmt$(th.target):'-')+' · '+esc2(th.deadline||'-')+'</td></tr></tbody></table>'; }
+  const calls=(D.calls||[]).filter(c=>c.sym===sym&&c.conviction!=='flickering');
+  if(calls.length){ h+='<h2>This account\'s record on '+esc2(sym)+'</h2><table><thead><tr><th>Date</th><th>Call</th><th>Price</th>'+CALL_HORIZONS.map(hz=>'<th>'+hz+' d</th>').join('')+'</tr></thead><tbody>'+calls.slice(-20).map(c=>'<tr><td>'+esc2(c.date)+'</td><td>'+esc2(c.label||c.verdict)+'</td><td>'+(c.price?fmt$(c.price):'-')+'</td>'+CALL_HORIZONS.map(hz=>{ const m=(c.marks||{})[hz]; if(!m)return '<td class="na">awaiting</td>'; if(m.missed)return '<td class="na">missed</td>'; const sr=(m.price-c.price)/c.price*100, pr=(m.spy-c.spy)/c.spy*100; return '<td>'+((sr-pr)>=0?'+':'')+(sr-pr).toFixed(1)+' vs index</td>'; }).join('')+'</tr>').join('')+'</tbody></table>'; }
+  h+='<p class="m">Source line: checks from Finnhub metrics under your bars; statements SEC EDGAR; insiders and analyst counts Finnhub; headlines Finnhub company news; the model Kronos through the worker. These are checks against bars you set, not a recommendation. Research software, not advice.</p>';
+  return h;
+}
+function exportHoldingsCsv(){
+  const rows=[['ticker','type','shares','cost_basis','broker','price','price_date','manual_price','last_reviewed']];
+  (D.holdings||[]).forEach(h=>rows.push([h.sym,h.type||'',h.shares,h.cost,h.broker||'',h.price==null?'':h.price,h.priceDate||'',h.manualPrice?'yes':'no',h.reviewedAt?new Date(h.reviewedAt).toISOString().slice(0,10):'']));
+  rows.push(['CASH','cash',1,D.cash||0,'','','','','']);
+  downloadText('perceptfolio-holdings-'+new Date().toISOString().slice(0,10)+'.csv',csvRows(rows),'text/csv');
 }
 
 /* ============================ D4. MARKS ARE APPEND-ONLY ============================
@@ -15709,15 +16569,18 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
     if(!isBiz()||busy) return; if(!force&&Date.now()-at<600000) return; busy=true;
     try{
       var r=await fetch(base()+'/org?code='+encodeURIComponent(prof().invite)); var j=await r.json(); ORG=j&&j.org||null; at=Date.now();
+      window.PF_ORG=ORG;
       if(ORG&&ORG.rulebook&&typeof D!=='undefined'&&D){ var rb=ORG.rulebook; D.rules=D.rules||{}; D.rules.qBuy=rb.qBuy; D.rules.pBuy=rb.pBuy; D.rules.qSell=rb.qSell; D.rules.mBuy=rb.mBuy; }
       paint();
+      if(ORG&&!ORG.paused)ensureSeatKey().catch(function(){});
+      if(ORG&&(ORG.isAdmin||ORG.role==='reviewer'))renderFirmCard();
     }catch(e){}finally{busy=false;}
   }
   function paint(){
     var b=document.getElementById('bizBanner'); if(!b) return;
     var mine=document.getElementById('pfOrgLine'); if(!mine){ mine=document.createElement('span'); mine.id='pfOrgLine'; mine.style.cssText='margin-left:auto;font-family:var(--mono);font-size:12px;letter-spacing:.04em'; b.appendChild(mine); }
     if(!ORG){ mine.textContent=''; return; }
-    b.style.display='flex'; mine.textContent=(ORG.firm?ORG.firm+' · ':'')+'seat '+ORG.seat+' of '+ORG.seats+(ORG.rulebook?' · firm rulebook applied':(ORG.isAdmin?' · no rulebook published yet':''));
+    b.style.display='flex'; mine.textContent=(ORG.firm?ORG.firm+' · ':'')+'seat '+ORG.seat+' of '+ORG.seats+(ORG.role==='reviewer'?' · reviewer seat, read-only':'')+(ORG.rulebook?' · firm rulebook applied'+(ORG.rulebookVersion?' ('+ORG.rulebookVersion+')':''):(ORG.isAdmin?' · no rulebook published yet':''));
     var ids=['setQBuy','setPBuy','setMBuy','setQSell'];
     ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; var lock=!!ORG.rulebook&&!ORG.isAdmin; el.disabled=lock; el.title=lock?'Set by your firm\'s admin seat':''; });
     var host=document.getElementById('setQSell'); host=host&&host.closest('.field'); if(!host) return;
@@ -15735,8 +16598,78 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       note.innerHTML=ORG.rulebook?'<b style="color:var(--text)">Set by your firm.</b> The admin seat published these rules'+(ORG.rulebookAt?' on '+new Date(ORG.rulebookAt).toLocaleDateString():'')+'; they apply to every seat and cannot be changed here.':'Your firm\'s admin seat has not published a rulebook yet; these are your own rules until they do.';
     }
   }
-  /* Attribution: who made the call, on the record itself. */
-  if(typeof window.recordCall==='function'){ var _rc=window.recordCall; window.recordCall=function(){ var r=_rc.apply(this,arguments); try{ if(ORG&&D&&Array.isArray(D.calls)&&D.calls.length){ var c=D.calls[D.calls.length-1]; if(c&&!c.by) c.by={seat:ORG.seat,name:(D.displayName||'').trim()||null,firm:ORG.id}; } }catch(e){} return r; }; }
+  /* ===== A7.1. The seat's key: made once per device, kept in IndexedDB as a non-extractable
+     CryptoKey (scripts can use it to sign, never read it), its public half registered with the
+     firm. Every call this seat makes is signed over the fields that identify it, so attribution
+     is a signature, not a name in a field. If IndexedDB is unavailable the call is stamped with
+     the name alone and says so. ===== */
+  var SEATKEY=null, SEATKID=null;
+  function idb(){ return new Promise(function(res,rej){ try{ var q=indexedDB.open('pf-seat',1); q.onupgradeneeded=function(){ q.result.createObjectStore('k'); }; q.onsuccess=function(){ res(q.result); }; q.onerror=function(){ rej(q.error); }; }catch(e){ rej(e); } }); }
+  function idbGet(db,k){ return new Promise(function(res,rej){ var t=db.transaction('k','readonly').objectStore('k').get(k); t.onsuccess=function(){ res(t.result); }; t.onerror=function(){ rej(t.error); }; }); }
+  function idbPut(db,k,v){ return new Promise(function(res,rej){ var t=db.transaction('k','readwrite').objectStore('k').put(v,k); t.onsuccess=function(){ res(); }; t.onerror=function(){ rej(t.error); }; }); }
+  function b64u(buf){ return btoa(String.fromCharCode.apply(null,new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+  async function ensureSeatKey(){
+    if(SEATKEY)return SEATKEY;
+    var p=prof(); if(!p||!p.invite)return null;
+    var db=await idb(); var slot='seat:'+p.invite;
+    var rec=await idbGet(db,slot);
+    if(!rec){ var kp=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']); var pub=await crypto.subtle.exportKey('jwk',kp.publicKey); rec={priv:kp.privateKey,pub:{kty:'EC',crv:'P-256',x:pub.x,y:pub.y},registered:false}; await idbPut(db,slot,rec); }
+    SEATKEY=rec;
+    var kidBuf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(rec.pub.x+'.'+rec.pub.y)); SEATKID=Array.from(new Uint8Array(kidBuf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('').slice(0,16);
+    if(!rec.registered){ try{ var r=await fetch(base()+'/org/keys',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:p.invite,key:rec.pub,device:(navigator.platform||'device').slice(0,40)})}); if(r.ok){ rec.registered=true; await idbPut(db,slot,rec); } }catch(e){} }
+    return rec;
+  }
+  /* The signed message: exactly the fields a reader would want to pin to a person. */
+  function signedMessageOf(c){ return canonicalJson({id:callId(c),sym:c.sym,verdict:c.verdict||null,ts:c.ts,price:c.price==null?null:+c.price,spy:c.spy==null?null:+c.spy,rbv:c.rbv||null,seat:ORG?ORG.seat:null}); }
+  async function signCall(c){
+    try{ var k=await ensureSeatKey(); if(!k||!k.priv)return; var sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},k.priv,new TextEncoder().encode(signedMessageOf(c))); c.by=c.by||{}; c.by.sig=b64u(sig); c.by.key=SEATKID; if(typeof saveDB==='function')saveDB(); if(typeof pushRecordCopy==='function')pushRecordCopy(); }catch(e){}
+  }
+  window.PF_signedMessageOf=signedMessageOf;
+  /* Attribution: who made the call, on the record itself, then the signature a moment later. */
+  if(typeof window.recordCall==='function'){ var _rc=window.recordCall; window.recordCall=function(){ var before=(D&&Array.isArray(D.calls))?D.calls.length:0; var r=_rc.apply(this,arguments); try{ if(ORG&&D&&Array.isArray(D.calls)&&D.calls.length>before){ var c=D.calls[D.calls.length-1]; if(c&&!c.by) c.by={seat:ORG.seat,name:(D.displayName||'').trim()||null,firm:ORG.id}; if(c&&c.by&&!c.by.sig)signCall(c); } }catch(e){} return r; }; }
+  /* ===== A7.3, A7.4. The firm's records, for the admin seat and a reviewer seat: one table per
+     seat, and the firm's evidence pack as one file. Rendered on History. ===== */
+  async function renderFirmCard(){
+    var host=document.getElementById('firmCard'); if(!host){ var hb=document.getElementById('behaviourBody'); if(!hb)return; host=document.createElement('div'); host.id='firmCard'; host.className='card'; host.style.marginBottom='16px'; hb.closest('.card').parentNode.insertBefore(host,hb.closest('.card')); }
+    host.innerHTML='<h3>The firm\'s records</h3><div class="muted" style="font-size:12.5px">Loading…</div>';
+    try{
+      var r=await fetch(base()+'/org/records?code='+encodeURIComponent(prof().invite)); var j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+      window.PF_FIRM=j;
+      var rows=j.seats.map(function(sx){ var rec=sx.record; var calls=rec?rec.calls.length:0; var sealed=rec?rec.calls.reduce(function(a,c){ return a+Object.values(c.marks||{}).filter(function(m){return m&&m.hash;}).length; },0):0; var signed=rec?rec.calls.filter(function(c){return c.by&&c.by.sig;}).length:0; var last=sx.serverHeads.length?sx.serverHeads[sx.serverHeads.length-1]:null; return '<tr><td>'+sx.seat+'</td><td>'+esc(sx.email||'')+'</td><td>'+esc(sx.role)+(sx.paused?' · paused':'')+'</td><td>'+calls+'</td><td>'+signed+'</td><td>'+sealed+'</td><td class="muted">'+(rec&&rec.updatedAt?new Date(rec.updatedAt).toISOString().slice(0,10):'none')+'</td><td class="muted">'+(last?last.day+' · '+last.n:'none')+'</td></tr>'; }).join('');
+      host.innerHTML='<h3>The firm\'s records · '+esc(j.firm||'')+'</h3><table style="font-size:12.5px"><thead><tr><th>Seat</th><th>Email</th><th>Role</th><th>Calls</th><th>Signed</th><th>Sealed marks</th><th>Server copy</th><th>Last head</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+        '<div class="muted" style="font-size:12px;margin-top:6px">Rulebook '+esc(j.rulebookVersion||'not published')+' · '+(j.rulebookLog||[]).length+' version'+((j.rulebookLog||[]).length===1?'':'s')+' · '+(j.keys||[]).length+' seat key'+((j.keys||[]).length===1?'':'s')+' registered</div>'+
+        '<div class="row" style="margin-top:10px;gap:8px"><button class="btn btn-sm" onclick="exportFirmPack()">Firm evidence pack (JSON)</button><button class="btn btn-ghost btn-sm" onclick="openFirmStatement()">Firm statement, this quarter</button>'+(ORG.isAdmin?'<span class="muted" style="font-size:12px">Roles: seat number and analyst or reviewer</span> <input id="roleSeat" type="number" min="2" style="max-width:70px" placeholder="seat"> <select id="roleKind" style="max-width:120px"><option value="analyst">analyst</option><option value="reviewer">reviewer</option></select> <button class="btn btn-ghost btn-sm" onclick="setSeatRole()">Set</button>':'')+'</div>';
+    }catch(e){ host.innerHTML='<h3>The firm\'s records</h3><div class="muted" style="font-size:12.5px">'+esc(e.message||String(e))+'</div>'; }
+  }
+  /* A4.4 for the firm: one page over every seat's server copy for the current quarter. Edges
+     here are raw excess over the index (the seat's own statement carries the beta-adjusted
+     figure); the page says so. */
+  window.openFirmStatement=function(){
+    var j=window.PF_FIRM; if(!j)return toast('Load the firm\'s records first.');
+    var q=quarterOf(Date.now()), b=quarterBounds(q); var inQ=function(ts){ return ts>=b.a&&ts<b.b; };
+    var esc2=function(x){ return esc(x==null?'':x); }, sign=function(x){ return (x>=0?'+':'\u2212')+Math.abs(x).toFixed(2); };
+    var rows=[], totals={made:0,landed:0,edges:{}};
+    j.seats.forEach(function(sx){ var rec=sx.record; if(!rec)return; var calls=rec.calls.filter(function(c){ return c.conviction!=='flickering'&&(c.verdict==='buy'||c.verdict==='sell'); }); var made=calls.filter(function(c){ return inQ(c.ts); }).length; var landed=0, edges={}; calls.forEach(function(c){ Object.keys(c.marks||{}).forEach(function(h){ var m=c.marks[h]; if(!m||!m.at||!inQ(m.at)||m.missed)return; landed++; if(m.price>0&&c.price>0&&m.spy>0&&c.spy>0){ var e=((m.price-c.price)/c.price-(m.spy-c.spy)/c.spy)*100; e=c.verdict==='sell'?-e:e; (edges[h]=edges[h]||[]).push(e); (totals.edges[h]=totals.edges[h]||[]).push(e); } }); }); totals.made+=made; totals.landed+=landed; rows.push({seat:sx.seat,email:sx.email,role:sx.role,made:made,landed:landed,edges:edges,reviews:rec.reviews.filter(function(r){ return inQ(r.at); }).length}); });
+    var cell=function(ed){ var st=expectancyStats(ed||[]); if(!st)return '-'; return sign(st.expectancy)+(st.lo!=null?' ('+sign(st.lo)+' to '+sign(st.hi)+')':'')+' n='+st.n; };
+    var h='<h1>Firm record statement · '+esc2(j.firm||'')+' · '+esc2(q)+'</h1><p class="m">Generated '+new Date().toISOString().slice(0,10)+' · rulebook '+esc2(j.rulebookVersion||'not published')+' · '+j.seats.length+' seats</p>'+
+      '<table><thead><tr><th>Seat</th><th>Role</th><th>Calls made</th><th>Marks landed</th><th>Reviews closed</th>'+CALL_HORIZONS.map(function(hz){ return '<th>'+hz+' d excess, pts</th>'; }).join('')+'</tr></thead><tbody>'+
+      rows.map(function(r){ return '<tr><td>'+r.seat+' '+esc2(r.email||'')+'</td><td>'+esc2(r.role)+'</td><td>'+r.made+'</td><td>'+r.landed+'</td><td>'+r.reviews+'</td>'+CALL_HORIZONS.map(function(hz){ return '<td>'+cell(r.edges[hz])+'</td>'; }).join('')+'</tr>'; }).join('')+
+      '<tr><th>Firm</th><td></td><td>'+totals.made+'</td><td>'+totals.landed+'</td><td></td>'+CALL_HORIZONS.map(function(hz){ return '<td>'+cell(totals.edges[hz])+'</td>'; }).join('')+'</tr></tbody></table>'+
+      '<p class="m">Source line: each seat\'s record copy on the worker as of '+new Date(j.asOf).toISOString().slice(0,16).replace('T',' ')+'Z. Excess is the stock\'s move less the index\'s move over the same days, signed by the call, before beta adjustment; the interval is \u00b11.96 standard errors. Each seat\'s own statement carries the beta-adjusted figure. Research software, not advice.</p>';
+    var w=window.open('','_blank'); if(!w)return toast('The browser blocked the window. Allow pop-ups for this site and try again.');
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>PerceptFolio firm statement '+esc2(q)+'</title><style>body{font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#111;margin:32px;max-width:1000px}h1{font-size:22px;margin:0 0 4px}table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}thead th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#555}.m{color:#555}@media print{body{margin:0}}</style></head><body>'+h+'</body></html>'); w.document.close();
+  };
+  window.exportFirmPack=function(){
+    var j=window.PF_FIRM; if(!j)return toast('Load the firm\'s records first.');
+    var pack={format:'perceptfolio-firm-evidence/1',exportedAt:new Date().toISOString(),firm:j.firm,id:j.id,rulebook:j.rulebook,rulebookVersion:j.rulebookVersion,rulebookLog:j.rulebookLog,keys:j.keys,seats:j.seats.map(function(sx){ return {seat:sx.seat,email:sx.email,role:sx.role,paused:sx.paused,record:sx.record,serverHeads:sx.serverHeads}; }),
+      note:'Every seat\'s record copy with its marks, hashes and sequence numbers; each seat\'s server-dated heads; the seat keys that signed the calls; the rulebook versions, chained. Each seat verifies on perceptfolio.com/verify/ by loading its part as a pack: {format:"perceptfolio-evidence/1", calls, reviews, chain, serverHeads, keys}.'};
+    downloadText('perceptfolio-firm-evidence-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(pack,null,2),'application/json');
+  };
+  window.setSeatRole=async function(){
+    var seat=parseInt((document.getElementById('roleSeat')||{}).value,10), role=(document.getElementById('roleKind')||{}).value;
+    try{ var r=await fetch(base()+'/org/roles',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:prof().invite,seat:seat,role:role})}); var j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status)); toast('Seat '+seat+' is now '+role+'.'); renderFirmCard(); }catch(e){ toast('Could not set the role: '+(e.message||e)); }
+  };
+  var _st2=window.showTab; if(typeof _st2==='function'){ window.showTab=function(t){ var r=_st2.apply(this,arguments); if(t==='history'&&ORG&&(ORG.isAdmin||ORG.role==='reviewer'))renderFirmCard(); return r; }; }
   /* First-run data key. No key and no worker proxy means no prices; say so once, with the two steps. */
   function keyNudge(){
     try{
@@ -15942,6 +16875,25 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 #tab-world .wd-countries li.pick:hover span:first-child{text-decoration:underline;text-underline-offset:.2em}
 #tab-world .wd-countries li.on span:first-child{font-weight:700;color:var(--brand2)}
 #tab-world .wd-meta a{color:var(--accent)}
+/* Rates and the economy: tiles in the stat idiom, and the curve. */
+.rates-sec{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+.rates-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.rate-tile{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel2)}
+.rate-tile .rl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.rate-tile .rv{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:3px;line-height:1.1}
+.rate-tile .rc{font-size:11.5px;margin-top:4px;font-variant-numeric:tabular-nums;min-height:15px}
+.rate-tile .rd{font-size:10.5px;color:var(--muted);margin-top:4px}
+.rates-curve{display:flex;align-items:center;gap:16px;margin-top:12px;flex-wrap:wrap}
+.rates-curve svg{max-width:100%;height:auto;flex:0 0 auto}
+.rates-curve .ax{font-family:var(--mono);font-size:9.5px;fill:var(--muted)}
+.rates-curve .now{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.rates-curve .was{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-dasharray:4 4;opacity:.7}
+.rates-curve .dot{fill:var(--accent)}
+.rates-curve-note{font-size:12.5px;line-height:1.6;flex:1 1 180px}
+.rates-curve-note .rl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-right:4px}
+.rates-legend{display:flex;gap:14px;font-size:11.5px;margin-top:2px}
+.rates-legend i{display:inline-block;width:18px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:6px}
+.rates-legend i.was{border-top:1.5px dashed var(--muted)}
 .rates{display:flex;flex-wrap:wrap;gap:6px 0;font-size:13.5px;align-items:baseline}
 .rates i{display:inline-block;width:1px;height:14px;background:var(--border);margin:0 14px;vertical-align:middle}
 .rates b{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums}
@@ -17101,6 +18053,8 @@ header{border-bottom-color:var(--line)}
     return out.slice(0,limit||6);
   };
   window.universeSize=function(){ return U?U.length:0; };
+  /* a symbol's company name from the listing, indexed once */
+  var NI=null; window.universeName=function(sym){ if(!U)return ''; if(!NI){ NI={}; for(var i=0;i<U.length;i++)NI[U[i][0]]=U[i][1]; } return NI[String(sym||'').toUpperCase()]||''; };
   /* the Screener over the whole listing, in the background, resumable through the 12-hour cache */
   window.scanUniverse=function(){
     if(typeof hasMarketData==='function'&&!hasMarketData()){ if(typeof toast==='function')toast('Market data needs the data key first.'); return; }

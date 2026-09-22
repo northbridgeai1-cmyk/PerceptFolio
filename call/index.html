@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>A shared call | PerceptFolio</title>
+<meta name="description" content="One call from a PerceptFolio record, shared by its author: what was said, when, at what price, how it marked against the index, and its place in the chain.">
+<meta name="theme-color" content="#0b0c0f">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/verify/verify.css">
+<!-- A4.6. A shared call. The page reads one document from the worker (GET /share/<id>) and shows
+     it. No account, no inline script or style: the public policy applies. -->
+</head>
+<body>
+<nav class="nav"><div class="nav-in"><a class="logo" href="/"><span class="c1">Percept</span><span class="c2">Folio</span></a><a class="nav-back" href="/#record">What this is</a></div></nav>
+<main class="wrap">
+  <h1 id="title">A shared call.</h1>
+  <p class="lede" id="lede">Loading…</p>
+  <section class="card" id="callCard" hidden>
+    <table class="t" aria-label="The call"><tbody id="call"></tbody></table>
+  </section>
+  <section class="card" id="marksCard" hidden>
+    <h2>Marks against the index</h2>
+    <table class="t" aria-label="Marks"><thead><tr><th>Horizon</th><th>Marked on</th><th>Price</th><th>S&amp;P</th><th>Stock</th><th>Index</th><th>Excess</th></tr></thead><tbody id="marks"></tbody></table>
+    <p class="muted" id="marksNote"></p>
+  </section>
+  <section class="card" id="chainCard" hidden>
+    <h2>Its place in the chain</h2>
+    <table class="t" aria-label="Chain"><tbody id="chain"></tbody></table>
+  </section>
+  <section class="legend">
+    <table class="t" aria-label="What this page can and cannot show"><tbody>
+      <tr><th>What it shows</th><td>What the author's terminal said about one ticker, the price and the index level at that instant, and what happened on each fixed anniversary.</td></tr>
+      <tr><th>What the chain adds</th><td>Each mark's hash sits in a chain whose head is posted daily to a clock the author does not control. A server head that counts past this mark's sequence number means the mark existed by that day.</td></tr>
+      <tr><th>What it does not prove</th><td>The whole chain. For that, ask the author for the evidence pack and check it on the <a href="/verify/">verify page</a>.</td></tr>
+      <tr><th>What it is not</th><td>A recommendation. It is a record of what was said under rules the author set.</td></tr>
+    </tbody></table>
+  </section>
+  <p class="src">Source line: the record kept by PerceptFolio for its author; prices as recorded at the call and at each mark; the index is the S&amp;P 500 through SPY.</p>
+</main>
+<script src="/call/call.js" defer></script>
+</body>
+</html>

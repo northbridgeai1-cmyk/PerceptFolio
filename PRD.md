@@ -9,6 +9,8 @@
 
 ## 1. Summary
 
+**Bloomberg tells you everything that is happening. PerceptFolio tells you whether your decisions worked.** (A0.0, 2026-09-21: the one positioning sentence, used on the site and here. It replaces "a cheaper Bloomberg that anyone can use", which the product cannot be at a desk price and does not need to be.)
+
 PerceptFolio is a research terminal sold as software. Anyone can read what it does, run the live demo on the site, and buy a monthly or yearly subscription. Paying unlocks the terminal; each subscriber connects their own free market-data key in a guided first step. NorthBridge employees use the same terminal on permanent codes.
 
 It is sold as a tool, never as advice. The terminal applies rules the user sets to public data and records every verdict so the user can see whether the rules were any good. It makes no recommendation to any person. That positioning is what lets it be sold without an adviser or broker licence, and the terms of sale say so in plain language.
@@ -31,7 +33,7 @@ Kronos, a time-series forecasting model, joins the terminal as one input in Proj
 | D10 | The GitHub repo is public → the secret found in history is treated as exposed and rotated. | **DECIDED** |
 | D11 | magic-mcp and Strix are configured but dormant until you have keys. shadcn-ui-mcp and ui-ux-pro-max install now. | **DECIDED** |
 | D12 | No performance claims, no win rate, expectancy only; the record is new and says so. "What we refused" stays off the site. | **DECIDED** (standing) |
-| D13 | **Two plans.** Personal $149/mo · $1,490/yr. Business $119/seat/mo · $1,190/seat/yr, minimum 3 seats. Refunds 14 days. | **DECIDED** |
+| D13 | **Two plans (revised 2026-09-21, WHAT-TO-ADD.md A2.8).** Personal $149/mo · $1,490/yr, the **Founding** price: held for anyone who has paid it, rising for new accounts after 2027-03-31 (the date is the owner's to move; `FOUNDING_UNTIL` in worker.js and `foundingUntil` in the site config must match). Business **$760/mo · $8,360/yr for three seats**, further seats quoted in the reply (per-seat price above three: **OPEN**). Refunds 14 days. Was: Business $119/seat/mo, min 3, 15% off at 8+. | **DECIDED** (per-seat above three OPEN) |
 | D15 | **Quote-first for everyone (revised 2026-09-13).** Request → Pierce is emailed who/what with a suggested quote → Pierce replies with the price (and questions) → Pierce grants; for a firm, admin issues one code per member email ("Issue member codes") → they enter their code. Firms of 8+ get 15% off every seat, stated in the quote. Stripe Checkout stays built for M7 but is not the site's path. | **DECIDED** |
 | D16 | **Business mode** changes terminal behaviour: org rulebook applied to all seats, per-analyst attribution on every call, client books on, seat admin, compliance export. | **DECIDED** |
 | D14 | Kronos hosts on **Modal**. Stripe is built against a stub and activated when the account exists. Legal entity: "NorthBridge", details pending. | **DECIDED** |

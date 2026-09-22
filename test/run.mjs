@@ -472,8 +472,15 @@ t('a paused code is refused on both lookup paths',
   /return rec\.paused \? null : rec/.test(worker));
 t('macro data is gated on a live grant, not the sync key',
   /Macro data needs a live invite code, or the sync key/.test(worker));
-t('the FRED series allowlist is closed: three statistics, the policy rate and its range, two yields, the balance sheet',
-  /FRED_ALLOWED = new Set\(\['VIXCLS', 'SP500', 'GDP', 'DFF', 'DFEDTARU', 'DFEDTARL', 'DGS2', 'DGS10', 'WALCL'\]\)/.test(worker));
+t('the FRED series allowlist is closed: three statistics, the policy rate and its range, the curve, the mortgage, prices, breakevens, jobs, the balance sheet',
+  /FRED_ALLOWED = new Set\(\['VIXCLS', 'SP500', 'GDP', 'DFF', 'DFEDTARU', 'DFEDTARL', 'DGS3MO', 'DGS2', 'DGS10', 'DGS30', 'MORTGAGE30US', 'CPIAUCSL', 'T10YIE', 'UNRATE', 'WALCL'\]\)/.test(worker));
+/* The Market tab's rates card asks for exactly that list, and the Fed funds series, which counts
+   weekends, is fetched deep enough to carry a three-month change. */
+t('the terminal asks for the same series, side by side',
+  /const need=\['VIXCLS','SP500','GDP','DFF','DFEDTARU','DFEDTARL','DGS3MO','DGS2','DGS10','DGS30','MORTGAGE30US','CPIAUCSL','T10YIE','UNRATE','WALCL'\]/.test(term) &&
+  /await Promise\.all\(need\.map\(async s=>/.test(term) && /s==='DFF'\?100/.test(term));
+t('inflation is CPI read over twelve months, never the index level',
+  /const b=cpiRows\.find\(r=>r\.d\.slice\(0,7\)===want\)/.test(term));
 /* Wilshire withdrew WILL5000PR from FRED; asking for it prints an error on the Buffett card. */
 t('the terminal no longer asks FRED for the Wilshire 5000', !/need=\[[^\]]*'WILL5000PR'/.test(term));
 /* Earnings dates: one calendar for the whole market, a day at a time, behind the same door as
@@ -1215,9 +1222,22 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: one primary in the hero, a text link beside it', /variant="primary" size="lg"><a href="#request">Request a demo<\/a>/.test(src) && /or try it on real history first/.test(src));
   t('site: the nav carries no Request-a-demo primary on /pricing (the page is the ask); Resume session still shows there once entered', /: !onPricing && <Button asChild variant="primary"/.test(src));
   t('site: pricing is quote-first, one primary per card, no self-serve checkout', /<Link to="\/#request">Request access<\/Link>/.test(src) && /Request seats for a firm/.test(src) && !/checkout\(/.test(read('site/src/pages/Pricing.tsx')));
-  t('site: the business discount is one constant, stated on the page and in the form hint', /BUSINESS_DISCOUNT = \{ minSeats: 8, pct: 15 \}/.test(read('site/src/lib/config.ts')) && /Eight or more members get a lower price per seat/.test(src));
+  /* A2.8. Business is a desk price with three seats included; the per-seat figure above three is
+     OPEN, so the page and the form say "quoted in the reply" rather than inventing one. */
+  t('site: business is a flat desk price, three seats included, further seats quoted (A2.8)', /business: \{ monthly: 760, yearly: 8360, seatsIncluded: 3 \}/.test(read('site/src/lib/config.ts')) && /Three seats are included in the desk price; seats beyond three are quoted in the reply/.test(src) && !/BUSINESS_DISCOUNT/.test(read('site/src/lib/config.ts')));
+  t('site: Personal is the Founding price with the rise date printed (A2.8)', /foundingUntil: '2027-03-31'/.test(read('site/src/lib/config.ts')) && /Founding price/.test(read('site/src/pages/Pricing.tsx')) && /Rises for new accounts after \{fmtDate\(p\.foundingUntil\)\}/.test(read('site/src/pages/Pricing.tsx')));
+  t('site: no product is named beside the price (A1.6)', !/Koyfin|Godel|YCharts|COMPARISONS/.test(read('site/src/pages/Pricing.tsx') + read('site/src/lib/config.ts')));
+  t('site: who each plan is for comes before the price (A1.6)', (() => { const p = read('site/src/pages/Pricing.tsx'); return p.indexOf('Who each plan is for') < p.indexOf('Billing period'); })());
+  t('site: the positioning sentence is on the landing page and in the PRD (A0.0)', /Bloomberg tells you everything that is happening\. PerceptFolio tells you whether your decisions worked\./.test(read('site/src/pages/Landing.tsx')) && /Bloomberg tells you everything that is happening\. PerceptFolio tells you whether your decisions worked\./.test(read('PRD.md')));
+  t('site: the data tile says market data is built in, not bring your own key (A1.4)', /Market data, built in/.test(read('site/src/pages/Landing.tsx')) && !/Bring your own data key/.test(read('site/src/pages/Landing.tsx')));
+  t('site: the record mechanism is on the page with a verify link (A5.2)', /Hash-chained/.test(read('site/src/pages/Landing.tsx')) && /Server-clocked/.test(read('site/src/pages/Landing.tsx')) && /href="\/verify\/"/.test(read('site/src/pages/Landing.tsx')));
+  t('site: how a desk uses it, in four tiles (A5.4)', /Three seats/.test(read('site/src/pages/Landing.tsx')) && /One rulebook/.test(read('site/src/pages/Landing.tsx')) && /One record/.test(read('site/src/pages/Landing.tsx')) && /One statement/.test(read('site/src/pages/Landing.tsx')));
+  t('site: the screens are named by the decision each answers (A5.3)', /SCREENS\.map/.test(read('site/src/pages/Landing.tsx')) && (read('site/src/lib/config.ts').match(/\{ id: '[a-z]+', name:/g) || []).length === 15);
+  t('site: the time-to-evidence line sits under the empty scorecard (A5.5)', /calls a quarter, against the roughly 138 the interval needs/.test(read('site/src/pages/Landing.tsx')));
+  t('site: a security sheet and the flat-quarter statement are routed and linked (A2.6, A2.7, A5.6)', /path="\/security"/.test(read('site/src/main.tsx')) && /path="\/flat-quarter"/.test(read('site/src/main.tsx')) && /to="\/security"/.test(read('site/src/components/Footer.tsx')));
+  t('site: the support address is one constant, behind a flag until Email Routing exists (A1.5)', /SUPPORT_LIVE \? 'support@perceptfolio\.com' : CONTACT/.test(read('site/src/lib/config.ts')) && /mailto:' \+ SUPPORT/.test(read('site/src/components/Footer.tsx')) && /fetch\(WORKER \+ '\/version'/.test(read('site/src/components/Footer.tsx')));
   t('forms ask personal or firm, and seats only for a firm', /name="plan" value="business"/.test(idx) && /id="seatsWrap" hidden/.test(idx) && /plan === 'business' && <div/.test(src));
-  t('the worker tells the operator on every request, with a suggested quote', /Demo request: \$\{plan\}/.test(worker) && /Suggested quote:\\n\$\{q\.text\}/.test(worker) && /BUSINESS_DISCOUNT = \{ minSeats: 8, pct: 15 \}/.test(worker));
+  t('the worker tells the operator on every request, with a suggested quote', /Demo request: \$\{plan\}/.test(worker) && /Suggested quote:\\n\$\{q\.text\}/.test(worker) && /seatsIncluded: 3/.test(worker) && /FOUNDING_UNTIL = '2027-03-31'/.test(worker));
   t('member codes: one per email, operator only, business grants only, re-send instead of re-mint', /url\.pathname === '\/decide\/members'/.test(worker) && /rec\.status !== 'business'/.test(worker) && /rec\.members\.find\(x => x\.email === email\)/.test(worker));
   t('admin has Send quote and Issue member codes', /function mailQuote/.test(read('admin.html')) && /async function issueMembers/.test(read('admin.html')) && /Issue member codes/.test(read('admin.html')));
   t('site: once you have entered, the primary is Resume session, otherwise Request a demo', /\{entered\s*\? <Button asChild variant="primary"[^>]*><a href="\/terminal\/">Resume session<\/a>/.test(src) && /pf_seen=1/.test(src) && /quantfolio_v1/.test(src) && !/hasProfile/.test(src));
@@ -1225,7 +1245,7 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: skeleton before the demo deals; shimmer stops under reduced motion', /<Skeleton/.test(read('site/src/components/Demo.tsx')) && /prefers-reduced-motion: reduce\) \{ html \{ scroll-behavior: auto; \} \*, \*::before, \*::after \{ animation: none !important/.test(read('site/src/index.css')));
   t('site: Archivo self-hosted, never a font CDN', /url\("\/fonts\/Archivo\.woff2"\)/.test(read('site/src/index.css')) && !/fonts\.googleapis/.test(src + read('site/index.html')) && fs.existsSync('site/public/fonts/Archivo.woff2'));
   t('site: legal pages say software, not advice, and fourteen-day refunds', /not a registered investment adviser or broker-dealer/.test(src) && /Fourteen days from any payment/.test(src));
-  t('site: prices come from one config and match the PRD', /personal: \{ monthly: 149, yearly: 1490 \}/.test(read('site/src/lib/config.ts')) && /business: \{ monthly: 119, yearly: 1190, minSeats: 3 \}/.test(read('site/src/lib/config.ts')));
+  t('site: prices come from one config and match the worker', /personal: \{ monthly: 149, yearly: 1490, foundingUntil: '2027-03-31' \}/.test(read('site/src/lib/config.ts')) && /business: \{ monthly: 760, yearly: 8360, seatsIncluded: 3 \}/.test(read('site/src/lib/config.ts')) && /personal: \{ monthly: 149, yearly: 1490 \}, business: \{ monthly: 760, yearly: 8360, seatsIncluded: 3 \}/.test(worker));
   t('site: dist and node_modules are ignored', /site\/dist\//.test(read('.gitignore')) && /node_modules\//.test(read('.gitignore')));
 }
 
@@ -1377,10 +1397,25 @@ G('The terminal is not served without a session');
   t('post-sign-in redirects are same-origin only',
     /!n\.startsWith\('\/'\) \|\| n\.startsWith\('\/\/'\)/.test(enter));
   t('the public CSP has no unsafe-inline; the gated CSP keeps it for the single-file terminal', (() => {
-    const pub = (mw.match(/return `default-src 'self'; script-src 'self'; style-src 'self';[^`]*`/)||[''])[0];
+    const pub = (mw.match(/return `default-src 'self'; script-src 'self' https:\/\/static\.cloudflareinsights\.com; style-src 'self';[^`]*`/)||[''])[0];
     const gated = (mw.match(/return `default-src 'self'; script-src 'self' 'unsafe-inline'(?: 'wasm-unsafe-eval')?;[^`]*`/)||[''])[0];
     return pub && !/unsafe-inline/.test(pub) && /frame-ancestors 'none'/.test(pub) && gated && /frame-ancestors 'none'/.test(gated);
   })());
+  /* A1.1. The hero on the landing page is an iframe of /preview/dashboard.html, a snapshot of the
+     terminal's markup with its inline styles. Under the public policy those styles were refused and
+     the first thing a visitor saw was unstyled HTML. The preview's own policy must allow inline
+     style, keep script-src at 'self' (the file has no inline script; check that too, so nobody adds
+     one and widens the hole), and be frameable by this origin only. */
+  t('the preview snapshot is served under a policy its inline styles satisfy, framed by this origin only', (() => {
+    const prev = (mw.match(/if \(FRAMEABLE\.test\(path\)\) \{\s*return `([^`]*)`/)||[])[1] || '';
+    return /style-src 'self' 'unsafe-inline'/.test(prev) && /script-src 'self';/.test(prev) && /frame-ancestors 'self'/.test(prev) && !/frame-ancestors 'none'/.test(prev);
+  })());
+  t('the preview snapshot carries no inline script block, so script-src can stay at self (its leftover on* attributes are refused by that policy and never fire: pointer-events none)',
+    !/<script>[^<]/.test(read('preview/dashboard.html')));
+  /* A1.2. Pages injects Cloudflare Web Analytics on every page; the public policy must let it run
+     or there is no funnel data at all. */
+  t('the public CSP admits the Web Analytics beacon (script and its connect host)',
+    /script-src 'self' https:\/\/static\.cloudflareinsights\.com/.test(mw) && /https:\/\/cloudflareinsights\.com;/.test(mw));
   t('HSTS, nosniff, DENY framing, no-referrer and a Permissions-Policy are set on every response',
     /'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'/.test(mw) && /'X-Content-Type-Options': 'nosniff'/.test(mw)
     && /'X-Frame-Options': 'DENY'/.test(mw) && /'Referrer-Policy': 'no-referrer'/.test(mw) && /'Permissions-Policy'/.test(mw));
@@ -1480,12 +1515,24 @@ t('the terminal is noindex, so a search never lands on the login',
 t('every sitemap URL exists and is indexable', (() => {
   const locs=[...sitemap.matchAll(/<loc>https:\/\/perceptfolio\.com(\/[^<]*)<\/loc>/g)].map(m=>m[1]);
   if(!locs.length)return false;
+  const routes=[...read('site/src/main.tsx').matchAll(/<Route path="([^"]+)"/g)].map(m=>m[1]);
   return locs.every(loc => {
+    if(routes.includes(loc))return true;            // a React route: served by the SPA, indexable by default
     const f = loc==='/' ? 'index.html' : loc.replace(/^\/|\/$/g,'')+'/index.html';
     let html; try{ html=read(f); }catch(e){ return false; }
     const m=html.match(/<meta name="robots" content="([^"]*)"/);
     return !m || !/noindex/.test(m[1]);
   });
+})());
+/* A1.3. The test above checks a file exists in the REPO; /refused/ passed it for weeks while the
+   assembler never shipped the file and the live URL returned Not found. A listed URL must also be
+   something Pages actually serves: the root, a route the React app declares, or a legacy path
+   the assembler redirects. */
+t('every sitemap URL is served: a React route or an assembler redirect', (() => {
+  const locs=[...sitemap.matchAll(/<loc>https:\/\/perceptfolio\.com(\/[^<]*)<\/loc>/g)].map(m=>m[1]);
+  const routes=[...read('site/src/main.tsx').matchAll(/<Route path="([^"]+)"/g)].map(m=>m[1]);
+  const redirects=[...read('scripts/assemble.mjs').matchAll(/'(\/[a-z0-9./-]+) \/[a-z0-9-]+ 301'/g)].map(m=>m[1]);
+  return locs.every(loc => loc==='/' || routes.includes(loc) || redirects.includes(loc));
 })());
 /* A page nobody should reach by search must say so, or it can outrank the door. */
 t('the private surfaces are all noindex',
@@ -1770,12 +1817,23 @@ t('back to top appears only once it saves something', /window\.scrollY>600/.test
 /* ==================== HINDSIGHT ==================== */
 G('A leaderboard is a trap unless it grades the system');
 
-/* I10: the free tier is 60 calls a minute with no historical candles, so ranking the whole market
-   is unavailable rather than slow. */
-t('the file records why the whole market is not scanned',
-  /WHY THE WHOLE MARKET IS NOT AVAILABLE/.test(term));
-t('and the screen says it too, with the arithmetic',
-  /about four thousand quotes per window against a sixty-per-minute limit/.test(term));
+/* I10 still holds for a device: the free tier is 60 calls a minute with no historical candles.
+   The whole market is reached by the worker ranking it once a day (the most-actives pool by
+   three-month average dollar volume, thirty names, returns from five years of closes), and the
+   terminal reads that one document. The figure remains a trap and the file still says so. */
+t('the file records how the whole market is reached, and why the figure is still a trap',
+  /HOW THE WHOLE MARKET IS REACHED/.test(term) && /WHY THE FIGURE IS DANGEROUS EVEN NOW/.test(term));
+t('the market ranks itself on the worker, once a day, by dollar volume',
+  /url\.pathname === '\/popular'/.test(worker) && /three-month average dollar volume/.test(worker) &&
+  /expirationTtl: 2 \* 86400/.test(worker) && /scrIds=most_actives/.test(worker));
+t('penny stocks and micro caps are out, one share class a company, thirty names',
+  /q\.regularMarketPrice >= 5 && q\.marketCap >= 2e9/.test(worker) &&
+  /if \(seen\[k\] \|\| picked\.length >= 30\) return/.test(worker));
+t('a window a listing is too young for stays empty rather than measured short',
+  /if \(i < 0 \|\| best > 12\) continue;/.test(worker));
+t('the terminal reads that document, keeps it for the day, and folds its own names in beside it',
+  /INVITE_WORKER\+'\/popular'/.test(term) && /pf_popular_v1/.test(term) &&
+  /source:'market'/.test(term) && /if\(seen\[sym\]\)return;/.test(term));
 /* Five years is now reachable: the scoring call already carries the vendor's own price returns,
    so the panel no longer waits for a log to fill. Where the vendor omits a window it shows nothing
    rather than a shorter span relabelled. */
@@ -1789,11 +1847,11 @@ t('and shows nothing rather than a shorter span dressed up as five years',
 t('each row carries what the checklist said before the window opened',
   /function verdictBefore/.test(term) && /etDate\(c\.ts\)<=cutoffDate/.test(term));
 t('it refuses to double-list a name when there are too few tickers',
-  /const split=rows\.length>=6/.test(term));
+  /const split=rows\.length>=10/.test(term) && /rows\.slice\(0,5\)/.test(term) && /rows\.slice\(-5\)/.test(term));
 /* The same honesty, in a better place: every row states which source it came from, so a logged
    fallback covering 59 sessions can never read as a full year. */
 t('every row states the span it actually came from',
-  /r\.source==='vendor'\?'market history':r\.obs\+' logged sessions'/.test(term));
+  /r\.source==='market'\?'most traded':r\.source==='vendor'\?'market history':r\.obs\+' logged sessions'/.test(term));
 t('and the summary counts each source separately',
   /from the vendor calculation over the real window/.test(term) &&
   /from closes this app logged itself/.test(term));
@@ -1812,6 +1870,35 @@ t('and the longest windows are vendor-only',
 t('it states its own falsification, in a collapsed note',
   /the checklist is not selecting winners/.test(term) &&
   /aside\('Why the last column is the one that matters'/.test(term));
+
+/* ==================== HERIZEN, FOR THE WHOLE MARKET ==================== */
+G('A momentum score that only works on what you already watch is not a score');
+
+/* The score used to read the synced 300-session log alone, so a name nobody had refreshed could
+   not be scored at all. It reads the device's five-year history first now, and any listed name is
+   one /history fetch away. */
+t('the score reads the five-year history before the synced log',
+  /function herizen\(sym\)\{[\s\S]{0,400}longSeries\(sym\)\)\|\|\(D\.priceLog\|\|\{\}\)\[sym\]/.test(term));
+t('an unscored name is fetched once, on first sight',
+  /hzFetched\[sym\]=true;/.test(term) && /histFill\(sym\)\.then\(ok=>\{/.test(term));
+/* A failed fetch once cleared its flag and redrew the panel, which asked again at once: a loop
+   against the worker at the rate the promise resolves. The failure draws its own line instead. */
+t('a miss is reported by the callback, never by drawing the panel again',
+  /if\(ok\)\{renderHerizen\(\);return;\}/.test(term) &&
+  /delete hzFetched\[sym\];\s*\n\s*el\.innerHTML='<div class="empty">No price history found for/.test(term));
+t('a company name resolves to its ticker through the listing',
+  /universeMatches\(sym,1\)\[0\]/.test(term) && /window\.universeName=function/.test(term));
+t('the count beside the box is the listing, not the log',
+  /'any of '\+universeN\.toLocaleString\(\)\+' US-listed stocks'/.test(term));
+
+/* ==================== THE OPERATOR'S PARAGRAPH RULE ==================== */
+G('No paragraphs on screen: the reasoning lives in the source');
+t('the add-holding note about dollars, fractions and mutual funds is gone from every page',
+  !/Enter dollars<\/b> to buy by amount/.test(term) &&
+  !/Enter dollars<\/b> to buy by amount/.test(read('preview/dashboard.html')) &&
+  !/Enter dollars<\/b> to buy by amount/.test(read('site/public/preview/dashboard.html')));
+t('the rates card carries no caption, only tiles, the curve and a source line',
+  /FRED, as of '\+esc\(day\(asOf\)\)\+'/.test(term) && /class="muted rates-legend"/.test(term));
 
 /* ==================== P4. CRAFT AND MOBILE ==================== */
 G('The daily check happens on a phone');
@@ -2334,6 +2421,111 @@ t('a head must be a real digest before it is stored', /\^\[0-9a-f\]\{64\}\$/.tes
    when its fetch settles, so ordering here is load-bearing, not cosmetic. */
 t('verification runs after the section that rewrites the DOM',
   term.indexOf('const v=await verifyChain()') > term.indexOf("el.innerHTML=out+head('Worker')"));
+
+/* ==================== A2.3 to A2.5: the server copy, the pack, the verifier ==================== */
+G('The record leaves the browser as a projection, and can be checked without trusting anyone');
+{
+  const vjs = read('verify/verify.js'), vhtml = read('verify/index.html');
+  /* The verifier must hash exactly as the terminal does, or it verifies nothing. Byte for byte. */
+  for (const fn of ['canonicalJson', 'chainRecord', 'reviewRecord', 'sha'])
+    t('verify.js carries the terminal\'s ' + fn + ' verbatim', grab(vjs, fn) === grab(term, fn));
+  t('the verify page runs under the strict public policy: no inline script, no inline style, external files only',
+    !/<script>[^<]/.test(vhtml) && !/ style="/.test(vhtml) && /<script src="\/verify\/verify\.js" defer>/.test(vhtml) && /href="\/verify\/verify\.css"/.test(vhtml));
+  t('the verify page is noindex and the assembler ships it', /noindex/.test(vhtml) && /copy\('verify'\)/.test(read('scripts/assemble.mjs')));
+  t('the verify page states what a chain does not prove', /A chain built from invented prices verifies/.test(vhtml));
+  /* Behavioural: seal a small record with the terminal's functions, then run the verifier's
+     recompute over the resulting pack. A tampered price must break it; a server head naming an
+     entry must be matched by that entry. */
+  const V = new Function(`
+    ${grab(term, 'canonicalJson')}
+    ${grab(term, 'chainRecord')}
+    ${grab(term, 'reviewRecord')}
+    async ${grab(term, 'sha')}
+    ${grab(vjs, 'entriesOf')}
+    async ${grab(vjs, 'recompute')}
+    ${grab(vjs, 'headCheck')}
+    return {canonicalJson, chainRecord, reviewRecord, sha, entriesOf, recompute, headCheck};
+  `)();
+  const seal = async (pack) => {
+    const chain = { head: '', n: 0 };
+    const pending = [];
+    pack.calls.forEach(c => Object.keys(c.marks).forEach(h => pending.push({ id: c.id, h: +h, mk: c.marks[h] })));
+    pending.sort((a, b) => (a.mk.at || 0) - (b.mk.at || 0));
+    pack.reviews.forEach(r => pending.push({ review: r }));
+    for (const e of pending) {
+      const rec = e.review ? V.reviewRecord(e.review, chain.head) : V.chainRecord(e.id, e.h, e.mk, chain.head);
+      const hash = await V.sha(V.canonicalJson(rec)); const tgt = e.review || e.mk; tgt.hash = hash; tgt.seq = chain.n; chain.head = hash; chain.n++;
+    }
+    pack.chain = chain; return pack;
+  };
+  const mk = (p, spy, at) => ({ price: p, spy, beta: 1.1, at, lag: 0, intended: '2026-12-20', actual: '2026-12-21' });
+  const pack = await seal({ format: 'perceptfolio-evidence/1', calls: [
+    { id: '1:AAPL:checklist', sym: 'AAPL', ts: 1, marks: { 30: mk(200, 650, 1000), 90: mk(210, 660, 3000) } },
+    { id: '2:MSFT:checklist', sym: 'MSFT', ts: 2, marks: { 30: mk(400, 655, 2000) } }],
+    reviews: [{ sym: 'AAPL', at: 4000, marks: [{ n: 1, mark: 'supported' }, { n: 2, mark: 'broken' }] }] });
+  let res = await V.recompute(pack);
+  t('a sealed record of marks and a review recomputes end to end', res.n === 4 && !res.broken && res.contiguous && res.head === pack.chain.head);
+  t('entries are ordered by sequence: marks by time, then the review', res.entries.map(e => e.kind + ':' + (e.sym)).join(',') === 'mark:AAPL,mark:MSFT,mark:AAPL,review:AAPL');
+  const h1 = { day: '2026-12-21', at: 1, head: res.entries[2].mk.hash, n: 3 };
+  t('a server head naming entry n is matched by the entry with seq n-1', V.headCheck(res, h1).ok === true);
+  t('a server head with a hash the pack does not carry is refused', V.headCheck(res, { day: 'x', at: 1, head: 'ab'.repeat(32), n: 3 }).ok === false);
+  const tampered = JSON.parse(JSON.stringify(pack)); tampered.calls[0].marks[30].price = 201;
+  res = await V.recompute(tampered);
+  t('changing one price breaks the chain at that entry and every later one', !!res.broken && res.broken.seq === 0 && res.rows.filter(r => !r.ok).length === 4);
+  const flipped = JSON.parse(JSON.stringify(pack)); flipped.reviews[0].marks[1].mark = 'supported';
+  res = await V.recompute(flipped);
+  t('changing a review mark breaks the chain at the review', !!res.broken && res.broken.kind === 'review');
+  /* The terminal side. */
+  t('the record\'s server copy is a projection: no thesis text, no holdings, no notes', /function recordProjection\(\)/.test(term) && !/thesis/.test(grab(term, 'recordProjection')) && !/holdings/.test(grab(term, 'recordProjection')));
+  t('the server copy is opt-in for a person and always on for a seat of a firm', /if\(p\.invite&&p\.inviteTier==='business'\)return true;\n  return !!D\.recordCopy;/.test(term));
+  t('the copy is pushed after sealing, beside the chain head', /if\(n\)pushChainHead\(\); pushRecordCopy\(\);/.test(term));
+  t('the evidence pack fetches the live server heads and says where they came from', /serverHeads:heads,serverHeadsSource:headsSource/.test(term) && /A chain proves no mark was altered since it was written/.test(term));
+  t('the CSV has one row per call with each horizon\'s mark as columns, and holdings ride separately', /'mark'\+h\+'_hash'/.test(term) && /function exportHoldingsCsv/.test(term));
+  t('reviews enter the same chain as marks, as their own record shape', /kind:'review'/.test(grab(term, 'reviewRecord')) && /unsealedMarks\(\)\.concat\(unsealedReviews\(\)\)/.test(term));
+  /* The worker side. */
+  t('the worker stores the record copy under the same identity rules as the chain', /url\.pathname === '\/record'\) \{/.test(worker) && /const key = 'rec:' \+ ident;/.test(worker));
+  t('the worker keeps only the fields the record needs, validated, capped at a megabyte', (() => {
+    const route = worker.slice(worker.indexOf("url.pathname === '/record') {"), worker.indexOf("url.pathname === '/record') {") + 4500);
+    return /raw\.length > 1024 \* 1024/.test(route) && route.includes("hash: /^[0-9a-f]{64}$/.test(String(m.hash || '')) ? m.hash : null") && !/thesis\s*:/.test(route) && !/holdings\s*:/.test(route) && !/note\s*:/.test(route);
+  })());
+}
+
+/* ==================== A3: THE REVIEW ==================== */
+G('The review: what changed since you last looked, then the assumptions marked by hand');
+{
+  const R = new Function(`
+    const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    ${term.slice(term.indexOf('const ASSUMPTION_KINDS='), term.indexOf('function parseAssumptions('))}
+    ${grab(term, 'assumptionKind')}
+    ${grab(term, 'parseAssumptions')}
+    ${grab(term, 'reviewDue')}
+    ${grab(term, 'insiderSummary')}
+    ${grab(term, 'digestRow')}
+    const D = { reviews: [] };
+    ${grab(term, 'assumptionFailures')}
+    return {assumptionKind, parseAssumptions, reviewDue, insiderSummary, digestRow, assumptionFailures, D};
+  `)();
+  const as = R.parseAssumptions('1. Gross margin stays above 40%\n2) Revenue grows faster than 10%\n\nNo share loss to the second player\n4. a\n5. b\n6. c\n7. d');
+  t('assumptions: one per line, numbering stripped and reassigned, blanks dropped, capped at six', as.length === 6 && as[0].n === 1 && as[0].text === 'Gross margin stays above 40%' && as[2].n === 3 && as[2].text === 'No share loss to the second player');
+  t('assumptions: each carries a kind for the History table', as[0].kind === 'margin' && as[1].kind === 'growth' && as[2].kind === 'competition' && R.assumptionKind('the Fed cuts twice') === 'macro' && R.assumptionKind('xyz') === 'other');
+  t('review due on the date', R.reviewDue({ reviewDate: '2026-01-01' }, '2026-09-21') === 'date' && R.reviewDue({ reviewDate: '2027-01-01' }, '2026-09-21') === null);
+  t('review due on the cadence since the last one closed, or since the thesis was written', R.reviewDue({ reviewEvery: 30, reviewedAt: Date.now() - 31 * 86400000 }, '2026-09-21') === 'cadence' && R.reviewDue({ reviewEvery: 30, reviewedAt: Date.now() - 5 * 86400000 }, '2026-09-21') === null && R.reviewDue({ reviewEvery: 30, created: '2026-01-01' }, '2026-09-21') === 'cadence');
+  const ins = R.insiderSummary({ data: [{ name: 'A', transactionDate: '2026-09-10', change: 1000, transactionCode: 'P' }, { name: 'B', transactionDate: '2026-09-11', change: -500, transactionCode: 'S' }, { name: 'C', transactionDate: '2025-01-01', change: 9000, transactionCode: 'P' }] }, Date.parse('2026-09-01'));
+  t('insiders: buyers and sellers since a date, older rows ignored', ins.buyers.join() === 'A' && ins.sellers.join() === 'B' && ins.bought === 1000 && ins.sold === 500);
+  t('a digest row escapes what it prints and links only when given a URL', /<a href="https:\/\/x\.example\/a&amp;b"/.test(R.digestRow('Filing', '8-K <results>', '2026-09-01', 'https://x.example/a&b')) && /&lt;results&gt;/.test(R.digestRow('Filing', '8-K <results>', '2026-09-01')) && !/<a /.test(R.digestRow('Filing', 'x', '')));
+  R.D.reviews = [{ marks: [{ n: 1, mark: 'broken', kind: 'growth' }, { n: 2, mark: 'supported', kind: 'margin' }] }, { marks: [{ n: 1, mark: 'uncertain', kind: 'growth' }] }];
+  const af = R.assumptionFailures();
+  t('History counts the assumptions you get wrong, by kind, broken first', af.total === 3 && af.reviews === 2 && af.rows[0].kind === 'growth' && af.rows[0].broken === 1 && af.rows[0].uncertain === 1);
+  /* The hand-mark rule and the chain. */
+  t('the terminal never marks an assumption itself: marks come from radio inputs the person set', /document\.querySelector\('input\[name="asm'\+a\.n\+'"\]:checked'\)/.test(term) && !/mark:\s*'broken'/.test(grab(term, 'reviewDigest')));
+  t('a closed review with marks is sealed into the chain and pushed with the record copy', /if\(marks\.length\)D\.reviews\.push\(rec\)/.test(term) && /const n=await sealNewMarks\(\); if\(n\)\{ pushChainHead\(\); \} pushRecordCopy\(\);/.test(grab(term, 'submitReview')));
+  t('a review closes with a snapshot, so the next digest has something to diff against', /D\.reviewSnap\[sym\]=await reviewSnapshot\(sym\)/.test(term));
+  t('nothing changed is a line with the date and what was checked', /digestRow\('Nothing changed','since '\+\(d\.sinceDay\|\|'the thesis was written'\)\+'\. Checked: '/.test(term));
+  t('every digest line cites a source and a date; none says what it means', /No line above says what it means; that is yours/.test(term) && /digestRow\('Filing'/.test(term) && /digestRow\('Insiders'/.test(term) && /digestRow\('Analysts'/.test(term) && /digestRow\(touched\.length\?'Headline, touches '/.test(term) && /digestRow\('Model'/.test(term) && /digestRow\('Verdict'/.test(term) && /digestRow\('Check'/.test(term));
+  t('Command: REVIEW fires on the date or the cadence, opens the review, and carries the digest in its row', /if\(th&&reviewDue\(th,today\)\)/.test(term) && /action:'openReview\(/.test(term) && /digest:h\.sym/.test(term) && /fillDigestInto\(q\[cmdOpen\]\.digest/.test(term));
+  t('the thesis form carries assumptions and a cadence; the holding menu carries Review with the last date', /id="thesisAssumptions"/.test(term) && /id="thesisEvery"/.test(term) && /label:'Review'\+\(thesisFor\(sym\)&&thesisFor\(sym\)\.reviewedAt/.test(term));
+  t('the worker\'s filings route reads EDGAR submissions, keeps the forms a holder needs, names 8-K items, and caches six hours', /url\.pathname === '\/filings' && request\.method === 'GET'/.test(worker) && /data\.sec\.gov\/submissions\/CIK/.test(worker) && /'2\.02': 'results'/.test(worker) && /'5\.02': 'officer or director change'/.test(worker) && /expirationTtl: 6 \* 3600/.test(worker));
+}
 
 /* ==================== D4. MARKS ARE APPEND-ONLY ==================== */
 G('A mark survives the merge, because it cannot be rebuilt');
