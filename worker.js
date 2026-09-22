@@ -1393,6 +1393,10 @@ async function handle(request, env) {
      forget one from Settings, which is the same trust the code already carries. A sync that names
      no device (the bring-my-account fetch, old builds) registers nothing and is not counted. The
      seen stamp is written at most hourly a device, KV writes being the scarce thing. */
+  /* A person's devices, not a pair: the access code is what ties them together (2026-09-22), and
+     a laptop, a phone, a tablet and a spare is an ordinary set for one person. The cap exists so a
+     leaked code cannot quietly seed a crowd, not to ration the product. */
+  const DEVICE_LIMIT = 5;
   if (url.pathname === '/usync/devices' || url.pathname === '/usync/forget') {
     let body = {};
     if (request.method === 'POST') { try { body = await request.json(); } catch (e) { body = {}; } }
@@ -1404,9 +1408,9 @@ async function handle(request, env) {
       const id = clean(body.device, 40);
       const left = devs.filter(d => d.id !== id);
       if (left.length !== devs.length) await env.PF_SYNC.put(dk, JSON.stringify(left));
-      return json({ ok: true, devices: left, limit: 2 }, 200, env);
+      return json({ ok: true, devices: left, limit: DEVICE_LIMIT }, 200, env);
     }
-    return json({ devices: devs, limit: 2 }, 200, env);
+    return json({ devices: devs, limit: DEVICE_LIMIT }, 200, env);
   }
   if (url.pathname === '/usync') {
     const code = clean(url.searchParams.get('code'), 12).toUpperCase();
@@ -1419,8 +1423,8 @@ async function handle(request, env) {
       let devs = []; try { devs = JSON.parse((await env.PF_SYNC.get(dk)) || '[]'); } catch (e) { devs = []; }
       const mine = devs.find(d => d.id === device);
       if (!mine) {
-        if (devs.length >= 2) {
-          return json({ error: 'This code keeps its book on two devices already. Forget one under Settings → Sync on a device that has it.', devices: devs, limit: 2 }, 409, env);
+        if (devs.length >= DEVICE_LIMIT) {
+          return json({ error: 'Your code is already on ' + DEVICE_LIMIT + ' devices. Open Settings, Sync across your devices, on any of them and forget one you no longer use.', devices: devs, limit: DEVICE_LIMIT }, 409, env);
         }
         devs.push({ id: device, name: dname || 'a device', seen: Date.now() });
         await env.PF_SYNC.put(dk, JSON.stringify(devs));

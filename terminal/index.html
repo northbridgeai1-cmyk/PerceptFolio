@@ -1025,7 +1025,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
              and kept under its access code; the code brings it here and the password typed above
              becomes this device's password for it. No password ever leaves a device. -->
         <div id="authBring" style="display:none;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
-          <div style="font-size:13.5px;margin-bottom:8px"><b>No account on this device.</b> Enter your access code to bring it here.</div>
+          <div style="font-size:13.5px;margin-bottom:8px"><b>No account on this device yet.</b> Your access code brings your terminal here; the password above becomes this device's password.</div>
           <div class="field"><label>Access code</label><input id="loginCode" placeholder="XXXXX-XXXXX" autocomplete="off" spellcheck="false" style="text-transform:uppercase;font-family:var(--mono);letter-spacing:.06em" onkeydown="if(event.key==='Enter')bringAccount()"></div>
           <button class="btn" style="width:100%" onclick="bringAccount()">Bring my account</button>
           <p class="muted" id="bringNote" style="font-size:12.5px;margin-top:8px;line-height:1.5"></p>
@@ -1034,19 +1034,19 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </div>
 
       <div id="authUp" style="display:none">
-        <div class="auth-title">Set up this device</div>
-        <p class="auth-note">Your access code opened the door. Now choose the email and password you will sign in with here. They stay on this device.</p>
+        <div class="auth-title" id="setupTitle">Set up this device</div>
+        <p class="auth-note" id="setupNote">Your access code opened the door. Now choose the email and password you will sign in with here. They stay on this device.</p>
         <div class="auth-switch">
           <button id="authTabIn2" onclick="setAuthMode('in')">Sign in</button>
           <button class="on" id="authTabUp2" onclick="setAuthMode('up')">First time here</button>
         </div>
         <div class="field">
           <label>Email</label>
-          <input type="email" id="newEmail" placeholder="you@gmail.com" autocomplete="username" onkeydown="if(event.key==='Enter')createProfile()">
+          <input type="email" id="newEmail" placeholder="you@gmail.com" autocomplete="username" onkeydown="if(event.key==='Enter')setUpDevice()">
         </div>
         <div class="field">
           <label>Password</label>
-          <input type="password" id="newPassword" placeholder="Choose a password" autocomplete="new-password" onkeydown="if(event.key==='Enter')createProfile()">
+          <input type="password" id="newPassword" placeholder="Choose a password for this device" autocomplete="new-password" onkeydown="if(event.key==='Enter')setUpDevice()">
         </div>
         <!-- The account-type control is gone. The invite decides the tier, so offering a choice that is
              then overridden is theatre: it looks like a decision and is not one. The tier is shown
@@ -1058,7 +1058,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
           <label for="newInvite">Access code <span class="muted" style="font-weight:400">(the one from your email; filled in if you just used it)</span></label>
           <input id="newInvite" placeholder="XXXXX-XXXXX" maxlength="11" autocomplete="off"
                  style="text-transform:uppercase;font-family:var(--mono);letter-spacing:.08em"
-                 onkeydown="if(event.key==='Enter')createProfile()">
+                 onkeydown="if(event.key==='Enter')setUpDevice()" oninput="primeSetupForm()">
         </div>
         <!-- One checkbox covering both documents rather than two. Two boxes for a single decision
              is a dark pattern in reverse: it looks more rigorous and is just more friction. Both are
@@ -1067,7 +1067,8 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
           <input type="checkbox" id="agreeTerms">
           <span>I have read and agree to the <a href="/terms/" target="_blank" rel="noopener">Terms of use</a> and the <a href="/privacy/" target="_blank" rel="noopener">Privacy policy</a>.</span>
         </label>
-        <button class="btn" style="width:100%" onclick="createProfile()">Set up and open the terminal</button>
+        <button class="btn" style="width:100%" id="setupBtn" onclick="setUpDevice()">Open the terminal on this device</button>
+        <p class="muted" id="setupHint" style="font-size:12.5px;margin-top:10px;line-height:1.5"></p>
       </div>
 
       <p class="auth-legal">PerceptFolio is research software, not investment advice, and is not a registered investment adviser.</p>
@@ -2288,7 +2289,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Sync across your devices</h3>
-    <p class="muted" style="font-size:13px;margin:0 0 10px">Kept in step under your access code, on two devices.</p>
+    <p class="muted" style="font-size:13px;margin:0 0 10px">Your access code is what ties your devices together. Sign in on another device with the same code and your book comes with it, up to five devices.</p>
     <div id="syncDevices"></div>
     <div class="row">
       <button class="btn btn-ghost" onclick="syncNow()">Sync now</button>
@@ -3396,11 +3397,83 @@ function resetTransientState(){
 /* Sign in / Create account are two views of one card rather than two stacked forms. The duplicated
    switch markup is intentional — each view carries its own copy so the toggle sits in the same place
    whichever one is showing, instead of jumping as the form below it changes height. */
+/* ===== THE ACCESS CODE IS WHAT TIES DEVICES TOGETHER =====
+   One form, one button. The code is the identity: a book is kept on the worker under it, and a
+   code can set up a device only once (the redemption burns it). So the button asks the worker
+   first. A book under the code means the terminal already exists on another device: it is
+   brought here, the email it belongs to is used, and only a device password is chosen. No book
+   and an unredeemed code means a first terminal: it is created here and kept under the code from
+   its first sign-in, so the next device can bring it. A redeemed code with no book yet means the
+   other device has never synced; the form says so and what to do about it. */
+let _primedCode='';
+async function primeSetupForm(){
+  const inv=document.getElementById('newInvite'), title=document.getElementById('setupTitle'), note=document.getElementById('setupNote'), hint=document.getElementById('setupHint'), em=document.getElementById('newEmail');
+  if(!inv||!title)return;
+  const code=(inv.value||'').trim().toUpperCase();
+  if(!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)||code===_primedCode)return;
+  _primedCode=code;
+  try{
+    const r=await fetch(INVITE_WORKER+'/usync?code='+encodeURIComponent(code));
+    if(r.status===401){ hint.textContent='That code is not live. If it was paused, contact the person who issued it.'; return; }
+    const copy=r.ok?await r.json():null;
+    if(copy&&!copy.empty&&copy.data){
+      title.textContent='Your terminal is under this code';
+      note.textContent='It was set up on another device and is kept in step under your code. Choose a password for this device and it opens here too.';
+      if(copy.user&&em&&!em.value)em.value=String(copy.user).toLowerCase();
+      hint.textContent='';
+      return;
+    }
+    title.textContent='Set up this device';
+    note.textContent='Your access code opened the door. Now choose the email and password you will sign in with here. They stay on this device.';
+    hint.textContent='';
+  }catch(e){ hint.textContent='No connection to the access service; the button will try again.'; }
+}
+async function setUpDevice(){
+  const email=(document.getElementById('newEmail').value||'').trim().toLowerCase();
+  const pw=document.getElementById('newPassword').value||'';
+  const code=(document.getElementById('newInvite').value||'').trim().toUpperCase();
+  const hint=document.getElementById('setupHint'); const say=m=>{ if(hint)hint.textContent=m; };
+  if(!email||!email.includes('@'))return toast('Enter a valid email.');
+  if(!pw||pw.length<4)return toast('Choose a password of four characters or more.');
+  if(!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code))return toast('Your access code looks like XXXXX-XXXXX. It is in the email that gave you access.');
+  if(DB.profiles[email])return toast('That account is already on this device. Use Sign in.');
+  const agreed=(document.getElementById('agreeTerms')||{}).checked;
+  if(!agreed)return toast('Please accept the Terms of use and Privacy policy to continue.');
+  const btn=document.getElementById('setupBtn'); if(btn)btn.disabled=true;
+  try{
+    say('Asking the access service…');
+    let copy=null, status=0;
+    try{ const r=await fetch(INVITE_WORKER+'/usync?code='+encodeURIComponent(code)); status=r.status; copy=r.ok?await r.json():null; }catch(e){ say('No connection to the access service. Check your network and try again.'); return; }
+    if(status===401){ say('That code is not live. If it was paused, contact the person who issued it.'); return; }
+    if(copy&&!copy.empty&&copy.data){
+      /* The terminal exists elsewhere: bring it here under the email it belongs to. */
+      if(copy.user&&String(copy.user).toLowerCase()!==email){ const em=document.getElementById('newEmail'); if(em)em.value=String(copy.user).toLowerCase(); say('The terminal under this code belongs to '+copy.user+'. That email is filled in now; press the button again.'); return; }
+      DB.profiles[email]={invite:code,pinHash:await pwHash(pw),data:Object.assign(defaultData(),copy.data||{}),accountType:'personal',userId:makeUserId(),broughtAt:Date.now()};
+      DB.profiles[email].data.syncedAt=copy.updatedAt||Date.now();
+      persistDB();
+      syncCfg={url:INVITE_WORKER,code:code};
+      try{ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); localStorage.setItem('pf_door_code',code); }catch(e){}
+      say(''); rememberDevice(email);
+      toast('Your terminal is on this device now, and kept in step under your code.');
+      await finishLogin(email);
+      return;
+    }
+    /* No book under the code. Either a first terminal (the code is fresh) or another device that
+       has never synced (the code is redeemed). createProfile tells the two apart through /invite. */
+    let inv=null; try{ const r=await fetch(INVITE_WORKER+'/invite?code='+encodeURIComponent(code)); inv=await r.json(); }catch(e){}
+    if(inv&&inv.valid===false&&/redeemed/i.test(inv.error||'')){
+      say('Your terminal was set up on another device, but that device has not synced yet. On it, open Settings → Sync across your devices → Sync now. Then press this button again.');
+      return;
+    }
+    say('');
+    await createProfile();
+  }finally{ if(btn)btn.disabled=false; }
+}
 /* A first visit on this device (no profile yet) opens on the set-up form with the code that just
    opened the door already filled in, so the only two things to type are an email and a password.
    A device with a profile opens on Sign in. */
 function defaultAuthMode(){
-  try{ const n=Object.keys((DB&&DB.profiles)||{}).length; setAuthMode(n?'in':'up'); if(!n){ const inv=document.getElementById('newInvite'); const c=localStorage.getItem('pf_door_code')||''; if(inv&&!inv.value&&/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(c))inv.value=c; } }catch(e){ setAuthMode('in'); }
+  try{ const n=Object.keys((DB&&DB.profiles)||{}).length; setAuthMode(n?'in':'up'); if(!n){ const inv=document.getElementById('newInvite'); const c=localStorage.getItem('pf_door_code')||''; if(inv&&!inv.value&&/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(c))inv.value=c; primeSetupForm(); } }catch(e){ setAuthMode('in'); }
 }
 function setAuthMode(m){
   const inEl=document.getElementById('authIn'),upEl=document.getElementById('authUp');
@@ -15751,12 +15824,12 @@ async function checkConnection(){
   }catch(e){ out+=row(false,'Access code','could not be checked'); }
   /* 3. sync and the devices */
   if(syncActive()){
-    try{ const j=await (await fetch(INVITE_WORKER+'/usync/devices?code='+encodeURIComponent(code))).json(); const n=(j&&j.devices||[]).length; out+=row(true,'Sync',n+' of 2 devices'); renderSyncDevices((j&&j.devices)||[]); }
+    try{ const j=await (await fetch(INVITE_WORKER+'/usync/devices?code='+encodeURIComponent(code))).json(); const n=(j&&j.devices||[]).length, lim=(j&&j.limit)||5; out+=row(true,'Sync',n+' of '+lim+' devices under your code'); renderSyncDevices((j&&j.devices)||[]); }
     catch(e){ out+=row(false,'Sync','the device list could not be read'); }
   }else out+=row(null,'Sync','off on this device');
   /* 4. market data, a live quote */
   try{ const q=await getQuote('AAPL'); out+=row(true,'Market data','built in'+(D.apiKey?', this device\u2019s own key':'')+' \u00b7 AAPL '+q.c); }
-  catch(e){ out+=row(false,'Market data',esc(e.message)); }
+  catch(e){ out+=row(false,'Market data',D.dataNotIncluded?'not included on this plan; add your own Finnhub key in the Market data card above':esc(e.message)); }
   box.innerHTML=out;
   refreshMarketDataCard();
 }
@@ -16306,7 +16379,7 @@ async function syncFetch(method,slot,body){
   if(res.status===401)throw new Error('Your access code was not accepted. If your access was paused, sync stops with it.');
   if(res.status===409){
     let j=null; try{ j=await res.json(); }catch(e){}
-    const err=new Error((j&&j.error)||'This code keeps its book on two devices already.'); err.devices=(j&&j.devices)||[]; err.limit=2;
+    const err=new Error((j&&j.error)||'Your code is already on its limit of devices.'); err.devices=(j&&j.devices)||[]; err.limit=2;
     try{ renderSyncDevices(err.devices,true); }catch(e){}
     throw err;
   }
@@ -16424,7 +16497,7 @@ function renderSyncSettings(){
   setSyncStatus(s?('Kept in step. Last synced '+new Date(s).toLocaleString()):'Kept in step, not synced yet.');
   fetch(INVITE_WORKER+'/usync/devices?code='+encodeURIComponent(syncCfg.code)).then(r=>r.ok?r.json():null).then(j=>{ if(j)renderSyncDevices(j.devices||[]); }).catch(()=>{});
 }
-/* The two devices under the code: this one, and the other, with a way to forget the other (or a
+/* The devices under the code: this one and the others, with a way to forget one (or a
    third device's way in, when it is told the two that are there). */
 function renderSyncDevices(devs,refused){
   const box=document.getElementById('syncDevices'); if(!box)return;
@@ -17794,7 +17867,7 @@ select{padding-right:20px}
 #sidebar nav button.active .ico{color:var(--text)}
 .nav-sep{margin:10px 12px}
 .side-foot{opacity:.6}
-/* The two devices under a code, in Settings. */
+/* The devices under a code, in Settings. */
 .sync-devs{list-style:none;margin:0 0 12px;padding:0;border-top:1px solid var(--border)}
 .sync-devs li{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--border);font-size:13.5px}
 .sync-devs li span{flex:1}
