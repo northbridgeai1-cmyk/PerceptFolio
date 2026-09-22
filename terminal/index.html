@@ -997,7 +997,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
         <li><span class="auth-dot"></span><div><b>Size, not just selection</b><span>What a trade does to your concentration, cash and market exposure, before the money moves.</span></div></li>
         <li><span class="auth-dot"></span><div><b>Nothing is hidden</b><span>No black box, no broker connection, no trade placed on your behalf. It tells you; you decide.</span></div></li>
       </ul>
-      <div class="auth-foot">Access by invitation</div>
+      <div class="auth-foot">Access by code. Yours arrived by email.</div>
     </div>
   </div>
 
@@ -1006,10 +1006,10 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="auth-card">
       <div id="authIn">
         <div class="auth-title">Sign in</div>
-        <p class="auth-note">Welcome back.</p>
+        <p class="auth-note">Welcome back. The email and password you chose for this device.</p>
         <div class="auth-switch">
           <button class="on" id="authTabIn" onclick="setAuthMode('in')">Sign in</button>
-          <button id="authTabUp" onclick="setAuthMode('up')">Create account</button>
+          <button id="authTabUp" onclick="setAuthMode('up')">First time here</button>
         </div>
         <div class="field">
           <label>Email</label>
@@ -1034,11 +1034,11 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </div>
 
       <div id="authUp" style="display:none">
-        <div class="auth-title">Create account</div>
-        <p class="auth-note">Sets up a new profile in this browser.</p>
+        <div class="auth-title">Set up this device</div>
+        <p class="auth-note">Your access code opened the door. Now choose the email and password you will sign in with here. They stay on this device.</p>
         <div class="auth-switch">
           <button id="authTabIn2" onclick="setAuthMode('in')">Sign in</button>
-          <button class="on" id="authTabUp2" onclick="setAuthMode('up')">Create account</button>
+          <button class="on" id="authTabUp2" onclick="setAuthMode('up')">First time here</button>
         </div>
         <div class="field">
           <label>Email</label>
@@ -1055,7 +1055,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
              exactly that, so the site made a claim about itself that the software contradicted.
              The Worker has had /invite validate and burn routes the whole time; nothing called them. -->
         <div class="field">
-          <label for="newInvite">Invite code</label>
+          <label for="newInvite">Access code <span class="muted" style="font-weight:400">(the one from your email; filled in if you just used it)</span></label>
           <input id="newInvite" placeholder="XXXXX-XXXXX" maxlength="11" autocomplete="off"
                  style="text-transform:uppercase;font-family:var(--mono);letter-spacing:.08em"
                  onkeydown="if(event.key==='Enter')createProfile()">
@@ -1067,7 +1067,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
           <input type="checkbox" id="agreeTerms">
           <span>I have read and agree to the <a href="/terms/" target="_blank" rel="noopener">Terms of use</a> and the <a href="/privacy/" target="_blank" rel="noopener">Privacy policy</a>.</span>
         </label>
-        <button class="btn" style="width:100%" onclick="createProfile()">Create account</button>
+        <button class="btn" style="width:100%" onclick="createProfile()">Set up and open the terminal</button>
       </div>
 
       <p class="auth-legal">PerceptFolio is research software, not investment advice, and is not a registered investment adviser.</p>
@@ -1082,7 +1082,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="tour-head">
       <span class="tour-eyebrow">Getting started</span>
       <span class="spacer"></span>
-      <span class="tour-count" id="tourCount">1 / 7</span>
+      <span class="tour-count" id="tourCount">1 / 4</span>
       <button class="tour-x" onclick="endTour(false)" title="Skip" aria-label="Skip">&times;</button>
     </div>
     <div class="tour-body" id="tourBody"></div>
@@ -1234,11 +1234,11 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <div class="cmd-head">
     <div>
       <div class="greeting" id="cmdGreeting">Good morning</div>
-      <div class="muted" id="cmdSub" style="font-size:13.5px;margin-top:2px">Checking what needs you…</div>
+      <div class="muted" id="cmdSub" style="font-size:13.5px;margin-top:2px">Press Run review to see what needs you.</div>
     </div>
     <button class="btn" onclick="runDailyReview()" id="cmdRunBtn">Run review</button>
   </div>
-  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"><b>Nothing checked yet today.</b></div>
+  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"><b>Not reviewed yet today.</b> Run review pulls prices, checks everything, and lists what needs you.</div>
   <!-- The track record sits above the actions on purpose. Anything that tells you what to do should
        have to state, in the same breath, how often it has been right. -->
   <div id="cmdRecord" class="rec"></div>
@@ -1278,13 +1278,17 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
   <!-- Personal dashboard: hidden entirely for a business account's own view -->
   <div id="personalDashboardBody">
+    <!-- Start here. Three steps, each one a button that goes to the exact place, each ticked when it
+         is done. Stays on the Dashboard until the first review has run; after that the morning
+         routine is one line. The market-data step appears only where a key is actually needed. -->
     <div id="welcomeCard" class="welcome-card" style="display:none">
-      <h2>Let's set up your portfolio</h2>
-      <p class="muted" style="margin-bottom:16px">Three steps and PerceptFolio starts working for you.</p>
-      <p id="wcKeyStep" style="margin-bottom:10px"><span class="step-num">1</span>Add a Finnhub API key in <b>Settings</b>. Free at finnhub.io, about 2 minutes, no card. This is what loads prices.</p>
-      <p style="margin-bottom:10px"><span class="step-num wc-n">2</span>Add what you own in <b>Portfolio</b>. Stocks, ETFs, mutual funds, and cash on hand.</p>
-      <p style="margin-bottom:18px"><span class="step-num wc-n">3</span>Add a few tickers to your <b>Watchlist</b>. PerceptFolio scores them automatically.</p>
-      <button class="btn" onclick="showTab('portfolio')">Add your first holding</button>
+      <h2>Start here</h2>
+      <p class="muted" style="margin-bottom:16px">Three steps. Then every morning is one button.</p>
+      <div id="wcKeyStep" class="wc-step" style="margin-bottom:10px"><span class="step-num">0</span><div><b>Turn on prices.</b> Paste a free Finnhub key in Settings. Two minutes, no card. <button class="btn btn-sm btn-ghost" onclick="showTab('settings')">Open Settings</button></div></div>
+      <div class="wc-step" id="wcStep1" style="margin-bottom:10px"><span class="step-num wc-n">1</span><div><b>Add what you own.</b> Stocks, funds, and the cash you have to invest. <button class="btn btn-sm" onclick="showTab('portfolio')">Open Portfolio</button></div></div>
+      <div class="wc-step" id="wcStep2" style="margin-bottom:10px"><span class="step-num wc-n">2</span><div><b>Add a few tickers you are watching.</b> Optional. The terminal scores them for you. <button class="btn btn-sm btn-ghost" onclick="showTab('watchlist')">Open Lists</button></div></div>
+      <div class="wc-step" id="wcStep3" style="margin-bottom:6px"><span class="step-num wc-n">3</span><div><b>Press Run review.</b> It pulls prices, checks everything, and lists what needs you. <button class="btn btn-sm btn-ghost" onclick="showTab('command')">Open Command</button></div></div>
+      <p class="muted" style="font-size:12.5px;margin-top:12px">Lost? <a href="#" onclick="replayTour();return false">Show me around</a>, four screens, one minute.</p>
     </div>
     <!-- THE RECORD SITS ABOVE THE PORTFOLIO VALUE, deliberately.
          What this screen led with before was a number that goes up when the market goes up. It
@@ -1683,8 +1687,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="row">
       <input id="mapTicker" placeholder="Ticker (e.g. NVDA)" style="max-width:180px" onkeydown="if(event.key==='Enter')loadMap()">
       <button class="btn" onclick="loadMap()">Map it</button>
-      <button class="btn btn-ghost" onclick="toggleMappedList()" id="mappedToggle">All maps</button>
-      <button class="btn btn-ghost" onclick="relinkAll()" title="Creates the missing opposite entry for every relationship that has a ticker">⇄ Link</button>
       <span class="muted" id="mapStatus"></span>
     </div>
     <div id="mappedList" style="margin-top:12px;display:none"></div>
@@ -1736,7 +1738,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="wd-globe-wrap">
       <div id="wdGlobe" aria-label="Globe"></div>
       <div class="wd-tip" id="wdTip" hidden></div>
-      <div class="wd-idle" id="wdIdle"><div class="mv-empty"><span class="dot"></span><div><b>Pick an industry, or type a product, a company or a country.</b></div></div></div>
+      <div class="wd-idle" id="wdIdle"><div class="mv-empty"><span class="dot"></span><div><b>Click a country.</b> Or pick an industry above, or type a product or a company.</div></div></div>
     </div>
     <div class="wd-side">
       <div id="wdLegend"></div>
@@ -3394,6 +3396,12 @@ function resetTransientState(){
 /* Sign in / Create account are two views of one card rather than two stacked forms. The duplicated
    switch markup is intentional — each view carries its own copy so the toggle sits in the same place
    whichever one is showing, instead of jumping as the form below it changes height. */
+/* A first visit on this device (no profile yet) opens on the set-up form with the code that just
+   opened the door already filled in, so the only two things to type are an email and a password.
+   A device with a profile opens on Sign in. */
+function defaultAuthMode(){
+  try{ const n=Object.keys((DB&&DB.profiles)||{}).length; setAuthMode(n?'in':'up'); if(!n){ const inv=document.getElementById('newInvite'); const c=localStorage.getItem('pf_door_code')||''; if(inv&&!inv.value&&/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(c))inv.value=c; } }catch(e){ setAuthMode('in'); }
+}
 function setAuthMode(m){
   const inEl=document.getElementById('authIn'),upEl=document.getElementById('authUp');
   if(!inEl||!upEl)return;
@@ -3462,26 +3470,17 @@ function maybeStartTour(){
 
 const TOUR=[
   { tab:'dashboard', tag:'Dashboard', cls:'t-blue',
-    q:'What am I worth, and what changed?',
-    body:'Value, cash, today\'s move and total gain. The graph starts empty because the app has no record of your portfolio before today, it fills in from here.' },
+    q:'Where things stand.',
+    body:'What you own is worth this much today. The graph starts empty, because the terminal only knows what happens from the day you start. It fills in from here.' },
   { tab:'command', tag:'Command', cls:'t-blue',
-    q:'What needs me today?',
-    body:'One list each morning: sell signals, stops hit, breached limits, reviews due. Hit <b>Run review</b> to build it. Most days it says nothing needs you, and that is the correct answer, not a bug.' },
+    q:'Your morning, in one button.',
+    body:'Press <b>Run review</b>. The terminal pulls prices, checks everything you own and watch, and lists what needs you. Most days the list is empty. That is the right answer, not a problem.' },
   { tab:'portfolio', tag:'Portfolio', cls:'t-green',
-    q:'What do I own, and how much should I buy?',
-    body:'Add holdings here. <b>Before You Trade</b> shows what a purchase does to your concentration and cash before the money moves, being right about the company and wrong about the size is how accounts end.' },
+    q:'What you own, and how much to buy.',
+    body:'Add your holdings here. Before you buy more, <b>Before You Trade</b> shows what the purchase does to your concentration and your cash. Being right about the company and wrong about the size is how accounts end.' },
   { tab:'analyzer', tag:'Analyzer', cls:'t-violet',
-    q:'Is this company any good, and is the price sensible?',
-    body:'Type a ticker, get 22 checks: 12 quality, 6 value, 4 momentum. Read the rows that failed, not just the score, the score is only a summary of them.' },
-  { tab:'projections', tag:'Projections', cls:'t-amber',
-    q:'What range of outcomes am I looking at?',
-    body:'Monte Carlo and the drawdown model, which give ranges rather than answers. Below them, separated on purpose, sit <b>signals</b>. Rules that emit a position today. A range is not an instruction, and mixing the two is how people come to believe a trading rule knows the future.' },
-  { tab:'market', tag:'Market', cls:'t-amber',
-    q:'Was the checklist actually right?',
-    body:'The <b>Call Scorecard</b> marks every verdict against the S&amp;P on a fixed horizon, and compares three systems side by side. It will be empty for about ninety days, a record like that cannot be built backwards, only forwards.' },
-  { tab:'settings', tag:'Settings', cls:'t-red',
-    q:'Where do I start?',
-    body:'Three things, ten minutes: paste a free <b>Finnhub key</b>, enter what you own in Portfolio, then set your buy and sell bars. Those numbers are what the whole terminal runs on. Settings lives behind your avatar, top right.' }
+    q:'Is this company any good?',
+    body:'Type a ticker. You get twenty-two checks: twelve on quality, six on price, four on momentum. Read the rows that failed, not only the score. The score is a summary of those rows.' }
 ];
 let tourAt=0;
 function startTour(){
@@ -3525,7 +3524,7 @@ function endTour(complete){
   document.body.classList.remove('touring');
   document.querySelectorAll('.tour-lit').forEach(n=>n.classList.remove('tour-lit'));
   if(D){ D.tourSeen=true; saveDB(); }
-  if(complete)showTab('dashboard');
+  if(complete)showTab('dashboard');   // the Start here card is on the Dashboard
 }
 /* Re-runnable from Settings. Someone who skipped it on day one should not have to delete their
    profile to see it again. */
@@ -10380,11 +10379,14 @@ function renderAll(){
   if(personalBody)personalBody.style.display=bizOwnView?'none':'block';
   if(bizOwnView)renderBizDashboard();
   /* welcome / onboarding state */
-  const isNew=D.holdings.length===0&&D.watchlist.length===0;
+  /* Start here stays until the first review has run. Each step shows a tick once it is done. */
+  const done1=D.holdings.length>0, done2=(D.watchlist||[]).length>0, done3=!!D.lastRefresh;
+  const isNew=!(done1&&done3);
   const wc=document.getElementById('welcomeCard');
   if(wc)wc.style.display=(isNew&&!bizOwnView)?'block':'none';
   /* Market data is built in for a signed-in account; the key step only appears where it is true. */
-  if(wc){ const ks=document.getElementById('wcKeyStep'), built=hasMarketData(); if(ks)ks.style.display=built?'none':''; wc.querySelectorAll('.wc-n').forEach((n,i)=>{ n.textContent=String(built?i+1:i+2); }); const sub=wc.querySelector('p.muted'); if(sub)sub.textContent=(built?'Two':'Three')+' steps and PerceptFolio starts working for you.'; }
+  if(wc){ const ks=document.getElementById('wcKeyStep'), built=hasMarketData(); if(ks)ks.style.display=built?'none':''; wc.querySelectorAll('.wc-n').forEach((n,i)=>{ n.textContent=String(built?i+1:i+2); });
+    [['wcStep1',done1],['wcStep2',done2],['wcStep3',done3]].forEach(([id,ok])=>{ const el=document.getElementById(id); if(!el)return; el.classList.toggle('wc-done',!!ok); const n=el.querySelector('.step-num'); if(n&&ok)n.textContent='✓'; }); }
 
   /* dashboard numbers */
   let value=0,costTotal=0;
@@ -12755,13 +12757,13 @@ function renderCommand(){
   }
 
   if(!holdings.length&&!(D.watchlist||[]).length){
-    el.innerHTML='<div class="cmd-list"><div class="cmd-empty muted">Add holdings in <b>Portfolio</b> or tickers in <b>Watchlist</b>, then hit <b>Run review</b>.</div></div>';
+    el.innerHTML='<div class="cmd-list"><div class="cmd-empty muted">Nothing to review yet. Add what you own in <b>Portfolio</b>, or tickers you watch in <b>Lists</b>, then press <b>Run review</b>. <button class="btn btn-sm" style="margin-left:8px" onclick="showTab(\'portfolio\')">Open Portfolio</button></div></div>';
     return;
   }
   if(!q.length){
     el.innerHTML='<div class="cmd-list"><div class="cmd-empty">'+
       '<div class="pos" style="font-size:16px;font-weight:700">Nothing needs you</div>'+
-      '<div class="muted" style="font-size:13px;margin-top:6px;max-width:420px;margin-left:auto;margin-right:auto">No rules triggered, no policy breaches, no reviews due. Most days look like this.</div></div></div>';
+      '<div class="muted" style="font-size:13px;margin-top:6px;max-width:420px;margin-left:auto;margin-right:auto">No rule fired, no limit was crossed, no review is due. Most days look like this. Come back tomorrow.</div></div></div>';
     return;
   }
 
@@ -16516,6 +16518,8 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   if(emailEl&&!emailEl.value&&(u||last))emailEl.value=u||last;
   if(u&&DB.profiles[u]&&(remembered===u||!DB.profiles[u].pinHash)){
     finishLogin(u);
+  }else{
+    defaultAuthMode();   // first time on this device: the set-up form, code already filled in
   }
   setCalcMode('normal');calcRender();
 })();
@@ -16860,6 +16864,12 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 #wdGlobe .cesium-widget-credits a{color:#c3c9d4}
 #tab-world .wd-tip{position:absolute;z-index:3;pointer-events:none;transform:translate(14px,14px);max-width:260px;padding:6px 10px;border-radius:8px;background:var(--panel);color:var(--text);border:1px solid var(--border);box-shadow:var(--el-3);font-size:12.5px;line-height:1.4}
 #tab-world .wd-idle{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:24px;pointer-events:none}
+/* Start here: a step is a number, a line and a button; a done step is ticked and dimmed. */
+.welcome-card .wc-step{display:flex;gap:12px;align-items:flex-start}
+.welcome-card .wc-step>div{flex:1;line-height:1.55}
+.welcome-card .wc-step .btn{margin-left:8px;vertical-align:middle}
+.welcome-card .wc-step.wc-done{opacity:.6}
+.welcome-card .wc-step.wc-done .step-num{background:var(--green,#2ea043);color:#fff}
 #tab-world .wd-idle[hidden],#tab-world .wd-tip[hidden]{display:none}
 #tab-world .mv-empty{display:block;padding:14px 16px;border:1px solid var(--border);border-radius:4px;background:var(--bg);max-width:440px;pointer-events:auto}
 #tab-world .wd-idle .mv-empty{background:rgba(14,15,18,.88);backdrop-filter:blur(6px);color:#f2f3f5}
@@ -17040,10 +17050,15 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
          narrows to what it has there. The same click on the same country widens it again. */
       h.setInputAction(function(m){
         var p=sc.pick(m.position); if(p&&p.id&&p.id.ship){ showRouteDetail(p.id); return; } if(p&&p.id&&p.id.n){ showDetail(p.id); return; }
-        if(!SET||!NE)return;
+        if(!NE)return;
         var cart=viewer.camera.pickEllipsoid(m.position,sc.globe.ellipsoid); if(!cart)return;
         var cg=C.Cartographic.fromCartesian(cart), cc=countryOf(C.Math.toDegrees(cg.longitude),C.Math.toDegrees(cg.latitude));
-        if(cc)toggleCountry(cc);
+        if(!cc)return;
+        /* The map is the default: with nothing loaded, or with another country up, a click on a
+           country opens that country (its plants and what it sells and buys). With an industry
+           set up, a click narrows the set to that country and a second click widens it again. */
+        if(!SET||SET.country){ if(!SET||SET.country!==cc)showCountry(cc); return; }
+        toggleCountry(cc);
       },C.ScreenSpaceEventType.LEFT_CLICK);
       return viewer;
     });
@@ -17496,7 +17511,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   window.wdFromTicker=function(sym){
     loadIndex().then(function(){ return typeof getProfile==='function'?getProfile(sym):null; }).then(function(p){ $('wdQ').value=shortName((p&&p.name)||sym); wdSearch(); }).catch(function(){ $('wdQ').value=sym; wdSearch(); });
   };
-  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='world'){ loadIndex().catch(function(){ status('The industry list did not load.'); }); if(viewer){ viewer.resize(); viewer.scene.requestRender(); } } return r; }; }
+  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='world'){ loadIndex().catch(function(){ status('The industry list did not load.'); }); if(viewer){ viewer.resize(); viewer.scene.requestRender(); } else { /* the world map is the default view: draw the globe and its borders as soon as the tab opens, so there is something to click */ Promise.all([ensureViewer(),loadNE()]).then(function(){ viewer.resize(); viewer.scene.requestRender(); }).catch(function(){}); } } return r; }; }
 })();
 </script>
 <style id="v2-heat">

@@ -1219,8 +1219,9 @@ G('M3: the public site, same rules as the page it replaces');
   const leaked = NAMES.filter(n => src.toLowerCase().includes(n.toLowerCase()));
   t('site: no rulebook check is named', leaked.length === 0, leaked.join(', ') || '19 names checked');
   t('site: no "sign in" in copy', !/sign in/i.test(copy));
-  t('site: one primary in the hero, a text link beside it', /variant="primary" size="lg"><a href="#request">Request a demo<\/a>/.test(src) && /or try it on real history first/.test(src));
-  t('site: the nav carries no Request-a-demo primary on /pricing (the page is the ask); Resume session still shows there once entered', /: !onPricing && <Button asChild variant="primary"/.test(src));
+  t('site: one primary in the hero (ask), one secondary (a code), a text link beside them', /variant="primary" size="lg"><a href="#request">Ask for access<\/a>/.test(src) && /variant="secondary" size="lg"><a href="\/enter\/">I have a code<\/a>/.test(src) && /or try it on real history first/.test(src) && (read('site/src/pages/Landing.tsx').match(/variant="primary"/g) || []).length === 1);
+  t('site: how to get in, three steps under the hero, and a Have-a-code link in the nav', /1\. Ask/.test(src) && /3\. Enter/.test(src) && /perceptfolio\.com\/enter, type the code, choose a password/.test(src) && /href="\/enter\/"[^>]*>Have a code\?<\/a>/.test(read('site/src/components/Nav.tsx')));
+  t('site: the nav carries no Request-a-demo primary on /pricing (the page is the ask); Resume session still shows there once entered', /\{!onPricing && <Button asChild variant="primary"/.test(src));
   t('site: pricing is quote-first, one primary, no self-serve checkout', /<Link to="\/#request">Request access<\/Link>/.test(src) && !/Request seats for a firm/.test(src) && !/checkout\(/.test(read('site/src/pages/Pricing.tsx')));
   /* One plan (2026-09-22): the terminal, $760 a month or $8,360 a year. No second plan, no seats,
      no Founding label; the site never says Personal or Business. */
@@ -1568,7 +1569,7 @@ t('the sign-in toggle is an underline, not a box', /\.auth-switch button\.on\{ba
 t('no rounded frame is drawn around a table', !/border:1px solid var\(--border\);border-radius:(9|10)px;overflow:hidden/.test(term));
 /* The door keeps the code it was opened with, for a profile that has none of its own. */
 t('the door keeps the code for the terminal', /localStorage\.setItem\('pf_door_code', payload\.code\)/.test(read('enter/enter.js')));
-t('every model helper, the settings status, the macro helpers and the door read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 8);
+t('every model helper, the settings status, the macro helpers and the door read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 9);   /* the ninth: the set-up form pre-fills the code that opened the door */
 /* The greeting was chatbot furniture; a statement is headed by its date. */
 t('the dashboard and command screens are headed by the date', /function dateLine\(\)/.test(term) && !/'Good '\+period/.test(term));
 t('no headings are typed in Title Case',
@@ -1935,7 +1936,11 @@ t('buttons that need the network are disabled with the reason, not left spinning
 t('and are restored with their original label', /b\.textContent=b\.dataset\.onlineLabel/.test(term));
 /* Empty states on the panels that were blank. */
 t('the analyzer states its empty state in one line', /<div class="empty">Nothing analysed yet\.<\/div>/.test(term));
-t('the command tab explains what a review does', /<b>Nothing checked yet today\.<\/b>/.test(term));
+t('the command tab explains what a review does', /<b>Not reviewed yet today\.<\/b> Run review pulls prices, checks everything, and lists what needs you\./.test(term));
+/* First run: the door opens on the set-up form with the code filled in; the Dashboard carries Start here with three steps that tick off; the tour is four screens. */
+t('a first visit opens on the set-up form with the door code filled in', /function defaultAuthMode\(\)/.test(term) && /setAuthMode\(n\?'in':'up'\)/.test(term) && /defaultAuthMode\(\);   \/\/ first time on this device/.test(term));
+t('Start here: three steps, each a button, ticked when done, shown until the first review has run', /<h2>Start here<\/h2>/.test(term) && /id="wcStep1"/.test(term) && /id="wcStep3"/.test(term) && /const done1=D\.holdings\.length>0, done2=\(D\.watchlist\|\|\[\]\)\.length>0, done3=!!D\.lastRefresh;/.test(term) && /el\.classList\.toggle\('wc-done',!!ok\)/.test(term));
+t('the tour is four screens in plain sentences', (() => { const t0 = term.indexOf('const TOUR=['); const t1 = term.indexOf('];\nlet tourAt=0;'); const body = term.slice(t0, t1); return (body.match(/\{ tab:'/g) || []).length === 4 && /Your morning, in one button\./.test(body); })());
 t('the audit shows a skeleton rather than a blank panel while it computes',
   /id="auditBody"[^>]*aria-busy="true"/.test(term));
 

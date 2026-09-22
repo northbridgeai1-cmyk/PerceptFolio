@@ -31,7 +31,7 @@ export function Nav() {
           </div>
           {entered
             ? <Button asChild variant="primary" className="ml-2"><a href="/terminal/">Resume session</a></Button>
-            : !onPricing && <Button asChild variant="primary" className="ml-2"><Link to="/#request">Request a demo</Link></Button>}
+            : <><a href="/enter/" className="nav-link rounded-[8px] px-3 py-2 text-[15px] font-medium text-dim no-underline hover:bg-panel hover:text-text max-[700px]:hidden">Have a code?</a>{!onPricing && <Button asChild variant="primary" className="ml-2"><Link to="/#request">Request a demo</Link></Button>}</>}
         </div>
       </div>
     </nav>
