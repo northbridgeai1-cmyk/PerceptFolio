@@ -220,6 +220,10 @@ for (const fn of ['syncPush','syncPull','syncNow','syncPullForce','scheduleSync'
 /* A paced review of a long list takes minutes; a line that does not move for that long reads as a
    hang, so it counts and names the company, and every button that started the run is restored to
    the words it had. */
+/* The meter projected a quarter from a single afternoon: twelve calls on day one came out as
+   "about 1080 calls a quarter", which is arithmetic wearing the clothes of evidence and exactly
+   what this product refuses elsewhere. */
+t('the calls-a-quarter meter projects nothing under a fortnight and counts the watchlist', /const PROJECT_AFTER_DAYS=14;/.test(term) && /rate:since>=PROJECT_AFTER_DAYS\?n\*\(90\/since\):null/.test(term) && /Too early to say what that is a quarter; ask again after a fortnight/.test(term) && /\(D\.watchlist\|\|\[\]\)\.forEach\(s=>set\.add\(s\)\)/.test(term));
 t('a review says where it has got to, and both buttons come back to their own labels', /function reviewProgress\(sym,n,total\)/.test(term) && /reviewProgress\(s,\+\+done,toScore\.length\)/.test(term) && /paced to stay inside the data limit/.test(term) && /\(_reviewBtns\|\|\[\]\)\.forEach\(x=>\{ x\.b\.disabled=false; x\.b\.textContent=x\.label; \}\)/.test(term) && /id="refreshBtn"/.test(term));
 t('Finnhub calls wait their turn under the minute ceiling and a 429 is retried once', /const FH_PER_MIN=55;/.test(term) && /function fhWait\(\)/.test(term) && /const w=fhWait\(\); if\(w\)await sleep\(w\);/.test(term) && (term.match(/if\(_retried\)throw new Error\('RATE_LIMIT'\); await sleep\(2500\); return fh\(path,true\);/g) || []).length === 2);
 t('a failed score says which failure it was, never "No data" for a rate limit', /sc\.error==='RATE_LIMIT'\?'Not scored yet, too many at once'/.test(term) && /sc\.error==='NO_KEY'\?'Needs market data'/.test(term) && !/if\(sc\.error\)return\{label:'No data'/.test(term));

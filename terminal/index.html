@@ -14691,27 +14691,35 @@ async function renderEconCal(){
    watchlist and from the model, not only from trades; a five-trades-a-year investor still logs
    dozens of verdict changes. Say it with the person's own number: calls in the last ninety days,
    scaled to a quarter if the record is younger than that, against the ~138 the interval needs. */
+const PROJECT_AFTER_DAYS=14;      // a fortnight before a rate is projected from it
 function callsPerQuarter(){
   const calls=(D.calls||[]).filter(c=>c.conviction!=='flickering'&&(c.verdict==='buy'||c.verdict==='sell'));
-  if(!calls.length)return{n:0,rate:0,watched:watchedCount(),since:0};
+  if(!calls.length)return{n:0,rate:null,watched:watchedCount(),since:0};
   const first=Math.min.apply(null,calls.map(c=>c.ts));
   const since=Math.max(1,Math.min(90,(Date.now()-first)/864e5));
   const cut=Date.now()-90*864e5;
   const n=calls.filter(c=>c.ts>=cut).length;
-  return{n,rate:n*(90/since),watched:watchedCount(),since:Math.round(since)};
+  /* A day of logging says nothing about a quarter. Twelve calls on the first afternoon would
+     project to over a thousand, which is arithmetic wearing the clothes of evidence, and exactly
+     the kind of number this product exists to refuse. Below a fortnight the count is shown and
+     nothing is projected from it. */
+  return{n,rate:since>=PROJECT_AFTER_DAYS?n*(90/since):null,watched:watchedCount(),since:Math.round(since)};
 }
 function watchedCount(){
   const set=new Set((D.holdings||[]).map(h=>h.sym));
-  try{ allLists().forEach(l=>(l.syms||[]).forEach(t=>set.add(t))); }catch(e){}
+  (D.watchlist||[]).forEach(s=>set.add(s));
+  try{ allLists().forEach(l=>(l.syms||[]).forEach(s=>set.add(s))); }catch(e){}
   return set.size;
 }
 function meterHTML(marked,need){
   const m=callsPerQuarter();
-  if(!m.n)return '<div class="rec-meter muted" style="font-size:12px;margin-top:6px">No calls yet. Watch names in a list and run a review: the record fills from every verdict change, not only from your trades.</div>';
+  const box=s=>'<div class="rec-meter muted" style="font-size:12px;margin-top:6px">'+s+'</div>';
+  if(!m.n)return box('No calls yet. Watch names in a list and run a review: the record fills from every verdict change, not only from your trades.');
+  if(m.rate==null)return box('<b>'+m.n+'</b> call'+(m.n===1?'':'s')+' logged across '+m.watched+' watched name'+(m.watched===1?'':'s')+', over '+m.since+' day'+(m.since===1?'':'s')+'. Too early to say what that is a quarter; ask again after a fortnight.');
   const left=Math.max(0,(need||138)-(marked||0));
   const q=m.rate>0?left/m.rate:null;
-  return '<div class="rec-meter muted" style="font-size:12px;margin-top:6px">About <b>'+Math.round(m.rate)+'</b> call'+(Math.round(m.rate)===1?'':'s')+' a quarter at '+m.watched+' watched name'+(m.watched===1?'':'s')+(m.since<90?' (from '+m.since+' day'+(m.since===1?'':'s')+' so far)':'')+
-    (q!=null&&left>0?' · ~'+(need||138)+' marked calls in about '+(q<1?'a quarter':Math.ceil(q)+' quarters'):'')+'.</div>';
+  return box('About <b>'+Math.round(m.rate)+'</b> call'+(Math.round(m.rate)===1?'':'s')+' a quarter at '+m.watched+' watched name'+(m.watched===1?'':'s')+
+    (q!=null&&left>0?' \u00b7 ~'+(need||138)+' marked calls in about '+(q<1?'a quarter':Math.ceil(q)+' quarters'):'')+'.');
 }
 function recordStripHTML(){
   const days=90;
