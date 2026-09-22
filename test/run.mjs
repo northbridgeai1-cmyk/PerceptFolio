@@ -217,6 +217,10 @@ for (const fn of ['syncPush','syncPull','syncNow','syncPullForce','scheduleSync'
 /* The minute limit is paced, not discovered: a refresh of a handful of tickers is several calls
    each, and the rows that lost the race used to read "No data", which is a claim about the company
    rather than about the fetch. */
+/* A paced review of a long list takes minutes; a line that does not move for that long reads as a
+   hang, so it counts and names the company, and every button that started the run is restored to
+   the words it had. */
+t('a review says where it has got to, and both buttons come back to their own labels', /function reviewProgress\(sym,n,total\)/.test(term) && /reviewProgress\(s,\+\+done,toScore\.length\)/.test(term) && /paced to stay inside the data limit/.test(term) && /\(_reviewBtns\|\|\[\]\)\.forEach\(x=>\{ x\.b\.disabled=false; x\.b\.textContent=x\.label; \}\)/.test(term) && /id="refreshBtn"/.test(term));
 t('Finnhub calls wait their turn under the minute ceiling and a 429 is retried once', /const FH_PER_MIN=55;/.test(term) && /function fhWait\(\)/.test(term) && /const w=fhWait\(\); if\(w\)await sleep\(w\);/.test(term) && (term.match(/if\(_retried\)throw new Error\('RATE_LIMIT'\); await sleep\(2500\); return fh\(path,true\);/g) || []).length === 2);
 t('a failed score says which failure it was, never "No data" for a rate limit', /sc\.error==='RATE_LIMIT'\?'Not scored yet, too many at once'/.test(term) && /sc\.error==='NO_KEY'\?'Needs market data'/.test(term) && !/if\(sc\.error\)return\{label:'No data'/.test(term));
 t('the release calendar sits below the queue and folds after three lines', term.indexOf('<div id="commandQueue"></div>') < term.indexOf('<div id="econCal" class="md"></div>') && /const head=rel\.slice\(0,3\), rest=rel\.slice\(3\);/.test(term) && /more in the next thirty days/.test(term));

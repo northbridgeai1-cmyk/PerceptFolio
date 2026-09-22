@@ -1336,7 +1336,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="section-title">Today's signals</div>
     <div class="card"><div id="signalsList"><div class="empty">No signals today.</div></div></div>
     <div class="row" style="margin-top:14px">
-      <button class="btn" onclick="refreshAll()">Refresh data</button>
+      <button class="btn" onclick="runDailyReview()" id="refreshBtn">Refresh data</button>
       <span class="muted" id="lastRefresh"></span>
     </div>
   </div>
@@ -6053,7 +6053,9 @@ async function refreshAll(){
     }catch(e){}
     // Score watchlist + stock holdings
     const toScore=[...new Set([...D.watchlist,...D.holdings.filter(h=>h.type==='Stock').map(h=>h.sym)])];
+    let done=0;
     for(const s of toScore){
+      reviewProgress(s,++done,toScore.length);
       try{
         const prev=D.analyses[s];
         const sc=await scoreStock(s);
@@ -12885,11 +12887,13 @@ function renderCommand(){
   /* A3.1. The open REVIEW row carries the digest; it is fetched after the row is drawn. */
   if(cmdOpen!=null&&q[cmdOpen]&&q[cmdOpen].digest)fillDigestInto(q[cmdOpen].digest,document.getElementById('cmdDigest-'+q[cmdOpen].digest));
 }
+let _reviewBtns=null;
 async function runDailyReview(){
-  const btn=document.getElementById('cmdRunBtn'),st=document.getElementById('cmdStatus');
+  const btn=document.getElementById('cmdRunBtn'),st=document.getElementById('cmdStatus'),rb=document.getElementById('refreshBtn');
   if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
-  if(btn)btn.disabled=true;
-  if(st)st.textContent='Pulling prices and re-scoring everything…';
+  _reviewBtns=null;
+  if(btn)btn.disabled=true; if(rb)rb.disabled=true;
+  if(st)st.textContent='Pulling prices\u2026';
   try{
     await refreshAll();          // prices, scores, signals, snapshot. All existing machinery
     renderCommand();
@@ -12897,7 +12901,13 @@ async function runDailyReview(){
   }catch(e){
     if(st)st.textContent='';
     handleApiErr(e);
-  }finally{if(btn)btn.disabled=false;}
+  }finally{
+    /* Every button that started this run goes back to the words it had, not a guess at them. */
+    (_reviewBtns||[]).forEach(x=>{ x.b.disabled=false; x.b.textContent=x.label; });
+    if(btn){ btn.disabled=false; if(!_reviewBtns)btn.textContent='Run review'; }
+    if(rb){ rb.disabled=false; if(!_reviewBtns)rb.textContent='Refresh data'; }
+    _reviewBtns=null;
+  }
 }
 
 /* ================= MAP (LAYER DEEP) =================
@@ -14641,6 +14651,18 @@ function priceSourceLine(){
   const q=D.apiKey?'quotes: Finnhub, your key':(syncConfigured()||accessCodeFor(USER))?'quotes: Finnhub, built in':'quotes: none';
   const h=D.historySource?('closes: '+D.historySource):'closes: refreshed at the last review';
   return q+' · '+h;
+}
+/* Where a review has got to. Market data is sixty calls a minute and one company costs several,
+   so a book of twenty names is paced across a few minutes. A line that does not move for that long
+   is indistinguishable from a hang, so it counts, and it names the company being scored. */
+function reviewProgress(sym,n,total){
+  const st=document.getElementById('cmdStatus');
+  if(!_reviewBtns)_reviewBtns=[document.getElementById('cmdRunBtn'),document.getElementById('refreshBtn')].filter(Boolean).map(b=>({b,label:b.textContent}));
+  if(st)st.innerHTML='<b>Reviewing '+esc(sym)+'</b> \u00b7 '+n+' of '+total+(total>6?' \u00b7 paced to stay inside the data limit, a minute or two for a long list':'');
+  const btn=document.getElementById('cmdRunBtn');
+  if(btn&&btn.disabled)btn.textContent=n+' / '+total;
+  const rb=document.getElementById('refreshBtn');
+  if(rb&&rb.disabled)rb.textContent=n+' / '+total;
 }
 /* A6.3. The economic release calendar, from FRED through the worker, cached a day here too.
    Dates and names only. Nothing reads it; a person does. */
