@@ -17084,7 +17084,11 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 #wdGlobe .cesium-widget-credits{font:11px/1.4 var(--mono);color:#9aa3b2;padding:5px 8px;background:rgba(7,9,15,.6);border-top-right-radius:6px}
 #wdGlobe .cesium-widget-credits a{color:#c3c9d4}
 #tab-world .wd-tip{position:absolute;z-index:3;pointer-events:none;transform:translate(14px,14px);max-width:260px;padding:6px 10px;border-radius:8px;background:var(--panel);color:var(--text);border:1px solid var(--border);box-shadow:var(--el-3);font-size:12.5px;line-height:1.4}
-#tab-world .wd-idle{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:24px;pointer-events:none}
+/* The hint sat in the middle of the globe and, because .mv-empty takes pointer events, it ate
+   the very click it was asking for: "Click a country" was unclickable through the card. It now
+   sits at the bottom, out of the way of the planet, and lets every click through. */
+#tab-world .wd-idle{position:absolute;inset:auto 0 0 0;z-index:2;display:grid;place-items:end center;padding:0 24px 18px;pointer-events:none}
+#tab-world .wd-idle .mv-empty{pointer-events:none;background:rgba(7,9,15,.82);backdrop-filter:blur(4px)}
 /* Start here: a step is a number, a line and a button; a done step is ticked and dimmed. */
 .welcome-card .wc-step{display:flex;gap:12px;align-items:flex-start}
 .welcome-card .wc-step>div{flex:1;line-height:1.55}
