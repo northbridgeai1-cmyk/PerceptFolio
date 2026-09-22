@@ -214,6 +214,12 @@ for (const fn of ['syncPush','syncPull','syncNow','syncPullForce','scheduleSync'
 }
 /* The access code is what ties devices together (2026-09-22): a person's devices, capped so a
    leaked code cannot seed a crowd, and the cap is reported by the server rather than assumed. */
+/* The minute limit is paced, not discovered: a refresh of a handful of tickers is several calls
+   each, and the rows that lost the race used to read "No data", which is a claim about the company
+   rather than about the fetch. */
+t('Finnhub calls wait their turn under the minute ceiling and a 429 is retried once', /const FH_PER_MIN=55;/.test(term) && /function fhWait\(\)/.test(term) && /const w=fhWait\(\); if\(w\)await sleep\(w\);/.test(term) && (term.match(/if\(_retried\)throw new Error\('RATE_LIMIT'\); await sleep\(2500\); return fh\(path,true\);/g) || []).length === 2);
+t('a failed score says which failure it was, never "No data" for a rate limit', /sc\.error==='RATE_LIMIT'\?'Not scored yet, too many at once'/.test(term) && /sc\.error==='NO_KEY'\?'Needs market data'/.test(term) && !/if\(sc\.error\)return\{label:'No data'/.test(term));
+t('the release calendar sits below the queue and folds after three lines', term.indexOf('<div id="commandQueue"></div>') < term.indexOf('<div id="econCal" class="md"></div>') && /const head=rel\.slice\(0,3\), rest=rel\.slice\(3\);/.test(term) && /more in the next thirty days/.test(term));
 t('the device cap is one constant, two, and the terminal shows the server\'s number', /const DEVICE_LIMIT = 2;/.test(worker) && !/limit: 2 \}/.test(worker) &&   /* the number is the constant, never a literal in an answer */ /lim=\(j&&j\.limit\)\|\|2/.test(term) && /on two devices: a desk and a pocket/.test(term));
 t('a full code names the screen that frees a slot', /On either of them open Settings, Sync across your devices, and forget the one you no longer use/.test(worker));
 /* Market data is included for everyone who pays (2026-09-22). The switch that can take it away is

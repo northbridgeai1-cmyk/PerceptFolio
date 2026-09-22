@@ -1246,9 +1246,10 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <!-- The schedule sits beside the record because it is the thing that keeps the record
        honest: a mark not taken on the day cannot be taken later. -->
   <div id="marksDue" class="md"></div>
-  <!-- A6.3. Release dates in the next thirty days: context beside the queue, never a signal. -->
-  <div id="econCal" class="md"></div>
   <div id="commandQueue"></div>
+  <!-- A6.3. Release dates: context AFTER the queue, never above it. The queue is what the screen
+       is for; a calendar that pushes it below the fold is furniture in the way of the work. -->
+  <div id="econCal" class="md"></div>
 </div>
 
 <!-- DASHBOARD -->
@@ -4140,7 +4141,22 @@ function fhUsage(){
   _fhCalls=_fhCalls.filter(t=>t>cut);
   return{used:_fhCalls.length,limit:60};
 }
-async function fh(path){
+/* ---- THE MINUTE LIMIT, PACED RATHER THAN DISCOVERED ----
+   Finnhub allows sixty calls a minute and the worker's own cap is the same number. A refresh of a
+   handful of tickers is several calls each, so the old code walked into the ceiling and the
+   rows that lost the race said "No data", which is indistinguishable from a broken product.
+   Two changes: a call waits its turn when the last minute is nearly full, and a 429 is retried
+   once after a pause rather than surfacing as a failed score. */
+const FH_PER_MIN=55;                       // five below the real ceiling, for the worker's own calls
+function fhWait(){
+  const cut=Date.now()-60000;
+  _fhCalls=_fhCalls.filter(t=>t>cut);
+  if(_fhCalls.length<FH_PER_MIN)return 0;
+  return Math.max(0,_fhCalls[0]+60000-Date.now())+40;
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function fh(path,_retried){
+  const w=fhWait(); if(w)await sleep(w);
   _fhCalls.push(Date.now());
   if(_fhCalls.length>200)_fhCalls=_fhCalls.slice(-120);
   /* Built in. The operator's devices ask /finnhub with the key; every other signed-in account asks
@@ -4159,7 +4175,7 @@ async function fh(path){
        and surfaced as NO_KEY so every existing "add your key" prompt applies unchanged. */
     if(r.status===402){ if(!D.dataNotIncluded){ D.dataNotIncluded=true; saveDB(); } throw new Error('NO_KEY'); }
     if(r.status===401||r.status===403)throw new Error('BAD_KEY');
-    if(r.status===429)throw new Error('RATE_LIMIT');
+    if(r.status===429){ if(_retried)throw new Error('RATE_LIMIT'); await sleep(2500); return fh(path,true); }
     if(r.ok&&D.dataNotIncluded){ D.dataNotIncluded=false; saveDB(); }
     if(!r.ok){
       /* A worker with no FINNHUB_API_KEY set answers 500 with a message worth showing, rather than
@@ -4172,7 +4188,7 @@ async function fh(path){
   if(!D.apiKey)throw new Error('NO_KEY');
   const r=await fetch(FH+path+(path.includes('?')?'&':'?')+'token='+encodeURIComponent(D.apiKey));
   if(r.status===401||r.status===403)throw new Error('BAD_KEY');
-  if(r.status===429)throw new Error('RATE_LIMIT');
+  if(r.status===429){ if(_retried)throw new Error('RATE_LIMIT'); await sleep(2500); return fh(path,true); }
   if(!r.ok)throw new Error('HTTP_'+r.status);
   return r.json();
 }
@@ -4504,7 +4520,9 @@ function scoreTotal(sc){
    the blanket setting, and it's the mechanism that makes a written thesis do work rather than sit
    in a text box. */
 function verdictOf(sc,isHolding,sym){
-  if(sc.error)return{label:'No data',cls:'pill-na',key:'na'};
+  /* "No data" for a rate limit told the reader the company had no data, which is false and reads
+     as a broken terminal. Each failure says its own thing, in the words a person would use. */
+  if(sc.error)return{label:sc.error==='RATE_LIMIT'?'Not scored yet, too many at once':sc.error==='NO_KEY'?'Needs market data':sc.error==='NO_DATA'?'No quote for this ticker':'Not scored',cls:'pill-na',key:'na'};
   const r=D.rules;
   const th=sym?thesisFor(sym):null;
   if(isHolding&&th&&isFinite(th.sellBelow)&&th.sellBelow>0&&sc.qScore<th.sellBelow){
@@ -14637,7 +14655,14 @@ async function renderEconCal(){
     }
     const rel=(_econCal.doc.releases||[]).slice(0,10);
     if(!rel.length){ el.innerHTML=''; return; }
-    el.innerHTML='<table style="font-size:12.5px"><thead><tr><th>Release</th><th>Date</th></tr></thead><tbody>'+rel.map(x=>'<tr><td>'+esc(x.name)+'</td><td class="muted" style="white-space:nowrap">'+esc(x.date)+'</td></tr>').join('')+'</tbody></table><div class="muted" style="font-size:11px;margin-top:4px">'+esc(_econCal.doc.source||'')+'</div>';
+    /* Three lines, then the rest behind a summary. What is due this week is context worth a glance;
+       the whole month is a reference and belongs folded. */
+    const row=x=>'<tr><td>'+esc(x.name)+'</td><td class="muted" style="white-space:nowrap">'+esc(x.date)+'</td></tr>';
+    const head=rel.slice(0,3), rest=rel.slice(3);
+    el.innerHTML='<div class="section-title" style="margin-top:4px">Coming up</div>'+
+      '<table style="font-size:12.5px"><tbody>'+head.map(row).join('')+'</tbody></table>'+
+      (rest.length?'<details class="aside"><summary>'+rest.length+' more in the next thirty days</summary><div><table style="font-size:12.5px"><tbody>'+rest.map(row).join('')+'</tbody></table></div></details>':'')+
+      '<div class="muted" style="font-size:11px;margin-top:4px">'+esc(_econCal.doc.source||'')+'</div>';
   }catch(e){ el.innerHTML=''; }
 }
 /* A4.1. The calls-per-quarter meter. The record fills from every verdict change across the whole
