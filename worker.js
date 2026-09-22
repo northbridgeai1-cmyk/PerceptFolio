@@ -326,10 +326,14 @@ async function dailyBars(env, sym, days) {
   return { feed, bars: out.filter(b => b.d >= from) };
 }
 function feedLabel(feed) { return feed.licensed ? feed.name : 'yahoo (interim, unlicensed; set PRICE_FEED and PRICE_FEED_KEY)'; }
-/* Which plan tiers ride the worker's own Finnhub key on /data (A2.1). Unset: all of them, the
-   owner's standing instruction. Set to a comma list ("employee,operator") once the licence
-   question is decided the other way, and every other tier is told to connect its own key. A grant
-   with no tier recorded is treated as personal. */
+/* Which plan tiers ride the worker's own Finnhub key on /data (A2.1).
+   THE POSITION, 2026-09-22: market data is included for everyone who pays. DATA_TIERS is unset and
+   should stay unset; it exists as the one-secret switch for the day Finnhub asks, not as a setting
+   to leave on. A stray value here is silent from the outside and looks like a broken terminal, so
+   /version reports it and the admin page shows it in red. THE TRIGGER: at LICENCE_AT live grants,
+   the personal plan is no longer the honest place to be, and the commercial Finnhub plan is bought;
+   /version counts them so the date is not a guess. A grant with no tier recorded is personal. */
+const LICENCE_AT = 5;
 function dataIncludedFor(env, tier) {
   const tiers = String(env.DATA_TIERS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
   return !tiers.length || tiers.includes(String(tier || 'personal').toLowerCase());
@@ -601,6 +605,19 @@ async function handle(request, env) {
         RESEND_API_KEY: !!env.RESEND_API_KEY,
         MAIL_FROM: env.MAIL_FROM || null
       };
+      /* The data position, visible rather than assumed. DATA_TIERS should be unset: market data is
+         included for everyone who pays. Set, it silently turns paying accounts into bring-your-own
+         key, which from the outside looks like a broken terminal, so it is reported here and the
+         admin page shows it in red. Beside it, how close the licence trigger is: at LICENCE_AT
+         live grants the commercial Finnhub plan is bought. */
+      body.data = { included: 'everyone', dataTiers: env.DATA_TIERS || null, warn: env.DATA_TIERS ? 'DATA_TIERS is set: accounts outside it are refused market data and are asked for their own Finnhub key. Delete the secret unless that is deliberate.' : null };
+      try {
+        let live = 0, paused = 0;
+        const g = await env.PF_SYNC.list({ prefix: 'grant:', limit: 1000 });
+        for (const k of g.keys) { const r = JSON.parse(await env.PF_SYNC.get(k.name) || 'null'); if (!r) continue; if (r.paused) paused++; else live++; }
+        body.licence = { liveGrants: live, pausedGrants: paused, buyCommercialFeedAt: LICENCE_AT, due: live >= LICENCE_AT,
+          note: live >= LICENCE_AT ? 'Live grants have reached ' + LICENCE_AT + '. Finnhub\'s personal plan no longer covers this; buy the commercial plan and keep serving data from the worker.' : null };
+      } catch (e) {}
     }
     return json(body, 200, env);
   }
@@ -1393,10 +1410,10 @@ async function handle(request, env) {
      forget one from Settings, which is the same trust the code already carries. A sync that names
      no device (the bring-my-account fetch, old builds) registers nothing and is not counted. The
      seen stamp is written at most hourly a device, KV writes being the scarce thing. */
-  /* A person's devices, not a pair: the access code is what ties them together (2026-09-22), and
-     a laptop, a phone, a tablet and a spare is an ordinary set for one person. The cap exists so a
-     leaked code cannot quietly seed a crowd, not to ration the product. */
-  const DEVICE_LIMIT = 5;
+  /* Two devices under a code (owner, 2026-09-22): a desk and a pocket. The access code is what
+     ties them together, and the cap is what stops a leaked code seeding a crowd. One constant, so
+     the number is stated once and the terminal reads it from the answer rather than assuming. */
+  const DEVICE_LIMIT = 2;
   if (url.pathname === '/usync/devices' || url.pathname === '/usync/forget') {
     let body = {};
     if (request.method === 'POST') { try { body = await request.json(); } catch (e) { body = {}; } }
@@ -1424,7 +1441,7 @@ async function handle(request, env) {
       const mine = devs.find(d => d.id === device);
       if (!mine) {
         if (devs.length >= DEVICE_LIMIT) {
-          return json({ error: 'Your code is already on ' + DEVICE_LIMIT + ' devices. Open Settings, Sync across your devices, on any of them and forget one you no longer use.', devices: devs, limit: DEVICE_LIMIT }, 409, env);
+          return json({ error: 'Your code is already on ' + DEVICE_LIMIT + ' devices. On either of them open Settings, Sync across your devices, and forget the one you no longer use.', devices: devs, limit: DEVICE_LIMIT }, 409, env);
         }
         devs.push({ id: device, name: dname || 'a device', seen: Date.now() });
         await env.PF_SYNC.put(dk, JSON.stringify(devs));

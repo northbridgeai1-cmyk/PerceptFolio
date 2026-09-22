@@ -2289,7 +2289,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Sync across your devices</h3>
-    <p class="muted" style="font-size:13px;margin:0 0 10px">Your access code is what ties your devices together. Sign in on another device with the same code and your book comes with it, up to five devices.</p>
+    <p class="muted" style="font-size:13px;margin:0 0 10px">Your access code is what ties your devices together. Sign in on another device with the same code and your book comes with it, on two devices: a desk and a pocket.</p>
     <div id="syncDevices"></div>
     <div class="row">
       <button class="btn btn-ghost" onclick="syncNow()">Sync now</button>
@@ -15824,7 +15824,7 @@ async function checkConnection(){
   }catch(e){ out+=row(false,'Access code','could not be checked'); }
   /* 3. sync and the devices */
   if(syncActive()){
-    try{ const j=await (await fetch(INVITE_WORKER+'/usync/devices?code='+encodeURIComponent(code))).json(); const n=(j&&j.devices||[]).length, lim=(j&&j.limit)||5; out+=row(true,'Sync',n+' of '+lim+' devices under your code'); renderSyncDevices((j&&j.devices)||[]); }
+    try{ const j=await (await fetch(INVITE_WORKER+'/usync/devices?code='+encodeURIComponent(code))).json(); const n=(j&&j.devices||[]).length, lim=(j&&j.limit)||2; out+=row(true,'Sync',n+' of '+lim+' devices under your code'); renderSyncDevices((j&&j.devices)||[]); }
     catch(e){ out+=row(false,'Sync','the device list could not be read'); }
   }else out+=row(null,'Sync','off on this device');
   /* 4. market data, a live quote */

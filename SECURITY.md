@@ -266,3 +266,19 @@ use without written approval. Posture from this date:
 - **`/notify`** stores two booleans per identity. Notices carry a ticker and a horizon or a date, never a price or a thesis. `[triggers] crons` is now in `worker.wrangler.toml`; without it the marker never ran.
 - **Business seats.** `/org/keys`: a P-256 public JWK per device per seat (the private key is a non-extractable CryptoKey in IndexedDB); calls are signed over id, ticker, verdict, time, price, index, rulebook version and seat; the verify page checks signatures against the pack's keys. `/org/rulebook` versions every publish in a hash chain (`rulebookLog`); every call records `rbv`. `/org/roles` (admin seat only) sets a reviewer seat, which reads and never calls. `/org/records` (admin or reviewer) returns every seat's record copy, heads and keys. `/org/status` (operator) is one line per seat for admin.html.
 - **Keyless public routes added**: `/filings` (EDGAR submissions), `/holders` (EDGAR full-text search over 13F-HR tables, by issuer name), `/calendar` (FRED release dates, behind a code). All rate-limited by address, cached, sourced.
+
+## The data position and the licence trigger (2026-09-22)
+
+Market data is included for everyone who pays: the worker's Finnhub key answers `/data` for every
+live access code. `DATA_TIERS` must stay **unset**; set, it refuses paying accounts and the terminal
+asks them for a key, which from the outside is indistinguishable from a broken product. It is now
+reported by `/version` (operator token only) and the admin page shows it in red, because this fault
+was live for a day and nothing on any screen said so.
+
+`LICENCE_AT = 5`. Finnhub's personal plan is what the worker's key sits on; at five live grants
+that is no longer the honest place to be, and the commercial plan is bought. `/version` counts live
+and paused grants against that number and the admin page draws the bar, so the date is a fact
+rather than a memory.
+
+Two devices under a code (`DEVICE_LIMIT`), a desk and a pocket. The cap is what stops a leaked code
+seeding a crowd; the terminal reads the number from the answer rather than printing its own.
