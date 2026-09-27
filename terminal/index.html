@@ -429,6 +429,15 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
   color:var(--text);cursor:pointer;font-family:inherit}
 .btn-add:hover{border-color:#3d434f;background:var(--panel2)}
 .btn-add .plus{font-size:14px;line-height:1;color:var(--accent)}
+.tolist-row{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin-bottom:6px;
+  background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);
+  font:inherit;font-size:14.5px;text-align:left;cursor:pointer}
+.tolist-row:hover{border-color:var(--muted)}
+.tolist-row.on{border-color:var(--accent,#3b82f6)}
+.tolist-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.tolist-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tolist-n{font:11px/1 var(--mono);color:var(--muted)}
+.tolist-tick{width:14px;text-align:right;color:var(--accent,#3b82f6);font-weight:700}
 .addwrap{display:none}
 .addwrap.open{display:block;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6);
   padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -1586,6 +1595,24 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <input id="newListName" placeholder="e.g. Semis, Dividend, Watching closely" maxlength="40" style="max-width:280px"
              onkeydown="if(event.key==='Enter')createList()">
       <button class="btn" onclick="createList()">Create</button>
+    </div>
+  </div>
+  </div>
+
+  <!-- ADD TO LIST. One picker, reached from every place a ticker appears: the watchlist, the
+       portfolio, the screener, the analyzer and the company sheet. A row per list with its colour,
+       ticked when the ticker is already filed there, and a box to make a new list without leaving.
+       Toggling saves at once, so there is no Save button to forget. -->
+  <div class="addwrap" id="add-tolist">
+  <div class="card" style="position:relative">
+    <button class="add-close" onclick="closeAddModal()" title="Close">&#10005;</button>
+    <h3 id="toListTitle">Add to list</h3>
+    <p class="muted" style="font-size:13px;margin-bottom:12px">A ticker can sit in several lists, or none. Filing it into a list also watches it, so it keeps being scored.</p>
+    <div id="toListRows"></div>
+    <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <input id="toListNew" placeholder="Or make a new list" maxlength="40" style="max-width:260px"
+             onkeydown="if(event.key==='Enter')createListWith()">
+      <button class="btn" onclick="createListWith()">Create and add</button>
     </div>
   </div>
   </div>
@@ -4688,6 +4715,60 @@ function addToList(sym,id){
   if(!D.watchlist.includes(sym))D.watchlist.push(sym);
   saveDB();renderAll();
 }
+/* ===== ADD TO LIST =====
+   One picker for every screen. _toListSym is the ticker being filed; it is held while the modal is
+   open because renderAll() redraws the rows underneath and the modal must keep its subject. */
+let _toListSym=null;
+function openListPicker(sym){
+  sym=(sym||'').trim().toUpperCase();
+  if(!sym)return;
+  _toListSym=sym;
+  const t=document.getElementById('toListTitle');
+  if(t)t.textContent='Add '+sym+' to a list';
+  renderListPicker();
+  openAdd('add-tolist');
+}
+function renderListPicker(){
+  const box=document.getElementById('toListRows');
+  if(!box||!_toListSym)return;
+  const sym=_toListSym, lists=allLists();
+  if(!lists.length){
+    box.innerHTML='<p class="muted" style="font-size:13.5px">No lists yet. Name one below and '+esc(sym)+' goes straight into it.</p>';
+    return;
+  }
+  box.innerHTML=lists.map(l=>{
+    const inIt=(l.syms||[]).includes(sym);
+    const col=(LIST_COLORS.find(c=>c.k===l.color)||{}).v||'var(--muted)';
+    return '<button type="button" class="tolist-row'+(inIt?' on':'')+'" onclick="toggleListMembership(\''+esc(sym)+'\',\''+esc(l.id)+'\')" aria-pressed="'+(inIt?'true':'false')+'">'+
+      '<span class="tolist-dot" style="background:'+col+'"></span>'+
+      '<span class="tolist-name">'+esc(l.name)+'</span>'+
+      '<span class="tolist-n">'+((l.syms||[]).length)+'</span>'+
+      '<span class="tolist-tick">'+(inIt?'&#10003;':'')+'</span></button>';
+  }).join('');
+}
+/* In or out, in one press. Saving here rather than on close means closing the modal can never
+   discard a change someone believes they made. */
+function toggleListMembership(sym,id){
+  const l=allLists().find(x=>x.id===id); if(!l)return;
+  if((l.syms||[]).includes(sym)){ removeFromList(sym,id); toast(sym+' removed from '+l.name+'.'); }
+  else { addToList(sym,id); toast(sym+' added to '+l.name+'.'); }
+  renderListPicker();
+}
+/* Make a list and file the ticker into it in one action, so the common case is not two trips. */
+function createListWith(){
+  const el=document.getElementById('toListNew');
+  const name=((el&&el.value)||'').trim().slice(0,40);
+  if(!name)return toast('Give the list a name.');
+  if(allLists().some(l=>l.name.toLowerCase()===name.toLowerCase()))return toast('You already have a list called that.');
+  const used=allLists().map(l=>l.color);
+  const free=LIST_COLORS.find(c=>!used.includes(c.k))||LIST_COLORS[allLists().length%LIST_COLORS.length];
+  const id=makeListId();
+  allLists().push({id,name,color:free.k,syms:[]});
+  if(el)el.value='';
+  if(_toListSym)addToList(_toListSym,id);
+  renderListPicker();
+  toast('List "'+name+'" created'+(_toListSym?', with '+_toListSym+' in it.':'.'));
+}
 function removeFromList(sym,id){
   const l=allLists().find(x=>x.id===id); if(!l||!l.syms)return;
   l.syms=l.syms.filter(x=>x!==sym);
@@ -5390,6 +5471,7 @@ function screenerMenu(btn,sym,inWatch){
   const q=JSON.stringify(String(sym));
   const items=[{label:'Analyze',run:'analyzeStock('+q+')'}];
   if(!inWatch)items.push({label:'Add to watchlist',run:'addWatchSym('+q+')'});
+  items.push({label:'Add to list',run:'openListPicker('+q+')'});
   openMenu(btn,items);
 }
 function historyMenu(btn,i){
@@ -5436,6 +5518,7 @@ function holdingMenu(btn,sym,idx){
     {label:(D.theses&&D.theses[sym])?'Thesis':'Write a thesis', run:"openThesis('"+sym+"')"},
     {label:'Review'+(thesisFor(sym)&&thesisFor(sym).reviewedAt?' (last '+new Date(thesisFor(sym).reviewedAt).toISOString().slice(0,10)+')':' (never)'), run:"openReview('"+sym+"')"},
     {label:'Company sheet', run:"openCompanySheet('"+sym+"')"},
+    {label:listsFor(sym).length?'Lists ('+listsFor(sym).length+')':'Add to list', run:"openListPicker('"+sym+"')"},
     {label:'Sell / trim',  run:"toggleSellRow("+idx+")"},
     {label:isFavorite(sym)?'Remove from favourites':'Add to favourites', run:"toggleFavorite('"+sym+"')"},
     {label:'Remove holding', run:"removeHolding("+idx+")", danger:true}
@@ -5446,11 +5529,9 @@ function tickerMenu(btn,sym,idx){
   const items=[{label:'Analyze '+sym, run:"analyzeStock('"+sym+"')"}];
   items.push({label:isFavorite(sym)?'Remove from favourites':'Add to favourites',
               run:"toggleFavorite('"+sym+"')"});
-  allLists().forEach(l=>{
-    const inIt=(l.syms||[]).includes(sym);
-    items.push({label:(inIt?'Remove from ':'Add to ')+l.name,
-                run:(inIt?"removeFromList('":"addToList('")+sym+"','"+l.id+"')"});
-  });
+  /* One item, not one per list: a dozen lists used to make this menu taller than the screen. */
+  items.push({label:listsFor(sym).length?'Lists ('+listsFor(sym).length+')':'Add to list',
+              run:"openListPicker('"+sym+"')"});
   items.push({label:'Remove from watchlist', run:"removeWatch("+idx+")", danger:true});
   openMenu(btn,items);
 }
@@ -9251,6 +9332,7 @@ function renderAnalysis(sym,sc){
   '<div class="card" style="margin-top:16px">'+
     '<div class="row"><div class="big">'+esc(sym)+', $'+sc.price.toFixed(2)+'</div><div class="spacer"></div>'+
     '<button class="btn btn-ghost btn-sm" onclick="openCompanySheet(\''+sym+'\')" title="One printable page: the checks, the statements, insiders, analysts, headlines, the model, the thesis, the record">Company sheet</button> '+
+    '<button class="btn btn-ghost btn-sm" onclick="openListPicker(\''+sym+'\')" title="File this ticker into one of your lists. Anything in a list is watched and scored.">'+(listsFor(sym).length?'Lists ('+listsFor(sym).length+')':'Add to list')+'</button> '+
     '<button class="btn btn-ghost btn-sm" onclick="toggleFavorite(\''+sym+'\');renderAnalysis(\''+sym+'\',D.analyses[\''+sym+'\'])" title="'+(isFavorite(sym)?'Remove from Favorites':'Add to Favorites')+'">'+(isFavorite(sym)?'★ Favorited':'☆ Favorite')+'</button> '+
     '<span class="pill '+v.cls+'">'+v.label+'</span> '+
     '<span class="muted" style="font-size:12px">Your call:</span> '+myTagSelect(sym)+'</div>'+

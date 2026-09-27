@@ -1349,6 +1349,19 @@ G('One grant, one code, two devices');
   t('a decision is one of three, and none of them is a firm', /\['personal', 'employee', 'denied'\]/.test(worker) && !/'business'/.test(worker));
   t('audit fix: public lookups by code are rate-limited', /tooMany\(env, request, '\/status', 30\)/.test(worker));
   t('audit fix: no allow-origin header when no origin is configured', /\.\.\.\(allowed \? \{ 'Access-Control-Allow-Origin': allowed \} : \{\}\)/.test(worker) && !/'Access-Control-Allow-Origin': allowed \|\| 'null'/.test(worker));
+  /* ADD TO LIST (2026-09-27). One picker, reached from the watchlist, the portfolio, the screener
+     and the analyzer. The watchlist menu used to carry one item per list, which ran off the screen
+     once there were a dozen. Filing a ticker also watches it, so nothing sits in a list unscored. */
+  t('a ticker can be filed into any list from one picker, everywhere it appears',
+    /function openListPicker\(sym\)/.test(term) && /function toggleListMembership\(sym,id\)/.test(term)
+    && /id="add-tolist"/.test(term) && /function createListWith\(\)/.test(term)
+    && (term.match(/openListPicker\('/g) || []).length >= 3);
+  t('the picker saves on each press, so closing it can never discard a change',
+    /function toggleListMembership\(sym,id\)\{[\s\S]{0,200}?removeFromList\(sym,id\)[\s\S]{0,120}?addToList\(sym,id\)/.test(term));
+  t('filing a ticker watches it, and unfiling never unwatches it',
+    /if\(!D\.watchlist\.includes\(sym\)\)D\.watchlist\.push\(sym\);/.test(term)
+    && /function removeFromList\(sym,id\)\{[\s\S]{0,180}?l\.syms=l\.syms\.filter/.test(term)
+    && !/function removeFromList[\s\S]{0,180}?D\.watchlist=/.test(term));
   t('the terminal has no firm rulebook to apply and no seat to lock inputs for', !/D\.rules\.qBuy=rb\.qBuy/.test(term) && !/Publish to all/.test(term) && !/PF_ORG/.test(term));
   t('the four bars are the account\'s own, versioned by their digest', /return 'p:'\+fnv1a\(canonicalJson\(\{qBuy:/.test(term));
   t('first-run data key card: shown without a key, saves to the profile, removed once set', /pfKeyCard/.test(term) && /D\.apiKey=v; if\(typeof saveDB==='function'\) saveDB\(\); card\.remove\(\)/.test(term));
@@ -1450,7 +1463,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v135/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v136/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
