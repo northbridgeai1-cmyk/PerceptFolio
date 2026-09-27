@@ -33,7 +33,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB ceiling; a portfolio blob is normally
    version running and the version in git drift apart silently and there is no way to tell from
    outside which one is live. That has already cost two rounds of debugging a fix that was correct
    in git and absent in production. GET /version answers the question in one request. */
-const WORKER_VERSION = '2026-09-22.5';
+const WORKER_VERSION = '2026-09-27.1';
 
 /* ---- The site's own addresses ----
    ALLOWED_ORIGIN names the domain. The same deployment also answers at its Pages address, which is
