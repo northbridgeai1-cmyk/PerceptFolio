@@ -708,7 +708,8 @@ t('a ticker in no named list belongs to Watchlist',
   /\(D\.watchlist\|\|\[\]\)\.filter\(x=>!filed\.has\(x\)\)/.test(term));
 t('the Lists column is rendered before My Call, matching the header',
   term.indexOf("listDotsHtml(s)+' '+listMenuHtml(s)") < term.indexOf("'<td class=\"mycall-cell\">'+myTagSelect(s)"));
-t('the empty-state colspan matches the column count', /colspan="9" class="empty"/.test(term));
+/* Ten columns since the pick box was added ahead of Ticker. */
+t('the empty-state colspan matches the column count', /colspan="10" class="empty"/.test(term));
 
 /* ==================== "+ ADD" DIALOGS ==================== */
 G('Add forms are dialogs, not permanent fixtures at the top of every tab');
@@ -1357,11 +1358,26 @@ G('One grant, one code, two devices');
      and the analyzer. The watchlist menu used to carry one item per list, which ran off the screen
      once there were a dozen. Filing a ticker also watches it, so nothing sits in a list unscored. */
   t('a ticker can be filed into any list from one picker, everywhere it appears',
-    /function openListPicker\(sym\)/.test(term) && /function toggleListMembership\(sym,id\)/.test(term)
+    /function openListPicker\(symOrSyms\)/.test(term) && /function toggleListMembership\(id\)/.test(term)
     && /id="add-tolist"/.test(term) && /function createListWith\(\)/.test(term)
     && (term.match(/openListPicker\('/g) || []).length >= 3);
+  /* MANY AT ONCE (2026-09-27). Tick rows in the watchlist, then act on all of them from one bar. */
+  t('tickers can be picked in bulk and acted on from one bar',
+    /let _picked=new Set\(\)/.test(term) && /function pickAllWatch\(on\)/.test(term)
+    && /id="pickBar"/.test(term) && /function bulkAddToList\(\)/.test(term)
+    && /function bulkRemoveFromList\(\)/.test(term) && /function bulkRemoveWatch\(\)/.test(term));
+  /* A selection is a thing you are doing now, not a fact about the book: storing it on D would have
+     people acting on rows they ticked yesterday. */
+  t('the selection is never persisted to the profile', !/D\.picked|picked:\[\]/.test(term) && /let _picked=new Set\(\);/.test(term));
+  /* Filtering away a ticked row and then pressing Remove must not act on what nobody can see. */
+  t('the bar drops tickers that are no longer on screen', /if\(!vis\.has\(s\)\)_picked\.delete\(s\);/.test(term));
+  /* With some of a selection already filed, one press COMPLETES rather than inverts: inverting
+     would take out the ones already in, which is never what pressing "add" means. */
+  t('a partial selection completes on press, and only an all-in list removes',
+    /const state=have===0\?'none':have===syms\.length\?'all':'some';/.test(term)
+    && /if\(have===syms\.length\)\{\s*\n\s*syms\.forEach\(s=>removeFromList\(s,id\)\);/.test(term));
   t('the picker saves on each press, so closing it can never discard a change',
-    /function toggleListMembership\(sym,id\)\{[\s\S]{0,200}?removeFromList\(sym,id\)[\s\S]{0,120}?addToList\(sym,id\)/.test(term));
+    /function toggleListMembership\(id\)\{[\s\S]{0,400}?removeFromList\(s,id\)[\s\S]{0,200}?addToList\(s,id\)/.test(term));
   t('filing a ticker watches it, and unfiling never unwatches it',
     /if\(!D\.watchlist\.includes\(sym\)\)D\.watchlist\.push\(sym\);/.test(term)
     && /function removeFromList\(sym,id\)\{[\s\S]{0,180}?l\.syms=l\.syms\.filter/.test(term)
@@ -1467,7 +1483,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v136/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v137/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }

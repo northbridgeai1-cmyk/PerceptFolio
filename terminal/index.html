@@ -429,6 +429,11 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
   color:var(--text);cursor:pointer;font-family:inherit}
 .btn-add:hover{border-color:#3d434f;background:var(--panel2)}
 .btn-add .plus{font-size:14px;line-height:1;color:var(--accent)}
+.pick-th,.pick-td{width:32px;text-align:center;padding-right:0}
+.pick-box{cursor:pointer}
+.pick-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:10px 12px;
+  background:var(--panel2);border:1px solid var(--accent,#3b82f6);border-radius:8px;font-size:13.5px}
+.pick-bar .spacer{flex:1 1 auto}
 .tolist-row{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin-bottom:6px;
   background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);
   font:inherit;font-size:14.5px;text-align:left;cursor:pointer}
@@ -437,6 +442,7 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .tolist-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
 .tolist-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tolist-n{font:11px/1 var(--mono);color:var(--muted)}
+.tolist-part{font:11px/1 var(--mono);color:var(--muted)}
 .tolist-tick{width:14px;text-align:right;color:var(--accent,#3b82f6);font-weight:700}
 .addwrap{display:none}
 .addwrap.open{display:block;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6);
@@ -1634,9 +1640,22 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <button class="btn-ghost btn btn-sm" onclick="clearWatchlistFilters()">Clear</button>
     </div>
   </div>
+  <!-- MANY AT ONCE. Tick rows, then act on all of them from here: file them into a list, take them
+       out of one, or drop them from the watchlist. Hidden until something is ticked, so it costs
+       nothing to anyone doing one ticker at a time. -->
+  <div id="pickBar" class="pick-bar" style="display:none">
+    <b id="pickCount"></b>
+    <span class="spacer"></span>
+    <button class="btn btn-sm" onclick="bulkAddToList()">Add to list</button>
+    <button class="btn btn-ghost btn-sm" onclick="bulkRemoveFromList()">Remove from this list</button>
+    <button class="btn btn-ghost btn-sm" onclick="bulkAnalyze()">Analyze</button>
+    <button class="btn btn-danger btn-sm" onclick="bulkRemoveWatch()">Remove from watchlist</button>
+    <button class="btn btn-ghost btn-sm" onclick="pickClear()">Clear</button>
+  </div>
   <div class="card" style="overflow-x:auto">
     <table id="watchTable">
       <thead><tr>
+        <th class="pick-th"><input type="checkbox" id="wlPickAll" onclick="pickAllWatch(this.checked)" title="Select every ticker shown" aria-label="Select all"></th>
         <th class="sortable" id="wlTh_sym" onclick="sortWatchlist('sym')">Ticker</th>
         <th class="sortable" id="wlTh_price" onclick="sortWatchlist('price')">Share price</th>
         <th class="sortable th-quality sortable" id="wlTh_quality" onclick="sortWatchlist('quality')">Quality <span class="th-den">/12</span></th>
@@ -4715,43 +4734,125 @@ function addToList(sym,id){
   if(!D.watchlist.includes(sym))D.watchlist.push(sym);
   saveDB();renderAll();
 }
+/* ===== MANY AT ONCE =====
+   _picked holds the tickers ticked in the watchlist table. It is deliberately NOT stored on D: a
+   selection is a thing you are doing right now, not a thing about the book, and a selection that
+   survived a reload would have people acting on rows they picked yesterday. It is cleared whenever
+   the open list changes, for the same reason. */
+let _picked=new Set();
+function pickOne(sym,on){ on?_picked.add(sym):_picked.delete(sym); renderPickBar(); syncPickAll(); }
+function pickAllWatch(on){
+  visiblePickSyms().forEach(s=>on?_picked.add(s):_picked.delete(s));
+  document.querySelectorAll('#watchBody .pick-box').forEach(b=>{ b.checked=on; });
+  renderPickBar();
+}
+function visiblePickSyms(){ return [...document.querySelectorAll('#watchBody .pick-box')].map(b=>b.getAttribute('data-sym')); }
+function pickClear(){ _picked.clear(); document.querySelectorAll('#watchBody .pick-box').forEach(b=>{b.checked=false;}); renderPickBar(); syncPickAll(); }
+/* The header box reads the rows rather than the other way round, so it is never a lie: ticked when
+   every visible row is ticked, indeterminate when some are. */
+function syncPickAll(){
+  const all=document.getElementById('wlPickAll'); if(!all)return;
+  const vis=visiblePickSyms(), on=vis.filter(s=>_picked.has(s)).length;
+  all.checked=vis.length>0&&on===vis.length;
+  all.indeterminate=on>0&&on<vis.length;
+}
+function renderPickBar(){
+  const bar=document.getElementById('pickBar'); if(!bar)return;
+  /* Only tickers still on screen count: filtering to something else and then pressing Remove would
+     otherwise act on rows nobody can see. */
+  const vis=new Set(visiblePickSyms());
+  [..._picked].forEach(s=>{ if(!vis.has(s))_picked.delete(s); });
+  const n=_picked.size;
+  bar.style.display=n?'flex':'none';
+  const c=document.getElementById('pickCount');
+  if(c)c.textContent=n+' selected';
+  const rm=bar.querySelector('button[onclick="bulkRemoveFromList()"]');
+  const open=listView?listById(listView):null;
+  if(rm)rm.style.display=(open&&!open.isDefault)?'':'none';
+  syncPickAll();
+}
+function pickedSyms(){ return [..._picked]; }
+/* One picker for the whole selection: the same modal, applied to every ticker ticked. */
+function bulkAddToList(){
+  const syms=pickedSyms(); if(!syms.length)return;
+  openListPicker(syms);
+}
+function bulkRemoveFromList(){
+  const syms=pickedSyms(); const open=listView?listById(listView):null;
+  if(!syms.length||!open||open.isDefault)return;
+  syms.forEach(s=>removeFromList(s,open.id));
+  toast(syms.length+' taken out of '+open.name+'. Still watched.');
+  pickClear();
+}
+function bulkRemoveWatch(){
+  const syms=pickedSyms(); if(!syms.length)return;
+  if(!confirm('Remove '+syms.length+' ticker'+(syms.length===1?'':'s')+' from the watchlist?\n\nThey stop being scored. Holdings are not touched.'))return;
+  D.watchlist=(D.watchlist||[]).filter(s=>!_picked.has(s));
+  allLists().forEach(l=>{ l.syms=(l.syms||[]).filter(s=>!_picked.has(s)); });
+  pickClear(); saveDB(); renderAll();
+  toast(syms.length+' removed from the watchlist.');
+}
+async function bulkAnalyze(){
+  const syms=pickedSyms(); if(!syms.length)return;
+  toast('Analyzing '+syms.length+'\u2026');
+  for(const s of syms){ try{ await analyzeStock(s); }catch(e){} }
+  renderAll(); toast('Analyzed '+syms.length+'.');
+}
+
 /* ===== ADD TO LIST =====
-   One picker for every screen. _toListSym is the ticker being filed; it is held while the modal is
-   open because renderAll() redraws the rows underneath and the modal must keep its subject. */
-let _toListSym=null;
-function openListPicker(sym){
-  sym=(sym||'').trim().toUpperCase();
-  if(!sym)return;
-  _toListSym=sym;
+   One picker for every screen, for one ticker or a whole selection. _toListSyms holds the subject
+   while the modal is open, because renderAll() redraws the rows underneath and the modal must not
+   lose what it is acting on. */
+let _toListSyms=[];
+/* Takes one ticker or many. One is a list of one, so the modal has a single code path and every
+   caller that passed a string still works. */
+function openListPicker(symOrSyms){
+  const syms=(Array.isArray(symOrSyms)?symOrSyms:[symOrSyms])
+    .map(x=>String(x||'').trim().toUpperCase()).filter(Boolean);
+  if(!syms.length)return;
+  _toListSyms=syms;
   const t=document.getElementById('toListTitle');
-  if(t)t.textContent='Add '+sym+' to a list';
+  if(t)t.textContent=syms.length===1?('Add '+syms[0]+' to a list')
+                                    :('Add '+syms.length+' tickers to a list');
   renderListPicker();
   openAdd('add-tolist');
 }
 function renderListPicker(){
   const box=document.getElementById('toListRows');
-  if(!box||!_toListSym)return;
-  const sym=_toListSym, lists=allLists();
+  if(!box||!_toListSyms.length)return;
+  const syms=_toListSyms, lists=allLists();
+  const label=syms.length===1?esc(syms[0]):(syms.length+' tickers');
   if(!lists.length){
-    box.innerHTML='<p class="muted" style="font-size:13.5px">No lists yet. Name one below and '+esc(sym)+' goes straight into it.</p>';
+    box.innerHTML='<p class="muted" style="font-size:13.5px">No lists yet. Name one below and '+label+' go'+(syms.length===1?'es':'')+' straight into it.</p>';
     return;
   }
   box.innerHTML=lists.map(l=>{
-    const inIt=(l.syms||[]).includes(sym);
+    const have=syms.filter(s=>(l.syms||[]).includes(s)).length;
+    /* Three states with many tickers: none in, some in, all in. "Some" must not read as "in",
+       or pressing it would look like a removal when it is really a completion. */
+    const state=have===0?'none':have===syms.length?'all':'some';
     const col=(LIST_COLORS.find(c=>c.k===l.color)||{}).v||'var(--muted)';
-    return '<button type="button" class="tolist-row'+(inIt?' on':'')+'" onclick="toggleListMembership(\''+esc(sym)+'\',\''+esc(l.id)+'\')" aria-pressed="'+(inIt?'true':'false')+'">'+
+    const mark=state==='all'?'&#10003;':state==='some'?('<span class="tolist-part">'+have+'/'+syms.length+'</span>'):'';
+    return '<button type="button" class="tolist-row'+(state==='all'?' on':'')+'" onclick="toggleListMembership(\''+esc(l.id)+'\')" aria-pressed="'+(state==='all'?'true':'false')+'">'+
       '<span class="tolist-dot" style="background:'+col+'"></span>'+
       '<span class="tolist-name">'+esc(l.name)+'</span>'+
       '<span class="tolist-n">'+((l.syms||[]).length)+'</span>'+
-      '<span class="tolist-tick">'+(inIt?'&#10003;':'')+'</span></button>';
+      '<span class="tolist-tick">'+mark+'</span></button>';
   }).join('');
 }
-/* In or out, in one press. Saving here rather than on close means closing the modal can never
-   discard a change someone believes they made. */
-function toggleListMembership(sym,id){
+/* One press acts on everything selected. With a partial selection the press COMPLETES it rather
+   than inverting each ticker: inverting would take out the ones already filed, which is never what
+   someone pressing "add" means. Only an all-in list removes. */
+function toggleListMembership(id){
   const l=allLists().find(x=>x.id===id); if(!l)return;
-  if((l.syms||[]).includes(sym)){ removeFromList(sym,id); toast(sym+' removed from '+l.name+'.'); }
-  else { addToList(sym,id); toast(sym+' added to '+l.name+'.'); }
+  const syms=_toListSyms, have=syms.filter(s=>(l.syms||[]).includes(s)).length;
+  if(have===syms.length){
+    syms.forEach(s=>removeFromList(s,id));
+    toast((syms.length===1?syms[0]:syms.length+' tickers')+' removed from '+l.name+'.');
+  } else {
+    syms.forEach(s=>addToList(s,id));
+    toast((syms.length===1?syms[0]:syms.length-have+' tickers')+' added to '+l.name+'.');
+  }
   renderListPicker();
 }
 /* Make a list and file the ticker into it in one action, so the common case is not two trips. */
@@ -4765,9 +4866,10 @@ function createListWith(){
   const id=makeListId();
   allLists().push({id,name,color:free.k,syms:[]});
   if(el)el.value='';
-  if(_toListSym)addToList(_toListSym,id);
+  _toListSyms.forEach(sm=>addToList(sm,id));
   renderListPicker();
-  toast('List "'+name+'" created'+(_toListSym?', with '+_toListSym+' in it.':'.'));
+  toast('List "'+name+'" created'+(_toListSyms.length
+    ? ', with '+(_toListSyms.length===1?_toListSyms[0]:_toListSyms.length+' tickers')+' in it.' : '.'));
 }
 function removeFromList(sym,id){
   const l=allLists().find(x=>x.id===id); if(!l||!l.syms)return;
@@ -10482,7 +10584,7 @@ function renderAll(){
     return true;
   });
   if(D.watchlist.length&&!filteredWatch.length){
-    wb.innerHTML='<tr><td colspan="9" class="empty">Nothing matches these filters.</td></tr>';
+    wb.innerHTML='<tr><td colspan="10" class="empty">Nothing matches these filters.</td></tr>';
   }
   const wlGetters={
     sym:x=>x.s,
@@ -10517,7 +10619,8 @@ function renderAll(){
     g.rows.forEach(({s,i})=>{
     const sc=D.analyses[s];const v=sc?verdictOf(sc,false):null;
     const tr=document.createElement('tr');
-    tr.innerHTML='<td><b>'+esc(s)+'</b>'+earningsCell(s)+'</td><td>'+(sc&&sc.price?fmt$(sc.price):'-')+'</td>'+
+    tr.innerHTML='<td class="pick-td"><input type="checkbox" class="pick-box" data-sym="'+esc(s)+'"'+(_picked.has(s)?' checked':'')+' onclick="pickOne(\''+esc(s)+'\',this.checked)" aria-label="Select '+esc(s)+'"></td>'+
+      '<td><b>'+esc(s)+'</b>'+earningsCell(s)+'</td><td>'+(sc&&sc.price?fmt$(sc.price):'-')+'</td>'+
       '<td>'+(sc&&!sc.error?sc.qScore+'/12':'-')+'</td><td>'+(sc&&!sc.error?sc.pScore+'/6':'-')+'</td><td>'+(sc&&!sc.error?sc.mScore+'/4':'-')+'</td>'+
       '<td>'+(v?'<span class="pill '+v.cls+'">'+v.label+'</span>':'<span class="muted">refresh to score</span>')+'</td>'+
       /* Lists BEFORE My Call, matching the header order. They were the other way round, which
@@ -10530,6 +10633,8 @@ function renderAll(){
     wb.appendChild(tr);
     });
   });
+
+  renderPickBar();
 
   /* favorites */
   const fl=document.getElementById('favoritesList');
