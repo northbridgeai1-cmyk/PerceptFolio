@@ -2311,8 +2311,8 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <p class="muted" style="font-size:12px"><b>Merge</b> adds anything they don't already have and leaves their existing positions untouched. <b>Replace</b> wipes the selected lists on the target account first; that can't be undone, so it asks first.</p>
   </div>
   <div class="card" style="margin-top:16px">
-    <h3>Sync across your devices</h3>
-    <p class="muted" style="font-size:13px;margin:0 0 10px">Your access code is what ties your devices together. Sign in on another device with the same code and your book comes with it, on two devices: a desk and a pocket.</p>
+    <h3>Where your book is kept</h3>
+    <p class="muted" style="font-size:13px;margin:0 0 10px">On the server, under your access code, from your first sign-in. This browser keeps a copy so the terminal is fast and works offline; the server copy is the one that survives a lost laptop. Sign in on another device with the same code and your book is there, on two devices: a desk and a pocket.</p>
     <div id="syncDevices"></div>
     <div class="row">
       <button class="btn btn-ghost" onclick="syncNow()">Sync now</button>
@@ -2618,6 +2618,24 @@ function persistDB(opts){
         }catch(e2){ /* still full: take the next step */ }
       }
     }
+    /* THE BROWSER IS A CACHE. THE SERVER IS WHERE THE BOOK LIVES.
+       Even with every cache emptied a browser can be too full to take another byte, and until now
+       that meant the change existed only on screen. It does not have to: the same change is already
+       destined for the worker under this account's code, and the worker has room.
+       So push it now rather than in eight seconds, and say which of the two happened. A change that
+       reached the server is not lost, whatever this browser does next. */
+    if(!_rescuing&&typeof syncActive==='function'&&syncActive()&&!(typeof isDemoUser==='function'&&isDemoUser())){
+      _rescuing=true;
+      if(D)D.lastLocalEdit=Date.now();
+      Promise.resolve()
+        .then(()=>syncPush())
+        .then(()=>{ clearSaveFailure(); showSaveFailure(quota,err,'rescued'); })
+        .catch(()=>{ clearSaveFailure(); showSaveFailure(quota,err); })
+        .finally(()=>{ _rescuing=false; });
+      _saveFailed=true;
+      showSaveFailure(quota,err,'rescuing');
+      return false;
+    }
     _saveFailed=true;
     showSaveFailure(quota,err);
     return false;
@@ -2688,6 +2706,9 @@ function trimLogs(d,keepDays){
 /* Loud and persistent, because the alternative is a silent one. Repeated failures do not stack up
    banners; one stays until a save succeeds. */
 let _saveFailed=false;
+/* syncPush ends by calling persistDB, which is how this got here. The flag stops the rescue from
+   starting a second rescue inside the first. */
+let _rescuing=false;
 function clearSaveFailure(){ const el=document.getElementById('saveFailBanner'); if(el)el.remove(); }
 /* Three different failures, three different things to do about them, so they do not share one
    message. A refusal is not a browser problem and must not read like one \u2014 the data is fine,
@@ -2708,18 +2729,25 @@ function showSaveFailure(isQuota,err,kind){
      what was already tried, so it does not read as "go and tidy up" to someone whose caches were
      cleared a second ago. */
   const copyOn=(typeof recordCopyOn==='function'&&recordCopyOn());
-  const head=refused ? 'Save stopped to protect your data.'
-           : isQuota ? 'This browser is full, and clearing the caches was not enough.'
-                     : 'Could not save to this browser.';
-  const body=refused ? esc((err&&err.message)||'')
-           : isQuota ? 'Cached prices and scores have already been cleared and there is still no room, so your last change is only on screen. '+
+  const rescuing=kind==='rescuing', rescued=kind==='rescued';
+  /* Rescued is not a failure, so it is not red and it does not ask for anything. */
+  el.style.background=rescued?'var(--green,#1f7a4d)':'var(--red,#e5534b)';
+  const head=refused  ? 'Save stopped to protect your data.'
+           : rescued  ? 'Saved to your account on the server.'
+           : rescuing ? 'This browser is full. Saving to your account instead\u2026'
+           : isQuota  ? 'This browser is full, and clearing the caches was not enough.'
+                      : 'Could not save to this browser.';
+  const body=refused  ? esc((err&&err.message)||'')
+           : rescued  ? 'This browser has no room left, so the change went straight to the worker under your access code. Sign in on any device and it is there. Free some space here when you can.'
+           : rescuing ? 'Nothing is lost while this finishes.'
+           : isQuota  ? 'Cached prices and scores have already been cleared and there is still no room, so your last change is only on screen. '+
                        (copyOn
                          ? 'Your record is on the server copy, so the calls and marks are safe. Holdings and notes are not: export a backup.'
                          : 'Export a backup, then delete a profile you no longer need under Settings.')
-                     : 'Your last change was not saved. '+esc((err&&err.message)||'');
+                      : 'Your last change was not saved. '+esc((err&&err.message)||'');
   el.innerHTML='<span><b>'+head+'</b> '+body+'</span>'+
     '<span style="flex:1"></span>'+
-    '<button class="btn btn-sm" style="background:#fff;color:#111;border:none" onclick="exportData()">Export backup</button>'+
+    (rescuing?'':'<button class="btn btn-sm" style="background:#fff;color:#111;border:none" onclick="exportData()">Export backup</button>')+
     /* Not now. The bar used to be undismissable, which made a full disk a wall across the screen
        for the rest of the session even after the person had decided what to do about it. It comes
        back on the next failed save, so dismissing it hides the notice, never the problem. */
