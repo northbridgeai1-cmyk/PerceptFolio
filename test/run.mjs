@@ -1333,6 +1333,10 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: Archivo self-hosted, never a font CDN', /url\("\/fonts\/Archivo\.woff2"\)/.test(read('site/src/index.css')) && !/fonts\.googleapis/.test(src + read('site/index.html')) && fs.existsSync('site/public/fonts/Archivo.woff2'));
   t('site: legal pages say software, not advice, and fourteen-day refunds', /not a registered investment adviser or broker-dealer/.test(src) && /Fourteen days from any payment/.test(src));
   t('site: the price comes from one config and matches the worker', /monthly: 760, yearly: 8360/.test(read('site/src/lib/config.ts')) && /const PRICE = \{ monthly: 760, yearly: 8360 \};/.test(worker));
+  /* THE STALE-BUNDLE TRAP (2026-09-27). assemble.mjs copied site/dist and trusted it, so editing a
+     .tsx, assembling and deploying shipped the PREVIOUS bundle with every check still passing:
+     the suite reads the source, and the source was right. It now builds when the source is newer. */
+  t('assemble builds the site when site/src is newer than site/dist', /execFileSync\('npm', \['--prefix', 'site', 'run', 'build'\]/.test(read('scripts/assemble.mjs')) && /src > built/.test(read('scripts/assemble.mjs')));
   t('site: dist and node_modules are ignored', /site\/dist\//.test(read('.gitignore')) && /node_modules\//.test(read('.gitignore')));
 }
 

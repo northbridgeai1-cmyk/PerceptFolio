@@ -1,4 +1,4 @@
-/* Assemble the Cloudflare Pages output. Run after `npm --prefix site run build`.
+/* Assemble the Cloudflare Pages output.
 
    dist/ is what Pages serves: the React site at the root, the gated terminal and admin beside it,
    the entry page, the fonts and demo data, and the Pages Functions. Nothing else from the repo
@@ -6,6 +6,40 @@
    step; until then GitHub Pages keeps serving the vanilla root. */
 import fs from 'fs';
 import path from 'path';
+import { execFileSync } from 'child_process';
+
+/* BUILD THE SITE FIRST, IF IT IS STALE.
+   This script used to copy site/dist and trust it. Editing a .tsx, running assemble and deploying
+   therefore shipped the PREVIOUS bundle, silently, with every check passing: the suite reads the
+   source, and the source was right. It cost a deploy of a fix that was never compiled.
+   So: compare the newest file under site/src (plus the config and index.html that also change the
+   output) against the newest file in site/dist, and run vite when the source is ahead. An
+   up-to-date build is skipped, so the common case stays fast. */
+const newest = (dir, ext = null) => {
+  let t = 0;
+  const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+    const f = path.join(d, e.name);
+    if (e.isDirectory()) walk(f);
+    else if (!ext || ext.test(e.name)) t = Math.max(t, fs.statSync(f).mtimeMs);
+  } };
+  if (fs.existsSync(dir)) walk(dir);
+  return t;
+};
+if (fs.existsSync('site/src')) {
+  const src = Math.max(
+    newest('site/src'),
+    newest('site/public'),
+    ...['site/index.html', 'site/vite.config.ts', 'site/tailwind.config.ts', 'site/package.json']
+      .filter(f => fs.existsSync(f)).map(f => fs.statSync(f).mtimeMs),
+  );
+  const built = newest('site/dist');
+  if (src > built) {
+    console.log(built ? 'site/dist is older than site/src: building' : 'no site build yet: building');
+    execFileSync('npm', ['--prefix', 'site', 'run', 'build'], { stdio: 'inherit' });
+  } else {
+    console.log('site build is current');
+  }
+}
 
 const out = 'dist';
 fs.rmSync(out, { recursive: true, force: true });
