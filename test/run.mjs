@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v139/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v140/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2816,6 +2816,36 @@ t('with no sync, or a worker that refuses, the red bar is what is left',
   /\.catch\(\(\)=>\{ clearSaveFailure\(\); showSaveFailure\(quota,err\); \}\)/.test(term));
 t('the demo account is never rescued to the server', /&&!\(typeof isDemoUser==='function'&&isDemoUser\(\)\)\)\{/.test(term));
 t('settings says where the book actually lives', /<h3>Where your book is kept<\/h3>/.test(term) && /On the server, under your access code, from your first sign-in/.test(term));
+
+/* ==================== THE WORLD, IN THE NEWS TAB ==================== */
+G('What is happening, and where');
+{
+  /* Finnhub covers markets and US companies and has nothing for "what is going on in Nigeria".
+     Google News publishes RSS that does, free and without a key; the browser cannot call it
+     (no CORS header), so the worker proxies, ranks and caches it. */
+  t('the worker proxies a free feed rather than asking for another key',
+    /url\.pathname === '\/worldnews'/.test(worker) && /news\.google\.com\/rss/.test(worker) && !/NEWS_API_KEY/.test(worker));
+  t('world news is gated on a live code and rate-limited like every other data route',
+    /tooMany\(env, request, '\/worldnews', 20\)/.test(worker) && /World news needs a live access code/.test(worker));
+  /* A bare country name in a search feed drags in travel pieces, so the results are ordered: the
+     headline naming the country, then the standing of the outlet, then recency. */
+  t('results are ranked, not just passed through',
+    /const WIRES = \[/.test(worker) && /if \(needle && it\.title\.toLowerCase\(\)\.includes\(needle\)\) s \+= 4;/.test(worker)
+    && /\.sort\(\(a, b\) => b\.s - a\.s \|\| b\.it\.at - a\.it\.at\)/.test(worker));
+  t('the " - Source" suffix Google appends is stripped, and the source kept as its own field',
+    /\.replace\(\/\\s\+-\\s\+\[\^-\]\{2,40\}\$\/, ''\)/.test(worker) && /source: source \|\| host/.test(worker));
+  t('a country name is scrubbed before it reaches the feed', /replace\(\/\[\^A-Za-z \\-'\.\]\/g, ''\)/.test(worker));
+  t('it is cached by the half hour, so a feed with a rate limit is asked rarely',
+    /Math\.floor\(Date\.now\(\) \/ 1800000\)/.test(worker) && /expirationTtl: 3600/.test(worker));
+  /* Context, never an input. A news feed inside a tool that grades decisions is read as one of the
+     inputs unless the panel says otherwise. */
+  t('the panel says it feeds no verdict, and every row carries its source and time',
+    /Not scored, and it feeds no verdict/.test(term) && /function renderWorldNews\(\)/.test(term));
+  t('links to other people\'s sites open safely', /target="_blank" rel="noopener noreferrer"/.test(term));
+  t('the News tab offers the world and a country box', /onclick="loadWorldNews\(''\)">World headlines<\/button>/.test(term) && /id="worldCountry"/.test(term));
+  t('it is contract-tested against the live feed', fs.existsSync('test/worldnews.mjs') && /country: returns coverage and puts the ones naming it first/.test(read('test/worldnews.mjs')));
+}
+
 t('the bar can be dismissed, and comes back on the next failed save',
   /function dismissSaveFailure\(\)\{ clearSaveFailure\(\); \}/.test(term)
   && /Not now<\/button>/.test(term) && !/_saveFailed=false;\s*\}\s*function dismissSaveFailure/.test(term));

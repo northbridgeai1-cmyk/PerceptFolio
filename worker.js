@@ -579,7 +579,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/quote', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/quote', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -854,6 +854,83 @@ async function handle(request, env) {
      one before, each a count of filers naming the issuer plus the first page of names as EDGAR
      returns them (not ranked by size: sizes live inside each filer's table). Display only, dated,
      cached a week; the source line names the overcount risk of a shared name. */
+  /* ---- GET /worldnews[?country=Name] : what is happening, and where ----
+     Finnhub's news is markets and US companies; it has nothing for "what is going on in Nigeria".
+     Google News publishes an RSS feed that does, free and without a key, so this proxies it. The
+     browser cannot call it directly (no CORS header), which is the other reason the route exists.
+
+     WHY SEARCH AND NOT THE COUNTRY EDITION. Google's per-country editions ignore hl=en: asking for
+     Japan in English returns the same US front page. The only route to English coverage OF a place
+     is the search feed, and a bare country name in a search feed drags in travel pieces and
+     listicles. So the results are ranked before they are returned:
+
+       a title that names the country outranks one that does not
+       a wire or paper of record outranks a content farm
+       newer outranks older, within the same band
+
+     Nothing is invented and nothing is dropped for its opinion: this is ordering, and the source
+     and date ride on every row so a reader can discount it themselves.
+
+     Cached 30 minutes a query. Gated on a live access code, like every other data route. */
+  const WIRES = ['reuters.com', 'apnews.com', 'bbc.co.uk', 'bbc.com', 'bloomberg.com', 'ft.com', 'wsj.com',
+    'nytimes.com', 'theguardian.com', 'aljazeera.com', 'cnbc.com', 'economist.com', 'nikkei.com',
+    'scmp.com', 'dw.com', 'france24.com', 'npr.org', 'politico.com', 'axios.com', 'afp.com'];
+  if (url.pathname === '/worldnews' && request.method === 'GET') {
+    if (await tooMany(env, request, '/worldnews', 20)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+    if (!(await activeGrant(code))) return json({ error: 'World news needs a live access code.' }, 401, env);
+    const country = clean(url.searchParams.get('country'), 60).replace(/[^A-Za-z \-'.]/g, '').trim();
+    const ck = 'wnews:' + (country ? country.toLowerCase() : '_world') + ':' + Math.floor(Date.now() / 1800000);
+    const hit = await env.PF_SYNC.get(ck);
+    if (hit) return json(Object.assign(JSON.parse(hit), { cached: true }), 200, env);
+
+    const feed = country
+      ? 'https://news.google.com/rss/search?q=' + encodeURIComponent(country + ' when:7d') + '&hl=en-US&gl=US&ceid=US:en'
+      : 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en';
+    let xml = '';
+    try {
+      const r = await fetch(feed, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PerceptFolio/1.0)', 'Accept': 'application/rss+xml,application/xml' } });
+      if (!r.ok) return json({ error: 'The news feed answered ' + r.status + '.' }, 502, env);
+      xml = await r.text();
+    } catch (e) {
+      return json({ error: 'The news feed could not be reached.' }, 502, env);
+    }
+
+    const unesc = t => String(t || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+      .replace(/<[^>]+>/g, '').trim();
+    const pick = (block, tag) => { const m = block.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)<\\/' + tag + '>')); return m ? unesc(m[1]) : ''; };
+    const items = [];
+    for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+      const b = m[1];
+      /* Google appends " - Source" to every headline; the source has its own tag, so the suffix is
+         duplication and it is what makes a list of headlines unreadable at a glance. */
+      const title = pick(b, 'title').replace(/\s+-\s+[^-]{2,40}$/, '').trim();
+      const link = pick(b, 'link');
+      const source = pick(b, 'source');
+      const at = Date.parse(pick(b, 'pubDate')) || 0;
+      let host = '';
+      try { host = new URL(link).hostname.replace(/^www\./, ''); } catch (e) {}
+      if (title && link) items.push({ title, url: link, source: source || host, at });
+    }
+    const needle = country.toLowerCase();
+    const scored = items.map(it => {
+      let s = 0;
+      if (needle && it.title.toLowerCase().includes(needle)) s += 4;
+      if (WIRES.some(w => (it.source || '').toLowerCase().includes(w.split('.')[0]))) s += 2;
+      if (it.at && Date.now() - it.at < 86400000) s += 1;
+      return { it, s };
+    }).sort((a, b) => b.s - a.s || b.it.at - a.it.at).map(x => x.it).slice(0, 30);
+
+    const body = { country: country || null, items: scored, n: scored.length,
+      source: 'Google News RSS', asOf: new Date().toISOString(), cached: false,
+      note: country
+        ? 'English-language coverage naming ' + country + ' in the last seven days, ordered by whether the headline names the country, then by the standing of the outlet, then by recency. Headlines, not analysis; each row carries its source.'
+        : 'World headlines. Each row carries its source and time; nothing here feeds a verdict.' };
+    await env.PF_SYNC.put(ck, JSON.stringify(body), { expirationTtl: 3600 });
+    return json(body, 200, env);
+  }
+
   if (url.pathname === '/holders' && request.method === 'GET') {
     if (await tooMany(env, request, '/holders', 20)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
     const sym = clean(url.searchParams.get('symbol'), 10).toUpperCase();

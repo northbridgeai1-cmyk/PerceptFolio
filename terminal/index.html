@@ -1946,7 +1946,18 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <div class="spacer"></div>
       <button class="btn btn-ghost" id="newsLoadBtn" onclick="loadNews(true)">Load my positions</button>
     </div>
+    <!-- THE WORLD. Finnhub covers markets and US companies and has nothing for "what is going on in
+         Nigeria", so this reads Google News through the worker. Kept in its own row, under its own
+         heading, because it is context and never an input to a verdict. -->
+    <div class="row" style="flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <button class="btn btn-ghost" onclick="loadWorldNews('')">World headlines</button>
+      <input id="worldCountry" placeholder="Or a country: Japan, Nigeria, Chile…" style="max-width:250px"
+             onkeydown="if(event.key==='Enter')loadWorldNews()">
+      <button class="btn" onclick="loadWorldNews()">Show</button>
+      <span class="muted" id="worldNewsStatus" style="font-size:12px"></span>
+    </div>
   </div>
+  <div id="worldNewsBody" style="margin-top:16px"></div>
   <div id="newsBody" style="margin-top:16px"><div class="empty" style="text-align:left;line-height:1.7"><b>No news loaded yet.</b><br><span style="font-size:12.5px">News is fetched on demand so it does not spend your Finnhub quota in the background. Press Refresh, or open a ticker from Portfolio. Headlines are shown as context only: this product never turns a headline into a buy or sell verdict, because a model asked to justify a verdict from headlines will always find a reason.</span></div></div>
 </div>
 
@@ -7752,6 +7763,56 @@ function symbolNewsCard(sym,items,tag,move){
     '</details>'+
   '</div>';
 }
+/* ===== WHAT IS HAPPENING, AND WHERE =====
+   Headlines with a source and a time, nothing more. They are not scored, they do not reach a
+   verdict, and the panel says so, because a news feed inside a tool that grades decisions will
+   otherwise be read as one of the inputs. */
+let worldNews=null;
+async function loadWorldNews(countryArg){
+  const el=document.getElementById('worldCountry');
+  const country=(countryArg!==undefined?countryArg:((el&&el.value)||'')).trim().replace(/[^A-Za-z \-'.]/g,'');
+  if(countryArg===''&&el)el.value='';
+  const st=document.getElementById('worldNewsStatus');
+  const code=accessCodeFor(USER);
+  if(!code){ if(st)st.textContent='Needs your access code: Settings \u2192 Access code.'; return; }
+  if(st)st.textContent=country?('Reading '+country+'\u2026'):'Reading the world\u2026';
+  try{
+    const base=(typeof INVITE_WORKER==='string'?INVITE_WORKER:'').replace(/\/+$/,'');
+    const r=await fetch(base+'/worldnews?code='+encodeURIComponent(code)+(country?'&country='+encodeURIComponent(country):''));
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    worldNews=j;
+    if(st)st.textContent='';
+  }catch(e){
+    worldNews=null;
+    if(st)st.textContent=e.message;
+  }
+  renderWorldNews();
+}
+function renderWorldNews(){
+  const box=document.getElementById('worldNewsBody');
+  if(!box)return;
+  if(!worldNews||!worldNews.items||!worldNews.items.length){ box.innerHTML=''; return; }
+  const when=t=>{ if(!t)return ''; const h=Math.round((Date.now()-t)/3600000);
+    return h<1?'just now':h<24?h+'h ago':Math.round(h/24)+'d ago'; };
+  box.innerHTML='<div class="card">'+
+    '<div class="row" style="align-items:baseline"><h3 style="margin:0">'+
+      (worldNews.country?esc(worldNews.country):'The world')+'</h3>'+
+      '<span class="spacer"></span>'+
+      '<span class="muted" style="font-size:12px">'+worldNews.n+' headlines'+(worldNews.cached?' \u00b7 cached':'')+'</span>'+
+      '<button class="btn btn-ghost btn-sm" style="margin-left:10px" onclick="clearWorldNews()">Close</button></div>'+
+    '<table style="margin-top:10px;font-size:13.5px"><tbody>'+
+      worldNews.items.map(i=>'<tr>'+
+        '<td style="white-space:nowrap;vertical-align:top;color:var(--muted);font:11px/1.6 var(--mono);padding-right:12px">'+esc(when(i.at))+'</td>'+
+        '<td style="vertical-align:top"><a href="'+esc(i.url)+'" target="_blank" rel="noopener noreferrer">'+esc(i.title)+'</a>'+
+          '<div class="muted" style="font-size:11.5px">'+esc(i.source||'')+'</div></td></tr>').join('')+
+    '</tbody></table>'+
+    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">'+esc(worldNews.note||'')+'</p>'+
+    '<p class="muted" style="font-size:11.5px;margin-top:4px">Source: '+esc(worldNews.source||'')+', read '+esc((worldNews.asOf||'').slice(0,16).replace('T',' '))+'Z. Not scored, and it feeds no verdict.</p>'+
+  '</div>';
+}
+function clearWorldNews(){ worldNews=null; renderWorldNews(); const el=document.getElementById('worldCountry'); if(el)el.value=''; const st=document.getElementById('worldNewsStatus'); if(st)st.textContent=''; }
+
 let newsFocus=null;
 async function searchNews(){
   const el=document.getElementById('newsSearch');
