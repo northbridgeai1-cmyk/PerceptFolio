@@ -2572,6 +2572,10 @@ if(STORE_KEY!=='quantfolio_v1'){
 }
 
 let DB={profiles:{}}, USER=null, D=null; // D = current user's data
+/* True while the first pull of a session is in flight, so the walkthrough does not open over a book
+   that is still arriving. Declared up here because finishLogin raises it long before the tour code
+   is reached, and a let is not hoisted. */
+let _firstPull=false;
 let _profileCount=null;                  // what was last successfully on disk (D6)
 
 function loadDB(){
@@ -3388,6 +3392,10 @@ async function bringAccount(){
 }
 async function finishLogin(email){
   const p=DB.profiles[email];
+  /* Raised BEFORE enterSession, which is what asks about the tour. Setting it further down, beside
+     the pull itself, was too late by one call: the walkthrough had already opened over a book that
+     was still on the wire. Lowered again in the pull's finally, which then asks once more. */
+  _firstPull=!!(email!==DEMO_ID&&((p&&(p.invite||p.inviteCode||p.code))||(()=>{try{return localStorage.getItem('pf_door_code');}catch(e){return '';}})()));
   /* Checked before the app is revealed, and skipped entirely for the sandbox account, which has no
      invite and never touches the worker. */
   if(email!==DEMO_ID){
@@ -3427,10 +3435,18 @@ async function finishLogin(email){
      still blank never seeds the slot: a fresh sign-in on a new phone would otherwise be the
      newest copy and replace the real book on the next device to pull. */
   if(syncActive()){
+    /* THE TOUR MUST NOT GREET A BOOK THAT IS STILL IN THE AIR. enterSession decides whether this
+       account looks new, and on a device signing in for the first time it decides that while the
+       pull is still on the wire. The person then gets a beginner's walkthrough over their own
+       twenty positions a second before those positions appear. So the tour is held until the pull
+       has landed, and asked again afterwards, when the answer is true. */
     syncPull(false)
       .then(r=>{ if(!r.applied&&!r.pushedInstead&&r.empty&&bookHasContent(D))return syncPush(); })
-      .catch(e=>setSyncStatus('✗ '+e.message,'neg'));
+      .catch(e=>setSyncStatus('✗ '+e.message,'neg'))
+      .finally(()=>{ _firstPull=false; try{ maybeStartTour(); }catch(e){} });
   }
+  /* No sync on this device: nothing is coming, so release the tour rather than suppress it. */
+  if(!syncActive()&&_firstPull){ _firstPull=false; try{ maybeStartTour(); }catch(e){} }
   if(hasMarketData()&&D.rules.autoRefresh==='yes')refreshAll();
 }
 /* Screener/Risk/Monte Carlo results (and their Chart.js instances) live in module-level globals
@@ -3598,9 +3614,63 @@ async function setUpDevice(){
     await createProfile();
   }finally{ if(btn)btn.disabled=false; }
 }
-/* A first visit on this device (no profile yet) opens on the set-up form with the code that just
-   opened the door already filled in, so the only two things to type are an email and a password.
-   A device with a profile opens on Sign in. */
+/* ================= OPEN FROM THE SESSION =================
+   The terminal used to meet a new device with a form: an email, a password, and the access code
+   again. All three had just been dealt with at the door. The code did not reach the page because
+   the session cookie is HttpOnly and script cannot read it, so the page asked the person to repeat
+   themselves for want of one server call.
+
+   That call is /api/whoami. Same origin, so the cookie rides along; the signature is checked there
+   and the access code comes back. From the code everything else follows: sync points at it, the
+   book is pulled from the worker, and the terminal opens on it.
+
+   THE ACCOUNT NAME. There is no email to ask for, so the profile is keyed by the code itself. A
+   person's name is theirs to set later under Settings; nothing here needs one.
+
+   NO PASSWORD. The gate already decided this browser is allowed in, and a second lock on the same
+   door is a thing to forget, not a defence: the profile lives behind an HttpOnly session cookie and
+   a code. Anyone who wants one can set it under Settings, and that still works exactly as before.
+
+   Returns true if the terminal was opened, false to fall back to the form. It never throws: an
+   unreachable server must land on the form, not on a blank page. */
+async function openFromSession(){
+  let who=null;
+  try{
+    const r=await fetch('/api/whoami',{credentials:'same-origin',cache:'no-store'});
+    if(!r.ok)return false;
+    who=await r.json();
+  }catch(e){ return false; }
+  if(!who||!who.ok||!who.signedIn||!who.code)return false;
+  const code=String(who.code).toUpperCase();
+  if(!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code))return false;
+
+  /* The code is the account. A device that has been here before under the same code reuses the
+     profile it already has rather than making a second one beside it. */
+  let user=null;
+  for(const [email,p] of Object.entries(DB.profiles||{})){
+    const c=(p&&(p.invite||p.inviteCode||p.code))||'';
+    if(String(c).toUpperCase()===code){ user=email; break; }
+  }
+  if(!user){
+    user=code.toLowerCase()+'@code.perceptfolio';
+    DB.profiles[user]={pinHash:'',data:defaultData(),accountType:'personal',userId:makeUserId(),
+                       invite:code,createdAt:Date.now(),
+                       /* Accepted at the door, on the page that carried both documents. */
+                       acceptedTerms:{at:Date.now(),terms:'2026-09-05',privacy:'2026-09-05'}};
+    persistDB();
+  }
+  try{ localStorage.setItem('pf_door_code',code); }catch(e){}
+  syncCfg={url:INVITE_WORKER,code};
+  try{ localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg)); }catch(e){}
+
+  /* Show the terminal before the pull, not after. A book of any size takes a moment to come down,
+     and a person staring at a sign-in form while their data is already on its way reads that as
+     the account being empty. finishLogin pulls on its own; this awaits nothing. */
+  await finishLogin(user);
+  return true;
+}
+/* A device with no session (a saved copy of this page, or an expired one) opens on the set-up form
+   with the code that opened the door already filled in. A device with a profile opens on Sign in. */
 function defaultAuthMode(){
   try{ const n=Object.keys((DB&&DB.profiles)||{}).length; setAuthMode(n?'in':'up'); if(!n){ const inv=document.getElementById('newInvite'); const c=localStorage.getItem('pf_door_code')||''; if(inv&&!inv.value&&/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(c))inv.value=c; primeSetupForm(); } }catch(e){ setAuthMode('in'); }
 }
@@ -3627,7 +3697,7 @@ function enterSession(){
      Both silent and unawaited: session entry must not wait on a network round-trip. */
   reconcileWorkerMarks().then(()=>pushCallRegistry());
   checkPendingRequests();                                   // operator devices only; silent otherwise
-  const acctEl=document.getElementById('acctEmail');if(acctEl)acctEl.textContent=USER;
+  const acctEl=document.getElementById('acctEmail');if(acctEl)acctEl.textContent=acctLabel();
   updateGreeting();
   loadEarnings().then(j=>{ if(j&&typeof renderAll==='function')renderAll(); });
   refreshMarketDataCard();
@@ -3662,6 +3732,7 @@ function accountLooksNew(){
 }
 function maybeStartTour(){
   if(!D||D.tourSeen)return;
+  if(_firstPull)return;                        // the book may be arriving; ask again when it has
   if(!accountLooksNew()){ D.tourSeen=true; saveDB(); return; }   // quietly mark, don't nag
   setTimeout(()=>startTour(),450);                               // let the first render settle
 }
@@ -3788,6 +3859,15 @@ function dateLine(){
   const d=new Date().toLocaleDateString(lang,{weekday:'long',month:'long',day:'numeric'});
   return d.charAt(0).toUpperCase()+d.slice(1);
 }
+/* An account the door opened is keyed by its code, not by an email anyone typed. Nowhere should
+   show that string as if a person had chosen it. */
+function isCodeAccount(u){ return /^[a-z0-9]{5}-[a-z0-9]{5}@code\.perceptfolio$/i.test(String(u||'')); }
+/* What to call this account on screen. An account opened by the door has no email, so it is named
+   by the code that opened it, which is the thing the person actually holds. */
+function acctLabel(){
+  if(!USER)return '';
+  return isCodeAccount(USER)?('Code '+USER.split('@')[0].toUpperCase()):USER;
+}
 function updateGreeting(){
   if(!USER)return;
   const hour=new Date().getHours();
@@ -3795,6 +3875,11 @@ function updateGreeting(){
   let display;
   if(D&&D.displayName&&D.displayName.trim()){
     display=D.displayName.trim().split(' ')[0];
+  }else if(isCodeAccount(USER)){
+    /* An account opened straight from the door is keyed by its access code, which is not a name and
+       must never be greeted as one. The date is the headline here anyway; a name is offered under
+       Settings for anyone who wants their own. */
+    display='';
   }else{
     const raw=USER.split('@')[0].replace(/[._-]+/g,' ').trim()||USER;
     const name=raw.split(' ')[0];
@@ -3814,13 +3899,13 @@ function updateGreeting(){
       av.style.borderWidth='1px';
     }else{
       av.style.backgroundImage='none';
-      av.textContent=display.charAt(0).toUpperCase();
+      av.textContent=display?display.charAt(0).toUpperCase():'\u25CF';
       av.style.borderColor=(D&&D.avatarColor)?D.avatarColor:'var(--border)';
       av.style.borderWidth=(D&&D.avatarColor)?'2px':'1px';
     }
   });
   const nameEl=document.getElementById('menuNameDisplay');
-  if(nameEl)nameEl.textContent=(D&&D.displayName&&D.displayName.trim())?D.displayName.trim():display;
+  if(nameEl)nameEl.textContent=(D&&D.displayName&&D.displayName.trim())?D.displayName.trim():(display||'Your terminal');
 }
 /* ---- Account menu: click the avatar for name/email/avatar-color/logout, instead of a permanent header row ---- */
 function toggleAccountMenu(ev){
@@ -3831,7 +3916,7 @@ function toggleAccountMenu(ev){
   m.style.display=opening?'block':'none';
   if(opening){
     document.getElementById('displayNameInput').value=(D&&D.displayName)||'';
-    document.getElementById('acctEmail').textContent=USER||'';
+    document.getElementById('acctEmail').textContent=acctLabel();
     const idLine=document.getElementById('acctIdLine');
     const prof=DB.profiles[USER];
     if(idLine)idLine.textContent=prof&&prof.userId?'ID '+prof.userId:'';
@@ -3925,7 +4010,7 @@ function switchAccount(){
 }
 
 function deleteProfile(){
-  if(!confirm('Delete profile "'+USER+'" and ALL its data? This cannot be undone.'))return;
+  if(!confirm('Delete profile "'+acctLabel()+'" and ALL its data? This cannot be undone.'))return;
   delete DB.profiles[USER];
   if(!persistDB({deleting:true}))return;      // the write was refused; the account still exists
   /* Session state is cleared here rather than left to logout(), which saves on the way out and
@@ -11523,7 +11608,7 @@ function exportData(){
      outside D, so it has to be added here explicitly rather than arriving for free. */
   const blob=new Blob([JSON.stringify({profile:USER,data:D,errors:readErrLog()},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='perceptfolio-'+USER+'-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  a.download='perceptfolio-'+(isCodeAccount(USER)?USER.split('@')[0]:USER)+'-'+new Date().toISOString().slice(0,10)+'.json';a.click();
   /* B2. The download was fired, which is as much as a page can know — the browser may still cancel
      the save dialog, so this is "an export was initiated", not proof a file landed on disk. It is
      the honest best available, and it is what the staleness banner keys on. */
@@ -11604,6 +11689,24 @@ function renderBackupBanner(){
      no way out gets read as furniture and stops being read at all. It returns next visit, and only
      an actual export removes it for good, because until then the claim is simply true. */
   if(!st||sessionStorage.getItem('pf_backup_snooze')){el.style.display='none';return;}
+  /* THE CLAIM HAS TO BE TRUE OR THE BANNER IS NOISE.
+     "Everything here lives only in this browser" was written when it did. A book kept on the
+     worker under an access code does not, and telling someone their data is one cleared cache from
+     gone while it is sitting on a server is the kind of warning that teaches people to ignore
+     warnings. With sync live this says the smaller, accurate thing instead: the server holds it,
+     an export is yours to keep offline, and the one real gap is anything not yet pushed. */
+  const onServer=(typeof syncActive==='function'&&syncActive()&&!(typeof isDemoUser==='function'&&isDemoUser()));
+  if(onServer){
+    const pending=(D&&(D.lastLocalEdit||0)>(D.syncedAt||0));
+    if(!pending){ el.style.display='none'; return; }
+    el.style.display='block';
+    el.style.cssText+=';padding:9px 14px;font-size:12.5px;line-height:1.5;display:flex;gap:12px;align-items:center;flex-wrap:wrap;'+
+      'background:rgba(217,164,65,.12);border-bottom:1px solid rgba(217,164,65,.35);color:var(--text)';
+    el.innerHTML='<span><b>Not everything has reached the server yet.</b> Your book is kept under your access code; the last few changes are still on their way and go up within a few seconds, or when you close the tab.</span>'+
+      '<button class="btn btn-sm" onclick="syncNow()">Send now</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="snoozeBackupBanner()">Not now</button>';
+    return;
+  }
   const never=st.level==='never';
   const ios=iosSafariUninstalled();
   el.style.display='block';
@@ -16835,7 +16938,12 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   if(u&&DB.profiles[u]&&(remembered===u||!DB.profiles[u].pinHash)){
     finishLogin(u);
   }else{
-    defaultAuthMode();   // first time on this device: the set-up form, code already filled in
+    /* NOTHING TO TYPE, NOTHING TO DOWNLOAD (owner's decision, 2026-09-27).
+       The door already took the access code and issued a session. Ask the server whose session it
+       is, and if it answers, open that account's book straight from the worker. The set-up form is
+       what is left for a browser with no session: someone who saved this page, or whose session
+       expired. See openFromSession(). */
+    openFromSession().then(opened=>{ if(!opened)defaultAuthMode(); });
   }
   setCalcMode('normal');calcRender();
 })();

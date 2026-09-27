@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v140/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v141/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -1719,7 +1719,7 @@ t('the sign-in toggle is an underline, not a box', /\.auth-switch button\.on\{ba
 t('no rounded frame is drawn around a table', !/border:1px solid var\(--border\);border-radius:(9|10)px;overflow:hidden/.test(term));
 /* The door keeps the code it was opened with, for a profile that has none of its own. */
 t('the door keeps the code for the terminal', /localStorage\.setItem\('pf_door_code', payload\.code\)/.test(read('enter/enter.js')));
-t('every model helper, the settings status, the macro helpers and the door read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 9);   /* the ninth: the set-up form pre-fills the code that opened the door */
+t('every model helper, the settings status, the macro helpers and the door read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 10);   /* the tenth: finishLogin, deciding whether a pull is coming */
 /* The greeting was chatbot furniture; a statement is headed by its date. */
 t('the dashboard and command screens are headed by the date', /function dateLine\(\)/.test(term) && !/'Good '\+period/.test(term));
 t('no headings are typed in Title Case',
@@ -2093,7 +2093,10 @@ t('and are restored with their original label', /b\.textContent=b\.dataset\.onli
 t('the analyzer states its empty state in one line', /<div class="empty">Nothing analysed yet\.<\/div>/.test(term));
 t('the command tab explains what a review does', /<b>Not reviewed yet today\.<\/b> Run review pulls prices, checks everything, and lists what needs you\./.test(term));
 /* First run: the door opens on the set-up form with the code filled in; the Dashboard carries Start here with three steps that tick off; the tour is four screens. */
-t('a first visit opens on the set-up form with the door code filled in', /function defaultAuthMode\(\)/.test(term) && /setAuthMode\(n\?'in':'up'\)/.test(term) && /defaultAuthMode\(\);   \/\/ first time on this device/.test(term));
+/* The form is now the FALLBACK, not the first thing a new device meets: a browser holding a live
+   session opens straight on the book. What is left for a saved copy of this page, or an expired
+   session, is the old set-up form with the door code filled in. */
+t('a device with no session falls back to the set-up form, code filled in', /function defaultAuthMode\(\)/.test(term) && /setAuthMode\(n\?'in':'up'\)/.test(term) && /openFromSession\(\)\.then\(opened=>\{ if\(!opened\)defaultAuthMode\(\); \}\)/.test(term));
 t('Start here: three steps, each a button, ticked when done, shown until the first review has run', /<h2>Start here<\/h2>/.test(term) && /id="wcStep1"/.test(term) && /id="wcStep3"/.test(term) && /const done1=D\.holdings\.length>0, done2=\(D\.watchlist\|\|\[\]\)\.length>0, done3=!!D\.lastRefresh;/.test(term) && /el\.classList\.toggle\('wc-done',!!ok\)/.test(term));
 t('the tour is four screens in plain sentences', (() => { const t0 = term.indexOf('const TOUR=['); const t1 = term.indexOf('];\nlet tourAt=0;'); const body = term.slice(t0, t1); return (body.match(/\{ tab:'/g) || []).length === 4 && /Your morning, in one button\./.test(body); })());
 t('the audit shows a skeleton rather than a blank panel while it computes',
@@ -2816,6 +2819,30 @@ t('with no sync, or a worker that refuses, the red bar is what is left',
   /\.catch\(\(\)=>\{ clearSaveFailure\(\); showSaveFailure\(quota,err\); \}\)/.test(term));
 t('the demo account is never rescued to the server', /&&!\(typeof isDemoUser==='function'&&isDemoUser\(\)\)\)\{/.test(term));
 t('settings says where the book actually lives', /<h3>Where your book is kept<\/h3>/.test(term) && /On the server, under your access code, from your first sign-in/.test(term));
+
+
+/* ==================== OPEN AND IT IS THERE ==================== */
+G('Nothing to type, nothing to download');
+{
+  /* The door already took the code and issued a session; the terminal then asked for an email, a
+     password and the same code again, because the HttpOnly cookie never reached the page. One
+     server call removes all three. */
+  t('the door tells the page whose session it is', fs.existsSync(path.join(ROOT, 'functions/api/whoami.js')) && /export async function onRequestGet/.test(read('functions/api/whoami.js')) && /verify\(readCookie\(request\), env\.SESSION_SECRET\)/.test(read('functions/api/whoami.js')));
+  t('whoami is never cached and varies on the cookie', /'Cache-Control': 'no-store, no-cache, must-revalidate, private'/.test(read('functions/api/whoami.js')) && /'Vary': 'Cookie'/.test(read('functions/api/whoami.js')));
+  t('the operator session carries no book to open', /s\.c === 'OPERATOR'/.test(read('functions/api/whoami.js')));
+  t('the terminal opens from the session before it ever shows a form', /function openFromSession\(\)/.test(term) && /openFromSession\(\)\.then\(opened=>\{ if\(!opened\)defaultAuthMode\(\); \}\)/.test(term));
+  t('an account opened by the door is keyed by its code and asks for no password', /user=code\.toLowerCase\(\)\+'@code\.perceptfolio'/.test(term) && /pinHash:'',data:defaultData\(\)/.test(term));
+  t('a device that has been here before reuses its profile instead of making a second', /if\(String\(c\)\.toUpperCase\(\)===code\)\{ user=email; break; \}/.test(term));
+  t('the code is never greeted as if it were a name', /function isCodeAccount\(u\)/.test(term) && /function acctLabel\(\)/.test(term) && /display=''/.test(term));
+  /* The walkthrough decided "this account is new" while the book was still on the wire, and opened
+     a beginner's tour over someone's twenty positions. */
+  t('the walkthrough waits for the book to land before deciding the account is new', /if\(_firstPull\)return;/.test(term) && /\.finally\(\(\)=>\{ _firstPull=false; try\{ maybeStartTour\(\); \}catch\(e\)\{\} \}\)/.test(term));
+  t('a device with no sync still gets the walkthrough rather than losing it', /if\(!syncActive\(\)&&_firstPull\)\{ _firstPull=false;/.test(term));
+  /* "Everything here lives only in this browser" is false once the worker holds it, and a warning
+     that is false is how people learn to ignore warnings. */
+  t('the backup banner stops claiming the browser is the only copy', /const onServer=\(typeof syncActive==='function'&&syncActive\(\)/.test(term) && /Not everything has reached the server yet/.test(term));
+  t('it is contract-tested', fs.existsSync('test/whoami.mjs') && /a live session returns the code the door was opened with/.test(read('test/whoami.mjs')));
+}
 
 /* ==================== THE WORLD, IN THE NEWS TAB ==================== */
 G('What is happening, and where');
