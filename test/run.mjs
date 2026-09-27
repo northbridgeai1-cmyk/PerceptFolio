@@ -1250,28 +1250,75 @@ G('M3: the public site, same rules as the page it replaces');
   const NAMES = ['Revenue growth','Gross margin','Operating margin','Free cash flow','Cash vs debt','Current ratio','EPS beats','Revenue guidance','Insider buying','Competitive moat','P/E vs own history','Comp analysis','DCF value','Forward P/E','PEG ratio','6-month return','12-month return','Near 52-week high','Beating the market'];
   const leaked = NAMES.filter(n => src.toLowerCase().includes(n.toLowerCase()));
   t('site: no rulebook check is named', leaked.length === 0, leaked.join(', ') || '19 names checked');
-  t('site: no "sign in" in copy', !/sign in/i.test(copy));
+  /* "Sign in" is allowed in exactly one place now (2026-09-27): the utility row above the nav, and
+     the card a code holder sees instead of the sales form. Both address someone who already pays.
+     It must still never appear in the selling copy. */
+  t('site: "sign in" appears only where it addresses a subscriber',
+    !/sign in/i.test(read('site/src/pages/Landing.tsx').replace(/\/\*[\s\S]*?\*\//g, '').toLowerCase())
+    && /Already have a code\? <\/span>Sign in/.test(read('site/src/components/Nav.tsx'))
+    && /Sign in with your code/.test(read('site/src/components/RequestForm.tsx')));
   /* One primary in the hero and one text link beside it. "I have a code" is gone (owner,
      2026-09-22): the email that carries the code carries the link to the terminal with it, so a
      second button on the page was a door nobody arrives at. */
-  t('site: one primary in the hero (ask), a text link beside it, and no code button', /variant="primary" size="lg"><a href="#request">Ask for access<\/a>/.test(src) && !/I have a code/.test(src) && /or try it on real history first/.test(src) && (read('site/src/pages/Landing.tsx').match(/variant="primary"/g) || []).length === 1);
+  t('site: one primary in the hero, a text link beside it, and no code button', /variant="primary" size="lg"><a href="#request">Request a demo<\/a>/.test(src) && !/I have a code/.test(src) && /or try it on real history first/.test(src) && (read('site/src/pages/Landing.tsx').match(/variant="primary"/g) || []).length === 1);
   /* FormSubmit delivers the request; the visitor has nothing to send. Opening their mail app made
      an arrived request look like a failed one. */
   t('the request form never opens a mail app', !/mailto:/.test(read('site/src/components/RequestForm.tsx')) && !/mailFallback/.test(read('site/src/components/RequestForm.tsx')) && /formsubmit\.co\/ajax\//.test(read('site/src/components/RequestForm.tsx')) && /Nothing else to send/.test(src));
-  t('site: how to get in, three steps under the hero, and a Have-a-code link in the nav', /1\. Ask/.test(src) && /3\. Enter/.test(src) && /perceptfolio\.com\/enter, type the code, choose a password/.test(src) && /href="\/enter\/"[^>]*>Have a code\?<\/a>/.test(read('site/src/components/Nav.tsx')));
-  t('site: the nav carries no Request-a-demo primary on /pricing (the page is the ask); Resume session still shows there once entered', /\{!onPricing && <Button asChild variant="primary"/.test(src));
-  t('site: pricing is quote-first, one primary, no self-serve checkout', /<Link to="\/#request">Request access<\/Link>/.test(src) && !/Request seats for a firm/.test(src) && !/checkout\(/.test(read('site/src/pages/Pricing.tsx')));
+  t('site: how to get in, three steps under the hero, and the code holder\'s way in above the nav', /1\. Ask/.test(src) && /3\. Enter/.test(src) && /href="\/enter\/"[\s\S]{0,220}?Sign in<\/a>/.test(read('site/src/components/Nav.tsx')));
+  /* ONE ACTION, EVERY PAGE (2026-09-27). The header carries a single filled button and it is always
+     the same one. The subscriber's row above it is where an existing holder signs in, so the two
+     audiences no longer read past each other. */
+  t('site: the nav has exactly one primary, and it is the demo unless you have entered', (() => {
+    const nv = read('site/src/components/Nav.tsx');
+    return (nv.match(/variant="primary"/g) || []).length === 2
+      && /Request a demo<\/Link>/.test(nv) && /Resume session<\/a>/.test(nv) && !/onPricing/.test(nv);
+  })());
+  /* The utility row carries the three things that are not the sale: the way back in, support, and
+     the language. The language moved up here because the primary row could not fit a logo, links,
+     a toggle and a button at 375px without clipping the button off the right edge. */
+  t('site: the subscriber row sits above the nav and carries support and the language', (() => {
+    const nv = read('site/src/components/Nav.tsx');
+    const util = nv.indexOf("The subscriber's row"), primary = nv.indexOf('aria-label="Primary"');
+    return util > -1 && primary > util
+      && nv.indexOf("mailto:' + SUPPORT") > util && nv.indexOf("mailto:' + SUPPORT") < primary
+      && nv.indexOf('data-lang-toggle') > util && nv.indexOf('data-lang-toggle') < primary;
+  })());
+  t('site: the subscription page is quote-first, one action, no self-serve checkout', /Request a demo<\/Link>/.test(read('site/src/pages/Subscription.tsx')) && !/checkout\(/.test(read('site/src/pages/Subscription.tsx')));
   /* One plan (2026-09-22): the terminal, $760 a month or $8,360 a year. No second plan, no seats,
      no Founding label; the site never says Personal or Business. */
-  t('site: one plan, the terminal, $760 a month or $8,360 a year, one config', /export const PLAN = \{ monthly: 760, yearly: 8360 \} as const;/.test(read('site/src/lib/config.ts')) && !/PLANS|business|Founding|seatsIncluded/.test(read('site/src/lib/config.ts')) && /<h2 className="text-\[28px\]">The terminal<\/h2>/.test(read('site/src/pages/Pricing.tsx')));
-  t('site: nothing on the site says Personal, Business, seats or apply', !/\bPersonal\b|\bBusiness\b|seats for a firm|\/apply/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')) && !fs.existsSync(path.join(ROOT, 'site/src/pages/Apply.tsx')));
+  t('site: one plan in one config, still matching the worker', /export const PLAN = \{ monthly: 760, yearly: 8360 \} as const;/.test(read('site/src/lib/config.ts')) && !/PLANS|Founding|seatsIncluded/.test(read('site/src/lib/config.ts')));
+  /* QUOTE ONLY (2026-09-27). No page renders a figure; the reply carries it. PLAN stays the one
+     place the number is written, for the worker and admin to agree with, and ships to nobody. */
+  /* Comments are stripped first: the figure is explained at length in the source of config.ts and
+     Subscription.tsx, which is where an explanation belongs, and a comment ships to nobody. What
+     must not exist is a rendered one. */
+  t('site: no page renders a price, and Pricing.tsx is gone', (() => {
+    const shipped = src.replace(/\/\*[\s\S]*?\*\//g, '');
+    return !fs.existsSync(path.join(ROOT, 'site/src/pages/Pricing.tsx'))
+      && !/PLAN\.(monthly|yearly)/.test(shipped)
+      && !/\$\s?760|8,360|8360/.test(shipped.replace(/export const PLAN[^;]*;/, ''));
+  })());
+  t('site: the subscription page sells what is included and ends in the one action', /What is included/.test(read('site/src/pages/Subscription.tsx')) && (read('site/src/pages/Subscription.tsx').match(/Request a demo/g) || []).length >= 2);
+  t('site: /pricing still resolves, so old links and the sitemap do not 404', /path="\/pricing" element=\{<Subscription \/>\}/.test(read('site/src/main.tsx')) && /path="\/subscription" element=\{<Subscription \/>\}/.test(read('site/src/main.tsx')));
+  /* "Business email" is a field label on the demo form, not the tier that was removed. */
+  t('site: nothing on the site says Personal, Business, seats or apply', !/\bPersonal\b|\bBusiness\b(?! email)|seats for a firm|\/apply/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')) && !fs.existsSync(path.join(ROOT, 'site/src/pages/Apply.tsx')));
   t('site: the request form asks no plan and no seat count', !/name="plan"/.test(read('site/src/components/RequestForm.tsx')) && !/id="seats"/.test(read('site/src/components/RequestForm.tsx')));
-  t('site: no product is named beside the price (A1.6)', !/Koyfin|Godel|YCharts|COMPARISONS/.test(read('site/src/pages/Pricing.tsx') + read('site/src/lib/config.ts')));
-  t('site: who each plan is for comes before the price (A1.6)', (() => { const p = read('site/src/pages/Pricing.tsx'); return p.indexOf('Who each plan is for') < p.indexOf('Billing period'); })());
+  t('site: no competitor is named anywhere (A1.6)', !/Koyfin|Godel|YCharts|COMPARISONS/.test(src));
+  /* THE DEMO REQUEST QUALIFIES IN THREE STAGES (2026-09-27): route, then who, then the problem. A
+     code holder is sent to the door instead of being handed a sales form. */
+  t('site: the form routes a code holder to the door before asking anything else', (() => {
+    const f = read('site/src/components/RequestForm.tsx');
+    return /Have you used PerceptFolio before\?/.test(f)
+      && /holder === 'code'/.test(f) && /href="\/enter\/">Sign in with your code/.test(f)
+      && f.indexOf('Tell us about yourself') > f.indexOf('Have you used PerceptFolio before?')
+      && f.indexOf('Tell us what you are trying to do') > f.indexOf('Tell us about yourself');
+  })());
+  t('site: the form asks for a business email, a role and what they run', /label="Business email"/.test(read('site/src/components/RequestForm.tsx')) && /const ROLES =/.test(read('site/src/components/RequestForm.tsx')) && /const BOOKS =/.test(read('site/src/components/RequestForm.tsx')));
+  t('site: stages two and three stay closed until the first is answered', /\{holder && holder !== 'code' && <>/.test(read('site/src/components/RequestForm.tsx')));
   t('site: the positioning sentence is on the landing page and in the PRD (A0.0)', /Bloomberg tells you everything that is happening\. PerceptFolio tells you whether your decisions worked\./.test(read('site/src/pages/Landing.tsx')) && /Bloomberg tells you everything that is happening\. PerceptFolio tells you whether your decisions worked\./.test(read('PRD.md')));
   t('site: the data tile says market data is built in, not bring your own key (A1.4)', /Market data, built in/.test(read('site/src/pages/Landing.tsx')) && !/Bring your own data key/.test(read('site/src/pages/Landing.tsx')));
   t('site: the record mechanism is on the page with a verify link (A5.2)', /Hash-chained/.test(read('site/src/pages/Landing.tsx')) && /Server-clocked/.test(read('site/src/pages/Landing.tsx')) && /href="\/verify\/"/.test(read('site/src/pages/Landing.tsx')));
-  t('site: the screens are named by the decision each answers (A5.3)', /SCREENS\.map/.test(read('site/src/pages/Landing.tsx')) && (read('site/src/lib/config.ts').match(/\{ id: '[a-z]+', name:/g) || []).length === 15);
+  t('site: the screens are named by the decision each answers (A5.3)', /SCREENS\.map/.test(read('site/src/pages/Landing.tsx')) && (read('site/src/lib/config.ts').match(/\{ id: '[a-z]+', name:/g) || []).length === 14 && !/Clients/.test(read('site/src/lib/config.ts')));
   t('site: the time-to-evidence line sits under the empty scorecard (A5.5)', /calls a quarter, against the roughly 138 the interval needs/.test(read('site/src/pages/Landing.tsx')));
   t('site: a security sheet and the flat-quarter statement are routed and linked (A2.6, A2.7, A5.6)', /path="\/security"/.test(read('site/src/main.tsx')) && /path="\/flat-quarter"/.test(read('site/src/main.tsx')) && /to="\/security"/.test(read('site/src/components/Footer.tsx')));
   t('site: the support address is one constant, behind a flag until Email Routing exists (A1.5)', /SUPPORT_LIVE \? 'support@perceptfolio\.com' : CONTACT/.test(read('site/src/lib/config.ts')) && /mailto:' \+ SUPPORT/.test(read('site/src/components/Footer.tsx')) && /fetch\(WORKER \+ '\/version'/.test(read('site/src/components/Footer.tsx')));

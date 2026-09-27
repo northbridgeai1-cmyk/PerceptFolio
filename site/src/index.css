@@ -81,7 +81,15 @@
   .sec { padding-block: var(--spacing-sec); }
   .sec + .sec { border-top: 1px solid var(--color-line); }
   .touch a:not(.btn) { display: inline-block; }
+  /* Touch targets on a phone: the padding is what this pair of rules is for. */
   @media (hover: none), (max-width: 760px) { .nav-link { display: inline-block; padding: 12px 12px; } .foot-link { display: inline-block; padding: 12px 10px; } }
+  /* AND THEN HIDE THE ORIENTATION LINKS, LAST WORD. The rule above set display on every .nav-link,
+     which beat Tailwind's max-[700px]:hidden utility (a different class, same specificity, earlier
+     in the sheet). On a phone the header therefore kept every link, wrapped onto two rows and
+     overflowed its own bar. This is declared after, with the same specificity, so it wins; the
+     links carry .nav-sm-hide instead of the utility, which makes the intent legible in the markup
+     rather than a specificity accident waiting to be re-broken. */
+  @media (max-width: 700px) { .nav-link.nav-sm-hide { display: none; } }
   /* The one authored motion: rows and tiles resolve top to bottom from a visible default. */
   @keyframes resolve { from { opacity: .28; transform: translateX(-5px); } to { opacity: 1; transform: none; } }
   @keyframes land { from { opacity: 0; transform: translateY(6px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }

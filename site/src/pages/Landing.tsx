@@ -5,7 +5,7 @@ import { Demo } from '@/components/Demo';
 import { CompanyDemo } from '@/components/CompanyDemo';
 import { RequestForm } from '@/components/RequestForm';
 import { Faq } from '@/components/Faq';
-import { PLAN, SCREENS } from '@/lib/config';
+import { SCREENS } from '@/lib/config';
 
 /* Composition alternates, no two adjacent sections share a layout: bleed, stack, left-heavy,
    right-heavy, centred strip, wide type, form, accordion. No eyebrows, no section numbers. */
@@ -30,12 +30,12 @@ export function Landing() {
           <h1 className="mb-6">A research terminal that keeps score on itself.</h1>
           <p className="lede text-[21px] max-w-[56ch]"><b className="font-semibold text-text">Bloomberg tells you everything that is happening. PerceptFolio tells you whether your decisions worked.</b></p>
           <p className="mt-4 max-w-[56ch] text-[17px] text-dim">Software for people who buy and sell shares. It checks each company against rules you set, writes down what it told you, and later shows whether that was right. Twenty-two checks, one verdict, a record nobody can edit.</p>
-          <div className="mt-8 flex flex-wrap items-center gap-5"><Button asChild variant="primary" size="lg"><a href="#request">Ask for access</a></Button><a href="#demo" className="text-[15px] text-dim underline underline-offset-[.2em] decoration-line2 hover:text-text hover:decoration-current">or try it on real history first</a></div>
+          <div className="mt-8 flex flex-wrap items-center gap-5"><Button asChild variant="primary" size="lg"><a href="#request">Request a demo</a></Button><a href="#demo" className="text-[15px] text-dim underline underline-offset-[.2em] decoration-line2 hover:text-text hover:decoration-current">or try it on real history first</a></div>
         </div></div>
         <TerminalDashboard />
         <div className="wrap">
           <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[780px]:grid-cols-1" role="list" aria-label="How to get in, in three steps">
-            {[['1. Ask', 'Fill in the form at the bottom of this page. A person at NorthBridge reads it and replies by email.'], ['2. See it', 'A demo of the terminal on your own positions. If it suits your work, the price is $760 a month or $8,360 a year.'], ['3. Enter', 'Your access code arrives by email, with the link straight to the terminal. Type the code, choose a password for your device, and it is yours.']].map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-sans text-[15px] font-bold tracking-normal">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
+            {[['1. Ask', 'Three short questions at the bottom of this page. A person at NorthBridge reads every one and replies by email.'], ['2. See it', 'A demo of the terminal run on your own positions, and the price and terms in writing.'], ['3. Enter', 'Your access code arrives by email, with the link straight to the terminal. Type the code, choose a password for your device, and it is yours.']].map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-sans text-[15px] font-bold tracking-normal">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
           </div>
         </div>
       </header>
@@ -107,15 +107,15 @@ export function Landing() {
       </div></section>
 
       <section id="request" className="sec" aria-labelledby="h-access"><div className="wrap">
-        <h2 id="h-access" className="mb-4">Ask for access by email.</h2>
+        <h2 id="h-access" className="mb-4">Request a demo.</h2>
         <p className="lede mb-8">The more you tell us, the faster the reply. This goes straight to NorthBridge's inbox; someone reads it and replies personally with a demo and your price. If it is not the right tool for your work, you will be told that plainly.</p>
         <div className="grid grid-cols-[minmax(0,560px)_1fr] items-start gap-[clamp(40px,6vw,96px)] min-[781px]:max-[960px]:gap-[clamp(56px,9vw,96px)] max-[780px]:grid-cols-1 max-[780px]:gap-12">
           <RequestForm />
           <dl className="mt-[6px]">
-            {[['Reviewed by a person', 'Not a queue and not an autoresponder. Every request is read by someone in the financial branch who can act on it, and you get a straight answer, including no.'], ['A demo, then a decision', `You see the terminal on your own positions before anyone asks you for anything. If it suits the work, it is $${PLAN.monthly} a month or $${PLAN.yearly.toLocaleString()} a year, and your code arrives by email.`], ['Market data, built in', 'Prices, fundamentals and news for US-listed stocks and ETFs come with your access, from Finnhub through our service; daily closes for the history. Each price on screen says whether it is a quote or a close, and from where. Prefer your own free Finnhub key? Connect it in Settings and it wins on that device.'], ['Thesis before position', 'Any position taken through the terminal carries a written thesis, a stop and a deadline, recorded when it is opened. A reason invented after the price moves is not a reason.']].map(([t, d]) => <div key={t} className="border-b border-line pb-5 mb-5 last:mb-0 last:border-b-0 last:pb-0"><dt className="mb-[6px] font-display text-[16px] font-bold tracking-[-.01em]">{t}</dt><dd className="max-w-[48ch] text-[15px] leading-[1.6] text-dim">{d}</dd></div>)}
+            {[['Reviewed by a person', 'Not a queue and not an autoresponder. Every request is read by someone in the financial branch who can act on it, and you get a straight answer, including no.'], ['A demo, then a decision', 'You see the terminal on your own positions before anyone asks you for anything. If it suits the work, the reply carries the price and the terms in writing, and your code arrives by email.'], ['Market data, built in', 'Prices, fundamentals and news for US-listed stocks and ETFs come with your access, from Finnhub through our service; daily closes for the history. Each price on screen says whether it is a quote or a close, and from where. Prefer your own free Finnhub key? Connect it in Settings and it wins on that device.'], ['Thesis before position', 'Any position taken through the terminal carries a written thesis, a stop and a deadline, recorded when it is opened. A reason invented after the price moves is not a reason.']].map(([t, d]) => <div key={t} className="border-b border-line pb-5 mb-5 last:mb-0 last:border-b-0 last:pb-0"><dt className="mb-[6px] font-display text-[16px] font-bold tracking-[-.01em]">{t}</dt><dd className="max-w-[48ch] text-[15px] leading-[1.6] text-dim">{d}</dd></div>)}
           </dl>
         </div>
-        <p className="mt-8 text-[15px] text-faint">Already convinced? <Link to="/pricing">See the plans</Link>.</p>
+        <p className="mt-8 text-[15px] text-faint">Want the detail first? <Link to="/subscription">What a subscription includes</Link>.</p>
       </div></section>
 
       <section id="faq" className="sec" aria-labelledby="h-faq"><div className="wrap max-w-[900px]"><h2 id="h-faq" className="mb-8">Questions worth answering.</h2><Faq /></div></section>

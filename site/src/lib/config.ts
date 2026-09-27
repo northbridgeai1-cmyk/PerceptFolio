@@ -12,7 +12,13 @@ export const CONTACT = 'northbridgeai1@gmail.com';
 export const SUPPORT_LIVE = false;
 export const SUPPORT = SUPPORT_LIVE ? 'support@perceptfolio.com' : CONTACT;
 
-/* One plan (owner's decision, 2026-09-22): the terminal, $760 a month or $8,360 a year, one
+/* QUOTE ONLY (owner's decision, 2026-09-27). Nothing on the site renders these numbers any more:
+   the price reaches a person in the operator's reply, after a demo on their own positions. PLAN
+   stays here because it is the single place the figure is written, it must agree with the worker's
+   PRICE and admin's quote draft, and the suite checks that all three match. Rendering it is what
+   stopped, not keeping it.
+
+   One plan (owner's decision, 2026-09-22): the terminal, $760 a month or $8,360 a year, one
    person, quote-first. There is no second plan and no seat price. The worker's PRICE must agree
    with these numbers; the suite checks both. */
 export const PLAN = { monthly: 760, yearly: 8360 } as const;
@@ -36,5 +42,4 @@ export const SCREENS: ReadonlyArray<{ id: string; name: string; asks: string; st
   { id: 'risk', name: 'Risk', asks: 'What does a bad month do to the book?' },
   { id: 'projections', name: 'Projections', asks: 'What range of outcomes is plausible, under stated assumptions?' },
   { id: 'alerts', name: 'Alerts', asks: 'What crossed a line while I was away?' },
-  { id: 'clients', name: 'Clients', asks: 'How is a client book doing, scored the same way, kept apart?' },
 ];
