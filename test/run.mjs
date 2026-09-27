@@ -904,8 +904,9 @@ t('the assertion refuses to boot rather than warning', /Refusing to boot/.test(t
    itself, which the assertion below is shaped to catch as well as the original leak. */
 t('the store is written from exactly one place',
   (term.match(/localStorage\.setItem\(STORE_KEY/g)||[]).length === 1);
-t('that one place is inside the guarded path, not recursing into it',
-  /function persistDB\(opts\)\{[\s\S]{0,900}?localStorage\.setItem\(STORE_KEY,JSON\.stringify\(DB\)\);/.test(term) &&
+t('that one place is reached only through the guarded path, not by recursing into it',
+  /function writeStore\(\)\{ localStorage\.setItem\(STORE_KEY,JSON\.stringify\(DB\)\); \}/.test(term) &&
+  (term.match(/writeStore\(\)/g)||[]).length === 3 &&
   !/function persistDB\(opts\)\{[\s\S]{0,900}?\n\s*persistDB\(\);/.test(term));
 t('every write goes through the guarded path', (term.match(/persistDB\(/g)||[]).length >= 10);
 t('the profile count is captured from what was actually on disk', /_profileCount=Object\.keys\(DB\.profiles\)\.length/.test(term));
@@ -1483,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v137/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v138/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2779,11 +2780,33 @@ t('the aggregate uses total return too', /accruedYield\(yieldPctFor\(c\.sym\),he
 t('an unknown yield accrues nothing rather than an assumption', /isFinite\(y\)&&y>0&&y<25/.test(term));
 
 /* ==================== QUOTA GUARD ==================== */
-G('A full browser store must fail loudly');
+G('A full browser store clears its own caches first, and only then says so');
 
-t('the single write path catches the write', /try\{\s*\n\s*localStorage\.setItem\(STORE_KEY,JSON\.stringify\(DB\)\);[^\n]*\n\s*\}catch\(err\)/.test(term));
+t('the single write path catches the write', /try\{\s*\n\s*writeStore\(\);\s*\n\s*\}catch\(err\)/.test(term));
 t('QuotaExceededError is recognised across browsers', /err\.name==='QuotaExceededError'\|\|err\.code===22\|\|err\.code===1014/.test(term));
 t('a failed save is shown, not swallowed', /function showSaveFailure/.test(term));
+/* MAKING ROOM IS THE TERMINAL'S JOB (2026-09-27). The bar used to tell the person to export a
+   backup and go and delete a profile, over caches this file filled up on its own. It now frees the
+   space and writes again; the bar is what is left when even an empty cache is not enough, and it
+   can be dismissed. */
+t('a full store frees its own caches and retries before saying anything',
+  /const RECLAIM_STEPS=\[/.test(term)
+  && /for\(let i=0;i<RECLAIM_STEPS\.length;i\+\+\)\{/.test(term));
+t('reclaim drops caches for tickers nobody watches or holds, keeping the ones they do',
+  /Object\.keys\(d\.analyses\|\|\{\}\)\.forEach\(s=>\{ if\(!k\.has\(s\)\)delete d\.analyses\[s\]; \}\);/.test(term)
+  && /\(d\.holdings\|\|\[\]\)\.forEach\(h=>h&&h\.sym&&k\.add\(h\.sym\)\);/.test(term));
+t('reclaim never touches the record, the holdings or anything a person wrote', (() => {
+  const m = term.match(/const RECLAIM_STEPS=\[[\s\S]*?\n\];/);
+  if (!m) return false;
+  return !/d\.holdings=|d\.calls|d\.reviews|d\.theses|d\.transactions|d\.chain|d\.lists=|d\.watchlist=/.test(m[0]);
+})());
+t('it steps from cheapest to dearest and stops as soon as the write lands',
+  /RECLAIM_STEPS\[i\]\(\);[\s\S]{0,200}?writeStore\(\);[\s\S]{0,400}?return true;/.test(term));
+t('the bar can be dismissed, and comes back on the next failed save',
+  /function dismissSaveFailure\(\)\{ clearSaveFailure\(\); \}/.test(term)
+  && /Not now<\/button>/.test(term) && !/_saveFailed=false;\s*\}\s*function dismissSaveFailure/.test(term));
+t('the bar says what was already tried, so it does not read as go and tidy up',
+  /clearing the caches was not enough/.test(term) && /have already been cleared/.test(term));
 t('a failed save does not schedule a sync of data that never saved',
   /if\(!persistDB\(\)\)return;/.test(term) && /showSaveFailure\(quota,err\);\s*\n\s*return false;/.test(term));
 

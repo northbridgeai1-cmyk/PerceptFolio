@@ -2579,6 +2579,9 @@ function loadDB(){
    all end the same way. If a write would reduce the number of profiles and the caller did not say
    it was deleting one, that write does not happen. Refusing to save is recoverable. Saving over
    an account is not. */
+/* THE ONE PLACE localStorage IS WRITTEN. Both the first attempt and every retry above go through
+   here, so the profile-count guard cannot be stepped around by adding another write. */
+function writeStore(){ localStorage.setItem(STORE_KEY,JSON.stringify(DB)); }
 function persistDB(opts){
   const o=opts||{};
   const n=Object.keys(DB.profiles||{}).length;
@@ -2591,9 +2594,30 @@ function persistDB(opts){
     return false;
   }
   try{
-    localStorage.setItem(STORE_KEY,JSON.stringify(DB));   // the one place this call is allowed
+    writeStore();
   }catch(err){
     const quota=err&&(err.name==='QuotaExceededError'||err.code===22||err.code===1014);
+    /* OUT OF SPACE IS A PROBLEM THIS CAN USUALLY SOLVE ITSELF.
+       The old behaviour was to stop, put up a red bar, and tell the person to export a backup and
+       go and delete one of their own profiles. That is asking someone to do housekeeping in the
+       middle of a decision, over caches this file filled up on its own and can refill whenever it
+       likes.
+       So: drop a cache, write again, and stop at the first write that lands, so a profile needing
+       one trim does not lose a year of price history. The bar is what is left when even an empty
+       cache is not enough, and by then it is telling the truth. */
+    if(quota){
+      const before=storeSize();
+      for(let i=0;i<RECLAIM_STEPS.length;i++){
+        try{ RECLAIM_STEPS[i](); }catch(e){ /* a malformed cache is itself what is being cleared */ }
+        try{
+          writeStore();
+          _profileCount=n; _saveFailed=false;
+          clearSaveFailure();
+          toast('Storage was full. '+Math.max(1,Math.round((before-storeSize())/1024))+' KB of cached prices and scores were cleared to make room. Your record and holdings are untouched.');
+          return true;
+        }catch(e2){ /* still full: take the next step */ }
+      }
+    }
     _saveFailed=true;
     showSaveFailure(quota,err);
     return false;
@@ -2616,9 +2640,55 @@ function saveDB(){
   if(typeof scheduleSync==='function')scheduleSync();
 }
 
+/* ===== MAKING ROOM, IN ORDER OF WHAT IT COSTS TO LOSE =====
+   Everything here is a cache. None of it is the record, the holdings, the lists, the theses or the
+   calls, and none of it needs a person's permission to go, because the terminal rebuilt all of it
+   from the network in the first place and will do so again on the next refresh.
+
+   The order matters: the cheapest thing to lose goes first, and each step stops as soon as the
+   write succeeds, so a profile that needed one trim does not lose a year of price history.
+
+     1  scores for tickers nobody is watching or holding any more    pure litter
+     2  the quarantine log, past the most recent 50                  diagnostics
+     3  daily closes and score history trimmed to 120 days           refetched on the next refresh
+     4  daily closes and score history trimmed to 60 days            same, harder
+     5  every cached score                                           one Run Analyzer away
+
+   What is never touched at any step: holdings, cash, transactions, watchlist, lists, favourites,
+   theses, reviews, calls, marks, the chain, alerts, rules and policy. If freeing space ever has to
+   reach those, it stops and puts the bar up instead. */
+function allDatas(){ return (DB&&DB.profiles?Object.values(DB.profiles):[]).map(p=>p&&p.data).filter(Boolean); }
+function storeSize(){ try{ return JSON.stringify(DB).length; }catch(e){ return 0; } }
+/* Every ticker this profile still cares about. A cache for anything else is litter. */
+function tickersInUse(d){
+  const k=new Set();
+  (d.watchlist||[]).forEach(s=>k.add(s));
+  (d.holdings||[]).forEach(h=>h&&h.sym&&k.add(h.sym));
+  (d.lists||[]).forEach(l=>(l.syms||[]).forEach(s=>k.add(s)));
+  (d.favorites||[]).forEach(s=>k.add(s));
+  return k;
+}
+const RECLAIM_STEPS=[
+  ()=>allDatas().forEach(d=>{ const k=tickersInUse(d);
+    Object.keys(d.analyses||{}).forEach(s=>{ if(!k.has(s))delete d.analyses[s]; });
+    Object.keys(d.scoreLog||{}).forEach(s=>{ if(!k.has(s))delete d.scoreLog[s]; });
+    Object.keys(d.priceLog||{}).forEach(s=>{ if(!k.has(s))delete d.priceLog[s]; }); }),
+  ()=>allDatas().forEach(d=>{ if(Array.isArray(d.quarantine)&&d.quarantine.length>50)d.quarantine=d.quarantine.slice(-50); }),
+  ()=>allDatas().forEach(d=>trimLogs(d,120)),
+  ()=>allDatas().forEach(d=>trimLogs(d,60)),
+  ()=>allDatas().forEach(d=>{ d.analyses={}; }),
+];
+function trimLogs(d,keepDays){
+  ['priceLog','scoreLog'].forEach(key=>{
+    const log=d[key]; if(!log||typeof log!=='object')return;
+    Object.keys(log).forEach(s=>{ if(Array.isArray(log[s])&&log[s].length>keepDays)log[s]=log[s].slice(-keepDays); });
+  });
+}
+
 /* Loud and persistent, because the alternative is a silent one. Repeated failures do not stack up
    banners; one stays until a save succeeds. */
 let _saveFailed=false;
+function clearSaveFailure(){ const el=document.getElementById('saveFailBanner'); if(el)el.remove(); }
 /* Three different failures, three different things to do about them, so they do not share one
    message. A refusal is not a browser problem and must not read like one \u2014 the data is fine,
    the write was stopped on purpose, and reloading recovers it. */
@@ -2633,16 +2703,30 @@ function showSaveFailure(isQuota,err,kind){
     document.body.appendChild(el);
   }
   const refused=kind==='refused';
+  /* By the time a quota bar is shown, reclaimSpace has already emptied every cache and the write
+     still failed, so there is nothing left for the terminal to do on its own. The message says
+     what was already tried, so it does not read as "go and tidy up" to someone whose caches were
+     cleared a second ago. */
+  const copyOn=(typeof recordCopyOn==='function'&&recordCopyOn());
   const head=refused ? 'Save stopped to protect your data.'
-           : isQuota ? 'This browser is out of storage.'
+           : isQuota ? 'This browser is full, and clearing the caches was not enough.'
                      : 'Could not save to this browser.';
   const body=refused ? esc((err&&err.message)||'')
-           : isQuota ? 'Your last change was not saved, and nothing further can be saved until space is freed. Export a backup now, then delete a profile you no longer need under Settings.'
+           : isQuota ? 'Cached prices and scores have already been cleared and there is still no room, so your last change is only on screen. '+
+                       (copyOn
+                         ? 'Your record is on the server copy, so the calls and marks are safe. Holdings and notes are not: export a backup.'
+                         : 'Export a backup, then delete a profile you no longer need under Settings.')
                      : 'Your last change was not saved. '+esc((err&&err.message)||'');
   el.innerHTML='<span><b>'+head+'</b> '+body+'</span>'+
     '<span style="flex:1"></span>'+
-    '<button class="btn btn-sm" style="background:#fff;color:#111;border:none" onclick="exportData()">Export backup</button>';
+    '<button class="btn btn-sm" style="background:#fff;color:#111;border:none" onclick="exportData()">Export backup</button>'+
+    /* Not now. The bar used to be undismissable, which made a full disk a wall across the screen
+       for the rest of the session even after the person had decided what to do about it. It comes
+       back on the next failed save, so dismissing it hides the notice, never the problem. */
+    '<button class="btn btn-sm btn-ghost" style="color:#fff;border-color:rgba(255,255,255,.5)" onclick="dismissSaveFailure()">Not now</button>';
 }
+/* Hidden, not resolved: _saveFailed stays true, so the next failed write raises it again. */
+function dismissSaveFailure(){ clearSaveFailure(); }
 function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorites:[],
   /* LISTS ARE AN ORGANISATIONAL LAYER OVER watchlist, NOT A REPLACEMENT FOR IT.
      watchlist stays the flat array of every symbol being followed, because two dozen other places
