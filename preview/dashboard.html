@@ -1076,11 +1076,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     </div>
   </div>
 </header>
-<div id="bizBanner" class="row" style="display:none;background:var(--panel2);border-bottom:1px solid var(--border);padding:8px 24px;font-size:13px;color:var(--muted)">
-  <span>Working on <b id="bizBannerClient" style="color:var(--text)"></b>'s account</span>
-  <div class="spacer"></div>
-  <button class="btn btn-ghost btn-sm" tabindex="-1" disabled="">Return to my account</button>
-</div>
 
 <!-- SIDEBAR. Thirteen destinations across a top bar squeezed every label; down the side there is
      room for all of them, and collapsed to icons it costs 56px. -->
@@ -1103,7 +1098,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     <button data-tab="risk" id="navRisk" data-tip="Risk" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"></use></svg></span><span class="lbl">Risk</span></button>
     <button data-tab="projections" id="navProjections" data-tip="Projections" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"></use></svg></span><span class="lbl">Projections</span></button>
     <button data-tab="alerts" id="navAlerts" data-tip="Alerts" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-alerts"></use></svg></span><span class="lbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
-    <button data-tab="clients" id="navClients" style="display:none" data-tip="Clients" class="pf-adv" tabindex="-1" disabled=""><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-clients"></use></svg></span><span class="lbl">Clients</span></button>
   </nav>
   <div class="side-foot"><span class="lbl">Press <b>[</b> to collapse</span></div>
 </aside>
@@ -1136,28 +1130,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
     <div class="greeting" id="greetingText">Good afternoon.</div>
     <div class="greeting-sub" id="greetingSub">Here's where things stand today.</div>
   </div>
-  <!-- Business account's own dashboard: earnings summary + client list, no personal-investing entry points -->
-  <div id="bizDashboardBody" style="display:none">
-    <div class="hero">
-      <div class="hero-label">Est. earnings across all clients</div>
-      <span class="hero-value" id="bizTotalEarnings">$0</span>
-      <div class="hero-change flat" id="bizEarningsSub">From client accounts with a fee % set</div>
-    </div>
-    <div class="stat-row">
-      <div class="stat s-count"><span class="stat-label"># Clients</span><span class="stat-value" id="bizClientCount">0</span></div>
-      <div class="stat s-in"><span class="stat-label">Combined client AUM</span><span class="stat-value" id="bizTotalAUM">$0</span></div>
-    </div>
-    <div class="section-title">Your Clients</div>
-    <div class="card" style="overflow-x:auto">
-      <table>
-        <thead><tr><th>Client</th><th>Login email</th><th>Portfolio value</th><th>Unrealized gain</th><th>Your fee</th><th>Est. fee owed</th><th></th></tr></thead>
-        <tbody id="bizDashClientsBody"></tbody>
-      </table>
-      <div id="bizDashClientsEmpty" class="empty">No clients yet. Head to the <b>Clients</b> tab to create one.</div>
-    </div>
-    <p class="muted" style="margin-top:12px;font-size:12px">Same private-note caveat as the Clients tab: this isn't a billing system, and taking a cut of gains has real regulatory strings attached (SEC Rule 205-3). See the Clients tab for the full disclaimer.</p>
-  </div>
-  <!-- Personal dashboard: hidden entirely for a business account's own view -->
+  <!-- The dashboard. -->
   <div id="personalDashboardBody" style="display: block;">
     <div id="welcomeCard" class="welcome-card" style="display:none">
       <h2>Let's set up your portfolio</h2>
@@ -1956,30 +1929,6 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
 </div>
 
-<!-- CLIENTS (business accounts only) -->
-<div id="tab-clients" class="tabs-hidden">
-  <p class="muted" style="margin-bottom:14px">A business account doesn't hold its own investments in PerceptFolio. Portfolio, Watchlist, and Alerts are hidden here for that reason. Manage client portfolios below, or click <b>Switch</b> on a client to work inside their account.</p>
-  <div class="card">
-    <h3>Create Client</h3>
-    <details class="aside"><summary>What a client account is, and is not</summary><div>This isn't a real brokerage account for your client. Their actual money stays wherever it's actually held (their own broker/custodian). This just gives you, the quant, a separate, walled-off place to track and score that client's holdings by hand, same as any other portfolio in this app. Most people never give the client login access at all. It's for your own recordkeeping. The email below is just an internal ID (it doesn't need to be real, and doesn't need to reach them) unless you specifically want them to log in themselves; if you do, set a password and hand them both. Either way, you can also work in their portfolio anytime via Switch, and export a snapshot for them via Settings → Export if you ever want to hand off a copy.</div></details>
-    <div class="row">
-      <input id="clientName" placeholder="Client name (e.g. Jane Smith)" style="max-width:200px" tabindex="-1" disabled="">
-      <input id="clientEmail" placeholder="ID (email format. Doesn't need to be real)" style="max-width:260px" tabindex="-1" disabled="">
-      <span class="pw-wrap"><input id="clientPassword" type="password" placeholder="Password (only if they'll log in)" style="max-width:220px" data-pw-wrapped="1" tabindex="-1" disabled=""><button type="button" class="pw-toggle" aria-label="Show password" tabindex="-1" disabled="">Show</button></span>
-      <input id="clientFeePct" type="number" min="0" max="100" step="0.1" placeholder="Fee % of gains (optional)" style="max-width:190px" tabindex="-1" disabled="">
-      <button class="btn" tabindex="-1" disabled="">Create Client</button>
-    </div>
-  </div>
-  <div class="section-title">Your Clients</div>
-  <div class="card" style="overflow-x:auto">
-    <table>
-      <thead><tr><th>Client</th><th>Login email</th><th>Portfolio value</th><th>Unrealized gain</th><th>Your fee</th><th>Est. fee owed</th><th></th></tr></thead>
-      <tbody id="clientsBody"></tbody>
-    </table>
-    <div id="clientsEmpty" class="empty">No clients yet. Create one above. Their portfolio is completely separate from yours.</div>
-  </div>
-  <details class="aside"><summary>This fee % is just a private note, not a billing system</summary><div>PerceptFolio has no payment processing and never moves money, "Est. fee owed" is a rough math estimate (fee % × unrealized gain, zero on losses), not an invoice. More importantly: taking a cut of a client's investment gains is a <b>performance-based fee</b>, and under SEC Rule 205-3 of the Investment Advisers Act, advisers generally can't charge performance fees except to "qualified clients" who clear specific net-worth/asset thresholds, and that's on top of needing to be a properly registered or exempt adviser in the first place just to manage someone else's investments for pay at all. Recording a number here doesn't make an arrangement compliant. Talk to a securities attorney before you charge anyone a percentage of their gains.</div></details>
-</div>
 
 <!-- SETTINGS -->
 <div id="tab-settings" class="tabs-hidden">
@@ -2073,7 +2022,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Copy Holdings / Watchlist to Another Account</h3>
-    <p class="muted" style="margin-bottom:12px">Copies from the account you're in right now into another one on this browser. Useful for setting a new client up with a starting book, or cloning your own list into a second account. It copies the positions and tickers only; cash, transaction history, dividends, alerts, and settings are left alone.</p>
+    <p class="muted" style="margin-bottom:12px">Copies from the account you're in right now into another one on this browser. Useful for cloning your own list into a second account. It copies the positions and tickers only; cash, transaction history, dividends, alerts, and settings are left alone.</p>
     <div class="row" style="margin-bottom:10px">
       <select id="copyTarget" style="max-width:280px" tabindex="-1" disabled=""><option value="">No other accounts on this browser</option></select>
       <select id="copyWhat" style="max-width:190px" tabindex="-1" disabled="">
@@ -2109,7 +2058,7 @@ nav button.active{box-shadow:inset 0 0 0 1px rgba(31,158,140,.28),0 0 22px -8px 
       <p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.55">Your invite code can sync this account across your own devices, no operator key needed. Be aware of the trade: your portfolio is stored on the worker under that code and is readable by anyone holding it, and sync stops the moment your access is paused.</p>
       <button class="btn btn-sm" style="margin-top:8px" tabindex="-1" disabled="">Turn on code sync</button>
     </div>
-    <!-- F1. A managed or business profile is told why sync is off, up front. A panel that simply
+    <!-- F1. A book held for someone else is told why sync is off, up front. A panel that simply
          does nothing when pressed reads as broken, and someone would go looking for the bug rather
          than understand the refusal. -->
     <div id="syncBlockedNotice" style="display:none;margin-top:12px;border:1px solid var(--border);border-left:3px solid var(--red,#e5534b);border-radius:8px;padding:12px 14px">

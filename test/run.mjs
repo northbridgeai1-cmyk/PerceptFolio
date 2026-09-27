@@ -404,7 +404,7 @@ G('Access queue: four views, a pause that states its own limits, and both emails
 t('four filter tabs exist', /data-f="pending"/.test(admin) && /data-f="accepted"/.test(admin) &&
   /data-f="denied"/.test(admin) && /data-f="all"/.test(admin));
 t('a paused grant still counts as accepted, not denied',
-  /const isAccepted=r=>r\.status==='personal'\|\|r\.status==='business'/.test(admin));
+  /const isAccepted=r=>r\.status==='granted'\|\|r\.status==='personal'\|\|r\.status==='business'/.test(admin));
 t('each tab shows a count', /\['pending','accepted','denied','all'\]\.forEach/.test(admin));
 
 t('the worker refuses a paused code', /if \(inv\.paused\) return json/.test(worker));
@@ -539,9 +539,10 @@ t('the terminal presents its invite code when it has no sync key',
 /* Stronger than before: the dropdown is gone entirely rather than present-but-overridden. A control
    whose value is discarded looks like a decision and is not one. */
 t('there is no account-type control to override', !/newAccountType/.test(term));
-t('the tier comes only from the grant, defaulting to the lesser of the two',
-  /const grantedTier=\(inv\.tier==='business'\|\|inv\.tier==='personal'\)\?inv\.tier:'personal'/.test(term) &&
-  /accountType:grantedTier/.test(term));
+/* One terminal (2026-09-27): there is one kind of account, so nothing on the door screen can pick
+   a tier and nothing in the terminal branches on one. */
+t('there is one kind of account and no tier to pick',
+  /accountType:'personal'/.test(term) && !/grantedTier/.test(term) && !/inviteTier/.test(term) && !/accountType==='business'/.test(term));
 t('first-run setup does not assume the reader owns the worker',
   !/Skip it if your worker already holds one/.test(term));
 
@@ -645,10 +646,14 @@ t('a never-exported profile is a red row',
 t('the dead version-skew fallback is gone', !/queue is mid-update/.test(idx));
 /* Access is by email now: the visitor's own mail app sends the request, so it always arrives and
    nothing on this side has to be able to send; the worker copy is best-effort for admin's list. */
-t('the request is delivered to the inbox by FormSubmit, with a mailto fallback and a worker copy for admin',
-  /formsubmit\.co\/ajax\/'\+PF\.contact/.test(idx) && /_honey:''/.test(idx) && /location\.href='mailto:'\+PF\.contact\+'\?subject='/.test(idx) && /keepalive:true\}\)\.catch\(\(\)=>\{\}\)/.test(idx));
+/* The visitor sends nothing (2026-09-27). FormSubmit delivers and the worker keeps a copy; a failure
+   says so and leaves the form filled in. The mailto fallback is gone from both landing pages: opening
+   a mail app after a request had already arrived read as "that did not work, send it yourself". */
+t('the request is delivered to the inbox by FormSubmit, with a worker copy for admin and no mail app',
+  /formsubmit\.co\/ajax\/'\+PF\.contact/.test(idx) && /_honey:''/.test(idx) && /keepalive:true\}\)\.catch\(\(\)=>\{\}\)/.test(idx) && !/mailto/.test(idx));
+t('neither landing page nor the thanks page opens a mail app', !/mailto/.test(idx) && !/mailto/.test(read('site/src/components/RequestForm.tsx')) && !/Email the branch/.test(read('thanks.html')));
 t('the CSP allows the FormSubmit endpoint on both the page and the Pages gate', /connect-src 'self' https:\/\/\*\.workers\.dev https:\/\/finnhub\.io https:\/\/formsubmit\.co;/.test(idx) && /'https:\/\/formsubmit\.co'\]/.test(read('functions/_middleware.js')));
-t('the email asks for the detail that speeds the reply', ['rqName','rqRole','rqFirm','rqBook','rqWho','rqWhen','rqSeats'].every(id => new RegExp('id="' + id + '"').test(idx)) && /Best time to talk/.test(idx));
+t('the request asks for the detail that speeds the reply, and for no plan or seat count', ['rqName','rqRole','rqFirm','rqBook','rqWho','rqWhen'].every(id => new RegExp('id="' + id + '"').test(idx)) && /Best time to talk/.test(idx) && !/rqSeats/.test(idx) && !/name=plan/.test(idx));
 
 /* ==================== SCHEMA INTEGRITY ==================== */
 G('defaultData must keep every key — a missing one is silent data loss');
@@ -914,8 +919,7 @@ t('a refusal reads differently from a storage failure',
 t('the count only advances after a successful write', /_profileCount=n;\s*\n\s*_saveFailed=false;/.test(term));
 /* Named rather than counted: the self-test harness legitimately uses it too, and a bare count
    would make adding a test look like adding a deletion path. */
-t('deliberate deletion passes the intent explicitly, at both real call sites',
-  /function removeClient\([\s\S]{0,400}?persistDB\(\{deleting:true\}\)/.test(term) &&
+t('deliberate deletion passes the intent explicitly at its real call site',
   /function deleteProfile\([\s\S]{0,300}?persistDB\(\{deleting:true\}\)/.test(term));
 t('DB.profiles is repaired if the stored blob is malformed', /if\(!DB\.profiles\|\|typeof DB\.profiles!=='object'\)DB\.profiles=\{\}/.test(term));
 
@@ -1047,7 +1051,7 @@ G('Nothing resumes into a session that ended');
 t('saveDB requires the profile to still exist', /if\(USER&&DB\.profiles\[USER\]\)\{/.test(term));
 t('deleteProfile clears the session itself rather than leaving it to logout',
   /delete DB\.profiles\[USER\];\s*\n\s*if\(!persistDB\(\{deleting:true\}\)\)return;/.test(term) &&
-  /USER=null; D=null; bizContext=null;/.test(term));
+  /USER=null; D=null;/.test(term));
 t('a refused write leaves the account intact', /the write was refused; the account still exists/.test(term));
 /* A network round trip takes seconds and a session can end inside one. */
 t('there is one test for a live session',
@@ -1271,9 +1275,11 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: the time-to-evidence line sits under the empty scorecard (A5.5)', /calls a quarter, against the roughly 138 the interval needs/.test(read('site/src/pages/Landing.tsx')));
   t('site: a security sheet and the flat-quarter statement are routed and linked (A2.6, A2.7, A5.6)', /path="\/security"/.test(read('site/src/main.tsx')) && /path="\/flat-quarter"/.test(read('site/src/main.tsx')) && /to="\/security"/.test(read('site/src/components/Footer.tsx')));
   t('site: the support address is one constant, behind a flag until Email Routing exists (A1.5)', /SUPPORT_LIVE \? 'support@perceptfolio\.com' : CONTACT/.test(read('site/src/lib/config.ts')) && /mailto:' \+ SUPPORT/.test(read('site/src/components/Footer.tsx')) && /fetch\(WORKER \+ '\/version'/.test(read('site/src/components/Footer.tsx')));
-  t('the worker tells the operator on every request, with a suggested quote', /Demo request: \$\{plan\}/.test(worker) && /Suggested quote:\\n\$\{q\.text\}/.test(worker) && /const PRICE = \{ monthly: 760, yearly: 8360 \};/.test(worker) && /The terminal: \$\$\{PRICE\.monthly\} a month/.test(worker));
-  t('member codes: one per email, operator only, business grants only, re-send instead of re-mint', /url\.pathname === '\/decide\/members'/.test(worker) && /rec\.status !== 'business'/.test(worker) && /rec\.members\.find\(x => x\.email === email\)/.test(worker));
-  t('admin has Send quote and Issue member codes', /function mailQuote/.test(read('admin.html')) && /async function issueMembers/.test(read('admin.html')) && /Issue member codes/.test(read('admin.html')));
+  t('the worker tells the operator on every request, with the one suggested quote', /Demo request from \$\{email\}/.test(worker) && /Suggested quote:\\n\$\{q\.text\}/.test(worker) && /const PRICE = \{ monthly: 760, yearly: 8360 \};/.test(worker) && /The terminal: \$\$\{PRICE\.monthly\} a month/.test(worker));
+  t('there is no member-code route and no seat to mint one for', !/decide\/members/.test(worker) && !/seatCodes/.test(worker) && !/minSeats/.test(worker));
+  /* One plan (2026-09-22): admin grants access or denies it. No seats, no member codes, no second
+     price, and nothing in the operator's hands that offers a business terminal. */
+  t('admin grants access or denies, with one quote and no seat machinery', /function mailQuote/.test(read('admin.html')) && /Grant access<\/button>/.test(read('admin.html')) && !/Grant business/.test(read('admin.html')) && !/issueMembers|seatStatus|seatCodes|Issue member codes/.test(read('admin.html')) && /const PRICE=\{monthly:760,yearly:8360\};/.test(read('admin.html')));
   t('site: once you have entered, the primary is Resume session, otherwise Request a demo', /\{entered\s*\? <Button asChild variant="primary"[^>]*><a href="\/terminal\/">Resume session<\/a>/.test(src) && /pf_seen=1/.test(src) && /quantfolio_v1/.test(src) && !/hasProfile/.test(src));
   t('the door sets the readable pf_seen cookie for a year beside the HttpOnly session', /pf_seen=1; Path=\/; Max-Age=31536000; Secure; SameSite=Lax/.test(read('functions/api/enter.js')) && /h\.append\('Set-Cookie', cookie\)/.test(read('functions/api/enter.js')));
   t('site: skeleton before the demo deals; shimmer stops under reduced motion', /<Skeleton/.test(read('site/src/components/Demo.tsx')) && /prefers-reduced-motion: reduce\) \{ html \{ scroll-behavior: auto; \} \*, \*::before, \*::after \{ animation: none !important/.test(read('site/src/index.css')));
@@ -1283,22 +1289,25 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: dist and node_modules are ignored', /site\/dist\//.test(read('.gitignore')) && /node_modules\//.test(read('.gitignore')));
 }
 
-/* ==================== M4: BUSINESS MODE, NOTIFICATION, ONBOARDING ==================== */
-G('A firm is one grant, one code per seat, one rulebook');
+/* ==================== M4: THE GRANT, NOTIFICATION, ONBOARDING ==================== */
+/* One terminal (2026-09-27). The firm machinery — seats, member codes, the published rulebook, the
+   org routes, the reviewer role and the client books — is gone from the worker, the terminal and
+   admin. What is left is one grant, one code, and up to two devices under it. */
+G('One grant, one code, two devices');
 {
   t('the worker can notify the operator through Cloudflare Email Routing without a third party', /await import\('cloudflare:email'\)/.test(worker) && /env\.NOTIFY\.send\(new EmailMessage/.test(worker) && /\[\[send_email\]\]/.test(read('worker.wrangler.toml')));
   t('a request answers with the notification state so a test shows where mail stands', /notified: notified\.attempted \? \(notified\.ok \? 'sent' : 'failed: '/.test(worker));
   t('the per-IP daily limit is ten, not three', /if \(seen >= 10\)/.test(worker));
-  t('org routes: any seat reads its firm; only the admin seat publishes; the operator pauses one seat', /url\.pathname === '\/org' && request\.method === 'GET'/.test(worker) && /c\.seat !== 1\) return json\(\{ error: 'Only the firm/.test(worker) && /url\.pathname === '\/pause\/code'/.test(worker));
-  t('audit fix: admin is seat 1 by stamp, members carry a seat, a missing seat never passes', /\.\.\.\(decision === 'business' \? \{ seat: 1 \} : \{\}\)/.test(worker) && /memberOf: rec\.email, seat: seatNo/.test(worker));
-  t('audit fix: public lookups by code are rate-limited', /tooMany\(env, request, '\/status', 30\)/.test(worker) && /tooMany\(env, request, '\/org', 30\)/.test(worker));
+  t('the org routes are gone, and the operator can still pause one code', !/'\/org/.test(worker) && /url\.pathname === '\/pause\/code'/.test(worker));
+  t('a decision is one of three, and none of them is a firm', /\['personal', 'employee', 'denied'\]/.test(worker) && !/'business'/.test(worker));
+  t('audit fix: public lookups by code are rate-limited', /tooMany\(env, request, '\/status', 30\)/.test(worker));
   t('audit fix: no allow-origin header when no origin is configured', /\.\.\.\(allowed \? \{ 'Access-Control-Allow-Origin': allowed \} : \{\}\)/.test(worker) && !/'Access-Control-Allow-Origin': allowed \|\| 'null'/.test(worker));
-  t('the terminal applies the firm rulebook and locks the inputs for members', /D\.rules\.qBuy=rb\.qBuy/.test(term) && /el\.disabled=lock/.test(term) && /Publish to all/.test(term));
-  t('every call is stamped with the seat and the name', /c\.by=\{seat:ORG\.seat,name:/.test(term));
+  t('the terminal has no firm rulebook to apply and no seat to lock inputs for', !/D\.rules\.qBuy=rb\.qBuy/.test(term) && !/Publish to all/.test(term) && !/PF_ORG/.test(term));
+  t('the four bars are the account\'s own, versioned by their digest', /return 'p:'\+fnv1a\(canonicalJson\(\{qBuy:/.test(term));
   t('first-run data key card: shown without a key, saves to the profile, removed once set', /pfKeyCard/.test(term) && /D\.apiKey=v; if\(typeof saveDB==='function'\) saveDB\(\); card\.remove\(\)/.test(term));
-  t('admin can pause or resume a single seat', /async function pauseSeat/.test(read('admin.html')) && /\/pause\/code/.test(read('admin.html')));
+  t('admin can pause or resume a single code', /async function pauseSeat/.test(read('admin.html')) && /\/pause\/code/.test(read('admin.html')));
   t('the worker deploys from its own config with the KV binding and kept vars', /keep_vars = true/.test(read('worker.wrangler.toml')) && /binding = "PF_SYNC"/.test(read('worker.wrangler.toml')));
-  t('the firm flow is contract-tested end to end', /pausing seat 3 pauses only seat 3/.test(read('test/billing.mjs')) && /the admin seat publishes it/.test(read('test/billing.mjs')));
+  t('the grant flow is contract-tested end to end', /a granted request mints exactly one code/.test(read('test/billing.mjs')) && /the granted code redeems into a durable grant/.test(read('test/billing.mjs')));
 }
 
 /* ==================== M5: SECURITY CLOSE-OUT ==================== */
@@ -1307,7 +1316,7 @@ G('Closed with evidence, not assurance');
   t('passwords: PBKDF2-SHA256, per-profile salt, 150k iterations, constant-time compare, legacy migrated on sign-in',
     /const PW_ITER=150000/.test(term) && /name:'PBKDF2',hash:'SHA-256',salt,iterations:PW_ITER/.test(term) && /crypto\.getRandomValues\(new Uint8Array\(16\)\)/.test(term)
     && /d\|=want\.charCodeAt\(i\)\^stored\.charCodeAt\(i\)/.test(term) && /p\.pinHash=await pwHash\(pw\); persistDB\(\)/.test(term) && !/pinHash:pw\?await sha\(pw\)/.test(term));
-  t('worker: per-minute per-IP limits on invite, checkout, apply, portal and rulebook', /tooMany\(env, request, '\/invite', 30\)/.test(worker) && /'\/checkout': 10, '\/apply': 5, '\/portal': 10, '\/org\/rulebook': 20/.test(worker));
+  t('worker: per-minute per-IP limits on invite, checkout and portal', /tooMany\(env, request, '\/invite', 30\)/.test(worker) && /'\/checkout': 10, '\/portal': 10/.test(worker));
   t('worker: 16 KB body cap on billing and org writes', /const MAX_BODY = 16 \* 1024/.test(worker) && /bodyTooLarge\(request\)\) return json\(\{ error: 'Payload too large\.' \}, 413/.test(worker));
   t('worker: no console.log in production code', !/console\.log/.test(worker));
   t('admin: every request-derived value rendered through esc()', (() => { const s = read('admin.html'); const bad = []; for (const m of s.matchAll(/\+\s*((?:r|m)\.(?:email|who|call|note|firm|code|contact)[A-Za-z_.]*)\s*\+/g)) { if (!s.slice(Math.max(0, m.index - 12), m.index).includes('esc(')) bad.push(m[1]); } return bad.length === 0; })());
@@ -1394,7 +1403,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v134/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v135/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -1407,11 +1416,11 @@ G('Stripe does the money; the worker does the access');
   t('webhook events are idempotent by id', /'evt:' \+ ev\.id/.test(worker));
   t('a second completion for the same customer never mints a second code', /if \(await env\.PF_SYNC\.get\('sub:' \+ customerId\)\) return json\(\{ ok: true, duplicate: 'customer' \}/.test(worker));
   t('prices live in Stripe Price IDs from env; no amount is ever posted', /priceVar: 'STRIPE_PRICE_/.test(worker) && !/unit_amount/.test(worker));
-  t('business checkout requires an accepted, single-use application token', /apptok:/.test(worker) && /app\.status !== 'accepted'/.test(worker));
+  t('there is one plan to check out on, and no application to gate it', /'personal-monthly'/.test(worker) && /'personal-yearly'/.test(worker) && !/apptok:/.test(worker) && !/business-yearly/.test(worker));
   t('past_due grants a grace window and lapses on its own', /GRACE_DAYS = 7/.test(worker) && /graceUntil: Date\.now\(\) \+ GRACE_DAYS/.test(worker) && /reason: rec\.paused \? 'paused' : lapsed \? 'lapsed' : 'active'/.test(worker));
   t('no billing without both Stripe secrets (fails closed)', /function billingConfigured\(env\)[\s\S]{0,120}STRIPE_SECRET_KEY && env\.STRIPE_WEBHOOK_SECRET/.test(worker));
-  t('the application form has a honeypot', /if \(body\.website\) return json\(\{ ok: true \}/.test(worker));
-  t('test/billing.mjs exists and covers the webhook, grace and org flows', fs.existsSync('test/billing.mjs') && /customer\.subscription\.deleted/.test(read('test/billing.mjs')) && /graceUntil/.test(read('test/billing.mjs')) && /org:/.test(read('test/billing.mjs')));
+  t('the only public form left is /request, behind a per-IP daily cap', /if \(seen >= 10\)/.test(worker) && !/url\.pathname === '\/apply'/.test(worker));
+  t('test/billing.mjs exists and covers the webhook, the grace window and the grant', fs.existsSync('test/billing.mjs') && /customer\.subscription\.deleted/.test(read('test/billing.mjs')) && /graceUntil/.test(read('test/billing.mjs')) && /liveCode/.test(read('test/billing.mjs')));
 }
 
 /* ==================== THE GATE (Pages Functions) ==================== */
@@ -1439,8 +1448,19 @@ G('The terminal is not served without a session');
     /HttpOnly; Secure; SameSite=Strict/.test(sess) && !/SameSite=(Lax|None)/.test(sess));
   t('the cookie is signed with HMAC-SHA256 and verified before use',
     /name: 'HMAC', hash: 'SHA-256'/.test(sess) && /crypto\.subtle\.verify/.test(sess) && /Date\.now\(\) > p\.exp\) return null/.test(sess));
-  t('employee and operator sessions are permanent; personal and business are 30 days',
-    /personal: 30 \* DAY, business: 30 \* DAY, employee: 3650 \* DAY, operator: 3650 \* DAY/.test(sess));
+  t('employee and operator sessions are permanent; the terminal is 30 days and slides',
+    /personal: 30 \* DAY, employee: 3650 \* DAY, operator: 3650 \* DAY/.test(sess) && !/business/.test(sess));
+  /* One new sign-in a day a code (2026-09-27). Enforced in the worker so the rule lives in one
+     place; the door skips it entirely for a device that already holds a session for the code. */
+  t('the door asks the worker before a fresh sign-in, and never blocks a device already signed in',
+    /POST \/door/.test(enter) && /const sameDevice = !!\(held && held\.c === code\)/.test(enter) && /if \(!sameDevice\) \{\n      const hold = await door\(code\);/.test(enter));
+  t('an unreachable worker does not lock a paying account out of its own terminal',
+    /\} catch \{ return null; \}\n    if \(r\.status !== 429\) return null;/.test(enter));
+  t('the worker holds the stamp for two days and answers with the hours left',
+    /const DOOR_WAIT_MS = 86400000/.test(worker) && /'door:' \+ code/.test(worker) && /retryAfterHours: hours/.test(worker) && /expirationTtl: 2 \* 86400/.test(worker));
+  t('the operator can lift the hold, and only the operator', /url\.pathname === '\/door\/clear'/.test(worker) && /safeEqual\(tok, env\.SYNC_SECRET\)\) return json\(\{ error: 'Unauthorized\.' \}, 401, env\);[\s\S]{0,400}?door:/.test(worker) && /function clearHold/.test(read('admin.html')) && /Let them sign in now/.test(read('admin.html')));
+  t('the rule is contract-tested, including the day passing on its own', /door: a day later it goes through on its own/.test(read('test/billing.mjs')) && /door: the next one the same day waits/.test(read('test/billing.mjs')));
+  t('the door itself is driven end to end against a stubbed worker', fs.existsSync('test/door.mjs') && /a device that already holds a session is never asked and never held/.test(read('test/door.mjs')) && /an unreachable worker lets the account in rather than locking it out/.test(read('test/door.mjs')));
   t('the operator key is verified by the worker, never stored on Pages',
     /\/version', \{ headers: \{ 'Authorization': 'Bearer ' \+ body\.secret/.test(enter) && /j\.configured && typeof j\.configured === 'object'/.test(enter) && !/env\.SYNC_SECRET/.test(enter));
   t('post-sign-in redirects are same-origin only',
@@ -1478,7 +1498,7 @@ G('The terminal is not served without a session');
   t('no 404.html in the Pages output, so unknown paths reach the React router', !/'404\.html'\]\) copy\(f\)/.test(read('scripts/assemble.mjs')));
   t('the entry page is noindex and robots keeps its allow-all design',
     /<meta name="robots" content="noindex,nofollow">/.test(read('enter/index.html')) && /^Allow: \/$/m.test(read('robots.txt')) && !/^Disallow:/m.test(read('robots.txt')));
-  t('the worker accepts the employee tier', /\['personal', 'business', 'employee', 'denied'\]/.test(worker));
+  t('the worker accepts the employee tier', /\['personal', 'employee', 'denied'\]/.test(worker));
   t('.dev.vars is ignored and documented', /\.dev\.vars/.test(read('.gitignore')) && fs.existsSync('.dev.vars.example'));
 }
 
@@ -1800,7 +1820,7 @@ t('it is optional and does nothing without a key and a from address',
 t('the code is minted and stored before mail is attempted, and returned either way',
   worker.indexOf("code = makeCode()") < worker.indexOf('mail = await sendDecisionEmail(') &&
   /return json\(\{ seatCodes: rec\.seatCodes || null, ok: true, decision, code, mail \}/.test(worker));
-t('a firm grant mints one code per seat, together, and the email lists them', /rec\.seatCodes = \[code\]/.test(worker) && /seat: i \+ 1, firmContact: rec\.email/.test(worker) && /One code per member; give each person their own/.test(worker) && /Copy all codes/.test(read('admin.html')));
+t('nothing mints a seat code any more', !/Copy all codes|Issue member codes/.test(read('admin.html')));
 t('a send failure is recorded rather than thrown', /return \{ attempted: true, ok: false/.test(worker));
 t('the outcome is stored on the request', /rec\.mail = mail;/.test(worker));
 /* A code minted and never delivered looks identical to one that was. */
@@ -1974,12 +1994,11 @@ t('touch targets are enlarged for coarse pointers only', /@media \(pointer:coars
 t('the touch block is last, because media queries add no specificity',
   term.lastIndexOf('@media (pointer:coarse)') > term.lastIndexOf('@media (max-width:400px)'));
 /* Row actions behind the 3-dot menu, finishing the treatment. */
-t('Screener, History and Clients row actions are behind overflow menus',
-  /function screenerMenu/.test(term) && /function historyMenu/.test(term) && /function clientMenu/.test(term));
+t('Screener and History row actions are behind overflow menus',
+  /function screenerMenu/.test(term) && /function historyMenu/.test(term));
 t('their menus use the expression-string convention the others use',
   /run:'removeTransaction\('\+\(\+i\)\+'\)'/.test(term));
-t('destructive row actions are marked as such', /run:'removeClient\('\+q\+'\)'\}/.test(term) &&
-  /danger:true,run:'removeTransaction/.test(term));
+t('destructive row actions are marked as such', /danger:true,run:'removeTransaction/.test(term));
 /* Offline: the worker already handled it, nothing told the user. */
 /* Built in script rather than markup, so assert on the construction. */
 t('offline is announced', /function renderOfflineState/.test(term) &&
@@ -2416,9 +2435,11 @@ t('the file says why this is the only blocking dialogue',
 /* ==================== F1. CLIENT BOOKS DO NOT SYNC ==================== */
 G('The one item with third-party consequences');
 
-t('a managed or business profile is identified', /function syncBlockedReason/.test(term) &&
+/* Nothing in this build creates a book held for someone else; the gate stays for the profiles an
+   older build left on a device. */
+t('a book held for someone else is identified', /function syncBlockedReason/.test(term) &&
   /if\(p\.managedBy\)return 'client'/.test(term) &&
-  /if\(p\.accountType==='business'\)return 'business'/.test(term));
+  !/accountType==='business'/.test(term));
 /* Enforced in the transport, not by hiding a button: scheduleSync fires on a timer. */
 t('syncActive is false for those profiles', /function syncActive\(\)\{\s*\n\s*if\(syncBlockedReason\(\)\)return false/.test(term));
 t('the debounced timer is stopped too', /if\(syncBlockedReason\(\)\)return;\s*\/\/ F1/.test(term));
@@ -2536,7 +2557,7 @@ G('The record leaves the browser as a projection, and can be checked without tru
   t('changing a review mark breaks the chain at the review', !!res.broken && res.broken.kind === 'review');
   /* The terminal side. */
   t('the record\'s server copy is a projection: no thesis text, no holdings, no notes', /function recordProjection\(\)/.test(term) && !/thesis/.test(grab(term, 'recordProjection')) && !/holdings/.test(grab(term, 'recordProjection')));
-  t('the server copy is opt-in for a person and always on for a seat of a firm', /if\(p\.invite&&p\.inviteTier==='business'\)return true;\n  return !!D\.recordCopy;/.test(term));
+  t('the server copy is opt-in, and nothing turns it on over the account\'s head', /function recordCopyOn\(\)[\s\S]{0,240}?return !!D\.recordCopy;/.test(term) && !/inviteTier/.test(term));
   t('the copy is pushed after sealing, beside the chain head', /if\(n\)pushChainHead\(\); pushRecordCopy\(\);/.test(term));
   t('the evidence pack fetches the live server heads and says where they came from', /serverHeads:heads,serverHeadsSource:headsSource/.test(term) && /A chain proves no mark was altered since it was written/.test(term));
   t('the CSV has one row per call with each horizon\'s mark as columns, and holdings ride separately', /'mark'\+h\+'_hash'/.test(term) && /function exportHoldingsCsv/.test(term));

@@ -168,9 +168,11 @@ document.getElementById('steps').innerHTML =
     '<div class="step"><div class="step-n">' + s[0] + '</div>' +
     '<div><h3>' + s[1] + '</h3><p>' + s[2] + '</p></div></div>').join('');
 
+/* No mail button. The request has already arrived — FormSubmit delivered it and the worker kept a
+   copy — so offering to open a mail app here read as "that did not work, send it yourself". The
+   address is in the footer for anyone who wants it. */
 document.getElementById('cta').innerHTML =
-  v.cta.map(c => '<a class="btn' + (c[2] ? ' btn-p' : '') + '" href="' + c[1] + '">' + c[0] + '</a>').join('') +
-  '<a class="btn" href="mailto:' + CONTACT + '">Email the branch</a>';
+  v.cta.map(c => '<a class="btn' + (c[2] ? ' btn-p' : '') + '" href="' + c[1] + '">' + c[0] + '</a>').join('');
 
 document.getElementById('aside').innerHTML = v.aside;
 </script>

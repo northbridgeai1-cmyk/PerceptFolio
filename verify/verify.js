@@ -49,20 +49,6 @@ async function recompute(pack){
   }
   return{entries,rows,broken,head:prev,n:entries.length,contiguous:entries.every((e,i)=>e.seq===i)};
 }
-/* A7.1. Signatures: a seat signs each call over these fields with a P-256 key whose public half
-   the firm registered; the pack carries the keys. The message is built exactly as the terminal
-   builds it (PF_signedMessageOf). */
-function signedMessageOf(c){ return canonicalJson({id:c.id,sym:c.sym,verdict:c.verdict||null,ts:c.ts,price:c.price==null?null:+c.price,spy:c.spy==null?null:+c.spy,rbv:c.rbv||null,seat:c.by?c.by.seat:null}); }
-function b64uToBuf(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; const bin=atob(s); const out=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i); return out.buffer; }
-async function verifySignatures(pack){
-  const keys=Array.isArray(pack.keys)?pack.keys:[]; const signed=(pack.calls||[]).filter(c=>c.by&&c.by.sig&&c.by.key);
-  if(!signed.length)return{signed:0,ok:0,noKey:0};
-  const imported={};
-  for(const k of keys){ try{ imported[k.kid]=await crypto.subtle.importKey('jwk',{kty:'EC',crv:'P-256',x:k.jwk.x,y:k.jwk.y},{name:'ECDSA',namedCurve:'P-256'},false,['verify']); }catch(e){} }
-  let ok=0,noKey=0;
-  for(const c of signed){ const key=imported[c.by.key]; if(!key){ noKey++; continue; } try{ if(await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,b64uToBuf(c.by.sig),new TextEncoder().encode(signedMessageOf(c))))ok++; }catch(e){} }
-  return{signed:signed.length,ok,noKey};
-}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short=h=>h?h.slice(0,10)+'…'+h.slice(-6):'';
@@ -99,8 +85,6 @@ async function run(pack){
   const heads=Array.isArray(pack.serverHeads)?pack.serverHeads:[];
   const hc=renderHeads(heads,false);
   row(tb,['Server heads in the pack',{text:heads.length?(hc.ok===hc.n?'all '+hc.n+' match':hc.ok+' of '+hc.n+' match'):'none',cls:heads.length?(hc.ok===hc.n?'ok':'bad'):'wait'},heads.length?('source: '+esc(pack.serverHeadsSource||'?')+'; earliest '+esc(heads[0].day)+', latest '+esc(heads[heads.length-1].day)):'the pack was exported without the server log (offline, or not reachable); fetch it below']);
-  const sg=await verifySignatures(pack);
-  if(sg.signed)row(tb,['Seat signatures',{text:sg.ok===sg.signed?'all '+sg.signed+' verify':sg.ok+' of '+sg.signed+' verify',cls:sg.ok===sg.signed?'ok':'bad'},(sg.noKey?sg.noKey+' signed with a key the pack does not carry; ':'')+'each signature is checked over the call\'s id, ticker, verdict, time, price, index and rulebook version against the seat\'s registered public key']);
   if(pack.verifiedOnDevice)row(tb,['The device\'s own result','',(pack.verifiedOnDevice.ok?'ok, ':'broken, ')+pack.verifiedOnDevice.n+' entries'+(pack.verifiedOnDevice.head?', head '+short(pack.verifiedOnDevice.head):'')+' (reported by the exporting device; not relied on here)']);
   const all=fmt&&chainOk&&headOk&&(heads.length?hc.ok===hc.n:true);
   const v=$('verdict'); v.textContent=RES.n?(all?'The record verifies.':'The record does not verify.'):'Nothing sealed yet: the chain is empty, so there is nothing to verify.'; v.className=RES.n?(all?'ok':'bad'):'';

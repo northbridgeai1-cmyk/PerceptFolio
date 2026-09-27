@@ -72,7 +72,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .pill{font:9.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;font-weight:700;padding:4px 7px;border-radius:3px}
 .p-pend{background:rgba(217,164,65,.14);color:#e0bc72}
 .p-personal{background:rgba(46,160,67,.14);color:#5fc275}
-.p-business{background:rgba(139,92,246,.14);color:#a98bf3}
+.p-business{background:rgba(139,92,246,.14);color:#a98bf3}   /* only ever seen on a grant made before 2026-09-22 */
 .p-denied{background:rgba(229,83,75,.14);color:#ef8b85}
 .req{border:1px solid var(--line);border-radius:9px;background:var(--panel);margin-bottom:14px;overflow:hidden}
 .req-h{padding:13px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line)}
@@ -171,7 +171,7 @@ function copyBtn(text,label){
 
 <main><div class="wrap">
   <h1>Access queue</h1>
-  <p class="lede">Every application. Decide personal, business or denied. Approving mints a single-use code valid for thirty days, which you send to the applicant yourself.</p>
+  <p class="lede">Every request for access. Grant it or deny it. Granting mints a single-use code valid for thirty days, which you send to the applicant yourself.</p>
 
   <!-- connection -->
   <div class="card" id="connCard">
@@ -303,7 +303,11 @@ function render(){
   const q=$('queue');
   /* "Accepted" means granted, whether or not it is currently paused — a paused grant is still an
      accepted applicant, and hiding it in Denied would misfile the one case you most need to find. */
-  const isAccepted=r=>r.status==='personal'||r.status==='business';
+  /* One plan, so one accepted state. 'personal' is what grants recorded before 2026-09-22 and it
+     still counts as granted. */
+  /* One plan, so one accepted state. 'personal' and 'business' are what grants recorded before
+     2026-09-22; both still count as granted, and nothing new writes them. */
+  const isAccepted=r=>r.status==='granted'||r.status==='personal'||r.status==='business';
   const match=r=>filter==='all'?true
     :filter==='pending'?(r.status||'pending')==='pending'
     :filter==='accepted'?isAccepted(r)
@@ -347,8 +351,7 @@ function render(){
       '</div>'+
       '<div class="req-b">'+
         '<div class="who">'+esc(r.who)+'</div>'+
-        '<div style="margin-top:8px;font-size:12.5px" class="muted">Asked for <b style="color:var(--text)">'+(r.plan==='business'?'Business, '+esc(String(r.seats||'?'))+' seats':'Personal')+'</b>. '+
-          'Suggested quote: '+esc(quoteText(r.plan,r.seats))+'</div>'+
+        '<div style="margin-top:8px;font-size:12.5px" class="muted">Suggested quote: '+esc(quoteText())+'</div>'+
         /* The free-text line is what new requests carry. The structured table is kept for records
            submitted before the requirement was dropped, and is hidden when there are none rather
            than rendering an empty frame. */
@@ -375,30 +378,14 @@ function render(){
             '<label for="n-'+esc(r.id)+'">Note (optional, stored with the decision)</label>'+
             '<input id="n-'+esc(r.id)+'" placeholder="Why you decided this way">'+
             '<div class="row" style="margin-top:11px">'+
-              (r.plan==='business'?'<div class="muted" style="font-size:12px;margin-bottom:8px;width:100%">A firm, '+esc(String(r.seats||'?'))+' seats. Send the quote; when they confirm, Grant business mints '+esc(String(r.seats||'the'))+' codes at once and emails them all to '+esc(r.email)+', one per member.</div>':'')+
               '<button class="btn btn-sm" onclick="mailQuote(\''+esc(r.id)+'\')">Send quote</button>'+
-              '<button class="btn btn-g btn-sm" onclick="decide(\''+esc(r.id)+'\',\'personal\')">Grant personal</button>'+
-              '<button class="btn btn-v btn-sm" onclick="decide(\''+esc(r.id)+'\',\'business\')">Grant business</button>'+
+              '<button class="btn btn-g btn-sm" onclick="decide(\''+esc(r.id)+'\',\'personal\')">Grant access</button>'+
               '<button class="btn btn-r btn-sm" onclick="decide(\''+esc(r.id)+'\',\'denied\')">Deny</button>'+
               '<span class="spacer"></span>'+
               '<span class="dim" style="font-size:11.5px" id="s-'+esc(r.id)+'"></span>'+
             '</div>'+
           '</div>'
         : '<div class="decide">'+
-            (r.status==='business'
-              ? ((r.seatCodes&&r.seatCodes.length>1)
-                  ? '<div style="margin-bottom:14px"><b>'+r.seatCodes.length+' seat codes</b>, one per member, sent to '+esc(r.email)+' in the grant email. Each makes its own account.'+
-                    '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">'+r.seatCodes.map((c,i)=>'<span style="font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 8px"><span class="muted">'+(i+1)+(i===0?' admin':'')+'</span> '+esc(c)+' <button type="button" class="link-btn" style="margin-left:6px;font-size:11px" onclick="pauseSeat(\''+esc(c)+'\',true)">pause</button><button type="button" class="link-btn" style="font-size:11px" onclick="pauseSeat(\''+esc(c)+'\',false)">resume</button></span>').join('')+'</div>'+
-                    '<button class="btn btn-sm" style="margin-top:8px" onclick="copyText(\''+esc(r.seatCodes.join(', '))+'\')">Copy all codes</button> <button class="btn btn-sm" style="margin-top:8px" onclick="seatStatus(\''+esc(r.id)+'\')">Seats</button><div id="seats-'+esc(r.id)+'" style="margin-top:8px"></div></div>'
-                  : '')+
-                '<div style="margin-bottom:12px"><b>Or email each member directly.</b> <span class="muted">Paste their emails and each gets their own code and their own email.</span>'+
-                '<textarea id="mem-'+esc(r.id)+'" rows="3" style="width:100%;margin-top:8px;font:inherit;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px" placeholder="analyst1@firm.com, analyst2@firm.com"></textarea>'+
-                '<div class="row" style="margin-top:8px;gap:8px;align-items:center"><button class="btn btn-v btn-sm" onclick="issueMembers(\''+esc(r.id)+'\')">Issue member codes</button><span class="muted" id="ms-'+esc(r.id)+'" style="font-size:12px"></span></div>'+
-                ((r.members&&r.members.length)
-                  ? '<table style="margin-top:10px;width:100%;font-size:12.5px;border-collapse:collapse">'+r.members.map(m=>'<tr><td style="padding:4px 0;border-top:1px solid var(--line)">'+esc(m.email)+'</td><td style="padding:4px 8px;border-top:1px solid var(--line);font-family:var(--mono)"><b>'+esc(m.code)+'</b></td><td class="'+(m.mail&&m.mail.ok?'ok':'muted')+'" style="padding:4px 0;border-top:1px solid var(--line)">'+(m.mail?(m.mail.ok?'emailed':'email failed, send by hand'):'not emailed')+'</td></tr>').join('')+'</table>'
-                  : '')+
-                '</div>'
-              : '')+
             (r.paused
               ? '<div class="paused-note"><b>Access paused.</b> '+
                 (r.code
@@ -412,6 +399,11 @@ function render(){
               (isAccepted(r)
                 ? '<button class="btn '+(r.paused?'btn-g':'btn-r')+' btn-sm" onclick="setPaused(\''+esc(r.id)+'\','+(r.paused?'false':'true')+')">'+
                   (r.paused?'Resume access':'Pause access')+'</button>'
+                : '')+
+              /* One new sign-in a day a code. Someone who cleared their site data, or moved to a new
+                 device, hits the hold through no fault of their own; this lifts it now. */
+              (isAccepted(r)&&r.code
+                ? '<button class="btn btn-sm" onclick="clearHold(\''+esc(r.code)+'\',\''+esc(r.id)+'\')" title="Let them sign in again now, without waiting out the day">Let them sign in now</button>'
                 : '')+
               '<button class="btn btn-r btn-sm" onclick="wipe(\''+esc(r.id)+'\')">Remove record</button>'+
               '<span class="spacer"></span>'+
@@ -428,12 +420,11 @@ async function decide(id,decision){
   if(st)st.textContent='Saving…';
   try{
     const rq=requests.find(x=>x.id===id)||{};
-    const r=await fetch(base()+'/decide',{method:'POST',headers:hdrs(),body:JSON.stringify({id,decision,note,seats:decision==='business'?(rq.seats||1):undefined})});
+    const r=await fetch(base()+'/decide',{method:'POST',headers:hdrs(),body:JSON.stringify({id,decision,note})});
     const j=await r.json();
     if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
     await load();
-    if(j.seatCodes&&j.seatCodes.length>1)show('connMsg','ok','Granted <b>business</b>: '+j.seatCodes.length+' seat codes minted and '+(j.mail&&j.mail.ok?'emailed':'ready to send')+'. They are listed on the request.');
-    else if(j.code)show('connMsg','ok','Granted <b>'+esc(decision)+'</b>. Code <b>'+esc(j.code)+'</b>. Single use, expires in 30 days. Opening the welcome email…');
+    if(j.code)show('connMsg','ok','Access granted. Code <b>'+esc(j.code)+'</b>. Single use, expires in 30 days. Opening the welcome email…');
     else show('connMsg','ok','Request denied and recorded. Opening the decline email…');
     /* Deciding and telling them are one action in practice, so the draft opens straight away rather
        than waiting to be remembered. The button stays for redrafting. */
@@ -477,16 +468,23 @@ async function wipe(id){
    The approval email leads with the code and states the single-use rule twice, in the line that
    carries the code and again on its own, because it is the one instruction that cannot be retried
    if it is missed. */
-/* The same numbers the worker's quoteFor uses. The operator's reply is the binding price; this
-   is the draft. Discount from BUSINESS_DISCOUNT.minSeats, stated in the email. */
-const PRICES={personal:{monthly:149,yearly:1490},business:{monthly:119,yearly:1190}};
-const BUSINESS_DISCOUNT={minSeats:8,pct:15};
-function quoteText(plan,seats){
-  if(plan!=='business')return 'Personal: $'+PRICES.personal.monthly+' a month, or $'+PRICES.personal.yearly.toLocaleString()+' a year (two months free).';
-  const n=Math.max(1,parseInt(seats,10)||1), disc=n>=BUSINESS_DISCOUNT.minSeats?BUSINESS_DISCOUNT.pct:0;
-  const m=Math.round(PRICES.business.monthly*(1-disc/100)), y=Math.round(PRICES.business.yearly*(1-disc/100));
-  return 'Business, '+n+' seats: $'+m+' per seat a month ($'+(m*n).toLocaleString()+' for the firm), or $'+y.toLocaleString()+' per seat a year ($'+(y*n).toLocaleString()+' for the firm).'+
-    (disc?' Because the firm has '+n+' members, each seat is '+disc+'% off the list price of $'+PRICES.business.monthly+' a month or $'+PRICES.business.yearly.toLocaleString()+' a year.':'');
+/* The same number the worker's quoteFor uses, and the site's PLAN. One plan; the operator's
+   reply is the binding price and this is the draft. */
+const PRICE={monthly:760,yearly:8360};
+function quoteText(){
+  return 'The terminal: $'+PRICE.monthly+' a month, or $'+PRICE.yearly.toLocaleString()+' a year (one month free).';
+}
+/* One new sign-in a day a code (2026-09-27). The worker holds the stamp in door:<code>; this
+   deletes it, so the next sign-in goes straight through. */
+async function clearHold(code,id){
+  const where=id?'s-'+id:'connMsg';
+  try{
+    const r=await fetch(base()+'/door/clear',{method:'POST',headers:hdrs(),body:JSON.stringify({code})});
+    const j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    const el=document.getElementById(where); if(el){ el.className='ok'; el.textContent='They can sign in now.'; }
+  }catch(e){
+    const el=document.getElementById(where); if(el){ el.className='bad'; el.textContent='Failed: '+e.message; }
+  }
 }
 async function pauseSeat(code,paused){
   try{ const r=await fetch(base()+'/pause/code',{method:'POST',headers:hdrs(),body:JSON.stringify({code,paused})}); const j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status)); show('connMsg','ok',(paused?'Paused':'Resumed')+' seat <b>'+esc(code)+'</b>. Takes effect at that seat\'s next check-in.'); }
@@ -495,35 +493,11 @@ async function pauseSeat(code,paused){
 function copyText(t){ try{ navigator.clipboard.writeText(t); show('connMsg','ok','Copied.'); }catch(e){ prompt('Copy:',t); } }
 function mailQuote(id){
   const r=requests.find(x=>x.id===id); if(!r)return;
-  const body='Thank you for asking about PerceptFolio.\n\n'+quoteText(r.plan,r.seats)+'\n\n'+
-    'If that works, reply to confirm and we will send your access code'+(r.plan==='business'?' and set up a code for each member; send us their email addresses':'')+'.\n\n'+
-    'Payment is by card through a secure link we send once you confirm. Fourteen-day refund on either plan.\n\n'+
+  const body='Thank you for asking about PerceptFolio.\n\n'+quoteText()+'\n\n'+
+    'If that works, reply to confirm and we will send your access code.\n\n'+
+    'Payment is by card through a secure link we send once you confirm. Fourteen-day refund.\n\n'+
     'PerceptFolio is research software, not investment advice, and it never places a trade.';
   location.href='mailto:'+encodeURIComponent(r.email)+'?subject='+encodeURIComponent('PerceptFolio: your quote')+'&body='+encodeURIComponent(body);
-}
-/* A7.5. One line per seat: devices and last sync, the last server-dated chain head, the record
-   copy's age, calls, registered keys. What a desk head asks on day two. */
-async function seatStatus(id){
-  const host=$('seats-'+id); if(!host)return; host.innerHTML='<span class="muted">Loading…</span>';
-  try{
-    const r=await fetch(base()+'/org/status?id='+encodeURIComponent(id),{headers:hdrs()}); const j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
-    const d=ts=>ts?new Date(ts).toISOString().slice(0,10):'never';
-    host.innerHTML='<table style="width:100%;font-size:12.5px;border-collapse:collapse"><thead><tr><th>Seat</th><th>Email</th><th>Role</th><th>Devices</th><th>Last sync</th><th>Last head</th><th>Record copy</th><th>Calls</th><th>Keys</th><th></th></tr></thead><tbody>'+
-      j.seats.map(sx=>'<tr><td style="border-top:1px solid var(--line);padding:4px 6px">'+sx.seat+(sx.paused?' <span class="muted">paused</span>':'')+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+esc(sx.email||'')+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+esc(sx.role)+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+sx.devices+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+d(sx.lastSync)+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+(sx.lastHead?esc(sx.lastHead.day)+' · '+sx.lastHead.n:'none')+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+d(sx.recordAt)+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+sx.calls+'</td><td style="border-top:1px solid var(--line);padding:4px 6px">'+sx.keys+'</td><td style="border-top:1px solid var(--line);padding:4px 6px"><button type="button" class="link-btn" style="font-size:11px" onclick="pauseSeat(\''+esc(sx.code)+'\','+(sx.paused?'false':'true')+')">'+(sx.paused?'resume':'pause')+'</button></td></tr>').join('')+
-      '</tbody></table><div class="muted" style="font-size:11.5px;margin-top:4px">Rulebook '+esc(j.rulebookVersion||'not published')+'. Rotating a seat is pause, then a new member code for the same email.</div>';
-  }catch(e){ host.innerHTML='<span class="muted">'+esc(e.message||String(e))+'</span>'; }
-}
-async function issueMembers(id){
-  const ta=$('mem-'+id), st=$('ms-'+id); if(!ta)return;
-  const emails=ta.value.split(/[\s,;]+/).map(e=>e.trim()).filter(Boolean);
-  if(!emails.length){ if(st)st.textContent='Paste at least one email.'; return; }
-  if(st)st.textContent='Issuing '+emails.length+'…';
-  try{
-    const r=await fetch(base()+'/decide/members',{method:'POST',headers:hdrs(),body:JSON.stringify({id,emails})});
-    const j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
-    await load();
-    show('connMsg','ok','Issued '+j.members.length+' member code'+(j.members.length===1?'':'s')+'. '+j.members.filter(m=>m.mail==='sent').length+' emailed.');
-  }catch(e){ if(st)st.textContent=''; show('connMsg','err','Failed: '+esc(e.message)); }
 }
 function mailReply(id){
   const r=requests.find(x=>x.id===id);
@@ -533,8 +507,6 @@ function mailReply(id){
      that has already been sent. */
   const origin='https://perceptfolio.com';
   const denied=r.status==='denied';
-  const tier=r.status==='business'?'Business, you can manage client portfolios as well as your own'
-                                  :'Personal. Your own portfolio';
 
   const subject=denied
     ? 'Your PerceptFolio application'
@@ -550,10 +522,6 @@ function mailReply(id){
     : 'Congratulations. Your access to PerceptFolio has been approved.\n\n'+
       'YOUR INVITE CODE:  '+(r.code||'(missing. Reissue from the admin queue)')+'\n'+
       'This code works ONCE, and expires 30 days from today.\n\n'+
-      ((r.seatCodes&&r.seatCodes.length>1)
-        ? 'Your firm has '+r.seatCodes.length+' seats. One code per member; give each person their own and keep the first for yourself:\n\n'+r.seatCodes.map((c,i)=>'    seat '+(i+1)+':  '+c).join('\n')+'\n\nEach code makes its own account with its own record and its own sync.\n\n'
-        : '')+
-      'Account type: '+tier+'\n'+
       'Sign in here: '+origin+'/terminal/\n\n'+
       'To get started, choose Create account and enter your email, a password, and the code above. '+
       'Because it is single use, it stops working the moment your account exists, so create the '+

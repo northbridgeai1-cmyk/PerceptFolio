@@ -10,13 +10,14 @@
    script cannot read it, Secure so it never travels in clear, SameSite=Strict so no other site can
    ride it, Path=/ so /api/enter and /terminal/ share it.
 
-   Tiers and lifetimes. personal and business sessions live 30 days and slide on use. employee and
-   operator sessions are permanent: sign in once on a device and it stays yours until the operator
-   pauses the grant. "Permanent" is ten years; a cookie needs some expiry to be stored at all. */
+   Tiers and lifetimes. A personal session — the terminal, the only thing sold — lives 30 days and
+   slides on use. employee and operator sessions are permanent: sign in once on a device and it
+   stays yours until the operator pauses the grant. "Permanent" is ten years; a cookie needs some
+   expiry to be stored at all. */
 
 export const COOKIE = 'pf_session';
 const DAY = 86400000;
-export const LIFETIME = { personal: 30 * DAY, business: 30 * DAY, employee: 3650 * DAY, operator: 3650 * DAY };
+export const LIFETIME = { personal: 30 * DAY, employee: 3650 * DAY, operator: 3650 * DAY };
 
 const enc = new TextEncoder();
 const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

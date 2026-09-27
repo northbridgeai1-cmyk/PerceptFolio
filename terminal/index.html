@@ -1203,11 +1203,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     </div>
   </div>
 </header>
-<div id="bizBanner" class="row" style="display:none;background:var(--panel2);border-bottom:1px solid var(--border);padding:8px 24px;font-size:13px;color:var(--muted)">
-  <span>Working on <b id="bizBannerClient" style="color:var(--text)"></b>&#39;s account</span>
-  <div class="spacer"></div>
-  <button class="btn btn-ghost btn-sm" onclick="returnToBusinessAccount()">Return to my account</button>
-</div>
 
 <!-- SIDEBAR. Thirteen destinations across a top bar squeezed every label; down the side there is
      room for all of them, and collapsed to icons it costs 56px. -->
@@ -1231,7 +1226,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <button data-tab="risk" id="navRisk" onclick="showTab('risk')" data-tip="Risk"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"/></svg></span><span class="lbl">Risk</span></button>
     <button data-tab="projections" id="navProjections" onclick="showTab('projections')" data-tip="Projections"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"/></svg></span><span class="lbl">Projections</span></button>
     <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')" data-tip="Alerts"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-alerts"/></svg></span><span class="lbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
-    <button data-tab="clients" id="navClients" onclick="showTab('clients')" style="display:none" data-tip="Clients"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-clients"/></svg></span><span class="lbl">Clients</span></button>
   </nav>
   <div class="side-foot"><span class="lbl">Press <b>[</b> to collapse</span></div>
 </aside>
@@ -1283,27 +1277,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div class="greeting" id="greetingText">Welcome</div>
     <div class="greeting-sub" id="greetingSub">Here's where things stand today.</div>
   </div>
-  <!-- Business account's own dashboard: earnings summary + client list, no personal-investing entry points -->
-  <div id="bizDashboardBody" style="display:none">
-    <div class="hero">
-      <div class="hero-label">Est. earnings across all clients</div>
-      <span class="hero-value" id="bizTotalEarnings">$0</span>
-      <div class="hero-change flat" id="bizEarningsSub">From client accounts with a fee % set</div>
-    </div>
-    <div class="stat-row">
-      <div class="stat s-count"><span class="stat-label"># Clients</span><span class="stat-value" id="bizClientCount">0</span></div>
-      <div class="stat s-in"><span class="stat-label">Combined client AUM</span><span class="stat-value" id="bizTotalAUM">$0</span></div>
-    </div>
-    <div class="section-title">Your clients</div>
-    <div class="card" style="overflow-x:auto">
-      <table>
-        <thead><tr><th>Client</th><th>Login email</th><th>Portfolio value</th><th>Unrealized gain</th><th>Your fee</th><th>Est. fee owed</th><th></th></tr></thead>
-        <tbody id="bizDashClientsBody"></tbody>
-      </table>
-      <div id="bizDashClientsEmpty" class="empty">No clients yet. Head to the <b>Clients</b> tab to create one.</div>
-    </div>
-  </div>
-  <!-- Personal dashboard: hidden entirely for a business account's own view -->
+  <!-- The dashboard. -->
   <div id="personalDashboardBody">
     <!-- Start here. Three steps, each one a button that goes to the exact place, each ticked when it
          is done. Stays on the Dashboard until the first review has run; after that the morning
@@ -2176,29 +2150,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
 </div>
 
-<!-- CLIENTS (business accounts only) -->
-<div id="tab-clients" class="tabs-hidden">
-  <div class="card">
-    <h3>Create client</h3>
-    <details class="aside"><summary>What a client account is, and is not</summary><div>This isn't a real brokerage account for your client. Their actual money stays wherever it's actually held (their own broker/custodian). This just gives you, the quant, a separate, walled-off place to track and score that client's holdings by hand, same as any other portfolio in this app. Most people never give the client login access at all. It's for your own recordkeeping. The email below is just an internal ID (it doesn't need to be real, and doesn't need to reach them) unless you specifically want them to log in themselves; if you do, set a password and hand them both. Either way, you can also work in their portfolio anytime via Switch, and export a snapshot for them via Settings → Export if you ever want to hand off a copy.</div></details>
-    <div class="row">
-      <input id="clientName" placeholder="Client name (e.g. Jane Smith)" style="max-width:200px">
-      <input id="clientEmail" placeholder="ID (email format. Doesn't need to be real)" style="max-width:260px">
-      <input id="clientPassword" type="password" placeholder="Password (only if they'll log in)" style="max-width:220px">
-      <input id="clientFeePct" type="number" min="0" max="100" step="0.1" placeholder="Fee % of gains (optional)" style="max-width:190px">
-      <button class="btn" onclick="createClientProfile()">Create client</button>
-    </div>
-  </div>
-  <div class="section-title">Your clients</div>
-  <div class="card" style="overflow-x:auto">
-    <table>
-      <thead><tr><th>Client</th><th>Login email</th><th>Portfolio value</th><th>Unrealized gain</th><th>Your fee</th><th>Est. fee owed</th><th></th></tr></thead>
-      <tbody id="clientsBody"></tbody>
-    </table>
-    <div id="clientsEmpty" class="empty">No clients yet. Create one above. Their portfolio is completely separate from yours.</div>
-  </div>
-  <details class="aside"><summary>This fee % is just a private note, not a billing system</summary><div>PerceptFolio has no payment processing and never moves money, "Est. fee owed" is a rough math estimate (fee % × unrealized gain, zero on losses), not an invoice. More importantly: taking a cut of a client's investment gains is a <b>performance-based fee</b>, and under SEC Rule 205-3 of the Investment Advisers Act, advisers generally can't charge performance fees except to "qualified clients" who clear specific net-worth/asset thresholds, and that's on top of needing to be a properly registered or exempt adviser in the first place just to manage someone else's investments for pay at all. Recording a number here doesn't make an arrangement compliant. Talk to a securities attorney before you charge anyone a percentage of their gains.</div></details>
-</div>
 
 <!-- SETTINGS -->
 <div id="tab-settings" class="tabs-hidden">
@@ -2331,7 +2282,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <p class="muted" style="font-size:12.5px;margin-top:6px;line-height:1.55">Stored on the worker under your code, readable by anyone holding it.</p>
       <button class="btn btn-sm" style="margin-top:8px" onclick="enableCodeSync()">Turn on code sync</button>
     </div>
-    <!-- F1. A managed or business profile is told why sync is off, up front. A panel that simply
+    <!-- F1. A book held for someone else is told why sync is off, up front. A panel that simply
          does nothing when pressed reads as broken, and someone would go looking for the bug rather
          than understand the refusal. -->
     <div id="syncBlockedNotice" style="display:none;margin-top:12px;border:1px solid var(--border);border-left:3px solid var(--red,#e5534b);border-radius:8px;padding:12px 14px">
@@ -2943,7 +2894,7 @@ async function pwVerify(pw,stored){
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
   return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
 
-/* Stable per-account ID. Every profile — personal, business, or client — gets its own, so two people
+/* Stable per-account ID. Every profile on the device gets its own, so two people
    named Pierce with different emails are unambiguously different accounts with different portfolios. */
 function makeUserId(){
   return 'PF-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,7).toUpperCase();
@@ -2992,14 +2943,10 @@ async function createProfile(){
     return toast('Could not reach the worker to check that code ('+e.message+').');
   }
 
-  /* THE GRANT DECIDES THE TIER, NOT THE DROPDOWN.
-     The worker returns the tier the operator chose when approving. Taking accountType from the form
-     instead meant anyone granted "personal" could select "business" on this screen and unlock the
-     Clients tab — a decision the operator had explicitly made the other way. The dropdown is now a
-     fallback for the case where a grant carries no tier at all. */
-  const grantedTier=(inv.tier==='business'||inv.tier==='personal')?inv.tier:'personal';
-  DB.profiles[email]={pinHash:pw?await pwHash(pw):'',data:defaultData(),accountType:grantedTier,userId:makeUserId(),
-                      invite:code,inviteTier:inv.tier||null,
+  /* One terminal, so there is one kind of account. The tier the grant carries is recorded as it
+     came, for the record; nothing on this screen can change what the operator decided. */
+  DB.profiles[email]={pinHash:pw?await pwHash(pw):'',data:defaultData(),accountType:'personal',userId:makeUserId(),
+                      invite:code,
                       /* Recorded on the profile: which documents were accepted and when. An
                          acceptance nobody can evidence later is not much of an acceptance. */
                       acceptedTerms:{at:Date.now(),terms:'2026-09-05',privacy:'2026-09-05'}};
@@ -3317,22 +3264,10 @@ async function finishLogin(email){
   }
   if(hasMarketData()&&D.rules.autoRefresh==='yes')refreshAll();
 }
-/* ---- Business accounts: switch into a client's portfolio without a server, then switch back ----
-   bizContext holds the business account's own email while USER/D are temporarily swapped to a client's.
-   This deliberately does NOT touch sessionStorage, so refreshing the page always lands back on your own
-   account, never stranded inside a client's — the swap only ever lives in memory for this tab. */
-let bizContext=null;
-/* A business account's OWN login doesn't hold personal investments — this gates the actual
-   add/trade functions, not just nav visibility, so switching to the Analyzer tab (still visible)
-   can't be used to sneak a holding onto the business account. */
-function isBizOwnView(){
-  const p=DB.profiles[USER];
-  return !!(p&&p.accountType==='business'&&!bizContext);
-}
 /* Screener/Risk/Monte Carlo results (and their Chart.js instances) live in module-level globals
-   outside of D, so a plain in-memory account switch (switchAccount/switchToClient/
-   returnToBusinessAccount — none of which reload the page) would otherwise leave a previous
-   account's computed results visible until the new account re-runs them. This clears/destroys
+   outside of D, so a plain in-memory account switch (switchAccount, which does not reload the
+   page) would otherwise leave a previous account's computed results visible until the new
+   account re-runs them. This clears/destroys
    all of that. _spyReturnCache/_spyReturnFetchedAt are deliberately left alone — that's shared
    market data, not user-specific. */
 function resetTransientState(){
@@ -3412,7 +3347,6 @@ function resetTransientState(){
   if(typeof closePalette==='function')closePalette();
 
   sellingIndex=null;
-  openClientReport=null;
   /* If an in-flight refreshAll()/refreshPrices() call was still awaiting Finnhub when the account was
      switched, this flag could otherwise stay stuck true forever (the old promise chain has no way to
      know it should stop), silently blocking every future refresh on the new account until a full page
@@ -3541,10 +3475,7 @@ function enterSession(){
   // and the two would recurse into each other.
   renderSyncSettings();
   updateAccountTypeUI();
-  updateBizBanner();
   renderAll();
-  const p=DB.profiles[USER];
-  if(p&&p.accountType==='business'&&!bizContext)showTab('dashboard');
   maybeStartTour();
 }
 /* ================= FIRST-RUN WALKTHROUGH =================
@@ -3563,7 +3494,6 @@ function accountLooksNew(){
 function maybeStartTour(){
   if(!D||D.tourSeen)return;
   if(!accountLooksNew()){ D.tourSeen=true; saveDB(); return; }   // quietly mark, don't nag
-  if(isBizOwnView())return;                                      // business own-view has 2 tabs, not 11
   setTimeout(()=>startTour(),450);                               // let the first render settle
 }
 
@@ -3628,33 +3558,11 @@ function endTour(complete){
 /* Re-runnable from Settings. Someone who skipped it on day one should not have to delete their
    profile to see it again. */
 function replayTour(){ startTour(); }
+/* One terminal, so every tab belongs to whoever is signed in. This only makes sure something is
+   open: a session that lands with no active tab gets the Dashboard.
+   Settings has no nav button at all; it is reachable from the avatar menu. */
 function updateAccountTypeUI(){
-  const p=DB.profiles[USER];
-  const isBiz=!!(p&&p.accountType==='business');
-  const navBtn=document.getElementById('navClients');
-  if(navBtn)navBtn.style.display=isBiz?'':'none';
-  // A business account's OWN login is not meant to hold personal investments, it manages
-  // clients' portfolios instead. Hide the personal-investing tabs on the business owner's own
-  // view; they reappear normally once switched into a client (bizContext set), since that's the
-  // client's own money being tracked, not the business's.
-  // A business account's own view is Dashboard + Clients ONLY. Everything else is hidden, because
-  // the business account doesn't hold investments of its own; it exists to manage client books.
-  // Switching into a client (bizContext set) restores the full nav, since that's the client's money.
-  const hideOwnInvesting=isBiz&&!bizContext;
-  ['navPortfolio','navWatchlist','navAlerts','navHistory','navScreener','navAnalyzer','navRisk','navProjections','navMarket','navNews','navMap','navCommand'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el)el.style.display=hideOwnInvesting?'none':'';
-  });
-  // Settings has no nav button at all any more. It's reachable only from the avatar menu.
-  // If the business owner was sitting on a now-hidden tab when they switched back, bounce them home.
-  if(hideOwnInvesting){
-    const active=document.querySelector('nav button.active');
-    const activeTab=active?active.getAttribute('data-tab'):null;
-    if(activeTab&&activeTab!=='dashboard'&&activeTab!=='clients')showTab('dashboard');
-  }else{
-    const active=document.querySelector('nav button.active');
-    if(!active)showTab('dashboard');
-  }
+  if(!document.querySelector('nav button.active'))showTab('dashboard');
 }
 function hideAccountMenu(){
   const m=document.getElementById('accountMenu');
@@ -3677,130 +3585,7 @@ function finishEditName(){
   inp.style.display='none';disp.style.display='block';
   updateGreeting();
 }
-function updateBizBanner(){
-  const b=document.getElementById('bizBanner');
-  if(!b)return;
-  if(bizContext){
-    b.style.display='flex';
-    const p=DB.profiles[USER];
-    document.getElementById('bizBannerClient').textContent=(p&&p.clientLabel)||USER;
-  }else{
-    b.style.display='none';
-  }
-}
-async function createClientProfile(){
-  const name=document.getElementById('clientName').value.trim();
-  const email=document.getElementById('clientEmail').value.trim().toLowerCase();
-  const pw=document.getElementById('clientPassword').value;
-  const feeRaw=document.getElementById('clientFeePct').value;
-  const feePct=feeRaw===''?0:Math.max(0,parseFloat(feeRaw)||0);
-  if(!name)return toast('Enter a client name.');
-  if(!email||!email.includes('@'))return toast('Enter a valid email for this client to log in with.');
-  if(DB.profiles[email])return toast('An account with that email already exists.');
-  DB.profiles[email]={pinHash:pw?await pwHash(pw):'',data:defaultData(),accountType:'personal',managedBy:USER,clientLabel:name,feePct,userId:makeUserId()};
-  persistDB();
-  document.getElementById('clientName').value='';
-  document.getElementById('clientEmail').value='';
-  document.getElementById('clientPassword').value='';
-  document.getElementById('clientFeePct').value='';
-  toast('Client "'+name+'" created. Click Switch to start tracking their portfolio. Only hand over the login if you actually want them to see it themselves.');
-  populateCopyTargets();
-  renderClientsList();
-}
-function setClientFee(email,val){
-  const p=DB.profiles[email];
-  if(!p)return;
-  const n=parseFloat(val);
-  p.feePct=isFinite(n)&&n>=0?n:0;
-  persistDB();
-  renderClientsList();
-}
-function switchToClient(email){
-  if(!DB.profiles[email])return;
-  saveDB(); // persist current (business) D back into its own profile slot before swapping away
-  bizContext=USER;
-  USER=email;
-  D=Object.assign(defaultData(),DB.profiles[email].data||{});
-  enterSession();
-  showTab('dashboard');
-}
-function returnToBusinessAccount(){
-  if(!bizContext)return;
-  saveDB(); // persist the client's changes back into their own profile slot before swapping away
-  USER=bizContext;
-  D=Object.assign(defaultData(),(DB.profiles[USER]&&DB.profiles[USER].data)||{});
-  bizContext=null;
-  enterSession();
-  showTab('clients');
-}
-let openClientReport=null;
-function toggleClientReport(email){
-  openClientReport=(openClientReport===email)?null:email;
-  renderClientsList();
-}
-function clientReportRowHtml(email,p){
-  const cd=p.data||{};
-  const holdings=cd.holdings||[];
-  const val=holdings.reduce((s,h)=>s+((h.price??h.cost)*h.shares),0)+(cd.cash||0);
-  const gain=holdings.reduce((s,h)=>{const pr=h.price??h.cost;return s+(pr!=null&&h.cost!=null?(pr-h.cost)*h.shares:0);},0);
-  const costBasis=holdings.reduce((s,h)=>s+((h.cost||0)*h.shares),0);
-  const gainPct=costBasis>0?(gain/costBasis*100):null;
-  const feePct=p.feePct||0;
-  const estFee=feePct>0&&gain>0?gain*feePct/100:0;
-  const byType={};
-  holdings.forEach(h=>{const v=(h.price??h.cost)*h.shares;byType[h.type]=(byType[h.type]||0)+v;});
-  if(cd.cash)byType['Cash']=(byType['Cash']||0)+cd.cash;
-  const allocRows=Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([t,v])=>
-    '<div class="row" style="justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+esc(t)+'</span><span>'+fmt$(v)+' ('+(val>0?(v/val*100).toFixed(1):'0')+'%)</span></div>'
-  ).join('')||'<div class="muted" style="font-size:13px">No holdings yet.</div>';
-  const topHoldings=[...holdings].sort((a,b)=>((b.price??b.cost)*b.shares)-((a.price??a.cost)*a.shares)).slice(0,5).map(h=>{
-    const v=(h.price??h.cost)*h.shares;
-    const g=(h.price!=null&&h.cost!=null)?(h.price-h.cost)*h.shares:null;
-    return '<div class="row" style="justify-content:space-between;font-size:13px;margin-bottom:4px"><span><b>'+esc(h.sym)+'</b> <span class="muted">'+esc(h.type)+(h.broker?' · '+esc(h.broker):'')+'</span></span><span>'+fmt$(v)+(g!=null?' <span class="'+(g>=0?'pos':'neg')+'">('+(g>=0?'+':'')+fmt$(g)+')</span>':'')+'</span></div>';
-  }).join('')||'<div class="muted" style="font-size:13px">No holdings yet.</div>';
-  return '<tr><td colspan="7"><div class="card" style="background:var(--panel2);margin:4px 0">'+
-    '<div class="row" style="justify-content:space-between;margin-bottom:10px;flex-wrap:wrap"><h3 style="margin:0">'+esc(p.clientLabel||email)+'. Report</h3><span class="muted" style="font-size:12px">As of '+new Date().toLocaleDateString()+'</span></div>'+
-    '<div class="row" style="gap:24px;margin-bottom:14px;flex-wrap:wrap">'+
-      '<div><div class="muted" style="font-size:11px;text-transform:uppercase">Total value</div><div style="font-size:20px;font-weight:700">'+fmt$(val)+'</div></div>'+
-      '<div><div class="muted" style="font-size:11px;text-transform:uppercase">Unrealized gain</div><div style="font-size:20px;font-weight:700" class="'+(gain>=0?'pos':'neg')+'">'+fmt$(gain)+(gainPct!=null?' ('+(gainPct>=0?'+':'')+gainPct.toFixed(1)+'%)':'')+'</div></div>'+
-      '<div><div class="muted" style="font-size:11px;text-transform:uppercase">Your fee</div><div style="font-size:20px;font-weight:700">'+feePct+'% <span class="muted" style="font-size:13px;font-weight:400">('+fmt$(estFee)+' est.)</span></div></div>'+
-    '</div>'+
-    '<div style="margin-bottom:14px"><div class="section-title" style="margin-bottom:6px">Allocation</div>'+allocRows+'</div>'+
-    '<div><div class="section-title" style="margin-bottom:6px">Top holdings</div>'+topHoldings+'</div>'+
-    '<p class="muted" style="margin-top:12px;font-size:11px">This is a local snapshot built from data you entered by hand, not a live feed from any brokerage or custodian. Their real account and official statements live wherever their money is actually held; this is just your own tracking copy of it.</p>'+
-  '</div></td></tr>';
-}
-function renderClientsList(){
-  const tb=document.getElementById('clientsBody');
-  if(!tb)return;
-  const clients=Object.entries(DB.profiles).filter(([email,p])=>p.managedBy===USER);
-  const emptyEl=document.getElementById('clientsEmpty');
-  if(emptyEl)emptyEl.style.display=clients.length?'none':'block';
-  tb.innerHTML=clients.map(([email,p])=>{
-    const cd=p.data||{};
-    const val=(cd.holdings||[]).reduce((s,h)=>s+((h.price??h.cost)*h.shares),0)+(cd.cash||0);
-    const gain=(cd.holdings||[]).reduce((s,h)=>{const pr=h.price??h.cost;return s+(pr!=null&&h.cost!=null?(pr-h.cost)*h.shares:0);},0);
-    const feePct=p.feePct||0;
-    const estFee=feePct>0&&gain>0?gain*feePct/100:0;
-    const row='<tr><td><b>'+esc(p.clientLabel||email)+'</b></td><td class="muted">'+esc(email)+'</td>'+
-      '<td>'+fmt$(val)+'</td>'+
-      '<td class="'+(gain>=0?'pos':'neg')+'">'+fmt$(gain)+'</td>'+
-      '<td><input type="number" min="0" max="100" step="0.1" value="'+feePct+'" style="width:64px" onchange="setClientFee(\''+esc(email)+'\',this.value)">%</td>'+
-      '<td>'+fmt$(estFee)+'</td>'+
-      '<td>'+ovfButton('clientMenu(this,\''+esc(email)+'\')','Actions for this client')+'</td></tr>';
-    return row+(openClientReport===email?clientReportRowHtml(email,p):'');
-  }).join('');
-}
-function removeClient(email){
-  const p=DB.profiles[email];
-  if(!p)return;
-  if(!confirm('Remove client "'+(p.clientLabel||email)+'" and ALL their portfolio data? This cannot be undone.'))return;
-  delete DB.profiles[email];
-  persistDB({deleting:true});
-  renderClientsList();
-  toast('Client removed.');
-}
-function logout(){saveDB();USER=null;D=null;bizContext=null;sessionStorage.removeItem('qf_user');try{ localStorage.removeItem('pf_user'); }catch(e){}location.reload();}
+function logout(){saveDB();USER=null;D=null;sessionStorage.removeItem('qf_user');try{ localStorage.removeItem('pf_user'); }catch(e){}location.reload();}
 /* Settings > Access code. Saved on the profile record (p.code) and, for this device, beside the
    door's own copy; the four model helpers read either. Checked against the worker so the status
    says whether the code is live rather than merely well-formed. */
@@ -3954,10 +3739,10 @@ function removeAvatarImage(){
   toast('Photo removed.');
 }
 /* Switch Account: save the current profile and go back to the login screen without a full page reload,
-   so you can log into a different account (personal, business, or a client's own login) right away. */
+   so you can log into a different account on this device right away. */
 function switchAccount(){
   saveDB();
-  USER=null;D=null;bizContext=null;
+  USER=null;D=null;
   const menu=document.getElementById('accountMenu');if(menu)menu.style.display='none';
   document.getElementById('app').style.display='none';
   /* Empty string, NOT 'block'. The sign-in screen is a CSS grid and its layout is controlled by the
@@ -3976,7 +3761,7 @@ function deleteProfile(){
   if(!persistDB({deleting:true}))return;      // the write was refused; the account still exists
   /* Session state is cleared here rather than left to logout(), which saves on the way out and
      would try to write a profile that no longer exists. */
-  USER=null; D=null; bizContext=null;
+  USER=null; D=null;
   try{ sessionStorage.removeItem('qf_user'); localStorage.removeItem('pf_user'); }catch(e){}
   location.reload();
 }
@@ -4712,7 +4497,6 @@ function updateBuyPreview(){
     +(short?' <span class="neg">- more than your '+fmt$(cash)+' cash</span>':'');
 }
 function addHolding(){
-  if(isBizOwnView())return toast('A business account doesn\'t hold its own investments in PerceptFolio. Switch into a client to add holdings for them.');
   const t=document.getElementById('hTicker').value.trim().toUpperCase();
   const type=document.getElementById('hType').value;
   const broker=document.getElementById('hBroker').value;
@@ -4762,7 +4546,6 @@ function addHolding(){
   if(wasEmpty&&!firstRunExportDone())showFirstRunExport();
 }
 function addToPortfolioFromAnalyzer(sym){
-  if(isBizOwnView())return toast('A business account doesn\'t hold its own investments in PerceptFolio. Switch into a client first.');
   showTab('portfolio');
   document.getElementById('hTicker').value=sym;
   document.getElementById('hType').value='Stock';
@@ -4775,7 +4558,6 @@ let sellingIndex=null;
 function toggleSellRow(i){sellingIndex=(sellingIndex===i)?null:i;renderAll();}
 function closeSellRow(){sellingIndex=null;renderAll();}
 function confirmSell(i){
-  if(isBizOwnView())return toast('A business account doesn\'t hold its own investments in PerceptFolio. Switch into a client to sell for them.');
   const h=D.holdings[i];
   if(!h)return;
   const sh=parseFloat(document.getElementById('sellShares_'+i).value);
@@ -4808,7 +4590,6 @@ function setHoldingPrice(i,val){
   recordHistorySnapshot();saveDB();renderAll();
 }
 function setCash(){
-  if(isBizOwnView())return toast('A business account doesn\'t hold its own cash balance in PerceptFolio. Switch into a client to set theirs.');
   const v=parseFloat(document.getElementById('cashInput').value);
   if(!isFinite(v)||v<0)return toast('Enter a valid cash amount.');
   D.cash=v;recordHistorySnapshot();saveDB();renderAll();toast('Cash updated.');
@@ -5614,14 +5395,6 @@ function screenerMenu(btn,sym,inWatch){
 function historyMenu(btn,i){
   openMenu(btn,[{label:'Delete this transaction',danger:true,run:'removeTransaction('+(+i)+')'}]);
 }
-function clientMenu(btn,email){
-  const q=JSON.stringify(String(email));
-  openMenu(btn,[
-    {label:(openClientReport===email?'Hide report':'Show report'),run:'toggleClientReport('+q+')'},
-    {label:'Switch into this client',run:'switchToClient('+q+')'},
-    {label:'Remove client and all data',danger:true,run:'removeClient('+q+')'}
-  ]);
-}
 function ovfButton(onclickExpr,title){
   return '<button class="ovf-btn" title="'+esc(title||'More')+'" aria-label="'+esc(title||'More')+'" onclick="event.stopPropagation();'+onclickExpr+'">'+
     '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">'+
@@ -5783,7 +5556,6 @@ function onListPick(sym,sel){
 }
 
 function addWatch(){
-  if(isBizOwnView())return toast('A business account doesn\'t hold its own watchlist in PerceptFolio. Switch into a client to add to theirs.');
   const t=document.getElementById('wTicker').value.trim().toUpperCase();
   if(!t)return;
   /* Adding from inside a list files it there. Watchlist is the default bucket, so adding while it
@@ -5973,7 +5745,6 @@ async function startScreener(givenList){
 }
 function stopScreener(){screenerCancelFlag=true;}
 function addWatchSym(sym){
-  if(isBizOwnView())return toast('A business account doesn\'t hold its own watchlist in PerceptFolio. Switch into a client to add to theirs.');
   if(D.watchlist.includes(sym))return toast(sym+' is already on your watchlist.');
   D.watchlist.push(sym);saveDB();renderAll();renderScreenerTable();toast(sym+' added to watchlist.');
 }
@@ -6171,23 +5942,18 @@ function bypassesHysteresis(sc,verdictKey,sym){
   return !!(th&&isFinite(th.sellBelow)&&th.sellBelow>0&&sc&&sc.qScore<th.sellBelow);
 }
 
-/* A7.2. The version of the bars a call was made under. A firm seat carries the published
-   rulebook's version from the worker (f:…, chained there); a personal account carries a short
-   digest of its own four bars (p:…), so a call can be read against the rules that stood when it
-   was made even after the rules move. Synchronous on purpose: recordCall is. */
+/* A7.2. The version of the bars a call was made under: a short digest of the account's own four
+   bars (p:…), so a call can be read against the rules that stood when it was made even after the
+   rules move. Synchronous on purpose: recordCall is. */
 function fnv1a(str){ let h=0x811c9dc5; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h.toString(16).padStart(8,'0'); }
 function rulebookVersion(){
   try{
-    const o=(typeof window!=='undefined')?window.PF_ORG:null;
-    if(o&&o.rulebook&&o.rulebookVersion)return o.rulebookVersion;
     const r=D.rules||{};
     return 'p:'+fnv1a(canonicalJson({qBuy:r.qBuy==null?null:+r.qBuy,pBuy:r.pBuy==null?null:+r.pBuy,qSell:r.qSell==null?null:+r.qSell,mBuy:r.mBuy==null?null:+r.mBuy}));
   }catch(e){ return null; }
 }
 function recordCall(sym,sc,verdictKey,verdictLabel,track){
   if(!D.calls)D.calls=[];
-  /* A7.3. A reviewer seat reads; it never makes a call. */
-  if(typeof window!=='undefined'&&window.PF_ORG&&window.PF_ORG.role==='reviewer')return;
   if(!D.pendingCalls)D.pendingCalls={};
   track=track||'checklist';
   /* THE CAP IS ENFORCED HERE, not in the UI. A retired strategy stops recording immediately, and a
@@ -9405,7 +9171,6 @@ function evaluateSignals(sym,sc,prev){
   if(v.key==='sell'&&prevV!=='sell')pushAlert('sell',sym,'Quality dropped to '+sc.qScore+'/'+sc.qTotal+'. Review whether to sell.');
 }
 function addPriceAlert(){
-  if(isBizOwnView())return toast('A business account doesn\'t hold its own price alerts in PerceptFolio. Switch into a client to set theirs.');
   const t=document.getElementById('paTicker').value.trim().toUpperCase();
   const dir=document.getElementById('paDir').value;
   const p=parseFloat(document.getElementById('paPrice').value);
@@ -10459,49 +10224,15 @@ function updateSortHeaders(prefix,sortState,labels){
   });
 }
 
-function renderBizDashboard(){
-  const clients=Object.entries(DB.profiles).filter(([email,p])=>p.managedBy===USER);
-  let totalEarnings=0,totalAUM=0;
-  const rows=clients.map(([email,p])=>{
-    const cd=p.data||{};
-    const val=(cd.holdings||[]).reduce((s,h)=>s+((h.price??h.cost)*h.shares),0)+(cd.cash||0);
-    const gain=(cd.holdings||[]).reduce((s,h)=>{const pr=h.price??h.cost;return s+(pr!=null&&h.cost!=null?(pr-h.cost)*h.shares:0);},0);
-    const feePct=p.feePct||0;
-    const estFee=feePct>0&&gain>0?gain*feePct/100:0;
-    totalEarnings+=estFee;totalAUM+=val;
-    return '<tr><td><b>'+esc(p.clientLabel||email)+'</b></td><td class="muted">'+esc(email)+'</td>'+
-      '<td>'+fmt$(val)+'</td>'+
-      '<td class="'+(gain>=0?'pos':'neg')+'">'+fmt$(gain)+'</td>'+
-      '<td>'+feePct+'%</td>'+
-      '<td>'+fmt$(estFee)+'</td>'+
-      '<td><button class="btn btn-ghost btn-sm" onclick="switchToClient(\''+esc(email)+'\')">Switch</button></td></tr>';
-  });
-  document.getElementById('bizTotalEarnings').textContent=fmt$(totalEarnings);
-  document.getElementById('bizClientCount').textContent=clients.length;
-  document.getElementById('bizTotalAUM').textContent=fmt$(totalAUM);
-  const tb=document.getElementById('bizDashClientsBody');
-  if(tb)tb.innerHTML=rows.join('');
-  const emptyEl=document.getElementById('bizDashClientsEmpty');
-  if(emptyEl)emptyEl.style.display=clients.length?'none':'block';
-}
 function renderAll(){
   renderBackupBanner();
   if(!D)return;
-  /* Business account's own view (not switched into a client) gets a completely different dashboard —
-     earnings + client list, not the personal onboarding/portfolio dashboard, so it can't be used as a
-     side door into personal investing. */
-  const bizOwnView=isBizOwnView();
-  const bizBody=document.getElementById('bizDashboardBody');
-  const personalBody=document.getElementById('personalDashboardBody');
-  if(bizBody)bizBody.style.display=bizOwnView?'block':'none';
-  if(personalBody)personalBody.style.display=bizOwnView?'none':'block';
-  if(bizOwnView)renderBizDashboard();
   /* welcome / onboarding state */
   /* Start here stays until the first review has run. Each step shows a tick once it is done. */
   const done1=D.holdings.length>0, done2=(D.watchlist||[]).length>0, done3=!!D.lastRefresh;
   const isNew=!(done1&&done3);
   const wc=document.getElementById('welcomeCard');
-  if(wc)wc.style.display=(isNew&&!bizOwnView)?'block':'none';
+  if(wc)wc.style.display=isNew?'block':'none';
   /* Market data is built in for a signed-in account; the key step only appears where it is true. */
   if(wc){ const ks=document.getElementById('wcKeyStep'), built=hasMarketData(); if(ks)ks.style.display=built?'none':''; wc.querySelectorAll('.wc-n').forEach((n,i)=>{ n.textContent=String(built?i+1:i+2); });
     [['wcStep1',done1],['wcStep2',done2],['wcStep3',done3]].forEach(([id,ok])=>{ const el=document.getElementById(id); if(!el)return; el.classList.toggle('wc-done',!!ok); const n=el.querySelector('.step-num'); if(n&&ok)n.textContent='✓'; }); }
@@ -10543,8 +10274,7 @@ function renderAll(){
 
   const gs=document.getElementById('greetingSub');
   if(gs){
-    if(bizOwnView)gs.textContent='Here\'s how your clients are doing.';
-    else if(isNew)gs.textContent='Let\'s get your portfolio set up below.';
+    if(isNew)gs.textContent='Let\'s get your portfolio set up below.';
     /* "Nice." is gone. A one-day move is noise and congratulating the operator on it trains them to
        read noise as skill — the precise habit this app exists to break. State the number, then say
        what it is worth, which is nothing on its own. */
@@ -10781,7 +10511,6 @@ function renderAll(){
      sitting on the Market tab left a stale table on screen. */
   renderScorecard();
   renderCommand();
-  if(DB.profiles[USER]&&DB.profiles[USER].accountType==='business')renderClientsList();
 
   if(D.lastRefresh)document.getElementById('lastRefresh').textContent='Updated '+new Date(D.lastRefresh).toLocaleString();
   updateBadge();
@@ -11223,8 +10952,7 @@ function populateCopyTargets(){
   }
   sel.innerHTML=targets.map(e=>{
     const p=DB.profiles[e];
-    const tag=p.managedBy===USER?' (your client)':(p.accountType==='business'?' (business)':'');
-    return '<option value="'+esc(e)+'">'+esc(p.clientLabel||e)+tag+'</option>';
+    return '<option value="'+esc(e)+'">'+esc(e)+'</option>';
   }).join('');
   if(targets.includes(prev))sel.value=prev;
 }
@@ -11235,7 +10963,7 @@ function copyToAccount(){
   const what=document.getElementById('copyWhat').value;
   const mode=document.getElementById('copyMode').value;
   const target=DB.profiles[email];
-  const label=target.clientLabel||email;
+  const label=email;
   if(!target.data)target.data=defaultData();
   const td=target.data;
   if(!Array.isArray(td.holdings))td.holdings=[];
@@ -12050,7 +11778,7 @@ async function submitReview(){
   if(!D.reviewSnap)D.reviewSnap={};
   const at=Date.now();
   const p=(DB.profiles||{})[USER]||{};
-  const rec={sym,at,marks,by:(typeof ORG!=='undefined'&&ORG)?{seat:ORG.seat,name:(D.displayName||'').trim()||null}:null};
+  const rec={sym,at,marks,by:{name:(D.displayName||'').trim()||null}};
   if(marks.length)D.reviews.push(rec);          // only a review with marks enters the chain; an empty one is a visit, not a record
   if(th){ th.reviewedAt=at; if(th.reviewEvery>0)th.reviewDate=new Date(at+th.reviewEvery*86400000).toISOString().slice(0,10); else if(th.reviewDate&&th.reviewDate<=new Date().toISOString().slice(0,10))th.reviewDate=''; }
   D.reviewSnap[sym]=await reviewSnapshot(sym);
@@ -15897,19 +15625,15 @@ function syncConfigured(){return !!(syncCfg&&syncCfg.url&&syncCfg.key);}
    (the Finnhub proxy, the request queue, /fred with a bearer) and must stay false in code mode, or
    an invited device would send "Bearer undefined" at routes it was never meant to reach. */
 function codeSyncActive(){return !!(syncCfg&&syncCfg.url&&syncCfg.code&&!syncCfg.key);}
-/* ============================ F1. CLIENT BOOKS DO NOT SYNC ============================
+/* ============================ F1. A BOOK HELD FOR SOMEONE ELSE DOES NOT SYNC ============================
    The operator's sync is a single shared SYNC_SECRET. Anything holding it can read and overwrite
    every slot, and the worker's own header says so. That is a decision the operator is entitled to
-   make about their own book.
+   make about their own book, and not one they can make about someone else's.
 
-   It is not a decision they are entitled to make about a client's. A client book contains another
-   person's positions, cost basis and, through feePct, a commercial relationship. Putting it behind
-   one shared bearer token that was never issued to them, and that cannot be revoked for them
-   alone, is the one item in this spec with third-party consequences.
-
-   So until per-user authentication covers these profiles, they do not sync at all. Local storage
-   and manual export only. The route out is /usync, which is already per-code and already carries
-   the pause flag; when a managed profile can hold its own credential this gate can be reconsidered.
+   Nothing in this build creates a profile held on another person's behalf. The gate stays for the
+   profiles an older build left on a device: a book marked managedBy still contains another person's
+   positions and cost basis, so it does not go near the shared key. Local storage and manual export
+   only.
 
    Enforced in the transport, not by hiding a button. A blocked profile has nothing to press, but
    scheduleSync fires on a timer and would push anyway. */
@@ -15917,15 +15641,12 @@ function syncBlockedReason(){
   const p=(DB.profiles||{})[USER];
   if(!p)return null;
   if(p.managedBy)return 'client';
-  if(p.accountType==='business')return 'business';
   return null;
 }
 function syncBlockedMessage(){
   const r=syncBlockedReason();
   if(!r)return '';
-  return r==='client'
-    ? 'This is a client book. It stays on this device: cloud sync runs on one shared key that was never issued to them and cannot be revoked for them alone. Use Export to move it.'
-    : 'Business profiles stay on this device. Cloud sync runs on one shared key with no per-account revocation, which is not an acceptable place for a book you hold on behalf of someone else. Use Export to move it.';
+  return 'This book is held for someone else, so it stays on this device: cloud sync runs on one shared key that was never issued to them and cannot be revoked for them alone. Use Export to move it.';
 }
 function syncActive(){
   if(syncBlockedReason())return false;
@@ -16162,21 +15883,18 @@ async function pushChainHead(){
    written. Neither survives the loss of the device the record lives in, and neither is a copy a
    third party can read. This is that copy: calls, their marks with hashes and sequence numbers,
    the chain state, the review marks. A PROJECTION, on purpose: no thesis text, no holdings, no
-   notes, nothing the account's sync already carries. Opt-in for a personal account (Settings), and
-   always on for a seat on a firm, whose record is the firm's evidence. Pushed a moment after the
-   record changes, never awaited, never blocking. */
+   notes, nothing the account's sync already carries. Opt-in, under Settings. Pushed a moment after
+   the record changes, never awaited, never blocking. */
 function recordCopyOn(){
   if(typeof isDemoUser==='function'&&isDemoUser())return false;
   if(syncBlockedReason())return false;
-  const p=(DB.profiles||{})[USER]||{};
-  if(p.invite&&p.inviteTier==='business')return true;
   return !!D.recordCopy;
 }
 function recordProjection(){
   const calls=(D.calls||[]).map(c=>{
     const marks={};
     Object.keys(c.marks||{}).forEach(h=>{ const m=c.marks[h]; if(!m)return; marks[h]={price:m.price==null?null:m.price,spy:m.spy==null?null:m.spy,beta:m.beta==null?null:m.beta,at:m.at||null,lag:m.lag||0,missed:!!m.missed,intended:m.intended||null,actual:m.actual||null,due:m.due||null,hash:m.hash||null,seq:m.seq==null?null:m.seq,cron:!!m.cron}; });
-    return{id:callId(c),sym:c.sym,track:c.track||'checklist',verdict:c.verdict,label:c.label,ts:c.ts,date:c.date,price:c.price,spy:c.spy,q:c.q,p:c.p,m:c.m,conviction:c.conviction,checks:c.checks||null,scorecard:c.scorecard||null,rbv:c.rbv||null,by:c.by?{seat:c.by.seat,name:c.by.name||null,sig:c.by.sig||null,key:c.by.key||null}:null,marks};
+    return{id:callId(c),sym:c.sym,track:c.track||'checklist',verdict:c.verdict,label:c.label,ts:c.ts,date:c.date,price:c.price,spy:c.spy,q:c.q,p:c.p,m:c.m,conviction:c.conviction,checks:c.checks||null,scorecard:c.scorecard||null,rbv:c.rbv||null,by:c.by?{name:c.by.name||null}:null,marks};
   });
   const reviews=(D.reviews||[]).map(r=>({sym:r.sym,at:r.at,by:r.by||null,marks:(r.marks||[]).map(x=>({n:x.n,mark:x.mark})),hash:r.hash||null,seq:r.seq==null?null:r.seq}));
   /* Next review dates only (A4.3): a ticker and a date, so the worker can say "due", never why. */
@@ -16280,15 +15998,13 @@ function snapshotScreen(){
 function renderRecordCopyCard(){
   const card=document.getElementById('recordCopyCard'), tg=document.getElementById('recordCopyToggle'), st=document.getElementById('recordCopyStatus');
   if(!card||!tg||!st)return;
-  const p=(DB.profiles||{})[USER]||{};
-  const seat=!!(p.invite&&p.inviteTier==='business');
   const blocked=syncBlockedReason()||(typeof isDemoUser==='function'&&isDemoUser());
   card.style.display=blocked?'none':'';
-  tg.checked=recordCopyOn(); tg.disabled=seat;
+  tg.checked=recordCopyOn(); tg.disabled=false;
   const nm=document.getElementById('notifyMarks'), nr=document.getElementById('notifyReviews');
   if(nm)nm.checked=!!(D.notify&&D.notify.marks); if(nr)nr.checked=!!(D.notify&&D.notify.reviews);
   const n=(D.calls||[]).length, sealed=(D.calls||[]).reduce((a,c)=>a+Object.values(c.marks||{}).filter(m=>m&&m.hash).length,0);
-  st.textContent=(seat?'On for every seat of a firm. ':(recordCopyOn()?'On. ':'Off. '))+n+' call'+(n===1?'':'s')+', '+sealed+' sealed mark'+(sealed===1?'':'s')+(D.recordCopyAt?' · last copy '+new Date(D.recordCopyAt).toLocaleString():' · no copy yet')+(D.recordCopyErr?' · last push failed: '+D.recordCopyErr:'');
+  st.textContent=(recordCopyOn()?'On. ':'Off. ')+n+' call'+(n===1?'':'s')+', '+sealed+' sealed mark'+(sealed===1?'':'s')+(D.recordCopyAt?' · last copy '+new Date(D.recordCopyAt).toLocaleString():' · no copy yet')+(D.recordCopyErr?' · last push failed: '+D.recordCopyErr:'');
 }
 
 /* ============================ A2.4. THE EVIDENCE PACK ============================
@@ -16307,10 +16023,7 @@ async function exportEvidencePack(){
   try{ const t=await cronUrl('/chain'); if(t){ const r=await fetch(t.url,{headers:t.headers}); if(r.ok){ heads=(await r.json()).heads||[]; headsSource='server'; } else headsSource='HTTP '+r.status; } }catch(e){ headsSource='not reachable'; }
   const verified=await verifyChain();
   const pr=recordProjection();
-  /* A7.1. A seat's pack carries the firm's registered public keys, so the verify page can check
-     each call's signature against the seat that made it. */
-  let keys=null; try{ const p0=(DB.profiles||{})[USER]||{}; if(p0.invite&&p0.inviteTier==='business'){ const r=await fetch(INVITE_WORKER+'/org/keys?code='+encodeURIComponent(p0.invite)); if(r.ok)keys=(await r.json()).keys||[]; } }catch(e){}
-  const pack={format:'perceptfolio-evidence/1',exportedAt:new Date().toISOString(),account:USER,name:(D.displayName||'').trim()||null,keys,
+  const pack={format:'perceptfolio-evidence/1',exportedAt:new Date().toISOString(),account:USER,name:(D.displayName||'').trim()||null,
     scorecard:(typeof SCORECARD_VERSION!=='undefined')?SCORECARD_VERSION:null,horizons:CALL_HORIZONS,
     calls:pr.calls,reviews:pr.reviews,chain:pr.chain,rulebook:pr.rulebook,
     serverHeads:heads,serverHeadsSource:headsSource,verifiedOnDevice:verified,
@@ -16324,11 +16037,11 @@ function csvCell(v){ if(v==null)return ''; const s=String(v); return /[",\n\r]/.
 function csvRows(rows){ return rows.map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n'; }
 function exportCallsCsv(){
   const H=CALL_HORIZONS;
-  const head=['id','date','ticker','track','verdict','label','price','spy','quality','value','momentum','conviction','checks','seat','name','rulebook'];
+  const head=['id','date','ticker','track','verdict','label','price','spy','quality','value','momentum','conviction','checks','name','rulebook'];
   H.forEach(h=>head.push('mark'+h+'_date','mark'+h+'_price','mark'+h+'_spy','mark'+h+'_stock_ret_pct','mark'+h+'_spy_ret_pct','mark'+h+'_excess_pct','mark'+h+'_edge','mark'+h+'_missed','mark'+h+'_seq','mark'+h+'_hash'));
   const rows=[head];
   (D.calls||[]).forEach(c=>{
-    const r=[callId(c),c.date,c.sym,c.track||'checklist',c.verdict,c.label,c.price,c.spy,c.q,c.p,c.m,c.conviction,c.checks||'',c.by?c.by.seat:'',c.by?c.by.name:'',c.rbv||''];
+    const r=[callId(c),c.date,c.sym,c.track||'checklist',c.verdict,c.label,c.price,c.spy,c.q,c.p,c.m,c.conviction,c.checks||'',c.by?c.by.name:'',c.rbv||''];
     H.forEach(h=>{
       const m=(c.marks||{})[h];
       if(!m){ r.push('','','','','','','','','',''); return; }
@@ -16372,8 +16085,8 @@ async function statementHTML(q){
   const esc2=s=>esc(s==null?'':s);
   const dt=ts=>new Date(ts).toISOString().slice(0,10);
   const p=(DB.profiles||{})[USER]||{};
-  const who=(D.displayName||'').trim()||USER; const seat=(typeof ORG!=='undefined'&&ORG)?' · seat '+ORG.seat+(ORG.name?' of '+ORG.name:''):'';
-  let h='<h1>Record statement · '+esc2(q)+'</h1><p class="m">'+esc2(who)+esc2(seat)+' · generated '+dt(Date.now())+' · scorecard '+esc2(typeof SCORECARD_VERSION!=='undefined'?SCORECARD_VERSION:'')+'</p>';
+  const who=(D.displayName||'').trim()||USER;
+  let h='<h1>Record statement · '+esc2(q)+'</h1><p class="m">'+esc2(who)+' · generated '+dt(Date.now())+' · scorecard '+esc2(typeof SCORECARD_VERSION!=='undefined'?SCORECARD_VERSION:'')+'</p>';
   h+='<table><tbody><tr><th>Calls made</th><td>'+made.length+' ('+made.filter(c=>c.verdict==='buy').length+' buy, '+made.filter(c=>c.verdict==='sell').length+' sell)</td></tr>'+
      '<tr><th>Marks landed</th><td>'+landed.length+' ('+landed.filter(x=>x.m.missed).length+' missed)</td></tr>'+
      '<tr><th>Sizing refusals</th><td>'+refusals.length+'</td></tr><tr><th>Reviews closed</th><td>'+reviews.length+' ('+reviews.reduce((a,r)=>a+(r.marks||[]).length,0)+' assumption marks)</td></tr>'+
@@ -16382,7 +16095,7 @@ async function statementHTML(q){
   CALL_HORIZONS.forEach(hz=>{ const st=expectancyStats(byH[hz]||[]); h+='<tr><td>'+hz+' d</td><td>'+(st?st.n:0)+'</td><td>'+(st?sign(st.expectancy):'-')+'</td><td>'+(st&&st.lo!=null?sign(st.lo)+' to '+sign(st.hi):'n too small')+'</td><td class="m">'+(!st?'nothing landed':st.lo==null?'one mark says nothing':(st.lo<0&&st.hi>0)?'crosses zero: no measurable edge on this sample':st.lo>0?'entirely above zero':'entirely below zero')+'</td></tr>'; });
   h+='</tbody></table>';
   h+='<h2>Marks landed</h2>'+(landed.length?'<table><thead><tr><th>Date</th><th>Ticker</th><th>Call</th><th>Horizon</th><th>At call</th><th>At mark</th><th>Edge</th></tr></thead><tbody>'+landed.map(x=>'<tr><td>'+dt(x.m.at)+'</td><td>'+esc2(x.c.sym)+'</td><td>'+esc2(String(x.c.verdict).toUpperCase())+' · '+esc2(x.c.date)+'</td><td>'+x.h+' d</td><td>'+(x.c.price?fmt$(x.c.price):'-')+'</td><td>'+(x.m.missed?'missed':fmt$(x.m.price))+'</td><td>'+(x.edge==null?'-':sign(x.edge))+'</td></tr>').join('')+'</tbody></table>':'<p class="m">None this quarter.</p>');
-  h+='<h2>Calls made</h2>'+(made.length?'<table><thead><tr><th>Date</th><th>Ticker</th><th>Call</th><th>Price</th><th>Quality</th><th>Value</th><th>Momentum</th><th>By</th></tr></thead><tbody>'+made.map(c=>'<tr><td>'+esc2(c.date)+'</td><td>'+esc2(c.sym)+'</td><td>'+esc2(c.label||c.verdict)+'</td><td>'+(c.price?fmt$(c.price):'-')+'</td><td>'+(c.q==null?'-':c.q)+'</td><td>'+(c.p==null?'-':c.p)+'</td><td>'+(c.m==null?'-':c.m)+'</td><td>'+esc2(c.by?(c.by.name||('seat '+c.by.seat)):'')+'</td></tr>').join('')+'</tbody></table>':'<p class="m">None this quarter.</p>');
+  h+='<h2>Calls made</h2>'+(made.length?'<table><thead><tr><th>Date</th><th>Ticker</th><th>Call</th><th>Price</th><th>Quality</th><th>Value</th><th>Momentum</th><th>By</th></tr></thead><tbody>'+made.map(c=>'<tr><td>'+esc2(c.date)+'</td><td>'+esc2(c.sym)+'</td><td>'+esc2(c.label||c.verdict)+'</td><td>'+(c.price?fmt$(c.price):'-')+'</td><td>'+(c.q==null?'-':c.q)+'</td><td>'+(c.p==null?'-':c.p)+'</td><td>'+(c.m==null?'-':c.m)+'</td><td>'+esc2(c.by?(c.by.name||''):'')+'</td></tr>').join('')+'</tbody></table>':'<p class="m">None this quarter.</p>');
   h+='<h2>What the limits refused</h2>'+(refusals.length?'<table><thead><tr><th>Date</th><th>Ticker</th><th>Asked</th><th>Limit</th><th>Binding</th></tr></thead><tbody>'+refusals.map(x=>'<tr><td>'+esc2(x.day)+'</td><td>'+esc2(x.sym)+'</td><td>'+fmt$(x.proposed)+'</td><td>'+fmt$(x.limit)+'</td><td>'+esc2(x.binding)+'</td></tr>').join('')+'</tbody></table>':'<p class="m">None logged this quarter.</p>');
   h+='<h2>Reviews closed</h2>'+(reviews.length?'<table><thead><tr><th>Date</th><th>Ticker</th><th>Supported</th><th>Broken</th><th>Uncertain</th></tr></thead><tbody>'+reviews.map(r=>'<tr><td>'+dt(r.at)+'</td><td>'+esc2(r.sym)+'</td><td>'+(r.marks||[]).filter(m=>m.mark==='supported').length+'</td><td>'+(r.marks||[]).filter(m=>m.mark==='broken').length+'</td><td>'+(r.marks||[]).filter(m=>m.mark==='uncertain').length+'</td></tr>').join('')+'</tbody></table>':'<p class="m">None this quarter.</p>');
   h+='<p class="m">Source line: the record in this terminal; expectancy is Jensen\'s alpha per call, beta-adjusted, against the S&amp;P; the interval is ±1.96 standard errors; a mark is missed when the app was not open inside the tolerance of its anniversary. Research software, not advice.</p>';
@@ -16801,123 +16514,10 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 <script src="/i18n/es.js"></script>
 <script src="/i18n/lang.js"></script>
 <script>
-/* ===== M4: business mode and the first-run data key (2026-09-14). Additive. =====
-   A business seat asks the worker about its firm once per session and again every ten minutes:
-   which seat it is, how many there are, and the rulebook if the admin seat has published one.
-   Members get the rulebook applied and the rule inputs locked; the admin seat gets a Publish
-   button. Every call is stamped with the seat and the person's name. Nothing here runs for a
-   personal account. */
+/* ===== The first-run data key (2026-09-14, trimmed 2026-09-27 when the firm seat went). =====
+   No key and no worker proxy means no prices, so say so once, on the Dashboard, with the one step
+   that fixes it. Additive: it hooks updateGreeting and touches nothing else. */
 (function(){
-  var ORG=null, at=0, busy=false;
-  function prof(){ return (typeof DB!=='undefined'&&DB&&DB.profiles&&typeof USER!=='undefined'&&USER)?DB.profiles[USER]:null; }
-  function base(){ try{ return (typeof syncConfigured==='function'&&syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,''); }catch(e){ return ''; } }
-  function isBiz(){ var p=prof(); return !!(p&&p.invite&&(p.inviteTier==='business'||p.accountType==='business')); }
-  async function sync(force){
-    if(!isBiz()||busy) return; if(!force&&Date.now()-at<600000) return; busy=true;
-    try{
-      var r=await fetch(base()+'/org?code='+encodeURIComponent(prof().invite)); var j=await r.json(); ORG=j&&j.org||null; at=Date.now();
-      window.PF_ORG=ORG;
-      if(ORG&&ORG.rulebook&&typeof D!=='undefined'&&D){ var rb=ORG.rulebook; D.rules=D.rules||{}; D.rules.qBuy=rb.qBuy; D.rules.pBuy=rb.pBuy; D.rules.qSell=rb.qSell; D.rules.mBuy=rb.mBuy; }
-      paint();
-      if(ORG&&!ORG.paused)ensureSeatKey().catch(function(){});
-      if(ORG&&(ORG.isAdmin||ORG.role==='reviewer'))renderFirmCard();
-    }catch(e){}finally{busy=false;}
-  }
-  function paint(){
-    var b=document.getElementById('bizBanner'); if(!b) return;
-    var mine=document.getElementById('pfOrgLine'); if(!mine){ mine=document.createElement('span'); mine.id='pfOrgLine'; mine.style.cssText='margin-left:auto;font-family:var(--mono);font-size:12px;letter-spacing:.04em'; b.appendChild(mine); }
-    if(!ORG){ mine.textContent=''; return; }
-    b.style.display='flex'; mine.textContent=(ORG.firm?ORG.firm+' · ':'')+'seat '+ORG.seat+' of '+ORG.seats+(ORG.role==='reviewer'?' · reviewer seat, read-only':'')+(ORG.rulebook?' · firm rulebook applied'+(ORG.rulebookVersion?' ('+ORG.rulebookVersion+')':''):(ORG.isAdmin?' · no rulebook published yet':''));
-    var ids=['setQBuy','setPBuy','setMBuy','setQSell'];
-    ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; var lock=!!ORG.rulebook&&!ORG.isAdmin; el.disabled=lock; el.title=lock?'Set by your firm\'s admin seat':''; });
-    var host=document.getElementById('setQSell'); host=host&&host.closest('.field'); if(!host) return;
-    var note=document.getElementById('pfOrgNote'); if(!note){ note=document.createElement('div'); note.id='pfOrgNote'; note.className='muted'; note.style.cssText='font-size:12.5px;margin-top:8px;line-height:1.5'; host.parentNode.insertBefore(note,host.nextSibling); }
-    if(ORG.isAdmin){
-      note.innerHTML='<b style="color:var(--text)">Firm rulebook.</b> These four rules apply to every seat when you publish them. '+(ORG.rulebookAt?'Published '+new Date(ORG.rulebookAt).toLocaleDateString()+'. ':'Not published yet. ')+'<button type="button" class="btn btn-sm" id="pfPublishRules" style="margin-left:6px">Publish to all '+ORG.seats+' seats</button> <span id="pfPublishMsg"></span>';
-      var pb=document.getElementById('pfPublishRules'); pb.onclick=async function(){
-        pb.disabled=true; var m=document.getElementById('pfPublishMsg'); m.textContent='Publishing…';
-        try{ var body={code:prof().invite,rulebook:{qBuy:document.getElementById('setQBuy').value,pBuy:document.getElementById('setPBuy').value,qSell:document.getElementById('setQSell').value,mBuy:document.getElementById('setMBuy').value}};
-          var r=await fetch(base()+'/org/rulebook',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); var j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
-          m.textContent='Published. Every seat picks it up within ten minutes.'; at=0; sync(true);
-        }catch(e){ m.textContent='Failed: '+e.message; } finally{ pb.disabled=false; }
-      };
-    } else {
-      note.innerHTML=ORG.rulebook?'<b style="color:var(--text)">Set by your firm.</b> The admin seat published these rules'+(ORG.rulebookAt?' on '+new Date(ORG.rulebookAt).toLocaleDateString():'')+'; they apply to every seat and cannot be changed here.':'Your firm\'s admin seat has not published a rulebook yet; these are your own rules until they do.';
-    }
-  }
-  /* ===== A7.1. The seat's key: made once per device, kept in IndexedDB as a non-extractable
-     CryptoKey (scripts can use it to sign, never read it), its public half registered with the
-     firm. Every call this seat makes is signed over the fields that identify it, so attribution
-     is a signature, not a name in a field. If IndexedDB is unavailable the call is stamped with
-     the name alone and says so. ===== */
-  var SEATKEY=null, SEATKID=null;
-  function idb(){ return new Promise(function(res,rej){ try{ var q=indexedDB.open('pf-seat',1); q.onupgradeneeded=function(){ q.result.createObjectStore('k'); }; q.onsuccess=function(){ res(q.result); }; q.onerror=function(){ rej(q.error); }; }catch(e){ rej(e); } }); }
-  function idbGet(db,k){ return new Promise(function(res,rej){ var t=db.transaction('k','readonly').objectStore('k').get(k); t.onsuccess=function(){ res(t.result); }; t.onerror=function(){ rej(t.error); }; }); }
-  function idbPut(db,k,v){ return new Promise(function(res,rej){ var t=db.transaction('k','readwrite').objectStore('k').put(v,k); t.onsuccess=function(){ res(); }; t.onerror=function(){ rej(t.error); }; }); }
-  function b64u(buf){ return btoa(String.fromCharCode.apply(null,new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
-  async function ensureSeatKey(){
-    if(SEATKEY)return SEATKEY;
-    var p=prof(); if(!p||!p.invite)return null;
-    var db=await idb(); var slot='seat:'+p.invite;
-    var rec=await idbGet(db,slot);
-    if(!rec){ var kp=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']); var pub=await crypto.subtle.exportKey('jwk',kp.publicKey); rec={priv:kp.privateKey,pub:{kty:'EC',crv:'P-256',x:pub.x,y:pub.y},registered:false}; await idbPut(db,slot,rec); }
-    SEATKEY=rec;
-    var kidBuf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(rec.pub.x+'.'+rec.pub.y)); SEATKID=Array.from(new Uint8Array(kidBuf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('').slice(0,16);
-    if(!rec.registered){ try{ var r=await fetch(base()+'/org/keys',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:p.invite,key:rec.pub,device:(navigator.platform||'device').slice(0,40)})}); if(r.ok){ rec.registered=true; await idbPut(db,slot,rec); } }catch(e){} }
-    return rec;
-  }
-  /* The signed message: exactly the fields a reader would want to pin to a person. */
-  function signedMessageOf(c){ return canonicalJson({id:callId(c),sym:c.sym,verdict:c.verdict||null,ts:c.ts,price:c.price==null?null:+c.price,spy:c.spy==null?null:+c.spy,rbv:c.rbv||null,seat:ORG?ORG.seat:null}); }
-  async function signCall(c){
-    try{ var k=await ensureSeatKey(); if(!k||!k.priv)return; var sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},k.priv,new TextEncoder().encode(signedMessageOf(c))); c.by=c.by||{}; c.by.sig=b64u(sig); c.by.key=SEATKID; if(typeof saveDB==='function')saveDB(); if(typeof pushRecordCopy==='function')pushRecordCopy(); }catch(e){}
-  }
-  window.PF_signedMessageOf=signedMessageOf;
-  /* Attribution: who made the call, on the record itself, then the signature a moment later. */
-  if(typeof window.recordCall==='function'){ var _rc=window.recordCall; window.recordCall=function(){ var before=(D&&Array.isArray(D.calls))?D.calls.length:0; var r=_rc.apply(this,arguments); try{ if(ORG&&D&&Array.isArray(D.calls)&&D.calls.length>before){ var c=D.calls[D.calls.length-1]; if(c&&!c.by) c.by={seat:ORG.seat,name:(D.displayName||'').trim()||null,firm:ORG.id}; if(c&&c.by&&!c.by.sig)signCall(c); } }catch(e){} return r; }; }
-  /* ===== A7.3, A7.4. The firm's records, for the admin seat and a reviewer seat: one table per
-     seat, and the firm's evidence pack as one file. Rendered on History. ===== */
-  async function renderFirmCard(){
-    var host=document.getElementById('firmCard'); if(!host){ var hb=document.getElementById('behaviourBody'); if(!hb)return; host=document.createElement('div'); host.id='firmCard'; host.className='card'; host.style.marginBottom='16px'; hb.closest('.card').parentNode.insertBefore(host,hb.closest('.card')); }
-    host.innerHTML='<h3>The firm\'s records</h3><div class="muted" style="font-size:12.5px">Loading…</div>';
-    try{
-      var r=await fetch(base()+'/org/records?code='+encodeURIComponent(prof().invite)); var j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
-      window.PF_FIRM=j;
-      var rows=j.seats.map(function(sx){ var rec=sx.record; var calls=rec?rec.calls.length:0; var sealed=rec?rec.calls.reduce(function(a,c){ return a+Object.values(c.marks||{}).filter(function(m){return m&&m.hash;}).length; },0):0; var signed=rec?rec.calls.filter(function(c){return c.by&&c.by.sig;}).length:0; var last=sx.serverHeads.length?sx.serverHeads[sx.serverHeads.length-1]:null; return '<tr><td>'+sx.seat+'</td><td>'+esc(sx.email||'')+'</td><td>'+esc(sx.role)+(sx.paused?' · paused':'')+'</td><td>'+calls+'</td><td>'+signed+'</td><td>'+sealed+'</td><td class="muted">'+(rec&&rec.updatedAt?new Date(rec.updatedAt).toISOString().slice(0,10):'none')+'</td><td class="muted">'+(last?last.day+' · '+last.n:'none')+'</td></tr>'; }).join('');
-      host.innerHTML='<h3>The firm\'s records · '+esc(j.firm||'')+'</h3><table style="font-size:12.5px"><thead><tr><th>Seat</th><th>Email</th><th>Role</th><th>Calls</th><th>Signed</th><th>Sealed marks</th><th>Server copy</th><th>Last head</th></tr></thead><tbody>'+rows+'</tbody></table>'+
-        '<div class="muted" style="font-size:12px;margin-top:6px">Rulebook '+esc(j.rulebookVersion||'not published')+' · '+(j.rulebookLog||[]).length+' version'+((j.rulebookLog||[]).length===1?'':'s')+' · '+(j.keys||[]).length+' seat key'+((j.keys||[]).length===1?'':'s')+' registered</div>'+
-        '<div class="row" style="margin-top:10px;gap:8px"><button class="btn btn-sm" onclick="exportFirmPack()">Firm evidence pack (JSON)</button><button class="btn btn-ghost btn-sm" onclick="openFirmStatement()">Firm statement, this quarter</button>'+(ORG.isAdmin?'<span class="muted" style="font-size:12px">Roles: seat number and analyst or reviewer</span> <input id="roleSeat" type="number" min="2" style="max-width:70px" placeholder="seat"> <select id="roleKind" style="max-width:120px"><option value="analyst">analyst</option><option value="reviewer">reviewer</option></select> <button class="btn btn-ghost btn-sm" onclick="setSeatRole()">Set</button>':'')+'</div>';
-    }catch(e){ host.innerHTML='<h3>The firm\'s records</h3><div class="muted" style="font-size:12.5px">'+esc(e.message||String(e))+'</div>'; }
-  }
-  /* A4.4 for the firm: one page over every seat's server copy for the current quarter. Edges
-     here are raw excess over the index (the seat's own statement carries the beta-adjusted
-     figure); the page says so. */
-  window.openFirmStatement=function(){
-    var j=window.PF_FIRM; if(!j)return toast('Load the firm\'s records first.');
-    var q=quarterOf(Date.now()), b=quarterBounds(q); var inQ=function(ts){ return ts>=b.a&&ts<b.b; };
-    var esc2=function(x){ return esc(x==null?'':x); }, sign=function(x){ return (x>=0?'+':'\u2212')+Math.abs(x).toFixed(2); };
-    var rows=[], totals={made:0,landed:0,edges:{}};
-    j.seats.forEach(function(sx){ var rec=sx.record; if(!rec)return; var calls=rec.calls.filter(function(c){ return c.conviction!=='flickering'&&(c.verdict==='buy'||c.verdict==='sell'); }); var made=calls.filter(function(c){ return inQ(c.ts); }).length; var landed=0, edges={}; calls.forEach(function(c){ Object.keys(c.marks||{}).forEach(function(h){ var m=c.marks[h]; if(!m||!m.at||!inQ(m.at)||m.missed)return; landed++; if(m.price>0&&c.price>0&&m.spy>0&&c.spy>0){ var e=((m.price-c.price)/c.price-(m.spy-c.spy)/c.spy)*100; e=c.verdict==='sell'?-e:e; (edges[h]=edges[h]||[]).push(e); (totals.edges[h]=totals.edges[h]||[]).push(e); } }); }); totals.made+=made; totals.landed+=landed; rows.push({seat:sx.seat,email:sx.email,role:sx.role,made:made,landed:landed,edges:edges,reviews:rec.reviews.filter(function(r){ return inQ(r.at); }).length}); });
-    var cell=function(ed){ var st=expectancyStats(ed||[]); if(!st)return '-'; return sign(st.expectancy)+(st.lo!=null?' ('+sign(st.lo)+' to '+sign(st.hi)+')':'')+' n='+st.n; };
-    var h='<h1>Firm record statement · '+esc2(j.firm||'')+' · '+esc2(q)+'</h1><p class="m">Generated '+new Date().toISOString().slice(0,10)+' · rulebook '+esc2(j.rulebookVersion||'not published')+' · '+j.seats.length+' seats</p>'+
-      '<table><thead><tr><th>Seat</th><th>Role</th><th>Calls made</th><th>Marks landed</th><th>Reviews closed</th>'+CALL_HORIZONS.map(function(hz){ return '<th>'+hz+' d excess, pts</th>'; }).join('')+'</tr></thead><tbody>'+
-      rows.map(function(r){ return '<tr><td>'+r.seat+' '+esc2(r.email||'')+'</td><td>'+esc2(r.role)+'</td><td>'+r.made+'</td><td>'+r.landed+'</td><td>'+r.reviews+'</td>'+CALL_HORIZONS.map(function(hz){ return '<td>'+cell(r.edges[hz])+'</td>'; }).join('')+'</tr>'; }).join('')+
-      '<tr><th>Firm</th><td></td><td>'+totals.made+'</td><td>'+totals.landed+'</td><td></td>'+CALL_HORIZONS.map(function(hz){ return '<td>'+cell(totals.edges[hz])+'</td>'; }).join('')+'</tr></tbody></table>'+
-      '<p class="m">Source line: each seat\'s record copy on the worker as of '+new Date(j.asOf).toISOString().slice(0,16).replace('T',' ')+'Z. Excess is the stock\'s move less the index\'s move over the same days, signed by the call, before beta adjustment; the interval is \u00b11.96 standard errors. Each seat\'s own statement carries the beta-adjusted figure. Research software, not advice.</p>';
-    var w=window.open('','_blank'); if(!w)return toast('The browser blocked the window. Allow pop-ups for this site and try again.');
-    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>PerceptFolio firm statement '+esc2(q)+'</title><style>body{font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#111;margin:32px;max-width:1000px}h1{font-size:22px;margin:0 0 4px}table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}thead th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#555}.m{color:#555}@media print{body{margin:0}}</style></head><body>'+h+'</body></html>'); w.document.close();
-  };
-  window.exportFirmPack=function(){
-    var j=window.PF_FIRM; if(!j)return toast('Load the firm\'s records first.');
-    var pack={format:'perceptfolio-firm-evidence/1',exportedAt:new Date().toISOString(),firm:j.firm,id:j.id,rulebook:j.rulebook,rulebookVersion:j.rulebookVersion,rulebookLog:j.rulebookLog,keys:j.keys,seats:j.seats.map(function(sx){ return {seat:sx.seat,email:sx.email,role:sx.role,paused:sx.paused,record:sx.record,serverHeads:sx.serverHeads}; }),
-      note:'Every seat\'s record copy with its marks, hashes and sequence numbers; each seat\'s server-dated heads; the seat keys that signed the calls; the rulebook versions, chained. Each seat verifies on perceptfolio.com/verify/ by loading its part as a pack: {format:"perceptfolio-evidence/1", calls, reviews, chain, serverHeads, keys}.'};
-    downloadText('perceptfolio-firm-evidence-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(pack,null,2),'application/json');
-  };
-  window.setSeatRole=async function(){
-    var seat=parseInt((document.getElementById('roleSeat')||{}).value,10), role=(document.getElementById('roleKind')||{}).value;
-    try{ var r=await fetch(base()+'/org/roles',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:prof().invite,seat:seat,role:role})}); var j=await r.json(); if(!r.ok)throw new Error(j.error||('HTTP '+r.status)); toast('Seat '+seat+' is now '+role+'.'); renderFirmCard(); }catch(e){ toast('Could not set the role: '+(e.message||e)); }
-  };
-  var _st2=window.showTab; if(typeof _st2==='function'){ window.showTab=function(t){ var r=_st2.apply(this,arguments); if(t==='history'&&ORG&&(ORG.isAdmin||ORG.role==='reviewer'))renderFirmCard(); return r; }; }
-  /* First-run data key. No key and no worker proxy means no prices; say so once, with the two steps. */
   function keyNudge(){
     try{
       if(typeof D==='undefined'||!D||!USER) return; var have=(typeof hasMarketData==='function')?hasMarketData():!!D.apiKey;
@@ -16933,8 +16533,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       document.getElementById('pfKeySave').onclick=function(){ var v=(document.getElementById('pfKeyInput').value||'').trim(); if(!v) return; D.apiKey=v; if(typeof saveDB==='function') saveDB(); card.remove(); if(typeof refreshAll==='function') refreshAll(); else if(typeof loadMarketData==='function') loadMarketData(true); };
     }catch(e){}
   }
-  if(typeof window.updateGreeting==='function'){ var _ug=window.updateGreeting; window.updateGreeting=function(){ var r=_ug.apply(this,arguments); try{ sync(false); keyNudge(); }catch(e){} return r; }; }
-  window.PF_ORG=function(){ return ORG; };
+  if(typeof window.updateGreeting==='function'){ var _ug=window.updateGreeting; window.updateGreeting=function(){ var r=_ug.apply(this,arguments); try{ keyNudge(); }catch(e){} return r; }; }
 })();
 </script>
 <script>

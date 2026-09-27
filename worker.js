@@ -88,10 +88,7 @@ function escHtml(x) {
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 function decisionEmailBody(rec, decision, code, note) {
-  const tier = decision === 'business' ? 'business' : decision === 'employee' ? 'employee' : 'personal';
-  const seatBlock = (decision === 'business' && Array.isArray(rec.seatCodes) && rec.seatCodes.length > 1)
-    ? `\nYour firm has ${rec.seatCodes.length} seats. One code per member; give each person their own and keep the first for yourself:\n\n${rec.seatCodes.map((c, i) => '    seat ' + (i + 1) + ':  ' + c).join('\n')}\n\nEach code makes its own account with its own record and its own sync. If you would rather we email each member directly, reply with their addresses.\n`
-    : '';
+  const tier = decision === 'employee' ? 'employee' : 'personal';
   if (decision === 'denied') {
     return {
       subject: 'Your PerceptFolio access request',
@@ -115,7 +112,6 @@ perceptfolio.com`
 
 Invite code: ${code}
 Account type: ${tier}
-${seatBlock}
 
 This code can be redeemed once, and expires 30 days from today.
 
@@ -543,14 +539,12 @@ async function handle(request, env) {
       calls.push({ sym, dir, target, stop, by });
     }
 
-    /* What they are asking for. plan and seats drive the suggested quote in the operator's email;
-       neither is binding, the operator replies with the price (PRD flow, 2026-09-13). */
-    const plan = clean(body.plan, 12).toLowerCase() === 'business' ? 'business' : 'personal';
-    const seats = plan === 'business' ? Math.max(1, Math.min(500, Math.floor(Number(body.seats) || 0))) : 1;
+    /* One plan, so a request carries nothing to choose. A page in someone's cache may still send
+       a plan or a seat count; both are read past and never stored. */
 
     const id = Date.now().toString(36) + '-' + makeCode().slice(0, 4).toLowerCase();
     const record = {
-      id, email, who, call, calls, plan, seats,
+      id, email, who, call, calls,
       status: 'pending',
       createdAt: Date.now(),
       date: new Date().toISOString().slice(0, 10),
@@ -565,9 +559,9 @@ async function handle(request, env) {
        price, so the reply (more questions, or the quote) is one email away. */
     let notified = { attempted: false };
     if (env.OPERATOR_EMAIL) {
-      const q = quoteFor(plan, seats);
-      notified = await sendPlain(env, env.OPERATOR_EMAIL, `Demo request: ${plan}${plan === 'business' ? ', ' + seats + ' seats' : ''} from ${email}`,
-        `${email}\n${plan === 'business' ? 'Business, ' + seats + ' seats' : 'Personal'}\n\nWho and what they run:\n${who}\n${call ? '\nA call they would stand behind:\n' + call + '\n' : ''}\nSuggested quote:\n${q.text}\n\nDecide in admin: ${(env.SITE_URL || 'https://perceptfolio.com')}/admin.html`);
+      const q = quoteFor();
+      notified = await sendPlain(env, env.OPERATOR_EMAIL, `Demo request from ${email}`,
+        `${email}\n\nWho and what they run:\n${who}\n${call ? '\nA call they would stand behind:\n' + call + '\n' : ''}\nSuggested quote:\n${q.text}\n\nDecide in admin: ${(env.SITE_URL || 'https://perceptfolio.com')}/admin.html`);
     }
     /* notified says whether the operator was told, so a test from the form shows where mail stands:
        sent, failed (with the reason), or not configured. Nothing about the visitor is echoed. */
@@ -585,7 +579,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/apply', '/apply/decide', '/quote', '/decide/members', '/org', '/org/rulebook', '/pause/code', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/org/keys', '/org/roles', '/org/records', '/org/status', '/holders']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/quote', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -652,6 +646,57 @@ async function handle(request, env) {
       }));
     }
     return json({ valid: true, tier: inv.tier, email: inv.email }, 200, env);
+  }
+
+  /* ---- POST /door {code} — may a FRESH sign-in proceed on this code right now? ----
+     ONE NEW SIGN-IN A DAY A CODE (the owner's rule, 2026-09-27). The code is the identity and it
+     covers two devices, a desk and a pocket. Two devices do not both need signing in within the
+     same hour, and a code being turned in a new browser twice in an afternoon is what a code
+     passed around looks like. So the first sign-in goes through and the next one waits out the
+     day, and the answer says how long is left rather than just refusing.
+
+     What this does NOT touch: a device that already holds a session. The Pages door only asks here
+     when there is no valid pf_session cookie to slide, so a signed-in terminal, a reload, a
+     background sync and the thirty-day slide are all unaffected. Re-signing in on a device whose
+     cookie was cleared is a fresh sign-in and does wait — which is the rule, and why
+     POST /door/clear exists for the operator.
+
+     door:<code> holds {at, n} with a two-day TTL: long enough to enforce a day, short enough that
+     the record cleans itself up and a quiet account is never holding a stale hold. */
+  const DOOR_WAIT_MS = 86400000;
+  if (url.pathname === '/door' && request.method === 'POST') {
+    if (await tooMany(env, request, '/door', 30)) return json({ ok: false, error: 'Too many attempts. Try again in a minute.' }, 429, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ ok: false, error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return json({ ok: false, error: 'Malformed code.' }, 400, env);
+    const dkey = 'door:' + code;
+    let last = null; try { last = JSON.parse((await env.PF_SYNC.get(dkey)) || 'null'); } catch (e) { last = null; }
+    const since = last && last.at ? Date.now() - last.at : Infinity;
+    if (since < DOOR_WAIT_MS) {
+      const leftMs = DOOR_WAIT_MS - since;
+      const hours = Math.ceil(leftMs / 3600000);
+      return json({
+        ok: false, error: 'This code signed in ' + (since < 3600000 ? 'less than an hour ago' : Math.floor(since / 3600000) + ' hours ago') +
+          '. One new sign-in a day: try again in ' + (hours === 1 ? 'an hour' : hours + ' hours') + '. A device already signed in keeps working.',
+        retryAfterMs: leftMs, retryAfterHours: hours
+      }, 429, env);
+    }
+    await env.PF_SYNC.put(dkey, JSON.stringify({ at: Date.now(), n: ((last && last.n) || 0) + 1 }), { expirationTtl: 2 * 86400 });
+    return json({ ok: true }, 200, env);
+  }
+
+  /* ---- POST /door/clear {code} (operator) — lift the day's hold ----
+     Someone who cleared their site data, or changed device, should not have to wait because the
+     rule cannot tell them from a shared code. The operator can say so in one click. */
+  if (url.pathname === '/door/clear' && request.method === 'POST') {
+    const auth = request.headers.get('Authorization') || '';
+    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!env.SYNC_SECRET || !safeEqual(tok, env.SYNC_SECRET)) return json({ error: 'Unauthorized.' }, 401, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return json({ error: 'Malformed code.' }, 400, env);
+    await env.PF_SYNC.delete('door:' + code);
+    return json({ ok: true, code, cleared: true }, 200, env);
   }
 
   /* Is this code a live, unpaused grant? Used by anything an invited user may reach without ever
@@ -783,11 +828,11 @@ async function handle(request, env) {
     if ((url.searchParams.get('format') || 'json') === 'csv') {
       const H = [30, 90, 180, 365];
       const cell = v => { if (v == null) return ''; const t = String(v); return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
-      const head = ['id', 'date', 'ticker', 'track', 'verdict', 'label', 'price', 'spy', 'quality', 'value', 'momentum', 'seat', 'name', 'rulebook'];
+      const head = ['id', 'date', 'ticker', 'track', 'verdict', 'label', 'price', 'spy', 'quality', 'value', 'momentum', 'name', 'rulebook'];
       H.forEach(h => head.push('mark' + h + '_date', 'mark' + h + '_price', 'mark' + h + '_spy', 'mark' + h + '_excess_pct', 'mark' + h + '_missed', 'mark' + h + '_seq', 'mark' + h + '_hash'));
       const lines = [head.map(cell).join(',')];
       for (const c of rec.calls || []) {
-        const r = [c.id, c.date, c.sym, c.track, c.verdict, c.label, c.price, c.spy, c.q, c.p, c.m, c.by ? c.by.seat : '', c.by ? c.by.name : '', c.rbv || ''];
+        const r = [c.id, c.date, c.sym, c.track, c.verdict, c.label, c.price, c.spy, c.q, c.p, c.m, c.by ? c.by.name : '', c.rbv || ''];
         for (const h of H) {
           const m = (c.marks || {})[h];
           if (!m) { r.push('', '', '', '', '', '', ''); continue; }
@@ -1263,7 +1308,7 @@ async function handle(request, env) {
       if (!c) return json({ error: 'That call is not in the server copy yet. Copy now under Settings, then share.' }, 404, env);
       const heads = JSON.parse(await env.PF_SYNC.get('chain:' + ident) || '[]');
       const id = Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
-      const doc = { id, ident, createdAt: Date.now(), call: c, by: c.by ? { name: c.by.name || null, seat: c.by.seat == null ? null : c.by.seat } : null, chain: rec.chain || null, serverHeads: heads.slice(-60), name: clean(body.name, 80) || null,
+      const doc = { id, ident, createdAt: Date.now(), call: c, by: c.by ? { name: c.by.name || null } : null, chain: rec.chain || null, serverHeads: heads.slice(-60), name: clean(body.name, 80) || null,
         note: 'One call from a PerceptFolio record, shared by its author. The hashes and sequence numbers place it in a chain whose head is posted daily to a clock the author does not control. It is a record of what was said, not a recommendation.' };
       await env.PF_SYNC.put('share:' + id, JSON.stringify(doc));
       const mine = JSON.parse(await env.PF_SYNC.get('shares:' + ident) || '[]'); mine.push({ id, callId, at: doc.createdAt }); await env.PF_SYNC.put('shares:' + ident, JSON.stringify(mine.slice(-200)));
@@ -1312,8 +1357,8 @@ async function handle(request, env) {
        notes, nothing the terminal's sync already carries. Its job is two things the browser
        cannot do for itself: survive the loss of the device, and be the copy a third party reads
        beside the daily head log. Last write wins; the heads log (/chain) is what makes a rewrite
-       visible, so this store need not referee. Opt-in for Personal, always on for Business seats
-       (the terminal decides; the worker stores what a live identity sends). */
+       visible, so this store need not referee. The terminal decides whether to keep a server copy;
+       the worker stores what a live identity sends. */
     if (url.pathname === '/record') {
       const key = 'rec:' + ident;
       if (request.method === 'GET') {
@@ -1336,11 +1381,11 @@ async function handle(request, env) {
           price: num(c.price), spy: num(c.spy), q: num(c.q), p: num(c.p), m: num(c.m),
           conviction: clean(c.conviction, 16), checks: clean(c.checks, 64) || null, scorecard: clean(c.scorecard, 16) || null,
           rbv: clean(c.rbv, 64) || null,
-          by: (c.by && typeof c.by === 'object') ? { seat: num(c.by.seat), name: clean(c.by.name, 80), sig: clean(c.by.sig, 200) || null, key: clean(c.by.key, 200) || null } : null,
+          by: (c.by && typeof c.by === 'object') ? { name: clean(c.by.name, 80) } : null,
           marks: Object.fromEntries(Object.entries(c.marks || {}).filter(([h]) => /^\d{1,4}$/.test(h)).map(([h, m]) => [h, mark(m)]).filter(([, m]) => m))
         })).filter(c => c.id && c.sym && c.ts > 0);
         const reviews = (Array.isArray(body.reviews) ? body.reviews : []).slice(0, 4000).map(r => ({
-          sym: clean(r.sym, 10).toUpperCase(), at: num(r.at), by: r.by ? { seat: num(r.by.seat), name: clean(r.by.name, 80) } : null,
+          sym: clean(r.sym, 10).toUpperCase(), at: num(r.at), by: r.by ? { name: clean(r.by.name, 80) } : null,
           marks: (Array.isArray(r.marks) ? r.marks : []).slice(0, 12).map(x => ({ n: num(x.n), mark: /^(supported|broken|uncertain)$/.test(String(x.mark)) ? x.mark : null })).filter(x => x.n != null && x.mark),
           hash: /^[0-9a-f]{64}$/.test(String(r.hash || '')) ? r.hash : null, seq: num(r.seq)
         })).filter(r => r.sym && r.at > 0);
@@ -1654,7 +1699,7 @@ async function handle(request, env) {
 
 
 
-  /* ---- Billing (M2): checkout, webhook, portal, business applications. Public by design: a buyer
+  /* ---- Billing (M2): checkout, webhook, portal. Public by design: a buyer
      holds no key, Stripe signs its own calls, and /apply/decide checks the operator key itself.
      See the section at the end of this file. Returns null when the path is not one of its routes. ---- */
   const billed = await handleBilling(request, env, url);
@@ -1709,7 +1754,10 @@ async function handle(request, env) {
     return json({ ok: true }, 200, env);
   }
 
-  /* ---- POST /decide — grant personal, grant business, or deny ----
+  /* ---- POST /decide — grant access, or deny ----
+     One plan (2026-09-22). 'personal' is the tier a grant records, kept as the word because grants
+     made before that date carry it; 'employee' is the operator's own people, free. There is one
+     tier to grant and nothing here mints more than one code. ----
      Approval mints a single-use code with a 30-day expiry. Denial keeps the record: knowing who you
      turned down, and why, is worth as much later as knowing who you let in. */
   if (url.pathname === '/decide' && request.method === 'POST') {
@@ -1720,8 +1768,8 @@ async function handle(request, env) {
     const decision = clean(body.decision, 12).toLowerCase();
     const note = clean(body.note, 1000);
     /* employee: a permanent code for NorthBridge staff, issued by the operator, never sold. */
-    if (!['personal', 'business', 'employee', 'denied'].includes(decision)) {
-      return json({ error: 'decision must be personal, business or denied.' }, 400, env);
+    if (!['personal', 'employee', 'denied'].includes(decision)) {
+      return json({ error: 'decision must be personal, employee or denied.' }, 400, env);
     }
     const stored = await env.PF_SYNC.get('req:' + id);
     if (!stored) return json({ error: 'No such request.' }, 404, env);
@@ -1737,27 +1785,8 @@ async function handle(request, env) {
       rec.code = code;
       await env.PF_SYNC.put('code:' + code, JSON.stringify({
         code, tier: decision, email: rec.email, requestId: id,
-        /* seat 1 is the firm's admin seat, and the only seat that may publish the rulebook */
-        ...(decision === 'business' ? { seat: 1 } : {}),
         issuedAt: Date.now(), expiresAt: Date.now() + 30 * 86400000, usedAt: null
       }), { expirationTtl: 40 * 86400 });
-      /* A FIRM gets one code per seat, minted together and sent in one email: the contact hands one
-         to each member. Separate codes rather than one shared code, because sync is keyed by code;
-         eight people on one code would overwrite each other's book, and one pause would pause all
-         eight. The first code is the contact's own seat. */
-      if (decision === 'business') {
-        const seats = Math.max(1, Math.min(500, Math.floor(Number(body.seats) || rec.seats || 1)));
-        rec.seats = seats;
-        rec.seatCodes = [code];
-        for (let i = 1; i < seats; i++) {
-          const c = makeCode();
-          await env.PF_SYNC.put('code:' + c, JSON.stringify({
-            code: c, tier: 'business', email: rec.email, requestId: id, seat: i + 1, firmContact: rec.email,
-            issuedAt: Date.now(), expiresAt: Date.now() + 30 * 86400000, usedAt: null
-          }), { expirationTtl: 40 * 86400 });
-          rec.seatCodes.push(c);
-        }
-      }
     }
     /* ---- Send the decision, if a mail provider is configured ----
        The code is minted and stored BEFORE this runs and is returned regardless of the outcome.
@@ -1770,7 +1799,7 @@ async function handle(request, env) {
       rec.mail = mail;
     }
     await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
-    return json({ seatCodes: rec.seatCodes || null, ok: true, decision, code, mail }, 200, env);
+    return json({ ok: true, decision, code, mail }, 200, env);
   }
 
   /* ---- POST /pause — suspend or restore an issued grant ----
@@ -1795,7 +1824,7 @@ async function handle(request, env) {
     const stored = await env.PF_SYNC.get('req:' + id);
     if (!stored) return json({ error: 'No such request.' }, 404, env);
     const rec = JSON.parse(stored);
-    if (rec.status !== 'personal' && rec.status !== 'business' && rec.status !== 'employee') {
+    if (rec.status !== 'personal' && rec.status !== 'employee') {
       return json({ error: 'Only a granted request can be paused.' }, 400, env);
     }
 
@@ -1880,36 +1909,29 @@ async function handle(request, env) {
 
    Env (all set in the dashboard, none in this file):
      STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
-     STRIPE_PRICE_PERSONAL_MONTHLY, STRIPE_PRICE_PERSONAL_YEARLY,
-     STRIPE_PRICE_BUSINESS_MONTHLY, STRIPE_PRICE_BUSINESS_YEARLY
-     SITE_URL (https://perceptfolio.com), OPERATOR_EMAIL (where applications are sent)
+     STRIPE_PRICE_PERSONAL_MONTHLY, STRIPE_PRICE_PERSONAL_YEARLY
+     SITE_URL (https://perceptfolio.com), OPERATOR_EMAIL (where requests are sent)
 
    KV keys:
-     sub:<customerId>   the subscription record  {customerId, subscriptionId, email, plan, tier, seats, status, currentPeriodEnd, code, orgId}
+     sub:<customerId>   the subscription record  {customerId, subscriptionId, email, plan, status, currentPeriodEnd, code}
      cust:<code>        code -> customerId, for the portal
      evt:<eventId>      webhook idempotency, 30 days
-     app:<id>           a business application  {id, token, firm, size, email, contact, runs, status, seats, at, decidedAt}
-     apptok:<token>     token -> application id, used once at checkout
-     org:<orgId>        {orgId, name, adminEmail, seats, adminCode, subscriptionId, status}
    Grants gain: subStatus, currentPeriodEnd, graceUntil.
    ===================================================================================================== */
 
 const PLANS = {
   'personal-monthly': { priceVar: 'STRIPE_PRICE_PERSONAL_MONTHLY', tier: 'personal' },
   'personal-yearly':  { priceVar: 'STRIPE_PRICE_PERSONAL_YEARLY',  tier: 'personal' },
-  'business-monthly': { priceVar: 'STRIPE_PRICE_BUSINESS_MONTHLY', tier: 'business', minSeats: 3 },
-  'business-yearly':  { priceVar: 'STRIPE_PRICE_BUSINESS_YEARLY',  tier: 'business', minSeats: 3 },
 };
 const GRACE_DAYS = 7;
 
 /* One plan (owner's decision, 2026-09-22): the terminal, $760 a month or $8,360 a year, for one
-   person. site/src/lib/config.ts carries the same two numbers; the suite checks they agree. The
-   business tier, seats and the org routes stay in the code for the firm machinery that exists,
-   but nothing is sold under them and the quote never mentions them. The operator's reply is the
+   person. site/src/lib/config.ts carries the same two numbers; the suite checks they agree. There
+   is no second plan to choose between and no seat count to quote; the operator's reply is the
    binding price. */
 const PRICE = { monthly: 760, yearly: 8360 };
-function quoteFor(plan, seats) {
-  return { plan: 'terminal', seats: 1, monthly: PRICE.monthly, yearly: PRICE.yearly, discountPct: 0,
+function quoteFor() {
+  return { plan: 'terminal', monthly: PRICE.monthly, yearly: PRICE.yearly, discountPct: 0,
     text: `The terminal: $${PRICE.monthly} a month, or $${PRICE.yearly.toLocaleString()} a year (one month free). One person, one book, your own rules; the record, its server copy if you want it, and the evidence pack. Fourteen-day refund on any payment.\nSupport by email on weekdays, US Eastern, answered the same or the next business day. The site and the service run on Cloudflare's network; the footer of the site measures whether the service is answering; an incident is told to you by email.` };
 }
 
@@ -1946,7 +1968,7 @@ async function verifyStripeSignature(rawBody, header, secret) {
 }
 
 function purchaseEmailBody(rec, code, siteUrl) {
-  const plan = rec.tier === 'business' ? `Business, ${rec.seats} seats` : rec.plan.includes('yearly') ? 'Personal, yearly' : 'Personal, monthly';
+  const plan = (rec.plan || '').includes('yearly') ? 'the terminal, yearly' : 'the terminal, monthly';
   return {
     subject: 'Your PerceptFolio access code',
     text: `Thank you. Your plan: ${plan}.
@@ -2388,11 +2410,11 @@ async function handleBilling(request, env, url) {
   const site = (env.SITE_URL || 'https://perceptfolio.com').replace(/\/+$/, '');
   if (request.method === 'POST' || request.method === 'PUT') {
     if (bodyTooLarge(request)) return json({ error: 'Payload too large.' }, 413, env);
-    const limited = { '/checkout': 10, '/apply': 5, '/portal': 10, '/org/rulebook': 20 }[url.pathname];
+    const limited = { '/checkout': 10, '/portal': 10 }[url.pathname];
     if (limited && await tooMany(env, request, url.pathname, limited)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
   }
 
-  /* ---- POST /checkout {plan, seats?, application?} -> {url} ---- */
+  /* ---- POST /checkout {plan} -> {url} ---- */
   if (url.pathname === '/checkout' && request.method === 'POST') {
     if (!billingConfigured(env)) return json({ error: 'Billing is not open yet. Request a demo and we will let you know.' }, 503, env);
     let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
@@ -2413,22 +2435,6 @@ async function handleBilling(request, env, url) {
       'metadata[plan]': plan,
       'metadata[tier]': P.tier,
     };
-
-    if (P.tier === 'business') {
-      /* A firm is accepted before it can pay (PRD D15). The acceptance token is single-use. */
-      const token = clean(body.application, 64);
-      const appId = token ? await env.PF_SYNC.get('apptok:' + token) : null;
-      if (!appId) return json({ error: 'Business plans are by application. Apply first; the checkout link arrives with the acceptance.' }, 403, env);
-      const app = JSON.parse(await env.PF_SYNC.get('app:' + appId) || 'null');
-      if (!app || app.status !== 'accepted') return json({ error: 'That application is not accepted.' }, 403, env);
-      const seats = Math.floor(Number(body.seats) || app.seats || 0);
-      if (!(seats >= P.minSeats)) return json({ error: `Business plans start at ${P.minSeats} seats.` }, 400, env);
-      params['line_items[0][quantity]'] = seats;
-      params['metadata[seats]'] = seats;
-      params['metadata[application]'] = appId;
-      params['metadata[firm]'] = app.firm;
-      params.customer_email = app.email;
-    }
 
     const r = await stripe(env, '/checkout/sessions', params);
     if (!r.ok || !r.j || !r.j.url) return json({ error: 'Stripe did not return a checkout page.', detail: r.j && r.j.error && r.j.error.message }, 502, env);
@@ -2454,22 +2460,15 @@ async function handleBilling(request, env, url) {
       const customerId = obj.customer, subscriptionId = obj.subscription;
       const email = (obj.customer_details && obj.customer_details.email) || obj.customer_email || null;
       const md = obj.metadata || {};
-      const tier = md.tier === 'business' ? 'business' : 'personal';
-      const seats = tier === 'business' ? Math.max(3, parseInt(md.seats, 10) || 3) : 1;
+      const tier = 'personal';
       if (!customerId || !email) return json({ error: 'Session has no customer or email.' }, 400, env);
       if (await env.PF_SYNC.get('sub:' + customerId)) return json({ ok: true, duplicate: 'customer' }, 200, env);
 
-      let orgId = null;
       const code = await mintCode(env, tier, email, { subscriptionId, customerId, subStatus: 'active' });
-      if (tier === 'business') {
-        orgId = 'org_' + makeCode().replace('-', '').toLowerCase();
-        await env.PF_SYNC.put('org:' + orgId, JSON.stringify({ orgId, name: md.firm || null, adminEmail: email, seats, adminCode: code, subscriptionId, customerId, status: 'active', members: [], createdAt: Date.now() }));
-        await syncGrant(env, code, { orgId, role: 'admin', seats });
-        if (md.application) { const app = JSON.parse(await env.PF_SYNC.get('app:' + md.application) || 'null'); if (app) { app.status = 'paid'; app.orgId = orgId; await env.PF_SYNC.put('app:' + md.application, JSON.stringify(app)); } }
-      }
-      await env.PF_SYNC.put('sub:' + customerId, JSON.stringify({ customerId, subscriptionId, email, plan: md.plan || null, tier, seats, status: 'active', currentPeriodEnd: null, code, orgId, createdAt: Date.now() }));
+      await env.PF_SYNC.put('sub:' + customerId, JSON.stringify({ customerId, subscriptionId, email, plan: md.plan || null, tier, status: 'active', currentPeriodEnd: null, code, createdAt: Date.now() }));
       await env.PF_SYNC.put('cust:' + code, customerId);
-      const mail = await sendPlain(env, email, purchaseEmailBody({ tier, seats, plan: md.plan || '' }, code, site).subject, purchaseEmailBody({ tier, seats, plan: md.plan || '' }, code, site).text);
+      const body = purchaseEmailBody({ plan: md.plan || '' }, code, site);
+      const mail = await sendPlain(env, email, body.subject, body.text);
       return json({ ok: true, provisioned: true, tier, mail: mail.attempted ? (mail.ok ? 'sent' : 'failed') : 'not configured' }, 200, env);
     }
 
@@ -2484,10 +2483,6 @@ async function handleBilling(request, env, url) {
       await env.PF_SYNC.put('sub:' + customerId, JSON.stringify(sub));
       const patch = subPatch(status, cpe);
       await syncGrant(env, sub.code, patch);
-      if (sub.orgId) {
-        const o = JSON.parse(await env.PF_SYNC.get('org:' + sub.orgId) || 'null');
-        if (o) { o.status = status; await env.PF_SYNC.put('org:' + sub.orgId, JSON.stringify(o)); for (const m of (o.members || [])) await syncGrant(env, m.code, patch); }
-      }
       return json({ ok: true, status }, 200, env);
     }
 
@@ -2506,20 +2501,6 @@ async function handleBilling(request, env, url) {
     return json({ url: r.j.url }, 200, env);
   }
 
-  /* ---- POST /apply {firm, size, email, contact, runs} : a business application ---- */
-  if (url.pathname === '/apply' && request.method === 'POST') {
-    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    if (body.website) return json({ ok: true }, 200, env); /* honeypot: bots fill it, people never see it */
-    const firm = clean(body.firm, 120), email = clean(body.email, 160), contact = clean(body.contact, 120), runs = clean(body.runs, 1500);
-    const size = Math.floor(Number(body.size) || 0);
-    if (!firm || !contact || !runs) return json({ error: 'Firm, contact name and what you run are required.' }, 400, env);
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400, env);
-    if (!(size >= 3)) return json({ error: 'Business plans start at three seats.' }, 400, env);
-    const id = 'app_' + makeCode().replace('-', '').toLowerCase();
-    await env.PF_SYNC.put('app:' + id, JSON.stringify({ id, firm, size, email, contact, runs, status: 'new', at: Date.now() }));
-    if (env.OPERATOR_EMAIL) await sendPlain(env, env.OPERATOR_EMAIL, `Business application: ${firm} (${size} seats)`, `${firm}\n${contact} <${email}>\n${size} seats\n\n${runs}\n\nDecide in admin.`);
-    return json({ ok: true, id }, 200, env);
-  }
 
   /* ---- POST /kronos {code, symbol, horizon} -> a model forecast, cached a day ----
      Gated by a live access code. Daily OHLCV comes from Yahoo's chart endpoint (Finnhub's candle
@@ -2818,182 +2799,13 @@ async function handleBilling(request, env, url) {
     return json(result, 200, env);
   }
 
-  /* ---- GET /quote?plan=&seats= : the suggested price, for admin's Send quote draft ---- */
+  /* ---- GET /quote : the one price, for admin's Send quote draft ---- */
   if (url.pathname === '/quote' && request.method === 'GET') {
-    return json(quoteFor(clean(url.searchParams.get('plan'), 12).toLowerCase() === 'business' ? 'business' : 'personal', parseInt(url.searchParams.get('seats') || '1', 10)), 200, env);
+    return json(quoteFor(), 200, env);
   }
 
-  /* ---- POST /decide/members {id, emails[]}  (operator) : one code per member of a granted firm ----
-     The firm's request was granted as business and the admin has the members' emails. Each member
-     gets their own code (tier business, tied to the request) and their own email; the codes are kept
-     on the request record so admin can show and pause them. Re-running with an email already issued
-     re-sends that member's existing code rather than minting a second. */
-  if (url.pathname === '/decide/members' && request.method === 'POST') {
-    const auth = request.headers.get('Authorization') || '';
-    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    if (!env.SYNC_SECRET || !safeEqual(tok, env.SYNC_SECRET)) return json({ error: 'Unauthorized.' }, 401, env);
-    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    const id = clean(body.id, 40);
-    const rec = JSON.parse(await env.PF_SYNC.get('req:' + id) || 'null');
-    if (!rec) return json({ error: 'No such request.' }, 404, env);
-    if (rec.status !== 'business') return json({ error: 'Grant the request as business first.' }, 409, env);
-    const emails = [...new Set((Array.isArray(body.emails) ? body.emails : String(body.emails || '').split(/[\s,;]+/)).map(e => clean(e, 160).toLowerCase()).filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)))].slice(0, 50);
-    if (!emails.length) return json({ error: 'No valid member emails.' }, 400, env);
-    rec.members = Array.isArray(rec.members) ? rec.members : [];
-    const results = [];
-    for (const email of emails) {
-      let m = rec.members.find(x => x.email === email);
-      if (!m) {
-        /* seat: an explicit member number, never 1. A missing seat used to read as the admin seat at
-           /org/rulebook; the check now requires seat === 1 and this stamps every member. */
-        const seatNo = (Array.isArray(rec.seatCodes) ? rec.seatCodes.length : 1) + rec.members.length + 1;
-        const code = await mintCode(env, 'business', email, { requestId: id, firm: rec.who.slice(0, 80), memberOf: rec.email, seat: seatNo });
-        m = { email, code, issuedAt: Date.now() };
-        rec.members.push(m);
-      }
-      const mail = await sendPlain(env, email, 'Your PerceptFolio access code',
-        `You have been given a seat on your firm's PerceptFolio account by ${rec.email}.\n\nYour access code is:\n\n    ${m.code}\n\nOpen ${(env.SITE_URL || 'https://perceptfolio.com')}/enter/ and type it in. It works on every device you own. Keep it private; anyone holding it can open your terminal.\n\nPerceptFolio is research software, not investment advice. It never places a trade.`);
-      m.mail = { attempted: mail.attempted, ok: !!mail.ok, at: Date.now() };
-      results.push({ email, code: m.code, mail: mail.attempted ? (mail.ok ? 'sent' : 'failed') : 'not configured' });
-    }
-    await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
-    return json({ ok: true, members: results }, 200, env);
-  }
 
-  /* ---- GET /org?code=  : a business seat asks about its firm ----
-     Any live business code may read: the firm, how many seats, which seat this is, whether it is
-     the admin seat (the first code of the grant), and the rulebook if the admin has published one.
-     Members apply that rulebook and cannot change it; that is what "one standard" means. */
-  if (url.pathname === '/org' && request.method === 'GET') {
-    if (await tooMany(env, request, '/org', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
-    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
-    if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) return json({ org: null }, 200, env);
-    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
-    if (!c || c.tier !== 'business' || !c.requestId) return json({ org: null }, 200, env);
-    const rec = JSON.parse(await env.PF_SYNC.get('req:' + c.requestId) || 'null');
-    if (!rec) return json({ org: null }, 200, env);
-    const seat = c.seat || 1, seats = rec.seats || (rec.seatCodes ? rec.seatCodes.length : 1);
-    return json({ org: { id: rec.id, firm: rec.firm || null, contact: rec.email, seats, seat, isAdmin: seat === 1, paused: !!c.paused,
-      role: (rec.roles || {})[String(seat)] || (seat === 1 ? 'admin' : 'analyst'),
-      rulebook: rec.rulebook || null, rulebookAt: rec.rulebookAt || null, rulebookVersion: rec.rulebookVersion || null } }, 200, env);
-  }
-
-  /* ---- PUT /org/rulebook {code, rulebook} : the admin seat publishes the firm's rules ---- */
-  if (url.pathname === '/org/rulebook' && request.method === 'PUT') {
-    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    const code = clean(body.code, 12).toUpperCase();
-    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
-    if (!c || c.tier !== 'business' || !c.requestId || c.seat !== 1) return json({ error: 'Only the firm\'s admin seat can publish the rulebook.' }, 403, env);
-    const rb = body.rulebook || {};
-    const num = (v, lo, hi, d) => { const n = parseInt(v, 10); return isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
-    const rulebook = { qBuy: num(rb.qBuy, 1, 12, 8), pBuy: num(rb.pBuy, 0, 6, 3), qSell: num(rb.qSell, 0, 12, 4), mBuy: num(rb.mBuy, 0, 4, 0) };
-    const rec = JSON.parse(await env.PF_SYNC.get('req:' + c.requestId) || 'null');
-    if (!rec) return json({ error: 'No such firm.' }, 404, env);
-    /* A7.2. Every publish is a version, chained to the one before: a call is judged against the
-       rules that stood when it was made, so the rules must be as unforgeable as the calls. */
-    const log = Array.isArray(rec.rulebookLog) ? rec.rulebookLog : [];
-    const prev = log.length ? log[log.length - 1].hash : '';
-    const at = Date.now();
-    const canon = JSON.stringify({ at, prevHash: prev, rulebook: { mBuy: rulebook.mBuy, pBuy: rulebook.pBuy, qBuy: rulebook.qBuy, qSell: rulebook.qSell }, seat: 1 });
-    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canon)))).map(b => b.toString(16).padStart(2, '0')).join('');
-    const version = 'f:' + hash.slice(0, 12);
-    log.push({ version, hash, prevHash: prev, at, rulebook, seat: 1 });
-    rec.rulebook = rulebook; rec.rulebookAt = at; rec.rulebookVersion = version; rec.rulebookLog = log.slice(-200);
-    await env.PF_SYNC.put('req:' + c.requestId, JSON.stringify(rec));
-    return json({ ok: true, rulebook, rulebookAt: rec.rulebookAt, version }, 200, env);
-  }
-
-  /* ---- A7.1. PUT /org/keys {code, key, device} : a seat registers a device's public key ----
-     A seat's device makes an ECDSA P-256 key pair and keeps the private half where scripts cannot
-     read it; the public half is registered here under the seat. Every call the seat makes is
-     signed with it, so attribution is a signature a compliance reader can check, not a name in a
-     field. GET /org/keys?code= returns every seat's keys, for the firm's evidence pack. */
-  if (url.pathname === '/org/keys') {
-    let body = {}; if (request.method === 'PUT') { try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); } }
-    const code = clean(url.searchParams.get('code') || body.code, 12).toUpperCase();
-    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
-    if (!c || c.tier !== 'business' || !c.requestId || c.paused) return json({ error: 'A live seat of a firm is required.' }, 403, env);
-    const kk = 'seatkeys:' + c.requestId;
-    const keys = JSON.parse(await env.PF_SYNC.get(kk) || '[]');
-    if (request.method === 'GET') return json({ keys }, 200, env);
-    if (request.method === 'PUT') {
-      const k = body.key;
-      if (!k || k.kty !== 'EC' || k.crv !== 'P-256' || typeof k.x !== 'string' || typeof k.y !== 'string' || k.d) return json({ error: 'key must be a public P-256 JWK (kty EC, crv P-256, x, y, no d).' }, 400, env);
-      const jwk = { kty: 'EC', crv: 'P-256', x: clean(k.x, 64), y: clean(k.y, 64) };
-      const kid = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(jwk.x + '.' + jwk.y)))).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
-      if (!keys.some(x => x.kid === kid)) { keys.push({ kid, seat: c.seat || 1, jwk, device: clean(body.device, 60) || null, at: Date.now() }); await env.PF_SYNC.put(kk, JSON.stringify(keys.slice(-100))); }
-      return json({ ok: true, kid, seat: c.seat || 1 }, 200, env);
-    }
-    return json({ error: 'Method not allowed.' }, 405, env);
-  }
-
-  /* ---- A7.3. PUT /org/roles {code(admin), seat, role} ; a reviewer seat reads, never calls ---- */
-  if (url.pathname === '/org/roles' && request.method === 'PUT') {
-    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    const code = clean(body.code, 12).toUpperCase();
-    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
-    if (!c || c.tier !== 'business' || !c.requestId || c.seat !== 1) return json({ error: 'Only the firm\'s admin seat sets roles.' }, 403, env);
-    const seat = parseInt(body.seat, 10), role = String(body.role || '');
-    if (!(seat > 1) || !/^(analyst|reviewer)$/.test(role)) return json({ error: 'seat (2 or more) and role (analyst or reviewer).' }, 400, env);
-    const rec = JSON.parse(await env.PF_SYNC.get('req:' + c.requestId) || 'null');
-    if (!rec) return json({ error: 'No such firm.' }, 404, env);
-    rec.roles = rec.roles || {}; rec.roles[String(seat)] = role;
-    await env.PF_SYNC.put('req:' + c.requestId, JSON.stringify(rec));
-    return json({ ok: true, roles: rec.roles }, 200, env);
-  }
-
-  /* ---- A7.3, A7.4. GET /org/records?code= : every seat's record copy, for the admin or a reviewer ----
-     The firm's evidence: each seat's calls, marks, chain state, the heads log, and the seat keys,
-     in one answer. Only the admin seat (1) or a seat with the reviewer role may read it; an
-     analyst seat reads its own record through /record. */
-  if (url.pathname === '/org/records' && request.method === 'GET') {
-    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
-    const c = JSON.parse(await env.PF_SYNC.get('code:' + code) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + code) || 'null');
-    if (!c || c.tier !== 'business' || !c.requestId || c.paused) return json({ error: 'A live seat of a firm is required.' }, 403, env);
-    const rec = JSON.parse(await env.PF_SYNC.get('req:' + c.requestId) || 'null');
-    if (!rec) return json({ error: 'No such firm.' }, 404, env);
-    const role = (rec.roles || {})[String(c.seat || 1)] || (c.seat === 1 ? 'admin' : 'analyst');
-    if (!(c.seat === 1 || role === 'reviewer')) return json({ error: 'The firm\'s records are read by the admin seat or a reviewer seat.' }, 403, env);
-    const codes = Array.isArray(rec.seatCodes) ? rec.seatCodes : [];
-    const seats = [];
-    for (let i = 0; i < codes.length; i++) {
-      const sc = codes[i];
-      const cr = JSON.parse(await env.PF_SYNC.get('code:' + sc) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + sc) || 'null') || {};
-      const r = JSON.parse(await env.PF_SYNC.get('rec:c:' + sc) || 'null');
-      const heads = JSON.parse(await env.PF_SYNC.get('chain:c:' + sc) || '[]');
-      seats.push({ seat: cr.seat || (i + 1), email: cr.email || null, role: (rec.roles || {})[String(cr.seat || (i + 1))] || ((cr.seat || (i + 1)) === 1 ? 'admin' : 'analyst'), paused: !!cr.paused, record: r ? { updatedAt: r.updatedAt, calls: r.calls || [], reviews: r.reviews || [], chain: r.chain || null, rulebook: r.rulebook || null } : null, serverHeads: heads.slice(-120) });
-    }
-    const keys = JSON.parse(await env.PF_SYNC.get('seatkeys:' + c.requestId) || '[]');
-    return json({ firm: rec.firm || null, id: rec.id, seats, keys, rulebook: rec.rulebook || null, rulebookVersion: rec.rulebookVersion || null, rulebookLog: (rec.rulebookLog || []).map(x => ({ version: x.version, at: x.at, rulebook: x.rulebook, hash: x.hash, prevHash: x.prevHash })), asOf: Date.now() }, 200, env);
-  }
-
-  /* ---- A7.5. GET /org/status?id= (operator) : one line per seat, for admin.html ---- */
-  if (url.pathname === '/org/status' && request.method === 'GET') {
-    const auth = request.headers.get('Authorization') || '';
-    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    if (!env.SYNC_SECRET || !safeEqual(tok, env.SYNC_SECRET)) return json({ error: 'Unauthorized.' }, 401, env);
-    const id = clean(url.searchParams.get('id'), 40);
-    const rec = JSON.parse(await env.PF_SYNC.get('req:' + id) || 'null');
-    if (!rec) return json({ error: 'No such firm.' }, 404, env);
-    const codes = Array.isArray(rec.seatCodes) ? rec.seatCodes : [];
-    const keys = JSON.parse(await env.PF_SYNC.get('seatkeys:' + id) || '[]');
-    const seats = [];
-    for (let i = 0; i < codes.length; i++) {
-      const sc = codes[i];
-      const cr = JSON.parse(await env.PF_SYNC.get('code:' + sc) || 'null') || JSON.parse(await env.PF_SYNC.get('grant:' + sc) || 'null') || {};
-      const devs = JSON.parse(await env.PF_SYNC.get('udev:' + sc) || '[]');
-      const heads = JSON.parse(await env.PF_SYNC.get('chain:c:' + sc) || '[]');
-      const r = JSON.parse(await env.PF_SYNC.get('rec:c:' + sc) || 'null');
-      const seat = cr.seat || (i + 1);
-      seats.push({ seat, code: sc, tail: sc.slice(-5), email: cr.email || null, paused: !!cr.paused, role: (rec.roles || {})[String(seat)] || (seat === 1 ? 'admin' : 'analyst'),
-        devices: devs.length, lastSync: devs.reduce((a, d) => Math.max(a, d.at || d.lastSeen || 0), 0) || null,
-        lastHead: heads.length ? { day: heads[heads.length - 1].day, n: heads[heads.length - 1].n } : null,
-        recordAt: r ? r.updatedAt : null, calls: r ? (r.calls || []).length : 0, keys: keys.filter(k => k.seat === seat).length });
-    }
-    return json({ id, firm: rec.firm || null, seats, rulebookVersion: rec.rulebookVersion || null }, 200, env);
-  }
-
-  /* ---- POST /pause/code {code, paused}  (operator) : pause one seat, not the whole firm ---- */
+  /* ---- POST /pause/code {code, paused}  (operator) : pause one code without touching its request ---- */
   if (url.pathname === '/pause/code' && request.method === 'POST') {
     const auth = request.headers.get('Authorization') || '';
     const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
@@ -3011,33 +2823,6 @@ async function handleBilling(request, env, url) {
     return json({ ok: true, code, paused }, 200, env);
   }
 
-  /* ---- POST /apply/decide {id, decision:'accept'|'decline', seats?, note?}  (operator) ---- */
-  if (url.pathname === '/apply/decide' && request.method === 'POST') {
-    const auth = request.headers.get('Authorization') || '';
-    const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    if (!env.SYNC_SECRET || !safeEqual(tok, env.SYNC_SECRET)) return json({ error: 'Unauthorized.' }, 401, env);
-    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    const id = clean(body.id, 40), decision = clean(body.decision, 10).toLowerCase(), note = clean(body.note, 1000);
-    const app = JSON.parse(await env.PF_SYNC.get('app:' + id) || 'null');
-    if (!app) return json({ error: 'No such application.' }, 404, env);
-    if (decision === 'accept') {
-      const seats = Math.max(3, Math.floor(Number(body.seats) || app.size || 3));
-      const token = makeCode() + makeCode();
-      app.status = 'accepted'; app.seats = seats; app.token = token; app.decidedAt = Date.now(); app.note = note;
-      await env.PF_SYNC.put('app:' + id, JSON.stringify(app));
-      await env.PF_SYNC.put('apptok:' + token, id, { expirationTtl: 30 * 86400 });
-      const link = `${site}/pricing/?business=${token}&seats=${seats}`;
-      const mail = await sendPlain(env, app.email, 'PerceptFolio: your application is accepted', `${note ? note + '\n\n' : ''}Your firm is accepted for ${seats} seats. Choose monthly or yearly and pay here:\n\n${link}\n\nThe link is yours alone and works once. After payment your admin code arrives by email; you invite your analysts from the terminal's org settings.`);
-      return json({ ok: true, status: 'accepted', link, mail: mail.attempted ? (mail.ok ? 'sent' : 'failed') : 'not configured' }, 200, env);
-    }
-    if (decision === 'decline') {
-      app.status = 'declined'; app.decidedAt = Date.now(); app.note = note;
-      await env.PF_SYNC.put('app:' + id, JSON.stringify(app));
-      await sendPlain(env, app.email, 'PerceptFolio: your application', `${note || 'Thank you for applying. PerceptFolio is not the right fit for your firm at the moment.'}`);
-      return json({ ok: true, status: 'declined' }, 200, env);
-    }
-    return json({ error: 'decision must be accept or decline.' }, 400, env);
-  }
 
   return null;
 }

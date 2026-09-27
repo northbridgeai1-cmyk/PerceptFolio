@@ -6,9 +6,9 @@ import { Input, Textarea } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { WORKER, CONTACT } from '@/lib/config';
 
-/* Access is by email. The form composes a structured message and opens the visitor's own mail app,
-   so the request always arrives and nothing on this side has to send. A copy goes to the worker so
-   admin lists it with plan and seats; if that fails, nothing is lost. */
+/* Access is by request. FormSubmit delivers the form to NorthBridge's inbox and the worker keeps its
+   own copy for admin, so the visitor sends nothing: no mail app is ever opened, on success or on
+   failure. A failure says so and leaves the form filled in. */
 export function RequestForm() {
   const nav = useNavigate(); const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<React.ReactNode>(null);
@@ -16,8 +16,7 @@ export function RequestForm() {
     e.preventDefault(); const f = new FormData(e.currentTarget); const v = (k: string) => String(f.get(k) || '').trim();
     const name = v('name'), role = v('role'), email = v('email'), firm = v('firm'), book = v('book'), who = v('who'), call = v('call').slice(0, 300), when = v('when');
     const subject = 'PerceptFolio access request: ' + name + (firm ? ', ' + firm : '');
-    /* One plan: the worker's request record still carries a plan field for admin; it is always the terminal. */
-    try { fetch(WORKER + '/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, who: [name, role, firm, '', book, '', who].filter(Boolean).join('\n'), call, plan: 'personal', seats: 1, at: Date.now() }), keepalive: true }).catch(() => {}); } catch { /* the email is the request */ }
+    try { fetch(WORKER + '/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, who: [name, role, firm, '', book, '', who].filter(Boolean).join('\n'), call, at: Date.now() }), keepalive: true }).catch(() => {}); } catch { /* the email is the request */ }
     const fields: Record<string, string> = { Name: name, Role: role || '-', Email: email, Firm: firm || '-', 'The book': book, 'What they want the terminal to do': who, 'A call they would stand behind': call || '-', 'Best time to talk': when || '-' };
     /* FormSubmit delivers the request to the inbox and the worker keeps its own copy, so there is
        nothing for the visitor to send. A failure says so and leaves the form filled in; it never

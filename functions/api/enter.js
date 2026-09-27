@@ -9,6 +9,13 @@
            later use is checked against that grant (GET /status). A paused grant is refused here
            exactly as it is at the gate.
 
+           ONE NEW SIGN-IN A DAY (the owner's rule, 2026-09-27). A device that already holds a valid
+           session for the code skips every check below and simply gets a fresh thirty days, so a
+           signed-in terminal is never interrupted. A sign-in with no session behind it asks the
+           worker (POST /door), which allows the first one and makes the next wait out the day. The
+           code covers two devices; it does not need turning in a third browser the same afternoon,
+           and a code doing that is a code being passed around.
+
    secret  SYNC_SECRET, the operator's key. This exists to break the loop where admin is behind the
            gate but admin is also where codes come from. It issues a permanent operator session and
            nothing else; the admin page still asks for the secret itself to talk to the worker.
@@ -16,7 +23,7 @@
    Rate limiting is applied in front of this route by Cloudflare (see PRD §10 #8); the code alphabet
    and length make guessing impractical even without it, and a wrong code costs one KV read. */
 
-import { sign, setCookie, LIFETIME } from '../_lib/session.js';
+import { sign, setCookie, LIFETIME, verify, readCookie } from '../_lib/session.js';
 
 const CODE = /^[A-Z0-9]{5}-[A-Z0-9]{5}$/;
 const json = (obj, status = 200, cookie) => {
@@ -77,6 +84,12 @@ export async function onRequestPost({ request, env }) {
     return { status: r.status, j };
   };
 
+  /* Already signed in on this device, on this code: not a new sign-in at all. Slide the session and
+     return, before the day's hold is even consulted. The grant is still checked below on the normal
+     path, so a paused code cannot ride an old cookie for thirty days; the gate re-checks it too. */
+  const held = await verify(readCookie(request), env.SESSION_SECRET);
+  const sameDevice = !!(held && held.c === code);
+
   let status;
   try { status = await get('/status?code=' + encodeURIComponent(code)); }
   catch { return json({ ok: false, error: 'The access service is not reachable right now. Try again in a minute.' }, 502); }
@@ -84,6 +97,10 @@ export async function onRequestPost({ request, env }) {
   /* Already redeemed: the durable grant decides. */
   if (status.j && status.j.known) {
     if (!status.j.active) return json({ ok: false, error: 'Access for this code is paused. Contact the person who issued it.' }, 423);
+    if (!sameDevice) {
+      const hold = await door(code);
+      if (hold) return hold;
+    }
     return issue(env, code, status.j.tier || 'personal', next);
   }
 
@@ -102,5 +119,26 @@ export async function onRequestPost({ request, env }) {
   catch { return json({ ok: false, error: 'The access service is not reachable right now. Try again in a minute.' }, 502); }
   if (!burn.j || !burn.j.valid) return json({ ok: false, error: (burn.j && burn.j.error) || 'That code could not be redeemed.' }, 400);
 
+  /* The first sign-in ever. Stamped, not held: there is nothing to wait for yet. */
+  await door(code);
   return issue(env, code, burn.j.tier || 'personal', next);
+
+  /* The day's hold. Returns a 429 Response to send back, or null to carry on. A worker that cannot
+     be reached does NOT lock anyone out: the grant was already checked, and refusing a paying
+     account because a rate rule could not be read is the wrong way to fail. */
+  async function door(c) {
+    let r;
+    try {
+      r = await fetch(worker + '/door', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ code: c }),
+      });
+    } catch { return null; }
+    if (r.status !== 429) return null;
+    const j = await r.json().catch(() => null);
+    const h = new Headers({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    if (j && j.retryAfterMs) h.set('Retry-After', String(Math.ceil(j.retryAfterMs / 1000)));
+    return new Response(JSON.stringify({ ok: false, error: (j && j.error) || 'One new sign-in a day on a code. Try again tomorrow.' }), { status: 429, headers: h });
+  }
 }

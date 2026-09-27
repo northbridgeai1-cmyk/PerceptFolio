@@ -400,7 +400,6 @@ section + section{border-top:1px solid var(--line)}
 .plan legend{font-weight:600;font-size:14px;margin-bottom:8px}
 .plan .opt{display:inline-flex;align-items:center;gap:8px;margin-right:18px;font-size:15px;cursor:pointer}
 .plan .opt input{accent-color:var(--accent);width:16px;height:16px}
-.plan .seats{margin-top:14px;margin-bottom:0}
 .fg .muted{color:var(--faint)}
 .fg input,.fg textarea{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-md);padding:12px 14px;color:var(--text);font-size:15px;transition:border-color .15s}
 .fg textarea{min-height:110px;resize:vertical;line-height:1.5}
@@ -713,16 +712,6 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 calc(var(--s-32) +
             <div><label for="rqEmail">Email <span class="req" aria-hidden="true">*</span></label><input id="rqEmail" type="email" required placeholder="you@example.com" autocomplete="email" inputmode="email"></div>
             <div><label for="rqFirm">Firm <span class="muted" style="font-weight:400">(if any)</span></label><input id="rqFirm" maxlength="120" autocomplete="organization"></div>
           </div>
-          <fieldset class="fg plan">
-            <legend>For</legend>
-            <label class="opt"><input type="radio" name="plan" value="personal" checked> Myself</label>
-            <label class="opt"><input type="radio" name="plan" value="business"> A firm</label>
-            <div class="fg seats" id="seatsWrap" hidden>
-              <label for="rqSeats">How many people will use it</label>
-              <input id="rqSeats" type="number" min="1" max="500" value="3" inputmode="numeric">
-              <p class="hint">Three or more. Eight or more members get a lower price per seat; the quote will say so.</p>
-            </div>
-          </fieldset>
           <div class="fg">
             <label for="rqBook">The book <span class="req" aria-hidden="true">*</span></label>
             <textarea id="rqBook" required rows="2" placeholder="Roughly how large, how many positions, what style: concentrated long, long/short, income, sector focus."></textarea>
@@ -745,7 +734,7 @@ footer{border-top:1px solid var(--line);padding:var(--s-40) 0 calc(var(--s-32) +
             <input id="rqWhen" maxlength="120" placeholder="Weekday mornings, US Eastern">
           </div>
           <button class="btn btn-p btn-lg" type="submit" id="rqBtn">Send the request</button>
-          <p class="hint" style="margin-top:12px">Delivered to NorthBridge by email. Prefer to write it yourself? Email <a href="mailto:northbridgeai1@gmail.com?subject=PerceptFolio%20access%20request">northbridgeai1@gmail.com</a> with the same details.</p>
+          <p class="hint" style="margin-top:12px">This goes straight to NorthBridge's inbox when you press the button. Nothing else to send.</p>
           <div class="msg" id="rqMsg" role="status" aria-live="polite"></div>
         </div>
       </form>
@@ -1073,35 +1062,26 @@ document.getElementById('reqForm').addEventListener('submit',async ev=>{
   ev.preventDefault();
   const v=id=>((document.getElementById(id)||{}).value||'').trim();
   const name=v('rqName'), role=v('rqRole'), email=v('rqEmail'), firm=v('rqFirm'), book=v('rqBook'), who=v('rqWho'), call=readCall(), when=v('rqWhen');
-  const plan=(document.querySelector('input[name=plan]:checked')||{}).value||'personal';
-  const seats=plan==='business'?parseInt(v('rqSeats'),10)||3:1;
   const btn=document.getElementById('rqBtn');
-  const subject='PerceptFolio access request: '+name+(firm?', '+firm:'')+(plan==='business'?' ('+seats+' seats)':'');
-  const fields={ Name:name, Role:role||'-', Email:email, Firm:firm||'-', For:plan==='business'?'a firm, '+seats+' seats':'myself', 'The book':book, 'What they want the terminal to do':who, 'A call they would stand behind':call||'-', 'Best time to talk':when||'-' };
-  /* A copy to the worker so admin lists it with plan and seats. Best effort; the email is the request. */
-  try{ fetch(PF.worker.replace(/\/+$/,'')+'/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,who:[name,role,firm,'',book,'',who].filter(Boolean).join('\n'),call,plan,seats,at:Date.now()}),keepalive:true}).catch(()=>{}); }catch(e){}
-  /* Delivery: FormSubmit posts the fields to NorthBridge's inbox with no server of our own. If it
-     cannot be reached, the visitor's own mail app carries the same message, so nothing is lost. */
-  const mailFallback=()=>{
-    const lines=Object.entries(fields).map(([k,val])=>k+': '+val).join('\n')+'\n\n(Sent from perceptfolio.com)';
-    show('ok','Opening your mail app with the request filled in. Press send there. If nothing opened, email <b>'+esc(PF.contact)+'</b> with the same details.');
-    location.href='mailto:'+PF.contact+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(lines);
-  };
+  const subject='PerceptFolio access request: '+name+(firm?', '+firm:'');
+  const fields={ Name:name, Role:role||'-', Email:email, Firm:firm||'-', 'The book':book, 'What they want the terminal to do':who, 'A call they would stand behind':call||'-', 'Best time to talk':when||'-' };
+  /* A copy to the worker so admin lists it. Best effort; FormSubmit below is the delivery. */
+  try{ fetch(PF.worker.replace(/\/+$/,'')+'/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,who:[name,role,firm,'',book,'',who].filter(Boolean).join('\n'),call,at:Date.now()}),keepalive:true}).catch(()=>{}); }catch(e){}
+  /* Delivery: FormSubmit posts the fields to NorthBridge's inbox, and the worker keeps its own
+     copy, so there is nothing for the visitor to send. A failure says so and leaves the form filled
+     in; it never opens a mail app, which looked like the request had not arrived when it had. */
+  const failed=()=>show('bad','That did not go through. Try again in a moment; if it keeps failing, write to <b>'+esc(PF.contact)+'</b>.');
   btn.disabled=true; show('ok','Sending…');
   try{
     const r=await fetch('https://formsubmit.co/ajax/'+PF.contact,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
       body:JSON.stringify(Object.assign({_subject:subject,_template:'table',_replyto:email,_honey:''},fields))});
     const j=await r.json().catch(()=>({}));
     if(r.ok&&String(j.success)==='true'){ location.href='/thanks.html?type=request'; return; }
-    mailFallback();
-  }catch(e){ mailFallback(); }
+    failed();
+  }catch(e){ failed(); }
   finally{ btn.disabled=false; }
 });
 
-(function planToggle(){
-  const w=document.getElementById('seatsWrap'); if(!w)return;
-  document.querySelectorAll('input[name=plan]').forEach(r=>r.addEventListener('change',()=>{ w.hidden=r.value!=='business'||!r.checked; if(!w.hidden)document.getElementById('rqSeats').focus(); }));
-})();
 /* Someone who has entered before does not need to be sold to: the one primary action in the nav
    becomes "Resume session" and opens the terminal. "Entered before" is either a terminal profile
    in this browser or the door's pf_seen cookie on the gated host. */
