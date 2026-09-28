@@ -14,6 +14,8 @@ const mk = () => {
 let fails = 0; const t = (n, ok, x = '') => { console.log((ok ? '  PASS  ' : '  FAIL  ') + n + (ok ? '' : '   ' + x)); if (!ok) fails++; };
 
 const now = Date.now();
+const rss = rows => '<rss><channel>' + rows.map(([t, u, ago]) =>
+  '<item><title>' + t + '</title><link>' + u + '</link><source>Reuters</source><pubDate>' + new Date(now - ago).toUTCString() + '</pubDate></item>').join('') + '</channel></rss>';
 const article = (id, headline, agoMs) => ({ id, headline, source: 'Reuters', url: 'https://r.co/' + id, datetime: Math.floor((now - agoMs) / 1000) });
 
 function seed(store, { news = true } = {}) {
@@ -31,10 +33,14 @@ function seed(store, { news = true } = {}) {
   const mails = [], calls = [];
   globalThis.fetch = async (u, o = {}) => {
     const s = String(u);
-    if (s.includes('company-news')) { const sym = new URL(s).searchParams.get('symbol'); calls.push(sym);
-      return new Response(JSON.stringify(sym === 'AAPL'
-        ? [article('a1', 'Apple sued over battery life', 40 * 60000), article('old', 'Ancient story', 9 * 3600000)]
-        : [article('m1', 'Microsoft signs cloud deal', 20 * 60000)]), { status: 200 }); }
+    if (s.includes('feeds.finance.yahoo.com')) { const sym = new URL(s).searchParams.get('s'); calls.push(sym);
+      return new Response(sym === 'AAPL'
+        ? rss([['Apple sued over battery life', 'https://r.co/a1', 40 * 60000], ['Ancient story', 'https://r.co/old', 9 * 3600000]])
+        : rss([['Microsoft signs cloud deal', 'https://r.co/m1', 20 * 60000]]), { status: 200 }); }
+    if (s.includes('company_tickers_exchange')) return new Response(JSON.stringify({ data: [[320193, 'Apple', 'AAPL'], [789019, 'Microsoft', 'MSFT']] }), { status: 200 });
+    if (s.includes('data.sec.gov/submissions')) return new Response(JSON.stringify({ filings: { recent: {
+      form: ['8-K', '10-Q'], acceptanceDateTime: [new Date(now - 50 * 60000).toISOString(), new Date(now - 5 * 86400000).toISOString()],
+      accessionNumber: ['0000320193-26-000101', '0000320193-26-000090'] } } }), { status: 200 });
     if (s.includes('resend')) { mails.push(JSON.parse(o.body)); return new Response('{}', { status: 200 }); }
     return new Response('{}', { status: 200 });
   };
@@ -47,6 +53,11 @@ function seed(store, { news = true } = {}) {
   t('the one watching MSFT hears about it; the one who is not, does not',
     /Microsoft signs cloud deal/.test(one.text) && !/Microsoft/.test(two.text));
   t('a story older than a few hours is not called news', !/Ancient story/.test(one.text));
+  /* An 8-K is the filing the story is usually about, and it arrives before the coverage does. */
+  t('a fresh 8-K is reported beside the headlines, with its EDGAR link',
+    /Filed a 8-K with the SEC/.test(one.text) && /sec\.gov\/Archives\/edgar\/data\/320193\//.test(one.text), one.text.slice(0, 200));
+  t('an older filing is not dressed up as news', !/10-Q/.test(one.text));
+  t('every line carries a link now', /https:\/\/r\.co\/a1/.test(one.text));
   t('the mail carries headlines only, and says it is no verdict',
     /Apple sued over battery life/.test(one.text) && /nothing here is a verdict/.test(one.text) && !/secret/.test(one.text));
 
@@ -61,7 +72,7 @@ function seed(store, { news = true } = {}) {
 {
   const { store, env } = mk(); seed(store, { news: false });
   const mails = [];
-  globalThis.fetch = async (u, o = {}) => { if (String(u).includes('resend')) { mails.push(1); } return new Response(JSON.stringify([article('x', 'Anything', 1000)]), { status: 200 }); };
+  globalThis.fetch = async (u, o = {}) => { if (String(u).includes('resend')) { mails.push(1); } return new Response(rss([['Anything', 'https://r.co/x', 1000]]), { status: 200 }); };
   await worker.scheduled({ cron: '*/15 13-21 * * 1-5' }, env, { waitUntil: p => p });
   await new Promise(r => setTimeout(r, 60));
   t('nobody is mailed who did not ask', mails.length === 0);
@@ -71,7 +82,7 @@ function seed(store, { news = true } = {}) {
   store.set('grant:AAAAA-AAAAA', JSON.stringify({ code: 'AAAAA-AAAAA', email: 'one@example.com', paused: true }));
   store.delete('uslot:BBBBB-BBBBB');
   const mails = [];
-  globalThis.fetch = async (u, o = {}) => { if (String(u).includes('resend')) { mails.push(1); } return new Response(JSON.stringify([article('x', 'Anything', 1000)]), { status: 200 }); };
+  globalThis.fetch = async (u, o = {}) => { if (String(u).includes('resend')) { mails.push(1); } return new Response(rss([['Anything', 'https://r.co/x', 1000]]), { status: 200 }); };
   await worker.scheduled({ cron: '*/15 13-21 * * 1-5' }, env, { waitUntil: p => p });
   await new Promise(r => setTimeout(r, 60));
   t('a paused grant is told nothing', mails.length === 0);
@@ -81,7 +92,7 @@ function seed(store, { news = true } = {}) {
 {
   const { store, env } = mk(); seed(store);
   let newsCalls = 0;
-  globalThis.fetch = async (u) => { if (String(u).includes('company-news')) newsCalls++; return new Response('[]', { status: 200 }); };
+  globalThis.fetch = async (u) => { if (String(u).includes('yahoo') || String(u).includes('sec.gov')) newsCalls++; return new Response(rss([]), { status: 200 }); };
   await worker.scheduled({ cron: '40 21 * * 1-5' }, env, { waitUntil: p => p });
   await new Promise(r => setTimeout(r, 60));
   t('the nightly schedule does not run the news watcher', newsCalls === 0 && !store.has('cron:news'));
@@ -102,7 +113,7 @@ function seed(store, { news = true } = {}) {
   env.NOTIFY = { send: async () => {} };
   globalThis.fetch = async (u) => {
     const s = String(u);
-    if (s.includes('company-news')) return new Response(JSON.stringify([article('n1', 'Something broke', 30 * 60000)]), { status: 200 });
+    if (s.includes('yahoo')) return new Response(rss([['Something broke', 'https://r.co/n1', 30 * 60000]]), { status: 200 });
     if (s.includes('resend')) { resendCalls++; return new Response('{}', { status: 200 }); }
     return new Response('{}', { status: 200 });
   };
@@ -115,8 +126,8 @@ function seed(store, { news = true } = {}) {
 {
   const { store, env } = mk(); seed(store);
   delete env.RESEND_API_KEY; delete env.MAIL_FROM; delete env.NOTIFY;
-  globalThis.fetch = async (u) => String(u).includes('company-news')
-    ? new Response(JSON.stringify([article('n2', 'Something else broke', 30 * 60000)]), { status: 200 })
+  globalThis.fetch = async (u) => String(u).includes('yahoo')
+    ? new Response(rss([['Something else broke', 'https://r.co/n2', 30 * 60000]]), { status: 200 })
     : new Response('{}', { status: 200 });
   await worker.scheduled({ cron: '*/15 13-21 * * 1-5' }, env, { waitUntil: p => p });
   await new Promise(r => setTimeout(r, 80));

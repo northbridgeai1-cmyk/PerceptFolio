@@ -2877,6 +2877,15 @@ G('The feed was never the slow part: nobody was watching it');
   t('the terminal offers the notice beside the other two', /id="notifyNews" onchange="setNotify\('news',this\.checked\)"/.test(term) && /news:!!\(D\.notify&&D\.notify\.news\)/.test(term));
   t('the worker stores the third preference', /const prefs = \{ marks: !!body\.marks, reviews: !!body\.reviews, news: !!body\.news \};/.test(worker));
   t('both halves are contract-tested', fs.existsSync('test/newswatch.mjs') && /the same story is never sent twice/.test(read('test/newswatch.mjs')) && /the nightly schedule does not run the news watcher/.test(read('test/newswatch.mjs')));
+  /* FREE, AND WITHOUT A LICENCE QUESTION. Yahoo's per-ticker RSS needs no key, shares no
+     per-minute budget with the scoring engine, and sits outside Finnhub's personal-use terms for
+     news. EDGAR beside it is the company speaking for itself, earlier than the coverage. */
+  t('headlines come from Yahoo\'s free per-ticker feed, not from the metered one',
+    /feeds\.finance\.yahoo\.com\/rss\/2\.0\/headline\?s='/.test(worker)
+    && !/company-news\?symbol=' \+ encodeURIComponent\(sym\)[\s\S]{0,120}?FINNHUB_API_KEY/.test(worker));
+  t('a fresh 8-K rides along, linked, and an old one does not', /\/\^\(8-K\|6-K\)\//.test(worker) && /data\.sec\.gov\/submissions\/CIK/.test(worker) && /sec\.gov\/Archives\/edgar\/data\//.test(worker));
+  t('the ticker-to-CIK table is fetched once a day, not once a ticker', /async function cikForSymbol\(env, sym\)/.test(worker) && /'cikmap:' \+ new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/.test(worker));
+  t('every line in the mail carries its link', /\+ \(x\.url \? '\\n      ' \+ x\.url : ''\)/.test(worker));
   /* ONE MAIL PATH. sendPlainMail posted to Resend and nothing else, while sendPlain beside it
      already fell back to Cloudflare Email Routing. So on a worker with the NOTIFY binding and no
      Resend account every cron notice went nowhere, silently, because an unattempted send is not an

@@ -408,6 +408,37 @@ async function notifyMarks(env, ident, landed) {
    WHAT IT WILL NOT DO. It does not summarise, rank, score or interpret. A headline, its publisher
    and its time, for a name you hold or watch. Nothing here reaches a rulebook or a verdict; the
    terminal is where a story becomes a decision, and only by a person. */
+/* The watcher runs at module scope and cannot reach the parser inside the fetch handler. */
+function watchRss(xml) {
+  const un = t => String(t || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    .replace(/<[^>]+>/g, '').trim();
+  const pick = (b, tag) => { const m = b.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)<\\/' + tag + '>')); return m ? un(m[1]) : ''; };
+  const out = [];
+  for (const m of String(xml).matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const b = m[1], title = pick(b, 'title'), url = pick(b, 'link');
+    let host = ''; try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) {}
+    if (title && url) out.push({ title, url, source: pick(b, 'source') || host, at: Date.parse(pick(b, 'pubDate')) || 0 });
+  }
+  return out;
+}
+/* Ticker to CIK, from the SEC's own table, cached for the day. Zero-padded to ten, which is the
+   only form data.sec.gov accepts. */
+async function cikForSymbol(env, sym) {
+  const key = 'cikmap:' + new Date().toISOString().slice(0, 10);
+  let map = null;
+  try { map = JSON.parse(await env.PF_SYNC.get(key) || 'null'); } catch (e) {}
+  if (!map) {
+    const r = await fetch('https://www.sec.gov/files/company_tickers_exchange.json',
+      { headers: { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)', 'Accept': 'application/json' } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    map = {};
+    for (const row of (j.data || [])) if (row && row[2]) map[String(row[2]).toUpperCase()] = String(row[0]).padStart(10, '0');
+    await env.PF_SYNC.put(key, JSON.stringify(map), { expirationTtl: 3 * 86400 });
+  }
+  return map[sym] || null;
+}
 const NEWS_WATCH_MAX_SYMBOLS = 40;   // per run, pooled across every account
 const NEWS_WATCH_FRESH_MS = 3 * 3600000;   // older than this and it is not news, it is history
 async function runNewsWatch(env) {
@@ -415,7 +446,6 @@ async function runNewsWatch(env) {
   const startedAt = Date.now();
   const note = { at: new Date(startedAt).toISOString(), accounts: 0, symbols: 0, mailed: 0, errors: [] };
   try {
-    if (!env.FINNHUB_API_KEY) throw new Error('no FINNHUB_API_KEY on the worker');
     const list = await env.PF_SYNC.list({ prefix: 'uslot:', limit: 100 });
 
     /* Pass one: who is listening, and for what. */
@@ -453,16 +483,42 @@ async function runNewsWatch(env) {
     const from = new Date(startedAt - 2 * 86400000).toISOString().slice(0, 10);
     const bySym = {};
     for (const sym of symbols) {
+      bySym[sym] = [];
+      /* Headlines from Yahoo's per-ticker RSS rather than Finnhub. Free, no key, no per-minute
+         budget to share with the scoring engine, and outside Finnhub's personal-use terms for
+         news, which is a licence question this no longer has to answer. Headline, publisher and
+         link only; nothing is stored beyond that. */
       try {
-        const r = await fetch('https://finnhub.io/api/v1/company-news?symbol=' + encodeURIComponent(sym) +
-          '&from=' + from + '&to=' + today + '&token=' + env.FINNHUB_API_KEY);
-        if (!r.ok) continue;
-        const arr = await r.json();
-        if (!Array.isArray(arr)) continue;
-        bySym[sym] = arr
-          .filter(a => a && a.headline && a.datetime && (startedAt - a.datetime * 1000) < NEWS_WATCH_FRESH_MS)
-          .map(a => ({ id: String(a.id || a.url || a.headline).slice(0, 80), sym, headline: String(a.headline).slice(0, 200), source: String(a.source || '').slice(0, 60), at: a.datetime * 1000 }));
+        const r = await fetch('https://feeds.finance.yahoo.com/rss/2.0/headline?s=' + encodeURIComponent(sym) + '&region=US&lang=en-US',
+          { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PerceptFolio/1.0)', 'Accept': 'application/rss+xml,application/xml' } });
+        if (r.ok) for (const it of watchRss(await r.text())) {
+          if (!(startedAt - it.at < NEWS_WATCH_FRESH_MS)) continue;
+          bySym[sym].push({ id: (it.url || it.title).slice(0, 80), sym, headline: it.title.slice(0, 200), source: it.source.slice(0, 60), at: it.at, url: it.url });
+        }
       } catch (e) { /* one symbol failing is not the run failing */ }
+      /* AND WHAT THE COMPANY SAID ITSELF. An 8-K is the filing the story is usually about, it
+         arrives before the coverage does, and EDGAR carries no licence question at all. */
+      try {
+        const cik = await cikForSymbol(env, sym);
+        if (cik) {
+          const r = await fetch('https://data.sec.gov/submissions/CIK' + cik + '.json',
+            { headers: { 'User-Agent': 'PerceptFolio/1.0 (research terminal; northbridgeai1@gmail.com)', 'Accept': 'application/json' } });
+          if (r.ok) {
+            const j = await r.json();
+            const rec = (j && j.filings && j.filings.recent) || {};
+            const forms = rec.form || [], dates = rec.acceptanceDateTime || rec.filingDate || [], accs = rec.accessionNumber || [];
+            for (let i = 0; i < Math.min(forms.length, 20); i++) {
+              if (!/^(8-K|6-K)/.test(String(forms[i] || ''))) continue;
+              const at = Date.parse(dates[i] || '') || 0;
+              if (!at || !(startedAt - at < NEWS_WATCH_FRESH_MS)) continue;
+              const acc = String(accs[i] || '').replace(/-/g, '');
+              bySym[sym].push({ id: 'edgar:' + accs[i], sym, headline: 'Filed a ' + forms[i] + ' with the SEC',
+                source: 'SEC EDGAR', at,
+                url: 'https://www.sec.gov/Archives/edgar/data/' + Number(cik) + '/' + acc });
+            }
+          }
+        }
+      } catch (e) { /* EDGAR being slow is not the run failing */ }
     }
 
     /* Pass three: tell each watcher only what is new TO THEM. */
@@ -484,7 +540,7 @@ async function runNewsWatch(env) {
       await env.PF_SYNC.put(seenKey, JSON.stringify(seen), { expirationTtl: 3 * 86400 });
       fresh.sort((a, b) => b.at - a.at);
       const lines = fresh.slice(0, 12).map(x =>
-        '  ' + x.sym + '  ' + new Date(x.at).toISOString().slice(11, 16) + 'Z  ' + x.headline + (x.source ? '  (' + x.source + ')' : ''));
+        '  ' + x.sym + '  ' + new Date(x.at).toISOString().slice(11, 16) + 'Z  ' + x.headline + (x.source ? '  (' + x.source + ')' : '') + (x.url ? '\n      ' + x.url : ''));
       const r = await sendPlainMail(env, w.to,
         'PerceptFolio: news on ' + [...new Set(fresh.map(x => x.sym))].slice(0, 4).join(', ') + (fresh.length > 4 ? ' and others' : ''),
         'Published in the last few hours, on names you hold or watch:\n\n' + lines.join('\n') +
