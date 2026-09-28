@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v145/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v146/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2516,6 +2516,17 @@ t('an existing export counts as done', /D\.lastExportAt\|\|D\.firstRunAck/.test(
 t('a row menu builds an argument that survives an HTML attribute',
   /const q="'"\+String\(sym\)\.replace\(\/'\/g,""\)\+"'";/.test(term) && !/const q=JSON\.stringify\(String\(sym\)\)/.test(term));
 t('openMenu escapes a run that would break the attribute anyway', /String\(it\.run\)\.replace\(\/"\/g,'&quot;'\)/.test(term));
+/* WHICH DECISION MADE THE MONEY. The claim is that this tells you whether your decisions worked,
+   and until now it could answer only for the book as a whole. A total says you were up; it does
+   not say which holding carried you. */
+t('contribution is computed per holding, with weight beside it',
+  /function renderAttribution\(\)/.test(term) && /share:totalGain!==0\?g\/Math\.abs\(totalGain\)\*100:null/.test(term)
+  && /weight:totalVal>0\?val\(h\)\/totalVal\*100:0/.test(term) && /id="attribBody"/.test(term));
+/* A number that looks like attribution and is not would be worse than no number. */
+t('it says plainly that it is not Brinson attribution',
+  /It is not Brinson attribution/.test(term) && /no allocation-versus-selection split and no factor model/.test(term));
+t('a loser contributes a negative share, so the column adds up', /Signed on purpose: a loser's contribution is negative/.test(term));
+t('it is drawn when the tab that holds it is opened', /if\(t==='risk'\)renderAttribution\(\);/.test(term));
 t('the first-holding card says where the book is kept, not that there is no server',
   /It is kept on our server under your access code/.test(term) && !/PerceptFolio has no server/.test(term));
 t('iOS Safari gets the seven-day rule specifically',

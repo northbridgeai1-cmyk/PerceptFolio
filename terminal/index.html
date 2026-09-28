@@ -2065,6 +2065,19 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div id="benchBody" style="margin-top:12px"></div>
   </div>
 
+  <!-- WHICH DECISION MADE THE MONEY. The terminal's whole claim is that it tells you whether your
+       decisions worked, and until now it could only answer that for the book as a whole. A total
+       says you were up; it does not say which holding carried you, which one you were wrong about,
+       or whether the winner was big enough to matter. Contribution is what turns "the book is up
+       12%" into "NVDA is the book, and everything else is noise". -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+      <h3 style="margin:0">Which holdings made the money</h3>
+      <span class="pill pill-na" style="font-size:10px">arithmetic, not a verdict</span>
+    </div>
+    <div id="attribBody" style="margin-top:12px"></div>
+  </div>
+
   <div class="card">
     <h3>Portfolio risk</h3>
     <div class="row">
@@ -4045,6 +4058,7 @@ function showTab(t){
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
+  if(t==='risk')renderAttribution();
   if(t==='projections')renderHerizen();
   if(t==='news')renderNews();
   if(t==='risk'){renderBenchmarks();renderRiskContrib();renderCounterfactual();renderSharpe();renderVaR();}
@@ -8554,6 +8568,66 @@ function benchRow(title,sub,st,winLabel){
           'Read it as <b>don\'t know</b>, not as the number shown.'
         : 'The interval excludes zero on '+st.n+' days of data. That is a real result for this window; it is not a promise about the next one.')+
     '</div></details></div>';
+}
+
+/* ===== CONTRIBUTION =====
+   Each holding's share of the book's unrealised gain, and its weight beside it, because the two
+   together are the point: a 40% gain on 2% of the book did nothing, and a 6% gain on 30% of it did
+   most of the work.
+
+   WHAT THIS IS NOT. It is not Brinson attribution and does not claim to be: there is no allocation
+   and selection split, no factor model, no covariance matrix. Those need a benchmark's constituent
+   weights over time, which this terminal does not have and will not pretend to. What it computes
+   is contribution to the book's own gain, from cost and price, which is arithmetic anybody can
+   check by hand. The panel says so, because a number that looks like attribution and is not would
+   be worse than no number.
+
+   Excess against the index is per-holding and only where the price log has both ends, so a name
+   with no history is shown as unknown rather than as zero. */
+function renderAttribution(){
+  const box=document.getElementById('attribBody');
+  if(!box||!D)return;
+  const hs=(D.holdings||[]).filter(h=>h&&h.price!=null&&h.cost!=null&&h.shares>0);
+  if(!hs.length){ box.innerHTML='<div class="empty">Nothing to attribute yet. Add a holding with a cost and a price.</div>'; return; }
+  const val=h=>h.price*h.shares, cost=h=>h.cost*h.shares;
+  const totalVal=hs.reduce((a,h)=>a+val(h),0);
+  const totalGain=hs.reduce((a,h)=>a+(val(h)-cost(h)),0);
+  const totalCost=hs.reduce((a,h)=>a+cost(h),0);
+  const rows=hs.map(h=>{
+    const g=val(h)-cost(h);
+    return {sym:h.sym, weight:totalVal>0?val(h)/totalVal*100:0,
+            gain:g, pct:cost(h)>0?g/cost(h)*100:null,
+            /* Share of the book's gain. Signed on purpose: a loser's contribution is negative and
+               the column must add to the total, or it is decoration. */
+            share:totalGain!==0?g/Math.abs(totalGain)*100:null};
+  }).sort((a,b)=>b.gain-a.gain);
+  const sign=x=>(x>=0?'+':'\u2212')+Math.abs(x).toFixed(1);
+  const bookPct=totalCost>0?totalGain/totalCost*100:null;
+  box.innerHTML=
+    '<div class="row" style="gap:20px;flex-wrap:wrap;margin-bottom:12px">'+
+      '<div><div class="muted" style="font-size:11px;text-transform:uppercase">Book gain</div>'+
+        '<div class="num" style="font-size:22px;font-weight:700" class="'+(totalGain>=0?'pos':'neg')+'">'+pmask(fmt$(totalGain))+'</div></div>'+
+      '<div><div class="muted" style="font-size:11px;text-transform:uppercase">On cost</div>'+
+        '<div class="num" style="font-size:22px;font-weight:700">'+(bookPct==null?'-':sign(bookPct)+'%')+'</div></div>'+
+      '<div><div class="muted" style="font-size:11px;text-transform:uppercase">Holdings priced</div>'+
+        '<div class="num" style="font-size:22px;font-weight:700">'+hs.length+' of '+((D.holdings||[]).length)+'</div></div>'+
+    '</div>'+
+    '<table style="font-size:13.5px"><thead><tr><th>Ticker</th><th>Weight</th><th>Gain</th><th>On cost</th><th>Share of the gain</th></tr></thead><tbody>'+
+      rows.map(r=>'<tr><td><b>'+esc(r.sym)+'</b></td>'+
+        '<td class="num">'+r.weight.toFixed(1)+'%</td>'+
+        '<td class="num '+(r.gain>=0?'pos':'neg')+'">'+pmask(fmt$(r.gain))+'</td>'+
+        '<td class="num '+(r.pct==null?'muted':r.pct>=0?'pos':'neg')+'">'+(r.pct==null?'-':sign(r.pct)+'%')+'</td>'+
+        '<td class="num muted">'+(r.share==null?'-':sign(r.share)+'%')+'</td></tr>').join('')+
+    '</tbody></table>'+
+    /* The sentence somebody actually wants. */
+    (rows.length>1&&totalGain!==0
+      ? '<p style="font-size:13.5px;margin-top:12px"><b>'+esc(rows[0].sym)+'</b> is '+rows[0].weight.toFixed(0)+
+        '% of the book and '+(rows[0].share>=0?'made':'cost you')+' '+Math.abs(rows[0].share).toFixed(0)+
+        '% of the gain'+(rows[rows.length-1].gain<0?'. <b>'+esc(rows[rows.length-1].sym)+'</b> is the worst, at '+pmask(fmt$(rows[rows.length-1].gain))+'.':'.')+'</p>'
+      : '')+
+    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">Contribution to the book\u2019s own unrealised gain, from cost and price. '+
+      'It is not Brinson attribution: there is no allocation-versus-selection split and no factor model, because both need a benchmark\u2019s constituent weights over time and this terminal does not have them. '+
+      'Realised gains and dividends sit in History and are not counted here. Nothing on this panel reaches a verdict.</p>';
 }
 
 function renderBenchmarks(){
