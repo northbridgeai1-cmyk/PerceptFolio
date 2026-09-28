@@ -2425,6 +2425,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <button class="btn btn-ghost" onclick="exportHoldingsCsv()">Holdings (CSV)</button>
       <!-- Deliberately permissive: iOS matches by UTI rather than file extension, so a bare
            accept=".json" greys the backup file out in the Files picker and makes import impossible. -->
+      <label class="btn btn-ghost" style="display:inline-block">Import trades (CSV)<input type="file" accept=".csv,text/csv" style="display:none" onchange="importTradesCsv(event)"></label>
       <label class="btn btn-ghost" style="display:inline-block">Import JSON<input type="file" accept=".json,application/json,text/json,text/plain" style="display:none" onchange="importData(event)"></label>
     </div>
   </div>
@@ -11992,6 +11993,113 @@ function snoozeBackupBanner(){
   renderBackupBanner();
   toast('Hidden for this visit. Settings \u2192 Backup / Restore has the export whenever you want it.');
 }
+/* ===== BRING YOUR BROKER'S HISTORY IN =====
+   Every broker exports a CSV of trades and every one of them names the columns differently. This
+   reads the header rather than demanding a format, so a file from Schwab, Fidelity, IBKR, Vanguard,
+   E*TRADE or Robinhood lands without the person editing it first.
+
+   WHY THIS MATTERS MORE THAN IT LOOKS. The record starts empty, and the terminal cannot say
+   anything about a person's decisions until it has marked a few dozen. A broker export carries
+   years of real decisions with real dates and real prices. Imported, the record is not a blank
+   page on day one: it is their actual history, and the marking can begin from it.
+
+   WHAT IT WILL NOT DO. It does not invent a thesis for a trade nobody wrote one for, and it does
+   not mark an imported trade as though the terminal had called it. An imported row is history, and
+   it is labelled imported so it can never be mistaken for a call this terminal made and graded.
+   That distinction is the whole product; an importer that blurred it would be worse than none. */
+const CSV_ALIASES = {
+  date: ['date','trade date','trandate','run date','activity date','settlement date','executed','time','datetime','date acquired'],
+  sym: ['symbol','ticker','instrument','security','stock','underlying symbol','symbol/cusip'],
+  side: ['action','side','type','transaction type','activity','description','buy/sell','trans code'],
+  qty: ['quantity','shares','qty','amount of shares','units','no. of shares'],
+  price: ['price','share price','price per share','trade price','execution price','avg price','price ($)'],
+};
+/* A quoted field may contain commas, so the line cannot simply be split. */
+function csvSplit(line){
+  const out=[]; let cur='', q=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(q){ if(ch==='"'&&line[i+1]==='"'){cur+='"';i++;} else if(ch==='"'){q=false;} else cur+=ch; }
+    else if(ch==='"')q=true;
+    else if(ch===','){out.push(cur);cur='';}
+    else cur+=ch;
+  }
+  out.push(cur);
+  return out.map(x=>x.trim());
+}
+function csvNum(v){
+  const t=String(v==null?'':v).replace(/[$,\s]/g,'').replace(/^\((.*)\)$/,'-$1');
+  const f=parseFloat(t);
+  return isFinite(f)?f:null;
+}
+function csvDate(v){
+  const t=String(v||'').trim().slice(0,24);
+  if(/^\d{4}-\d{2}-\d{2}/.test(t))return t.slice(0,10);
+  const d=new Date(t);
+  return isNaN(d)?null:d.toISOString().slice(0,10);
+}
+/* Some exports carry the side only inside a description: "YOU BOUGHT 10 AAPL". */
+function csvSide(v){
+  const t=String(v||'').toLowerCase();
+  if(/\bsell|sold|sale\b/.test(t))return 'sell';
+  if(/\bbuy|bought|purchase\b/.test(t))return 'buy';
+  return null;
+}
+function importTradesCsv(ev){
+  const f=ev&&ev.target&&ev.target.files&&ev.target.files[0];
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ applyTradesCsv(String(rd.result||'')); }catch(e){ toast('That file could not be read: '+e.message); } ev.target.value=''; };
+  rd.readAsText(f);
+}
+function applyTradesCsv(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2)return toast('That file has no rows.');
+  /* Brokers put preamble above the header, so the header is the first line that names a symbol
+     column rather than simply the first line. */
+  let hi=-1, head=null;
+  for(let i=0;i<Math.min(lines.length,25);i++){
+    const cells=csvSplit(lines[i]).map(x=>x.toLowerCase());
+    if(cells.some(c=>CSV_ALIASES.sym.includes(c))){ hi=i; head=cells; break; }
+  }
+  if(hi<0)return toast('No column named Symbol or Ticker was found, so the file could not be read.');
+  const col={};
+  for(const key of Object.keys(CSV_ALIASES)){
+    col[key]=head.findIndex(c=>CSV_ALIASES[key].includes(c));
+  }
+  if(col.sym<0||col.qty<0)return toast('That file has no share-quantity column, so trades cannot be read from it.');
+
+  const seen=new Set((D.transactions||[]).map(t=>[t.date,t.sym,t.action,t.shares,t.price].join('|')));
+  let added=0, skipped=0, dupes=0;
+  for(let i=hi+1;i<lines.length;i++){
+    const c=csvSplit(lines[i]);
+    const sym=String(c[col.sym]||'').toUpperCase().replace(/[^A-Z.\-]/g,'');
+    const shares=Math.abs(csvNum(c[col.qty])||0);
+    const price=col.price>=0?csvNum(c[col.price]):null;
+    const date=col.date>=0?csvDate(c[col.date]):null;
+    /* The side may live in its own column or inside a description; both are tried. */
+    const side=csvSide(col.side>=0?c[col.side]:'')||csvSide(lines[i]);
+    if(!sym||!(shares>0)||!side||!date||!(price>0)){ skipped++; continue; }
+    const key=[date,sym,side,shares,price].join('|');
+    if(seen.has(key)){ dupes++; continue; }
+    seen.add(key);
+    if(!D.transactions)D.transactions=[];
+    D.transactions.push({ts:new Date(date+'T12:00:00Z').getTime(),date,sym,action:side,
+      type:'Stock',shares,price,broker:'',spy:null,
+      /* Never confused with a call this terminal made and graded. */
+      imported:true});
+    added++;
+  }
+  if(!added&&!dupes)return toast('No rows could be read. Needed: a date, a symbol, a quantity, a price and a buy or sell.');
+  D.transactions.sort((a,b)=>(a.ts||0)-(b.ts||0));
+  if(D.transactions.length>2000)D.transactions=D.transactions.slice(D.transactions.length-2000);
+  saveDB(); renderAll();
+  toast(added+' trade'+(added===1?'':'s')+' imported'+
+    (dupes?', '+dupes+' already there':'')+
+    (skipped?', '+skipped+' row'+(skipped===1?'':'s')+' without a date, price or side skipped':'')+
+    '. They are marked imported: history, not calls this terminal made.');
+}
+
 function importData(ev){
   const f=ev.target.files[0];if(!f)return;
   const r=new FileReader();

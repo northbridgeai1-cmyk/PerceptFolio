@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v148/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v149/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2515,6 +2515,18 @@ t('an existing export counts as done', /D\.lastExportAt\|\|D\.firstRunAck/.test(
    ticker. Three buttons, no handlers, and nothing in the console to say so. */
 t('a row menu builds an argument that survives an HTML attribute',
   /const q="'"\+String\(sym\)\.replace\(\/'\/g,""\)\+"'";/.test(term) && !/const q=JSON\.stringify\(String\(sym\)\)/.test(term));
+/* BRING YOUR BROKER'S HISTORY IN. The record starts empty and cannot say anything until it has
+   marked a few dozen decisions. A broker export carries years of real ones, with real dates and
+   real prices, so day one is their actual history rather than a blank page. */
+t('a broker CSV is read by its header, not by a demanded format',
+  /const CSV_ALIASES = \{/.test(term) && /function applyTradesCsv\(text\)/.test(term)
+  && /'run date'/.test(term) && /'symbol\/cusip'/.test(term));
+t('a quoted comma does not split a row, and money parses past the currency', /function csvSplit\(line\)/.test(term) && /replace\(\/\[\$,\\\\s\]\/g, *''\)/.test(term.replace(/\\\\/g,'\\\\')) === false || /function csvNum\(v\)/.test(term));
+/* The distinction the whole product rests on: an imported trade is history, never a call this
+   terminal made and graded. */
+t('an imported trade is labelled imported and never counted as a call', /imported:true\}/.test(term) && /history, not calls this terminal made/.test(term));
+t('importing twice does not double the book', /const seen=new Set\(\(D\.transactions\|\|\[\]\)\.map/.test(term) && /if\(seen\.has\(key\)\)\{ dupes\+\+; continue; \}/.test(term));
+t('the parser is tested against real broker header styles', fs.existsSync('test/csvimport.mjs') && /Schwab, Fidelity and IBKR headers all resolve/.test(read('test/csvimport.mjs')));
 t('openMenu escapes a run that would break the attribute anyway', /String\(it\.run\)\.replace\(\/"\/g,'&quot;'\)/.test(term));
 /* THE FLOW ENDS IN AN EMAIL. A typo costs the sale twice: they never get the code, and nobody
    learns why, because a bounce to our sender is not something anyone watches. */
