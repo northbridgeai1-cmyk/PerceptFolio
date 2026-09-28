@@ -229,3 +229,11 @@ npx wrangler secret put NEWS_API_KEY -c worker.wrangler.toml
 npx wrangler secret put NEWS_API_URL -c worker.wrangler.toml   # only for a reseller or proxy
 ```
 To go back to the free feed: `npx wrangler secret delete NEWS_API_KEY -c worker.wrangler.toml`.
+
+**2026-09-27, knowing it when it breaks.** Two halves, both free, because the latency was never in the feed: Finnhub carries a company's headlines within minutes and the terminal simply had nobody watching.
+
+**While you are looking:** News refreshes itself every 90 seconds, and only while News is the open tab and the window is in front. It stops on a tab change, on blur and on the page being hidden, because a timer running behind a hidden tab spends the shared market-data allowance on a page nobody is reading.
+
+**While you are not:** a second cron, `*/15 13-21 * * 1-5` (about 9am to 5:45pm New York), reads the synced book under `uslot:<code>` for the holdings and the watchlist, pools those symbols across every account so ten accounts watching ten names cost ten calls rather than a hundred, and emails each account only what is new to it. Opt-in, beside the mark and review notices; a paused grant is told nothing; `newsseen:<ident>` stops a story being sent twice and expires in three days. Headlines, publisher and time only: nothing is scored, ranked or interpreted, and nothing reaches a rulebook.
+
+`scheduled()` branches on `event.cron`, and an unrecognised schedule falls to the nightly marking pass, because losing a mark is the worse failure.

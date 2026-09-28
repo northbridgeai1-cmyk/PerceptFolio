@@ -46,4 +46,7 @@ binding = "AI"
 # day; the run itself checks the exchange calendar and the licence (it records why it did
 # nothing when there is no licensed feed). Without this block scheduled() never fires.
 [triggers]
-crons = ["40 21 * * 1-5"]
+# 21:40 UTC on weekdays: the nightly pass that marks the record and sends review notices.
+# Every fifteen minutes from 13:00 to 21:45 UTC on weekdays: the news watcher, which is roughly
+# 9am to 5:45pm New York across both halves of the year. scheduled() branches on which fired.
+crons = ["40 21 * * 1-5", "*/15 13-21 * * 1-5"]

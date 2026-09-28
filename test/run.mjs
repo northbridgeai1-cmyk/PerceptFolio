@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v142/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v143/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2844,6 +2844,40 @@ G('Nothing to type, nothing to download');
   t('it is contract-tested', fs.existsSync('test/whoami.mjs') && /a live session returns the code the door was opened with/.test(read('test/whoami.mjs')));
 }
 
+
+
+/* ==================== KNOWING IT WHEN IT BREAKS ==================== */
+G('The feed was never the slow part: nobody was watching it');
+{
+  /* 1. Live while you are looking. */
+  t('News refreshes itself while it is the open tab', /const NEWS_LIVE_MS=90000;/.test(term) && /function newsLiveOn\(\)/.test(term) && /if\(t==='news'\)newsLiveOn\(\); else newsLiveOff\(\);/.test(term));
+  /* A timer left running behind a hidden tab spends the market-data allowance on a page nobody is
+     reading, and on a shared key that is somebody else's bill. */
+  t('the timer stops on a hidden tab, on blur, and on leaving News',
+    /if\(document\.hidden\|\|!openTabIs\('news'\)\)return;/.test(term)
+    && /window\.addEventListener\('blur',newsLiveOff\)/.test(term)
+    && /if\(document\.hidden\)newsLiveOff\(\)/.test(term));
+  t('the open tab is read from the nav rather than a second variable to keep in step', /function openTabIs\(name\)\{ const b=document\.querySelector\('nav button\.active'\)/.test(term));
+
+  /* 2. Told when you are not here. */
+  t('a quarter-hourly schedule runs beside the nightly one', /crons = \["40 21 \* \* 1-5", "\*\/15 13-21 \* \* 1-5"\]/.test(read('worker.wrangler.toml')));
+  t('the two schedules do different jobs, and an unknown one falls to the nightly',
+    /const isNews = String\(\(event && event\.cron\) \|\| ''\)\.startsWith\('\*\/15'\);/.test(worker)
+    && /isNews \? runNewsWatch\(env\) : runCronMarks\(env\)/.test(worker));
+  t('the watcher reads the synced book for the names, and nothing else from it',
+    /function runNewsWatch\(env\)/.test(worker) && /prefix: 'uslot:'/.test(worker)
+    && /\(Array\.isArray\(d\.holdings\) \? d\.holdings : \[\]\)\.map\(h => h && h\.sym\)/.test(worker));
+  /* Ten accounts watching the same ten names must cost ten calls, not a hundred. */
+  t('symbols are pooled across accounts before a single call is made', /const symbols = \[\.\.\.pool\]\.slice\(0, NEWS_WATCH_MAX_SYMBOLS\);/.test(worker));
+  t('it is opt-in, and a paused grant is told nothing', /if \(!prefs\.news\) continue;/.test(worker) && /emailForIdent reads the grant and returns null for a paused one/.test(worker));
+  t('a story is never sent twice, and the ledger cannot grow without bound',
+    /'newsseen:' \+ w\.ident/.test(worker) && /if \(seen\[item\.id\]\) continue;/.test(worker) && /expirationTtl: 3 \* 86400/.test(worker));
+  t('stale stories are not called news', /NEWS_WATCH_FRESH_MS = 3 \* 3600000/.test(worker));
+  t('the mail carries headlines only and says it is no verdict', /Headlines only\. Nothing here has been scored/.test(worker));
+  t('the terminal offers the notice beside the other two', /id="notifyNews" onchange="setNotify\('news',this\.checked\)"/.test(term) && /news:!!\(D\.notify&&D\.notify\.news\)/.test(term));
+  t('the worker stores the third preference', /const prefs = \{ marks: !!body\.marks, reviews: !!body\.reviews, news: !!body\.news \};/.test(worker));
+  t('both halves are contract-tested', fs.existsSync('test/newswatch.mjs') && /the same story is never sent twice/.test(read('test/newswatch.mjs')) && /the nightly schedule does not run the news watcher/.test(read('test/newswatch.mjs')));
+}
 
 /* ==================== FEAR AND GREED ==================== */
 G('Somebody else\'s measurement, reported with its working');

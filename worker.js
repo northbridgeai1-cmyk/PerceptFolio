@@ -221,8 +221,13 @@ export default {
      close). Without the trigger this handler never runs. Whether it is actually running is
      observable: every run stamps cron:last, which /version reports to an authenticated caller —
      "never" there means the trigger is missing, not that the code is. */
+  /* TWO SCHEDULES, TWO JOBS. The nightly one marks the record and sends the review notices; it
+     must run once, after the close, and doing it every quarter hour would be both wrong and
+     expensive. The quarter-hourly one only watches news. Branching on event.cron keeps them apart;
+     an unrecognised schedule falls to the nightly job, because losing a mark is the worse failure. */
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runCronMarks(env).then(() => runReviewNotices(env)).catch(() => {}));
+    const isNews = String((event && event.cron) || '').startsWith('*/15');
+    ctx.waitUntil((isNews ? runNewsWatch(env) : runCronMarks(env).then(() => runReviewNotices(env))).catch(() => {}));
   },
   async fetch(request, env) {
     /* Everything is wrapped so that ANY failure still returns CORS headers. Without this an
@@ -349,7 +354,7 @@ async function emailForIdent(env, ident) {
 }
 async function notifyPrefs(env, ident) {
   const raw = await env.PF_SYNC.get('notify:' + ident);
-  return raw ? JSON.parse(raw) : { marks: false, reviews: false };
+  return raw ? JSON.parse(raw) : { marks: false, reviews: false, news: false };
 }
 async function sendPlainMail(env, to, subject, text) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM || !to) return { attempted: false, ok: false };
@@ -368,6 +373,116 @@ async function notifyMarks(env, ident, landed) {
   await sendPlainMail(env, to, 'PerceptFolio: ' + landed.length + ' mark' + (landed.length === 1 ? '' : 's') + ' landed',
     'Marked today against the index:\n\n' + landed.map(x => '  ' + x).join('\n') + '\n\nThe reading is in the terminal: perceptfolio.com/terminal/ (Command, the record strip; History for every call).\n\nThis notice is sent because you turned it on under Settings. Turn it off there.');
 }
+/* ===== NEWS ON YOUR OWN NAMES, WHILE THE MARKET IS OPEN =====
+
+   THE LATENCY WAS NEVER IN THE FEED. Finnhub carries a company's headlines within minutes; the
+   terminal simply had nobody watching, so you learned about it when you next opened the News tab.
+   This runs every fifteen minutes through the session and mails the ones that are yours.
+
+   WHOSE NAMES. The synced book under uslot:<code> already holds the holdings and the watchlist,
+   which is exactly the list that matters and is nobody's extra work to maintain. Nothing else is
+   read from it: the symbols, and then the door is shut.
+
+   WHAT IT COSTS. Symbols are pooled across every account before any call is made, so ten accounts
+   watching the same ten names cost ten calls, not a hundred. The pool is capped, the run is capped,
+   and a write only happens when something new was actually found, which keeps this well inside
+   both Finnhub's minute and KV's day.
+
+   WHAT IT WILL NOT DO. It does not summarise, rank, score or interpret. A headline, its publisher
+   and its time, for a name you hold or watch. Nothing here reaches a rulebook or a verdict; the
+   terminal is where a story becomes a decision, and only by a person. */
+const NEWS_WATCH_MAX_SYMBOLS = 40;   // per run, pooled across every account
+const NEWS_WATCH_FRESH_MS = 3 * 3600000;   // older than this and it is not news, it is history
+async function runNewsWatch(env) {
+  if (!env.PF_SYNC) return;
+  const startedAt = Date.now();
+  const note = { at: new Date(startedAt).toISOString(), accounts: 0, symbols: 0, mailed: 0, errors: [] };
+  try {
+    if (!env.FINNHUB_API_KEY) throw new Error('no FINNHUB_API_KEY on the worker');
+    const list = await env.PF_SYNC.list({ prefix: 'uslot:', limit: 100 });
+
+    /* Pass one: who is listening, and for what. */
+    const watchers = [];
+    const pool = new Set();
+    for (const k of list.keys) {
+      const code = k.name.slice(6);
+      if (!/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(code)) continue;
+      const ident = 'c:' + code;
+      const prefs = await notifyPrefs(env, ident);
+      if (!prefs.news) continue;                       // opt-in, like every other notice
+      /* emailForIdent reads the grant and returns null for a paused one, so this is also the
+         check that a paused account is told nothing. activeGrant lives inside the fetch handler
+         and is not in scope out here; going through the grant record directly is the same test. */
+      const to = await emailForIdent(env, ident);
+      if (!to) continue;
+      let book = null;
+      try { book = JSON.parse(await env.PF_SYNC.get(k.name) || 'null'); } catch (e) { continue; }
+      const d = (book && book.data) || {};
+      const syms = [...new Set([
+        ...(Array.isArray(d.holdings) ? d.holdings : []).map(h => h && h.sym).filter(Boolean),
+        ...(Array.isArray(d.watchlist) ? d.watchlist : []),
+      ])].map(x => String(x).toUpperCase()).filter(x => /^[A-Z.\-]{1,8}$/.test(x)).slice(0, 25);
+      if (!syms.length) continue;
+      watchers.push({ ident, to, syms });
+      syms.forEach(x => pool.add(x));
+      note.accounts++;
+    }
+    if (!watchers.length) return void await env.PF_SYNC.put('cron:news', JSON.stringify(note));
+
+    /* Pass two: one call per symbol, shared by everyone who watches it. */
+    const symbols = [...pool].slice(0, NEWS_WATCH_MAX_SYMBOLS);
+    note.symbols = symbols.length;
+    const today = new Date().toISOString().slice(0, 10);
+    const from = new Date(startedAt - 2 * 86400000).toISOString().slice(0, 10);
+    const bySym = {};
+    for (const sym of symbols) {
+      try {
+        const r = await fetch('https://finnhub.io/api/v1/company-news?symbol=' + encodeURIComponent(sym) +
+          '&from=' + from + '&to=' + today + '&token=' + env.FINNHUB_API_KEY);
+        if (!r.ok) continue;
+        const arr = await r.json();
+        if (!Array.isArray(arr)) continue;
+        bySym[sym] = arr
+          .filter(a => a && a.headline && a.datetime && (startedAt - a.datetime * 1000) < NEWS_WATCH_FRESH_MS)
+          .map(a => ({ id: String(a.id || a.url || a.headline).slice(0, 80), sym, headline: String(a.headline).slice(0, 200), source: String(a.source || '').slice(0, 60), at: a.datetime * 1000 }));
+      } catch (e) { /* one symbol failing is not the run failing */ }
+    }
+
+    /* Pass three: tell each watcher only what is new TO THEM. */
+    for (const w of watchers) {
+      const seenKey = 'newsseen:' + w.ident;
+      let seen = {};
+      try { seen = JSON.parse(await env.PF_SYNC.get(seenKey) || '{}'); } catch (e) { seen = {}; }
+      const fresh = [];
+      for (const sym of w.syms) for (const item of (bySym[sym] || [])) {
+        if (seen[item.id]) continue;
+        seen[item.id] = startedAt;
+        fresh.push(item);
+      }
+      if (!fresh.length) continue;
+      /* The ledger is pruned to a day, so it cannot grow without bound and a story cannot be
+         re-sent because the entry aged out mid-morning. */
+      const cutoff = startedAt - 26 * 3600000;
+      for (const id of Object.keys(seen)) if (!(seen[id] > cutoff)) delete seen[id];
+      await env.PF_SYNC.put(seenKey, JSON.stringify(seen), { expirationTtl: 3 * 86400 });
+      fresh.sort((a, b) => b.at - a.at);
+      const lines = fresh.slice(0, 12).map(x =>
+        '  ' + x.sym + '  ' + new Date(x.at).toISOString().slice(11, 16) + 'Z  ' + x.headline + (x.source ? '  (' + x.source + ')' : ''));
+      const r = await sendPlainMail(env, w.to,
+        'PerceptFolio: news on ' + [...new Set(fresh.map(x => x.sym))].slice(0, 4).join(', ') + (fresh.length > 4 ? ' and others' : ''),
+        'Published in the last few hours, on names you hold or watch:\n\n' + lines.join('\n') +
+        (fresh.length > 12 ? '\n\n  and ' + (fresh.length - 12) + ' more.' : '') +
+        '\n\nHeadlines only. Nothing here has been scored, and nothing here is a verdict: the reading is in the terminal, perceptfolio.com/terminal/ (News).' +
+        '\n\nTo stop these: Settings, then the record copy card, and turn news off.');
+      if (r.ok) note.mailed++;
+    }
+  } catch (e) {
+    note.errors.push(String(e && e.message || e));
+  }
+  note.ms = Date.now() - startedAt;
+  try { await env.PF_SYNC.put('cron:news', JSON.stringify(note)); } catch (e) {}
+}
+
 /* Reviews due: the record copy carries each thesis's next review date (a date, never the text).
    One notice per due date per identity. */
 async function runReviewNotices(env) {
@@ -1536,7 +1651,7 @@ async function handle(request, env) {
       if (request.method === 'GET') return json(await notifyPrefs(env, ident), 200, env);
       if (request.method === 'PUT') {
         let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-        const prefs = { marks: !!body.marks, reviews: !!body.reviews };
+        const prefs = { marks: !!body.marks, reviews: !!body.reviews, news: !!body.news };
         await env.PF_SYNC.put(key, JSON.stringify(prefs));
         return json(Object.assign({ ok: true, address: !!(await emailForIdent(env, ident)) }, prefs), 200, env);
       }

@@ -2384,6 +2384,9 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <div style="margin-top:12px;display:grid;gap:6px;font-size:13.5px">
       <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="notifyMarks" onchange="setNotify('marks',this.checked)"><span>Email when a mark lands</span></label>
       <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="notifyReviews" onchange="setNotify('reviews',this.checked)"><span>Email when a review is due</span></label>
+      <!-- Every fifteen minutes while the market is open, on names in your holdings or watchlist.
+           Headlines only, deduplicated, and never the same story twice. -->
+      <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="notifyNews" onchange="setNotify('news',this.checked)"><span>Email when news breaks on a name you hold or watch</span></label>
       <span class="muted" id="notifyStatus" style="font-size:12px"></span>
     </div>
   </div>
@@ -4036,6 +4039,8 @@ function showTab(t){
   // Macro data is fetched only when the tab is actually opened, so a user who never looks at it
   // never spends a request on it.
   if(t==='market'){fillMacroInputs();renderScorecard();renderSeasonal();renderHindsight();loadMarketData(false);loadFearGreed();}
+  /* Only News keeps a timer, and only while it is the open tab. */
+  if(t==='news')newsLiveOn(); else newsLiveOff();
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
@@ -7854,6 +7859,38 @@ function symbolNewsCard(sym,items,tag,move){
     '</details>'+
   '</div>';
 }
+/* ===== LIVE WHILE YOU ARE LOOKING =====
+   A headline reaches the feed within a minute of publication; the terminal simply never went back
+   for it, so the page you were reading at half past nine was still the page you had at nine.
+
+   This refreshes News every ninety seconds, and ONLY while News is the open tab and the window is
+   actually in front. A timer that keeps running behind a hidden tab is a bill somebody else pays:
+   it spends the market-data allowance on a page nobody is reading. It stops on tab change, on
+   blur, and on the page being hidden, and starts again when you come back.
+
+   Ninety seconds is deliberate. Under a minute buys nothing a person can act on and costs a
+   multiple of the calls; the email watcher is what covers you when you are not here at all. */
+const NEWS_LIVE_MS=90000;
+let _newsLiveTimer=null;
+/* There is no currentTab global: showTab marks the open tab on its nav button, so that is what is
+   read here rather than adding a second source of truth to keep in step. */
+function openTabIs(name){ const b=document.querySelector('nav button.active'); return !!b&&b.dataset.tab===name; }
+function newsLiveOn(){
+  if(_newsLiveTimer)return;
+  _newsLiveTimer=setInterval(()=>{
+    if(document.hidden||!openTabIs('news'))return;     // belt and braces; the listeners also stop it
+    if(!hasMarketData())return;
+    newsCache={};                                       // the point is to go back to the wire
+    loadNews(false).then(()=>{ if(worldNews)loadWorldNews(worldNews.country||''); }).catch(()=>{});
+    const st=document.getElementById('newsStatus');
+    if(st)st.textContent='Updated '+new Date().toLocaleTimeString();
+  },NEWS_LIVE_MS);
+}
+function newsLiveOff(){ if(_newsLiveTimer){ clearInterval(_newsLiveTimer); _newsLiveTimer=null; } }
+document.addEventListener('visibilitychange',()=>{ if(document.hidden)newsLiveOff(); else if(openTabIs('news'))newsLiveOn(); });
+window.addEventListener('blur',newsLiveOff);
+window.addEventListener('focus',()=>{ if(openTabIs('news')&&!document.hidden)newsLiveOn(); });
+
 /* ===== FEAR AND GREED =====
    CNN's index, not ours. Loaded once a session when Market is opened, cached an hour at the worker.
    Everything here is reported: no number is recomputed, nothing is scored against a rulebook, and
@@ -16483,11 +16520,11 @@ async function setNotify(kind,on){
   const st=document.getElementById('notifyStatus');
   try{
     const t=await cronUrl('/notify'); if(!t){ if(st)st.textContent='Needs an access code: Settings → Access code.'; return; }
-    const cur=Object.assign({marks:!!(D.notify&&D.notify.marks),reviews:!!(D.notify&&D.notify.reviews)},{[kind]:!!on});
+    const cur=Object.assign({marks:!!(D.notify&&D.notify.marks),reviews:!!(D.notify&&D.notify.reviews),news:!!(D.notify&&D.notify.news)},{[kind]:!!on});
     const r=await fetch(t.url,{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},t.headers),body:JSON.stringify(cur)});
     const j=await r.json().catch(()=>({}));
     if(!r.ok){ if(st)st.textContent='Not saved: '+(j.error||('HTTP '+r.status)); return; }
-    D.notify={marks:!!j.marks,reviews:!!j.reviews}; saveDB();
+    D.notify={marks:!!j.marks,reviews:!!j.reviews,news:!!j.news}; saveDB();
     if(st)st.textContent=j.address?'Saved. Sent to the address on your access.':'Saved, but no email address is on record for this code; ask the operator.';
     if(on&&kind==='reviews')pushRecordCopy(true);
   }catch(e){ if(st)st.textContent='Not saved: not reachable.'; }
@@ -16525,8 +16562,8 @@ function renderRecordCopyCard(){
   const blocked=syncBlockedReason()||(typeof isDemoUser==='function'&&isDemoUser());
   card.style.display=blocked?'none':'';
   tg.checked=recordCopyOn(); tg.disabled=false;
-  const nm=document.getElementById('notifyMarks'), nr=document.getElementById('notifyReviews');
-  if(nm)nm.checked=!!(D.notify&&D.notify.marks); if(nr)nr.checked=!!(D.notify&&D.notify.reviews);
+  const nm=document.getElementById('notifyMarks'), nr=document.getElementById('notifyReviews'), nn=document.getElementById('notifyNews');
+  if(nm)nm.checked=!!(D.notify&&D.notify.marks); if(nr)nr.checked=!!(D.notify&&D.notify.reviews); if(nn)nn.checked=!!(D.notify&&D.notify.news);
   const n=(D.calls||[]).length, sealed=(D.calls||[]).reduce((a,c)=>a+Object.values(c.marks||{}).filter(m=>m&&m.hash).length,0);
   st.textContent=(recordCopyOn()?'On. ':'Off. ')+n+' call'+(n===1?'':'s')+', '+sealed+' sealed mark'+(sealed===1?'':'s')+(D.recordCopyAt?' · last copy '+new Date(D.recordCopyAt).toLocaleString():' · no copy yet')+(D.recordCopyErr?' · last push failed: '+D.recordCopyErr:'');
 }
