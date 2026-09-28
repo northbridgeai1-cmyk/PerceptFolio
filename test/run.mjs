@@ -1447,7 +1447,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
   const cat = read('world/catalog.mjs');
   t('the catalogue matches operators as whole words, case-insensitively, and the extractor never sends a regex to Overpass', /\(\^\|\[\^A-Za-z\]\)/.test(cat) && /keywords:/.test(cat) && /wikidata:/.test(cat) && /BASE_SETS/.test(read('scripts/world-extract.mjs')) && /out:csv/.test(read('scripts/world-extract.mjs')) && !/\["name"~/.test(read('scripts/world-extract.mjs')));
   t('the search box routes an industry phrase to a bundled layer and a company to the worker, and the worker route is code-gated', /function route\(phrase\)/.test(term) && /INVITE_WORKER\+'\/world'/.test(term) && /url\.pathname === '\/world'/.test(worker) && /grantIsLive\(env, code\)/.test(worker.slice(worker.indexOf("url.pathname === '/world'"), worker.indexOf("url.pathname === '/world'") + 800)));
-  t('the worker sends the phrase to Nominatim as a plain term, identified, at most once a second, caps the answer and caches a week', /\[A-Za-z0-9&'\.\\- \]\{2,40\}/.test(worker) && /nominatim\.openstreetmap\.org\/search/.test(worker) && /PerceptFolio-world\/1\.0/.test(worker) && /nominatim:last/.test(worker) && /WORLD_CAP = 50/.test(worker) && /expirationTtl: 7 \* 86400/.test(worker) && !/overpass-api|interpreter/i.test(worker));
+  t('the worker sends the phrase to Nominatim as a plain term, identified, at most once a second, caps the answer and caches a week', /\[A-Za-z0-9&'\.\\- \]\{2,40\}/.test(worker) && /nominatim\.openstreetmap\.org\/search/.test(worker) && /PerceptFolio-world\/1\.0/.test(worker) && /nominatim:last/.test(worker) && /WORLD_CAP = 200/.test(worker) && /expirationTtl: 7 \* 86400/.test(worker) && !/overpass-api|interpreter/i.test(worker));
   t('the globe’s credit line names the sources; the provenance and the God’s Eye View credit live in world/README.md (the page carries no essays by request)', /OpenStreetMap contributors \(ODbL\)/.test(term) && /Natural Earth II/.test(term) && /God's Eye View|God’s Eye View/.test(read('world/README.md')) && /incomplete by nature/.test(read('world/README.md')));
   t('plant links open in a new tab without a referrer', /rel="noopener noreferrer"/.test(term.slice(term.indexOf('id="v2-world"'))));
   t('on a phone the chips are a rail you swipe, the globe follows the box, the panel follows the globe', /@media \(max-width:768px\)\{\s*#tab-world \.wd-form input\{flex:1 1 0;min-width:0\}/.test(term) && /#tab-world \.wd-chips\{flex-wrap:nowrap;overflow-x:auto/.test(term) && /#tab-world \.wd-stage\{grid-template-columns:1fr;gap:12px\}/.test(term));
@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v144/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v145/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2510,6 +2510,12 @@ t('it fires once and is remembered', /D\.firstRunAck=Date\.now\(\)/.test(term) &
 t('an existing export counts as done', /D\.lastExportAt\|\|D\.firstRunAck/.test(term));
 /* The nag was written when there was no server. There is one now, so it says where the book is
    and offers an export rather than demanding one. */
+/* THE MENU THAT DREW PERFECTLY AND DID NOTHING. openMenu inlines an item's `run` into
+   onclick="…", so a JSON.stringify'd argument closed the attribute at the first character of the
+   ticker. Three buttons, no handlers, and nothing in the console to say so. */
+t('a row menu builds an argument that survives an HTML attribute',
+  /const q="'"\+String\(sym\)\.replace\(\/'\/g,""\)\+"'";/.test(term) && !/const q=JSON\.stringify\(String\(sym\)\)/.test(term));
+t('openMenu escapes a run that would break the attribute anyway', /String\(it\.run\)\.replace\(\/"\/g,'&quot;'\)/.test(term));
 t('the first-holding card says where the book is kept, not that there is no server',
   /It is kept on our server under your access code/.test(term) && !/PerceptFolio has no server/.test(term));
 t('iOS Safari gets the seven-day rule specifically',

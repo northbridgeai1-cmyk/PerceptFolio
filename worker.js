@@ -2698,7 +2698,12 @@ async function grantIsLive(env, code) {
 /* Nominatim, OSM's geocoder, the way God's Eye View uses it for keyless lookups: an honest
    User-Agent, and never more than one request a second across everyone who opens the terminal
    (a KV timestamp; eventually consistent, so a best effort, and the per-IP limit sits above it). */
-const WORLD_CAP = 50;
+/* Raised from 50 (2026-09-27): a search for a large company was coming back with a fraction of
+   its sites because the cap bit before the grouping did. Nominatim's own ceiling is what limits it
+   now, not ours. The honest limit is upstream and stated in the answer: OpenStreetMap indexes
+   places by NAME, and a plant is very often tagged with its operator rather than its brand, so a
+   company search finds the sites somebody happened to label. `saturated` says when the cap bit. */
+const WORLD_CAP = 200;
 const NOMINATIM_KEEP = { man_made: /^(works|wastewater_plant|water_works|mineshaft|adit|offshore_platform)$/, landuse: /^(industrial|quarry|construction|port)$/, industrial: /./, power: /^(plant|substation)$/, telecom: /^data_center$/, building: /^(industrial|factory|warehouse|manufacture|data_center)$/, craft: /./ };
 async function nominatim(env, q) {
   try {

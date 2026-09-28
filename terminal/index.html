@@ -429,6 +429,7 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
   color:var(--text);cursor:pointer;font-family:inherit}
 .btn-add:hover{border-color:#3d434f;background:var(--panel2)}
 .btn-add .plus{font-size:14px;line-height:1;color:var(--accent)}
+@media (max-width:900px){.fg-row{grid-template-columns:minmax(0,1fr)!important}}
 .pick-th,.pick-td{width:32px;text-align:center;padding-right:0}
 .pick-box{cursor:pointer}
 .pick-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:10px 12px;
@@ -1812,12 +1813,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <details class="aside"><summary>How the ruler works</summary><div>The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b>, it's a ruler, not a forecast.</div></details>
   </div>
 
-  <!-- 1a. Fear and greed. Somebody else's measurement, reported, with the seven readings it is
-       made of and the date on each. A single 0-100 score with nothing behind it is exactly the
-       kind of number this terminal exists to argue with; the components are what make it arguable.
-       It reaches no rulebook and no verdict, and the panel says so. -->
-  <div id="fearGreedCard"></div>
-
   <!-- 1b. Calendar effects — CONTEXT ONLY, and the panel says so twice.
        This exists because on the fourth of September somebody publishes "September is the worst
        month for stocks" and does not divide by the standard deviation. The defence against a bad
@@ -1835,6 +1830,10 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
        through the worker. Context beside everything else on this tab and never an input to a
        verdict; every tile carries its own date, because a monthly statistic sitting beside a daily
        one must say so before anything else. -->
+  <!-- Rates on the left, the dial in its own box on the right. It is one borrowed number and does
+       not deserve the width of the tab; beside the rates it reads as what it is, a second piece of
+       weather. Stacks underneath below 900px rather than squeezing the dial to nothing. -->
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start" class="fg-row">
   <div class="card">
     <div class="row" style="justify-content:space-between;flex-wrap:wrap">
       <h3 style="margin:0">Rates and the economy</h3>
@@ -1842,6 +1841,8 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     </div>
     <div id="ratesLine" style="margin-top:12px" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
     <details class="aside"><summary>Reading the card</summary><div><b>Fed funds</b> is the overnight rate the Fed sets, inside its target range; the <b>3-month</b> bill tracks it. The <b>2-year</b> is the market's bet on where that rate goes next; the <b>10-</b> and <b>30-year</b> price growth and inflation for decades ahead, and the <b>mortgage</b> rate is what the 10-year costs a household. When the 2-year sits above the 10-year (a negative <b>2s10s</b>) the curve is inverted, which has preceded most US recessions by a year or so and has also sent false alarms. <b>Inflation</b> is the CPI over the past twelve months, realised; the <b>breakeven</b> is the inflation the bond market expects over the next ten. <b>Unemployment</b> is the labour market as of last month. The <b>balance sheet</b> rising is the Fed buying bonds, falling is the Fed letting them run off. None of it feeds a score or a verdict here. It is the weather the businesses you rate are operating in.</div></details>
+  </div>
+  <div id="fearGreedCard"></div>
   </div>
 
   <!-- Hindsight. What the best and worst names DID, and why that is not a shopping list. -->
@@ -5770,7 +5771,9 @@ function openMenu(btn,items){
   const el=document.createElement('div');
   el.id=id; el.className='ovf-menu';
   el.innerHTML=items.map(it=>
-    '<button class="ovf-item'+(it.danger?' danger':'')+'" onclick="closeMenu();'+it.run+'">'+esc(it.label)+'</button>'
+    /* A double quote anywhere in run would terminate the attribute, exactly the bug this file
+       already shipped once. Escaped rather than trusted, so a future caller cannot repeat it. */
+    '<button class="ovf-item'+(it.danger?' danger':'')+'" onclick="closeMenu();'+String(it.run).replace(/"/g,'&quot;')+'">'+esc(it.label)+'</button>'
   ).join('');
   document.body.appendChild(el);
   /* Flip upward when there is not room below, so a menu on the last row is never cut off. */
@@ -5789,7 +5792,11 @@ window.addEventListener('scroll',()=>closeMenu(),true);
 function screenerMenu(btn,sym,inWatch){
   /* run is an expression string, matching every other menu in this file; openMenu inlines it into
      the item's onclick. Passing a function here would stringify into something that does nothing. */
-  const q=JSON.stringify(String(sym));
+  /* SINGLE QUOTES, NOT JSON.stringify. openMenu inlines this into onclick="…", so a double-quoted
+     argument closes the attribute at the first character of the ticker and the browser is left
+     holding onclick="closeMenu();analyzeStock(" with the rest as stray attributes. The menu drew
+     perfectly and did nothing, which is why it read as three dead buttons. */
+  const q="'"+String(sym).replace(/'/g,"")+"'";
   const items=[{label:'Analyze',run:'analyzeStock('+q+')'}];
   if(!inWatch)items.push({label:'Add to watchlist',run:'addWatchSym('+q+')'});
   items.push({label:'Add to list',run:'openListPicker('+q+')'});
@@ -8009,7 +8016,7 @@ function renderFearGreed(){
     '<div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">Fear and greed</h3>'+
       '<span class="muted" style="font-size:12px">'+esc(f.source)+(f.cached?' \u00b7 cached':'')+'</span></div>'+
     '<div style="display:grid;place-items:center;margin-top:6px">'+
-      '<svg viewBox="0 0 200 118" width="260" height="154" role="img" aria-label="Fear and greed '+Math.round(f.score)+' out of 100, '+esc(fgBand(f.score))+'">'+
+      '<svg viewBox="0 0 200 118" width="100%" height="auto" style="max-width:230px" role="img" aria-label="Fear and greed '+Math.round(f.score)+' out of 100, '+esc(fgBand(f.score))+'">'+
         seg(0,25,'#e5534b')+seg(25,45,'#d9a441')+seg(45,55,'#9aa0a6')+seg(55,75,'#5ac27f')+seg(75,100,'#2fa36b')+
         '<line x1="'+CX+'" y1="'+CY+'" x2="'+nx+'" y2="'+ny+'" stroke="var(--text)" stroke-width="3.5" stroke-linecap="round"/>'+
         '<circle cx="'+CX+'" cy="'+CY+'" r="7" fill="var(--panel)" stroke="var(--text)" stroke-width="3"/>'+
@@ -8017,7 +8024,7 @@ function renderFearGreed(){
         '<text x="180" y="114" font-size="9" fill="currentColor" opacity=".55">100</text>'+
       '</svg>'+
       '<div style="margin-top:-14px;text-align:center">'+
-        '<div class="num" style="font-size:40px;font-weight:800;line-height:1;color:'+col+'">'+Math.round(f.score)+'</div>'+
+        '<div class="num" style="font-size:34px;font-weight:800;line-height:1;color:'+col+'">'+Math.round(f.score)+'</div>'+
         '<div style="font-size:16px;font-weight:600;color:'+col+';margin-top:4px">'+esc(fgBand(f.score))+'</div>'+
         '<div class="muted" style="font-size:12px;margin-top:2px">'+esc(day(f.at))+'</div></div>'+
     '</div>'+
