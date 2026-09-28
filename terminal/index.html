@@ -2386,7 +2386,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="notifyReviews" onchange="setNotify('reviews',this.checked)"><span>Email when a review is due</span></label>
       <!-- Every fifteen minutes while the market is open, on names in your holdings or watchlist.
            Headlines only, deduplicated, and never the same story twice. -->
-      <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="notifyNews" onchange="setNotify('news',this.checked)"><span>Email when news breaks on a name you hold or watch</span></label>
+      <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="notifyNews" onchange="setNewsAlerts(this.checked)"><span>Notify me when news breaks on a name I hold or watch</span></label>
       <span class="muted" id="notifyStatus" style="font-size:12px"></span>
     </div>
   </div>
@@ -6018,10 +6018,14 @@ const PRESET_LISTS={
   materials:{label:'Materials',keywords:['materials','mining','chemicals','metals','steel'],tickers:['LIN','SHW','APD','ECL','FCX','NEM','DOW','DD','PPG','NUE','VMC','MLM','ALB','IFF','CE','IP']},
   communication:{label:'Communication Services',keywords:['communication','communications','media','telecom','streaming'],tickers:['GOOGL','META','NFLX','DIS','CMCSA','VZ','T','TMUS','CHTR','EA','TTWO','WBD','OMC','PINS']}
 };
+/* A PICK BUTTON RUNS THE SCREEN. These used to fill the ticker box and stop, leaving a toast as
+   the only sign anything had happened, so pressing "Dow 30" and watching nothing move read as a
+   dead button. Filling a box is not what somebody pressing a list of stocks is asking for. */
 function loadPreset(name){
   const p=PRESET_LISTS[name];if(!p)return;
   document.getElementById('screenerInput').value=p.tickers.join(', ');
-  toast('Loaded '+p.tickers.length+' '+p.label+' tickers, hit Run screen to score them.');
+  toast('Scoring '+p.tickers.length+' '+p.label+' tickers\u2026');
+  if(typeof startScreener==='function')startScreener();
 }
 /* Sector/theme search — matches against curated preset lists by label or keyword.
    Honest limitation: this is NOT a live scan of the whole market (Finnhub's free tier doesn't offer
@@ -6107,6 +6111,7 @@ function loadRecommendations(){
   const filtered=D.weeklyPicks.tickers.filter(t=>!held.has(t)&&!watched.has(t));
   if(!filtered.length)return toast('This week\'s picks are all already in your Portfolio or Watchlist. Check back next week for a fresh batch.');
   document.getElementById('screenerInput').value=filtered.join(', ');
+  if(typeof startScreener==='function')startScreener();
   if(isNewWeek){
     const carried=WEEKLY_PICK_SIZE-D.weeklyPicks.newCount;
     toast('New batch for this week: '+filtered.length+' tickers ('+D.weeklyPicks.newCount+' new, '+carried+' carried over from last week). Hit Run screen to score them.');
@@ -7859,6 +7864,54 @@ function symbolNewsCard(sym,items,tag,move){
     '</details>'+
   '</div>';
 }
+/* ===== A NOTIFICATION, NOT AN EMAIL =====
+   The owner's call: the terminal tells you, the inbox does not. It is the same news the watcher
+   found, delivered where the work is.
+
+   BE HONEST ABOUT WHAT THIS REACHES. A Notification raised by this page arrives while the terminal
+   is open, including when it is a background tab or a minimised window. It does not arrive with
+   the terminal closed; that needs Web Push and a key pair on the worker, which is a separate build.
+   The card says so rather than letting someone assume their phone will buzz on a Sunday.
+
+   Permission is asked for on the tick, never on load: a browser that is asked out of nowhere is a
+   browser where the person presses Block, and Block is not easily taken back. */
+let _newsAlerts=false, _seenHeadlines=null;
+async function setNewsAlerts(on){
+  const st=document.getElementById('notifyStatus');
+  if(!on){ _newsAlerts=false; D.newsAlerts=false; saveDB(); if(st)st.textContent='Notifications off.'; return; }
+  if(!('Notification' in window)){ if(st)st.textContent='This browser does not do notifications.'; document.getElementById('notifyNews').checked=false; return; }
+  let perm=Notification.permission;
+  if(perm==='default'){ try{ perm=await Notification.requestPermission(); }catch(e){ perm='denied'; } }
+  if(perm!=='granted'){
+    document.getElementById('notifyNews').checked=false;
+    if(st)st.textContent='The browser refused. Allow notifications for this site in its settings, then tick this again.';
+    return;
+  }
+  _newsAlerts=true; D.newsAlerts=true; saveDB();
+  if(st)st.textContent='On. You will be told while the terminal is open, including in a background tab. A closed terminal cannot reach you.';
+}
+/* Which headlines have already been shown, so a refresh does not re-announce the morning. Kept for
+   this session only: a notification you already read is not worth carrying to tomorrow. */
+function announceNews(items){
+  if(!_newsAlerts||!('Notification' in window)||Notification.permission!=='granted')return;
+  if(!_seenHeadlines)_seenHeadlines=new Set();
+  const fresh=[];
+  for(const it of items||[]){
+    const key=(it.url||it.headline||'').slice(0,120);
+    if(!key||_seenHeadlines.has(key))continue;
+    _seenHeadlines.add(key); fresh.push(it);
+  }
+  if(!fresh.length)return;
+  /* One notification, however many landed. A story per popup is how people turn them off. */
+  const head=fresh[0];
+  const body=fresh.length===1?head.headline:(fresh.length+' headlines, starting: '+head.headline);
+  try{
+    const nf=new Notification('PerceptFolio: '+[...new Set(fresh.map(x=>x.sym).filter(Boolean))].slice(0,3).join(', '),
+      {body:body.slice(0,180),tag:'pf-news',icon:'/icon-192.png'});
+    nf.onclick=()=>{ window.focus(); showTab('news'); nf.close(); };
+  }catch(e){}
+}
+
 /* ===== LIVE WHILE YOU ARE LOOKING =====
    A headline reaches the feed within a minute of publication; the terminal simply never went back
    for it, so the page you were reading at half past nine was still the page you had at nine.
@@ -7881,12 +7934,29 @@ function newsLiveOn(){
     if(document.hidden||!openTabIs('news'))return;     // belt and braces; the listeners also stop it
     if(!hasMarketData())return;
     newsCache={};                                       // the point is to go back to the wire
-    loadNews(false).then(()=>{ if(worldNews)loadWorldNews(worldNews.country||''); }).catch(()=>{});
+    loadNews(false).then(()=>{ announceNewsFromCache(); if(worldNews)loadWorldNews(worldNews.country||''); }).catch(()=>{});
     const st=document.getElementById('newsStatus');
     if(st)st.textContent='Updated '+new Date().toLocaleTimeString();
   },NEWS_LIVE_MS);
 }
 function newsLiveOff(){ if(_newsLiveTimer){ clearInterval(_newsLiveTimer); _newsLiveTimer=null; } }
+/* The refresh has already put everything in newsCache; this reads the names the person actually
+   holds or watches out of it and hands the new ones to announceNews. */
+function announceNewsFromCache(){
+  try{
+    const mine=new Set([...(D.holdings||[]).filter(h=>h.type!=='Fund').map(h=>h.sym),...(D.watchlist||[])]);
+    const out=[];
+    for(const sym of mine){
+      const hit=newsCache[sym+':'+newsWindow];
+      for(const a of ((hit&&hit.items)||[])){
+        if(!a||!a.datetime)continue;
+        if(Date.now()-a.datetime*1000>3*3600000)continue;
+        out.push({sym,headline:a.headline||'',url:a.url||''});
+      }
+    }
+    announceNews(out);
+  }catch(e){}
+}
 document.addEventListener('visibilitychange',()=>{ if(document.hidden)newsLiveOff(); else if(openTabIs('news'))newsLiveOn(); });
 window.addEventListener('blur',newsLiveOff);
 window.addEventListener('focus',()=>{ if(openTabIs('news')&&!document.hidden)newsLiveOn(); });
@@ -7923,27 +7993,39 @@ function renderFearGreed(){
     return '<span class="'+(d>0?'pos':d<0?'neg':'muted')+'">'+(d>0?'+':'')+d+'</span>'; };
   box.className='card';
   box.style.marginTop='16px';
+  /* A HALF DIAL AND A NEEDLE. A straight bar reads as a scale you are somewhere along; a dial reads
+     as an instrument with a resting point, which is what this is. Drawn to scale in SVG: 0 at the
+     left, 100 at the right, the needle at the score and nowhere else.
+     The seven components are gone from the card at the owner's request. They are still returned by
+     the worker, so anyone who wants them has them; the card is the reading. */
+  const A=Math.PI*(1-Math.max(0,Math.min(100,f.score))/100);   // 0 -> pi (left), 100 -> 0 (right)
+  const R=86, CX=100, CY=98;
+  const nx=(CX+Math.cos(A)*(R-16)).toFixed(1), ny=(CY-Math.sin(A)*(R-16)).toFixed(1);
+  const arc=(a0,a1,col)=>'<path d="M '+(CX+Math.cos(a0)*R).toFixed(1)+' '+(CY-Math.sin(a0)*R).toFixed(1)+
+    ' A '+R+' '+R+' 0 0 1 '+(CX+Math.cos(a1)*R).toFixed(1)+' '+(CY-Math.sin(a1)*R).toFixed(1)+
+    '" fill="none" stroke="'+col+'" stroke-width="15" stroke-linecap="butt"/>';
+  const seg=(lo,hi,col)=>arc(Math.PI*(1-lo/100),Math.PI*(1-hi/100),col);
   box.innerHTML=
     '<div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">Fear and greed</h3>'+
       '<span class="muted" style="font-size:12px">'+esc(f.source)+(f.cached?' \u00b7 cached':'')+'</span></div>'+
-    '<div class="row" style="align-items:baseline;gap:14px;margin-top:10px;flex-wrap:wrap">'+
-      '<span class="num" style="font-size:44px;font-weight:800;line-height:1;color:'+col+'">'+Math.round(f.score)+'</span>'+
-      '<span style="font-size:17px;font-weight:600;color:'+col+'">'+esc(fgBand(f.score))+'</span>'+
-      '<span class="muted" style="font-size:12.5px">'+esc(day(f.at))+'</span></div>'+
-    '<div style="height:8px;border-radius:4px;margin:12px 0 6px;background:linear-gradient(90deg,#e5534b,#d9a441,#9aa0a6,#5ac27f,#2fa36b);position:relative">'+
-      '<span style="position:absolute;top:-4px;left:calc('+Math.max(0,Math.min(100,f.score))+'% - 2px);width:4px;height:16px;border-radius:2px;background:var(--text);box-shadow:0 0 0 2px var(--panel)"></span></div>'+
-    '<div class="row muted" style="font-size:11px;justify-content:space-between"><span>0 extreme fear</span><span>100 extreme greed</span></div>'+
-    '<table style="margin-top:14px;font-size:13px"><thead><tr><th>Reading</th><th>Score</th><th>What it measures</th><th>As at</th></tr></thead><tbody>'+
-      f.parts.map(p=>'<tr><td>'+esc(p.name)+'</td>'+
-        '<td class="num" style="color:'+fgColour(p.score)+';font-weight:600">'+Math.round(p.score)+'</td>'+
-        '<td class="muted">'+esc(p.what)+'</td>'+
-        '<td class="muted" style="font:11px/1.5 var(--mono)">'+esc(day(p.at))+'</td></tr>').join('')+
-    '</tbody></table>'+
-    '<div class="row muted" style="font-size:12.5px;margin-top:10px;gap:16px;flex-wrap:wrap">'+
+    '<div style="display:grid;place-items:center;margin-top:6px">'+
+      '<svg viewBox="0 0 200 118" width="260" height="154" role="img" aria-label="Fear and greed '+Math.round(f.score)+' out of 100, '+esc(fgBand(f.score))+'">'+
+        seg(0,25,'#e5534b')+seg(25,45,'#d9a441')+seg(45,55,'#9aa0a6')+seg(55,75,'#5ac27f')+seg(75,100,'#2fa36b')+
+        '<line x1="'+CX+'" y1="'+CY+'" x2="'+nx+'" y2="'+ny+'" stroke="var(--text)" stroke-width="3.5" stroke-linecap="round"/>'+
+        '<circle cx="'+CX+'" cy="'+CY+'" r="7" fill="var(--panel)" stroke="var(--text)" stroke-width="3"/>'+
+        '<text x="12" y="114" font-size="9" fill="currentColor" opacity=".55">0</text>'+
+        '<text x="180" y="114" font-size="9" fill="currentColor" opacity=".55">100</text>'+
+      '</svg>'+
+      '<div style="margin-top:-14px;text-align:center">'+
+        '<div class="num" style="font-size:40px;font-weight:800;line-height:1;color:'+col+'">'+Math.round(f.score)+'</div>'+
+        '<div style="font-size:16px;font-weight:600;color:'+col+';margin-top:4px">'+esc(fgBand(f.score))+'</div>'+
+        '<div class="muted" style="font-size:12px;margin-top:2px">'+esc(day(f.at))+'</div></div>'+
+    '</div>'+
+    '<div class="row muted" style="font-size:12.5px;margin-top:14px;gap:16px;flex-wrap:wrap;justify-content:center">'+
       '<span>vs a week ago '+delta(f.score,f.prev.week)+'</span>'+
       '<span>vs a month ago '+delta(f.score,f.prev.month)+'</span>'+
       '<span>vs a year ago '+delta(f.score,f.prev.year)+'</span></div>'+
-    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">'+esc(f.note)+'</p>';
+    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55;text-align:center">'+esc(f.note)+'</p>';
 }
 
 /* ===== WHAT IS HAPPENING, AND WHERE =====
@@ -11757,10 +11839,11 @@ function showFirstRunExport(){
   box.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(6,7,9,.82);display:grid;place-items:center;padding:24px';
   box.innerHTML=
     '<div style="max-width:520px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px 24px">'+
-      '<h3 style="margin:0 0 10px;font-size:17px">Your first holding is recorded. Export it now.</h3>'+
+      '<h3 style="margin:0 0 10px;font-size:17px">Your first holding is recorded.</h3>'+
       '<p class="muted" style="font-size:13.5px;line-height:1.65;margin:0 0 10px">'+
-        'PerceptFolio has no server. Everything, including every call it will mark for you, lives only in this browser. '+
-        'Clearing site data deletes it, and the record is forward-only, so it cannot be rebuilt afterwards.</p>'+
+        'It is kept on our server under your access code, so losing this device does not lose the book, and '+
+        'signing in somewhere else brings it with you. This browser holds a copy so the terminal is quick and '+
+        'works on a plane. Export a backup any time you want one of your own; nothing depends on your remembering to.</p>'+
       '<details class="aside"><summary>Why this matters on iPhone</summary><div>'+
         (iosSafariUninstalled()
           ? '<b>You are on iPhone Safari without the app installed, which is the worst case:</b> iOS deletes this site\'s storage after seven days without a visit. Add it to your home screen from the share menu, and export a backup now.'
@@ -16563,7 +16646,7 @@ function renderRecordCopyCard(){
   card.style.display=blocked?'none':'';
   tg.checked=recordCopyOn(); tg.disabled=false;
   const nm=document.getElementById('notifyMarks'), nr=document.getElementById('notifyReviews'), nn=document.getElementById('notifyNews');
-  if(nm)nm.checked=!!(D.notify&&D.notify.marks); if(nr)nr.checked=!!(D.notify&&D.notify.reviews); if(nn)nn.checked=!!(D.notify&&D.notify.news);
+  if(nm)nm.checked=!!(D.notify&&D.notify.marks); if(nr)nr.checked=!!(D.notify&&D.notify.reviews); if(nn){ nn.checked=!!D.newsAlerts; _newsAlerts=!!D.newsAlerts&&('Notification' in window)&&Notification.permission==='granted'; }
   const n=(D.calls||[]).length, sealed=(D.calls||[]).reduce((a,c)=>a+Object.values(c.marks||{}).filter(m=>m&&m.hash).length,0);
   st.textContent=(recordCopyOn()?'On. ':'Off. ')+n+' call'+(n===1?'':'s')+', '+sealed+' sealed mark'+(sealed===1?'':'s')+(D.recordCopyAt?' · last copy '+new Date(D.recordCopyAt).toLocaleString():' · no copy yet')+(D.recordCopyErr?' · last push failed: '+D.recordCopyErr:'');
 }

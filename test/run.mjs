@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v143/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v144/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2508,8 +2508,10 @@ t('it fires on the first holding, not before',
 t('it fires once and is remembered', /D\.firstRunAck=Date\.now\(\)/.test(term) &&
   /function firstRunExportDone/.test(term));
 t('an existing export counts as done', /D\.lastExportAt\|\|D\.firstRunAck/.test(term));
-t('it names the real mechanism, not a vague warning',
-  /the record is forward-only, so it cannot be rebuilt/.test(term));
+/* The nag was written when there was no server. There is one now, so it says where the book is
+   and offers an export rather than demanding one. */
+t('the first-holding card says where the book is kept, not that there is no server',
+  /It is kept on our server under your access code/.test(term) && !/PerceptFolio has no server/.test(term));
 t('iOS Safari gets the seven-day rule specifically',
   /iOS deletes this site\\'s storage after seven days/.test(term));
 /* One blocking interruption only; a second teaches clicking through them. */
@@ -2874,7 +2876,14 @@ G('The feed was never the slow part: nobody was watching it');
     /'newsseen:' \+ w\.ident/.test(worker) && /if \(seen\[item\.id\]\) continue;/.test(worker) && /expirationTtl: 3 \* 86400/.test(worker));
   t('stale stories are not called news', /NEWS_WATCH_FRESH_MS = 3 \* 3600000/.test(worker));
   t('the mail carries headlines only and says it is no verdict', /Headlines only\. Nothing here has been scored/.test(worker));
-  t('the terminal offers the notice beside the other two', /id="notifyNews" onchange="setNotify\('news',this\.checked\)"/.test(term) && /news:!!\(D\.notify&&D\.notify\.news\)/.test(term));
+  /* The owner's call: the terminal tells you, the inbox does not. Permission is asked on the tick,
+     never on load, because a browser asked out of nowhere is a browser that presses Block. */
+  t('news arrives as a notification from the terminal, not as an email',
+    /id="notifyNews" onchange="setNewsAlerts\(this\.checked\)"/.test(term)
+    && /async function setNewsAlerts\(on\)/.test(term) && /function announceNews\(items\)/.test(term)
+    && /perm=await Notification\.requestPermission\(\)/.test(term));
+  t('it says plainly that a closed terminal cannot reach you', /A closed terminal cannot reach you/.test(term));
+  t('one notification however many landed, and it opens News', /tag:'pf-news'/.test(term) && /nf\.onclick=\(\)=>\{ window\.focus\(\); showTab\('news'\)/.test(term));
   t('the worker stores the third preference', /const prefs = \{ marks: !!body\.marks, reviews: !!body\.reviews, news: !!body\.news \};/.test(worker));
   t('both halves are contract-tested', fs.existsSync('test/newswatch.mjs') && /the same story is never sent twice/.test(read('test/newswatch.mjs')) && /the nightly schedule does not run the news watcher/.test(read('test/newswatch.mjs')));
   /* FREE, AND WITHOUT A LICENCE QUESTION. Yahoo's per-ticker RSS needs no key, shares no
