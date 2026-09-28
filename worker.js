@@ -701,6 +701,10 @@ async function handle(request, env) {
     const email = clean(body.email, 160);
     const who = clean(body.who, 2000);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400, env);
+    /* The flow ends in an email, so an address that cannot receive one is refused here rather than
+       discovered weeks later when the code never arrived. */
+    const deliver = await emailDeliverable(env, email);
+    if (!deliver.ok) return json({ error: deliver.why, suggest: deliver.suggest || null }, 400, env);
     if (who.length < 10) return json({ error: 'Tell us who you are and why, in a sentence or two.' }, 400, env);
 
     /* The three-call requirement was removed. It used to reject any request without exactly three
@@ -767,7 +771,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/quote', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -2390,6 +2394,67 @@ async function sendPlain(env, to, subject, text) {
   } catch (e) { return { attempted: true, ok: false, error: String(e && e.message || e) }; }
 }
 
+/* ===== CAN THIS ADDRESS ACTUALLY RECEIVE A CODE? =====
+   The whole flow ends in an email. A typo in it costs a sale twice over: the person never gets
+   their code and the operator never learns why, because a bounce to a Resend or Email Routing
+   sender is not something anybody watches.
+
+   BE HONEST ABOUT WHAT THIS PROVES. You cannot prove a mailbox exists without sending to it, and
+   SMTP probing is unreliable, frequently blocked, and rude. What this catches is the failure that
+   actually happens: a domain that cannot receive mail at all.
+
+     1  no MX and no A record  ->  refused. Mail has nowhere to go.
+     2  a known throwaway      ->  refused. The code outlives the inbox.
+     3  a near-miss on a big provider (gmial, hotnail, yaho) -> refused WITH the correction.
+
+   A domain answering with MX records is accepted. That is the strongest claim available without
+   sending, and the message says so rather than implying the address was validated.
+
+   The lookup is DNS-over-HTTPS at Cloudflare's own resolver, cached a week a domain, so the same
+   twenty domains everybody uses cost one lookup each. A resolver that cannot be reached ACCEPTS
+   the address: refusing a real customer because DNS was slow is the worse failure. */
+const DISPOSABLE = ['mailinator.com', 'guerrillamail.com', '10minutemail.com', 'tempmail.com',
+  'throwawaymail.com', 'yopmail.com', 'trashmail.com', 'sharklasers.com', 'getnada.com',
+  'temp-mail.org', 'fakeinbox.com', 'maildrop.cc', 'dispostable.com', 'mintemail.com'];
+/* One edit away from a provider everybody uses. Typed, not guessed: these are the misspellings
+   that actually appear in sign-up logs. */
+const TYPOS = {
+  'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com', 'gmail.co': 'gmail.com', 'gmaill.com': 'gmail.com',
+  'gnail.com': 'gmail.com', 'gamil.com': 'gmail.com', 'hotmial.com': 'hotmail.com', 'hotnail.com': 'hotmail.com',
+  'hotmai.com': 'hotmail.com', 'outlok.com': 'outlook.com', 'outloo.com': 'outlook.com',
+  'yaho.com': 'yahoo.com', 'yahooo.com': 'yahoo.com', 'iclod.com': 'icloud.com', 'icloud.co': 'icloud.com',
+};
+async function emailDeliverable(env, email) {
+  const at = String(email || '').lastIndexOf('@');
+  if (at < 1) return { ok: false, why: 'That is not an email address.' };
+  const domain = String(email).slice(at + 1).toLowerCase().trim();
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return { ok: false, why: 'That domain does not look like a domain.' };
+  if (TYPOS[domain]) return { ok: false, why: 'Did you mean ' + String(email).slice(0, at) + '@' + TYPOS[domain] + '?', suggest: String(email).slice(0, at) + '@' + TYPOS[domain] };
+  if (DISPOSABLE.includes(domain)) return { ok: false, why: 'That is a throwaway address. Your access code outlives it, so use one you will still read in a year.' };
+
+  const ck = 'mx:' + domain;
+  try {
+    const hit = await env.PF_SYNC.get(ck);
+    if (hit !== null) return hit === '1' ? { ok: true, cached: true } : { ok: false, cached: true, why: 'Nothing at ' + domain + ' can receive mail. Check the spelling.' };
+  } catch (e) { /* the lookup below is the fallback */ }
+
+  let deliverable = null;
+  try {
+    const q = t => fetch('https://cloudflare-dns.com/dns-query?name=' + encodeURIComponent(domain) + '&type=' + t,
+      { headers: { 'accept': 'application/dns-json' } }).then(r => r.ok ? r.json() : null);
+    const [mx, a] = await Promise.all([q('MX'), q('A')]);
+    /* A domain with no MX but an A record still accepts mail by the old fallback rule, so it is
+       not refused. Only "nothing at all" is. */
+    const hasMx = !!(mx && Array.isArray(mx.Answer) && mx.Answer.length);
+    const hasA = !!(a && Array.isArray(a.Answer) && a.Answer.length);
+    if (mx || a) deliverable = hasMx || hasA;
+  } catch (e) { deliverable = null; }
+
+  if (deliverable === null) return { ok: true, unchecked: true };   // resolver down: never block a real buyer
+  try { await env.PF_SYNC.put(ck, deliverable ? '1' : '0', { expirationTtl: 7 * 86400 }); } catch (e) {}
+  return deliverable ? { ok: true } : { ok: false, why: 'Nothing at ' + domain + ' can receive mail. Check the spelling.' };
+}
+
 /* Mint a code the way /decide does: a 30-day code record that the first /enter burns into a
    durable grant. tier decides the gate's session lifetime. */
 async function mintCode(env, tier, email, extra) {
@@ -3181,6 +3246,12 @@ async function handleBilling(request, env, url) {
     /* A real answer keeps for a month; an empty one (a small company, or a model having a bad day) for a day. */
     if (!note) await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: (suppliers.length || customers.length) ? 30 * 86400 : 86400 });
     return json(result, 200, env);
+  }
+
+  /* ---- GET /checkemail?email= : the same test, so the form can say it before the button ---- */
+  if (url.pathname === '/checkemail' && request.method === 'GET') {
+    if (await tooMany(env, request, '/checkemail', 30)) return json({ ok: true, unchecked: true }, 200, env);
+    return json(await emailDeliverable(env, clean(url.searchParams.get('email'), 160)), 200, env);
   }
 
   /* ---- GET /quote : the one price, for admin's Send quote draft ---- */

@@ -34,6 +34,24 @@ export function RequestForm() {
   const [msg, setMsg] = useState<React.ReactNode>(null);
   /* null = not answered yet, so stage 2 stays closed and the form cannot be submitted blind. */
   const [holder, setHolder] = useState<string | null>(null);
+  /* THE ADDRESS HAS TO BE ABLE TO RECEIVE A CODE. The whole flow ends in an email, so a typo costs
+     the sale twice: they never get their code, and nobody learns why, because a bounce to our
+     sender is not something anyone watches. Checked on blur rather than on every keystroke, which
+     would call the worker once a letter, and again on the server at /request so a stale page or a
+     script cannot get past it. */
+  const [mailWarn, setMailWarn] = useState<React.ReactNode>(null);
+  const checkEmail = async (e: React.FocusEvent<HTMLInputElement>) => {
+    const v = e.target.value.trim();
+    setMailWarn(null);
+    if (!v || !v.includes('@')) return;
+    try {
+      const r = await fetch(WORKER + '/checkemail?email=' + encodeURIComponent(v));
+      const j = await r.json();
+      if (j && j.ok === false) setMailWarn(j.suggest
+        ? <>Did you mean <button type="button" className="underline" onClick={() => { e.target.value = j.suggest; setMailWarn(null); }}>{j.suggest}</button>?</>
+        : j.why);
+    } catch { /* the server checks again on submit */ }
+  };
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -91,7 +109,8 @@ export function RequestForm() {
             <F id="role" label="Your role"><select id="role" name="role" required defaultValue="" className={sel}><option value="" disabled>Choose one</option>{ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select></F>
           </div>
           <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
-            <F id="email" label="Business email"><Input id="email" name="email" type="email" required placeholder="you@firm.com" autoComplete="email" inputMode="email" /></F>
+            <F id="email" label="Business email"><Input id="email" name="email" type="email" required placeholder="you@firm.com" autoComplete="email" inputMode="email" onBlur={checkEmail} />
+              {mailWarn ? <p className="mt-[6px] text-[13.5px] text-red">{mailWarn}</p> : null}</F>
             <F id="firm" label="Firm" opt><Input id="firm" name="firm" maxLength={120} autoComplete="organization" /></F>
           </div>
           <F id="runs" label="What you run"><select id="runs" name="runs" required defaultValue="" className={sel}><option value="" disabled>Choose one</option>{BOOKS.map(b => <option key={b} value={b}>{b}</option>)}</select></F>

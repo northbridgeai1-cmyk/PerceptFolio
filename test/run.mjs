@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v147/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v148/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2516,6 +2516,19 @@ t('an existing export counts as done', /D\.lastExportAt\|\|D\.firstRunAck/.test(
 t('a row menu builds an argument that survives an HTML attribute',
   /const q="'"\+String\(sym\)\.replace\(\/'\/g,""\)\+"'";/.test(term) && !/const q=JSON\.stringify\(String\(sym\)\)/.test(term));
 t('openMenu escapes a run that would break the attribute anyway', /String\(it\.run\)\.replace\(\/"\/g,'&quot;'\)/.test(term));
+/* THE FLOW ENDS IN AN EMAIL. A typo costs the sale twice: they never get the code, and nobody
+   learns why, because a bounce to our sender is not something anyone watches. */
+t('an address that cannot receive a code is refused before one is minted',
+  /async function emailDeliverable\(env, email\)/.test(worker) && /const deliver = await emailDeliverable\(env, email\);/.test(worker)
+  && /url\.pathname === '\/checkemail'/.test(worker));
+t('a near-miss is refused with the correction, not just rejected', /const TYPOS = \{/.test(worker) && /suggest: String\(email\)\.slice\(0, at\)/.test(worker));
+t('a throwaway is refused, because the code outlives the inbox', /const DISPOSABLE = \[/.test(worker));
+/* You cannot prove a mailbox exists without sending to it, and refusing a real buyer because DNS
+   was slow is the worse failure. */
+t('a resolver that cannot be reached accepts rather than blocks', /if \(deliverable === null\) return \{ ok: true, unchecked: true \};/.test(worker));
+t('a domain is looked up once a week, not once a visitor', /'mx:' \+ domain/.test(worker) && /expirationTtl: 7 \* 86400/.test(worker));
+t('the form says it on blur, and the server checks again on submit', /onBlur=\{checkEmail\}/.test(read('site/src/components/RequestForm.tsx')) && /\/checkemail\?email=/.test(read('site/src/components/RequestForm.tsx')));
+t('it is contract-tested', fs.existsSync('test/email.mjs') && /a near-miss is refused WITH the correction/.test(read('test/email.mjs')));
 /* THE HEADLINE NUMBER SHOWS ITS WORKING. Two outside reviewers challenged the 138 independently:
    one asked whether it was derived at all, the other said it must not be shown as a magic number
    without its assumptions. It was derived, and the derivation adapts once real marks exist — but
