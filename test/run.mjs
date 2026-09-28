@@ -2877,6 +2877,23 @@ G('The feed was never the slow part: nobody was watching it');
   t('the terminal offers the notice beside the other two', /id="notifyNews" onchange="setNotify\('news',this\.checked\)"/.test(term) && /news:!!\(D\.notify&&D\.notify\.news\)/.test(term));
   t('the worker stores the third preference', /const prefs = \{ marks: !!body\.marks, reviews: !!body\.reviews, news: !!body\.news \};/.test(worker));
   t('both halves are contract-tested', fs.existsSync('test/newswatch.mjs') && /the same story is never sent twice/.test(read('test/newswatch.mjs')) && /the nightly schedule does not run the news watcher/.test(read('test/newswatch.mjs')));
+  /* ONE MAIL PATH. sendPlainMail posted to Resend and nothing else, while sendPlain beside it
+     already fell back to Cloudflare Email Routing. So on a worker with the NOTIFY binding and no
+     Resend account every cron notice went nowhere, silently, because an unattempted send is not an
+     error. It delegates now, and the fallback's real limit is written down: Email Routing only
+     delivers to an address verified as a destination on the account. */
+  t('every notice goes through one mail path, which falls back to Email Routing',
+    /async function sendPlainMail\(env, to, subject, text\) \{\s*\n\s*if \(!to\) return \{ attempted: false, ok: false \};\s*\n\s*return sendPlain\(env, to, subject, text\);/.test(worker)
+    && (worker.match(/api\.resend\.com/g) || []).length === 2);   /* sendPlain, and the grant email that now falls back to it */
+  t('the limit of the fallback is written down where someone will read it', /only deliver to an address\s*\n\s*verified as a destination on the account/.test(worker));
+  /* A grant that is not delivered is a person who paid and cannot get in. */
+  t('the access-code email has the same fallback as every other notice', /if \(!\(env\.RESEND_API_KEY && env\.MAIL_FROM\)\) return sendPlain\(env, rec\.email, body\.subject, body\.text\);/.test(worker));
+  /* The welcome email told every new subscriber their data was browser-only and walked them
+     through a "Create account" step that no longer exists. */
+  t('the welcome email describes the door that exists now, not the old form',
+    /1\. Go to https:\/\/perceptfolio\.com\/enter\//.test(worker) && !/Choose "Create account"/.test(worker) && /There is no account to create and no password to choose/.test(worker));
+  t('it no longer tells people their book lives only in the browser',
+    !/There is no server holding your portfolio/.test(worker) && /Your book is kept on our server under your code/.test(worker));
 }
 
 /* ==================== FEAR AND GREED ==================== */

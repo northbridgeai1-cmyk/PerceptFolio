@@ -87,5 +87,42 @@ function seed(store, { news = true } = {}) {
   t('the nightly schedule does not run the news watcher', newsCalls === 0 && !store.has('cron:news'));
 }
 
+/* The notices went nowhere on a worker with the NOTIFY binding and no Resend account, because
+   sendPlainMail posted to Resend and nothing else. One path now.
+
+   WHAT THIS CAN AND CANNOT PROVE IN NODE. The Email Routing branch does `await
+   import('cloudflare:email')`, a module that exists only inside the Workers runtime, so it cannot
+   complete here and the send is reported as failed. What IS provable, and is the whole of the bug,
+   is the routing decision: with Resend unconfigured, Resend is not called and the Email Routing
+   branch is the one taken. The delegation itself is pinned statically in test/run.mjs. */
+{
+  const { store, env } = mk(); seed(store);
+  delete env.RESEND_API_KEY; delete env.MAIL_FROM;
+  let resendCalls = 0;
+  env.NOTIFY = { send: async () => {} };
+  globalThis.fetch = async (u) => {
+    const s = String(u);
+    if (s.includes('company-news')) return new Response(JSON.stringify([article('n1', 'Something broke', 30 * 60000)]), { status: 200 });
+    if (s.includes('resend')) { resendCalls++; return new Response('{}', { status: 200 }); }
+    return new Response('{}', { status: 200 });
+  };
+  await worker.scheduled({ cron: '*/15 13-21 * * 1-5' }, env, { waitUntil: p => p });
+  await new Promise(r => setTimeout(r, 80));
+  t('with no Resend configured, Resend is never called', resendCalls === 0, 'calls=' + resendCalls);
+}
+
+/* Neither configured: it must report a failure rather than claim to have sent. */
+{
+  const { store, env } = mk(); seed(store);
+  delete env.RESEND_API_KEY; delete env.MAIL_FROM; delete env.NOTIFY;
+  globalThis.fetch = async (u) => String(u).includes('company-news')
+    ? new Response(JSON.stringify([article('n2', 'Something else broke', 30 * 60000)]), { status: 200 })
+    : new Response('{}', { status: 200 });
+  await worker.scheduled({ cron: '*/15 13-21 * * 1-5' }, env, { waitUntil: p => p });
+  await new Promise(r => setTimeout(r, 80));
+  const note = JSON.parse(store.get('cron:news'));
+  t('with no mail at all it counts nothing sent, rather than reporting a success', note.mailed === 0, 'mailed=' + note.mailed);
+}
+
 console.log(fails ? '\n' + fails + ' FAILED' : '\nALL NEWS WATCH CHECKS PASSED');
 process.exit(fails ? 1 : 0);

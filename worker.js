@@ -116,13 +116,18 @@ Account type: ${tier}
 This code can be redeemed once, and expires 30 days from today.
 
 To use it:
-  1. Go to https://perceptfolio.com/terminal/
-  2. Choose "Create account"
-  3. Enter your email, a password, and the code above
+  1. Go to https://perceptfolio.com/enter/
+  2. Type the code above
+
+That is the whole of it. There is no account to create and no password to choose: the code is your
+account. The terminal opens on your book, and opening it on a second device is the same two steps.
+Your code covers two, a desk and a pocket.
 
 ${note ? note + '\n\n' : ''}Two things worth knowing before you start.
 
-Everything lives in your own browser. There is no server holding your portfolio, which is the point, and it means an export is your only backup. The app will ask you to take one when you add your first holding; please do.
+Your book is kept on our server under your code, from the first time you sign in. The browser keeps
+a copy so the terminal is quick and works on a plane, but losing the laptop does not lose the book.
+Export a backup whenever you want one of your own; nothing depends on your remembering to.
 
 It records what it tells you and marks it on a fixed horizon it cannot move afterwards. Early on it will mostly tell you that it does not have enough data to say anything yet. That is the product working, not failing.
 
@@ -130,8 +135,12 @@ Pierce
 perceptfolio.com`
   };
 }
+/* THE ONE MESSAGE THAT MUST ARRIVE. A grant that is not delivered is a person who paid and cannot
+   get in, so this goes through the same path as every other notice and gets the Email Routing
+   fallback with it, rather than being Resend-or-nothing. */
 async function sendDecisionEmail(env, rec, decision, code, note) {
   const body = decisionEmailBody(rec, decision, code, note);
+  if (!(env.RESEND_API_KEY && env.MAIL_FROM)) return sendPlain(env, rec.email, body.subject, body.text);
   try {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -356,13 +365,21 @@ async function notifyPrefs(env, ident) {
   const raw = await env.PF_SYNC.get('notify:' + ident);
   return raw ? JSON.parse(raw) : { marks: false, reviews: false, news: false };
 }
+/* ONE MAIL PATH, NOT TWO.
+   This used to post to Resend and nothing else, while sendPlain above already fell back to
+   Cloudflare Email Routing when Resend was not configured. So every notice the cron sends — marks
+   landing, reviews due, news breaking — went nowhere on a worker that had the NOTIFY binding and
+   no Resend account, silently, because an unattempted send is not an error.
+
+   It delegates now. Both callers get the same behaviour and there is one place to reason about.
+
+   KNOW THE LIMIT OF THE FALLBACK. Cloudflare Email Routing will only deliver to an address
+   verified as a destination on the account. That covers the operator, which is who most of these
+   notices are for today. A subscriber's own address needs Resend, and until RESEND_API_KEY and
+   MAIL_FROM exist their notices will report ok:false rather than quietly claiming to have sent. */
 async function sendPlainMail(env, to, subject, text) {
-  if (!env.RESEND_API_KEY || !env.MAIL_FROM || !to) return { attempted: false, ok: false };
-  const r = await fetch('https://api.resend.com/emails', {
-    method: 'POST', headers: { 'Authorization': 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text })
-  });
-  return { attempted: true, ok: r.ok };
+  if (!to) return { attempted: false, ok: false };
+  return sendPlain(env, to, subject, text);
 }
 async function notifyMarks(env, ident, landed) {
   if (!landed.length) return;
