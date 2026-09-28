@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v146/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v147/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2516,6 +2516,19 @@ t('an existing export counts as done', /D\.lastExportAt\|\|D\.firstRunAck/.test(
 t('a row menu builds an argument that survives an HTML attribute',
   /const q="'"\+String\(sym\)\.replace\(\/'\/g,""\)\+"'";/.test(term) && !/const q=JSON\.stringify\(String\(sym\)\)/.test(term));
 t('openMenu escapes a run that would break the attribute anyway', /String\(it\.run\)\.replace\(\/"\/g,'&quot;'\)/.test(term));
+/* THE HEADLINE NUMBER SHOWS ITS WORKING. Two outside reviewers challenged the 138 independently:
+   one asked whether it was derived at all, the other said it must not be shown as a magic number
+   without its assumptions. It was derived, and the derivation adapts once real marks exist — but
+   it lived in a source comment, where the person paying cannot read it. A product whose argument
+   is that numbers must be traceable cannot make its own headline number the exception. */
+t('the target explains itself, with the formula and which inputs are assumed',
+  /function needWhyHTML\(need\)/.test(term) && /n = \( 1\.96 &times; dispersion &divide; mean edge \)/.test(term)
+  && /assumed<\/span>/.test(term));
+t('it shows on the empty state too, which is when somebody asks why they are waiting',
+  (term.match(/\+needWhyHTML\(need\)/g) || []).length === 3);
+/* Calls on the same name close together are not independent evidence. effectiveN already discounts
+   them; the panel now says so rather than leaving the count looking larger than the evidence. */
+t('it reports how many calls are independent of each other', /Independent of each other/.test(term) && /effectiveN\(firm\.map/.test(term));
 /* WHICH DECISION MADE THE MONEY. The claim is that this tells you whether your decisions worked,
    and until now it could answer only for the book as a whole. A total says you were up; it does
    not say which holding carried you. */

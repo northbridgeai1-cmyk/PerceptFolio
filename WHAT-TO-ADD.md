@@ -237,3 +237,12 @@ To go back to the free feed: `npx wrangler secret delete NEWS_API_KEY -c worker.
 **While you are not:** a second cron, `*/15 13-21 * * 1-5` (about 9am to 5:45pm New York), reads the synced book under `uslot:<code>` for the holdings and the watchlist, pools those symbols across every account so ten accounts watching ten names cost ten calls rather than a hundred, and emails each account only what is new to it. Opt-in, beside the mark and review notices; a paused grant is told nothing; `newsseen:<ident>` stops a story being sent twice and expires in three days. Headlines, publisher and time only: nothing is scored, ranked or interpreted, and nothing reaches a rulebook.
 
 `scheduled()` branches on `event.cron`, and an unrecognised schedule falls to the nightly marking pass, because losing a mark is the worse failure.
+
+**2026-09-27, the two outside reviews, checked against the code.** Both challenged the same two things, both marked them ASSUMED because the terminal is gated, and both were already answered in the code:
+
+- **"Audit the 138."** It is derived: `n = (Z·sigma/mean)^2`, at an assumed 2% edge and 12% dispersion, and the assumption is dropped for the operator's own observed mean and dispersion the moment marks exist. The derivation was in a source comment only. **Fixed:** `needWhyHTML()` now puts the formula, the inputs, which are assumed, and the moving target on screen in every state including the empty one.
+- **"Decisions are not independent."** `effectiveN()` already computes pairwise correlation and discounts the count. **Fixed:** the panel now reports independent-of-each-other beside the raw count, so the two can differ visibly.
+- **"Lock in relative alpha at the mark."** Already done — a call stores price and spy, a mark stores price and spy, so excess is computed from both ends and cannot be recomputed later.
+- **"localStorage is capped at 5MB."** Correct, but the conclusion was stale: the book lives on the worker, and quota failure reclaims caches then pushes to the server.
+
+**Genuinely new and unresolved: the Tiingo redistribution question.** Internal commercial use and redistribution are separate licences. Serving closes and marks to a paying subscriber through `/history` and `/marks` may be redistribution. This needs reading the actual contract, not a code change. **It ranks above every feature**, beside the Finnhub commercial plan.

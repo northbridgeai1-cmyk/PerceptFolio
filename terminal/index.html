@@ -15279,15 +15279,48 @@ function watchedCount(){
   try{ allLists().forEach(l=>(l.syms||[]).forEach(s=>set.add(s))); }catch(e){}
   return set.size;
 }
+/* WHY THAT NUMBER, ON SCREEN RATHER THAN IN A COMMENT.
+   Two outside reviewers challenged the 138 independently. One asked whether it was derived at all;
+   the other said it must not be shown as a magic number without its assumptions. The derivation
+   was already here — n = (Z*sigma/mean)^2, and the target moves to the operator's own observed
+   mean and dispersion once marks exist — but it lived in a source comment, where a person paying
+   for the thing cannot read it.
+
+   That was the real gap the cold start exposed. The months before the record can speak are not
+   dead time if the terminal shows its working: the formula, the assumptions it is currently using,
+   how many calls are in, how many are independent, and what the number is waiting for. A product
+   whose argument is that numbers must be traceable cannot make its own headline number the one
+   exception. */
+function needWhyHTML(need){
+  const calls=(D&&D.calls)||[];
+  const firm=calls.filter(c=>c&&c.conviction!=='flickering');
+  let eff=null; try{ eff=effectiveN(firm.map(c=>({sym:c.sym,ts:c.ts,days:90}))); }catch(e){}
+  const assumed=(need||138)===138;
+  return '<details class="aside" style="margin-top:8px"><summary>Why '+(need||138)+'?</summary><div>'+
+    '<p style="margin:0 0 8px">The number of marked calls needed to tell a mean edge from zero at 95% confidence:</p>'+
+    '<p class="num" style="margin:0 0 8px;font-family:var(--mono);font-size:12.5px">n = ( 1.96 &times; dispersion &divide; mean edge )<sup>2</sup></p>'+
+    '<table style="font-size:12.5px"><tbody>'+
+      '<tr><td>Mean edge</td><td class="num">'+(assumed?'2.0% <span class="muted">assumed</span>':'your own, observed')+'</td></tr>'+
+      '<tr><td>Dispersion</td><td class="num">'+(assumed?'12.0% <span class="muted">assumed</span>':'your own, observed')+'</td></tr>'+
+      '<tr><td>Calls logged</td><td class="num">'+firm.length+'</td></tr>'+
+      (eff&&eff.pairs?'<tr><td>Independent of each other</td><td class="num">'+eff.neff.toFixed(1)+' <span class="muted">of '+eff.n+'</span></td></tr>':'')+
+      '<tr><td>Target</td><td class="num">'+(need||138)+'</td></tr>'+
+    '</tbody></table>'+
+    '<p style="margin:8px 0 0">'+(assumed
+      ? 'Those two are assumptions, used only until you have a record of your own. The moment marks exist the terminal drops them and recomputes the target from your own mean and dispersion, so a thinner or noisier edge demands more evidence and a strong one demands less.'
+      : 'Computed from your own marks, not from an assumption. It moves as the record does.')+'</p>'+
+    '<p style="margin:8px 0 0">Calls on the same name close together are not independent evidence, so they are discounted before the count is judged against the target. That is why the two rows can differ.</p>'+
+    '</div></details>';
+}
 function meterHTML(marked,need){
   const m=callsPerQuarter();
   const box=s=>'<div class="rec-meter muted" style="font-size:12px;margin-top:6px">'+s+'</div>';
-  if(!m.n)return box('No calls yet. Watch names in a list and run a review: the record fills from every verdict change, not only from your trades.');
-  if(m.rate==null)return box('<b>'+m.n+'</b> call'+(m.n===1?'':'s')+' logged across '+m.watched+' watched name'+(m.watched===1?'':'s')+', over '+m.since+' day'+(m.since===1?'':'s')+'. Too early to say what that is a quarter; ask again after a fortnight.');
+  if(!m.n)return box('No calls yet. Watch names in a list and run a review: the record fills from every verdict change, not only from your trades.')+needWhyHTML(need);
+  if(m.rate==null)return box('<b>'+m.n+'</b> call'+(m.n===1?'':'s')+' logged across '+m.watched+' watched name'+(m.watched===1?'':'s')+', over '+m.since+' day'+(m.since===1?'':'s')+'. Too early to say what that is a quarter; ask again after a fortnight.')+needWhyHTML(need);
   const left=Math.max(0,(need||138)-(marked||0));
   const q=m.rate>0?left/m.rate:null;
   return box('About <b>'+Math.round(m.rate)+'</b> call'+(Math.round(m.rate)===1?'':'s')+' a quarter at '+m.watched+' watched name'+(m.watched===1?'':'s')+
-    (q!=null&&left>0?' \u00b7 ~'+(need||138)+' marked calls in about '+(q<1?'a quarter':Math.ceil(q)+' quarters'):'')+'.');
+    (q!=null&&left>0?' \u00b7 ~'+(need||138)+' marked calls in about '+(q<1?'a quarter':Math.ceil(q)+' quarters'):'')+'.')+needWhyHTML(need);
 }
 function recordStripHTML(){
   const days=90;
