@@ -1812,6 +1812,12 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <details class="aside"><summary>How the ruler works</summary><div>The VIX is an annualised expectation of volatility. Divide it by the square root of 252 trading days (15.87, near enough 16) and you get the size of a typical day. This says whether today's move is ordinary or unusual for the current level of fear. <b>It says nothing about direction</b>, it's a ruler, not a forecast.</div></details>
   </div>
 
+  <!-- 1a. Fear and greed. Somebody else's measurement, reported, with the seven readings it is
+       made of and the date on each. A single 0-100 score with nothing behind it is exactly the
+       kind of number this terminal exists to argue with; the components are what make it arguable.
+       It reaches no rulebook and no verdict, and the panel says so. -->
+  <div id="fearGreedCard"></div>
+
   <!-- 1b. Calendar effects — CONTEXT ONLY, and the panel says so twice.
        This exists because on the fourth of September somebody publishes "September is the worst
        month for stocks" and does not divide by the standard deviation. The defence against a bad
@@ -4029,7 +4035,7 @@ function showTab(t){
   if(t==='alerts')markAlertsSeen();
   // Macro data is fetched only when the tab is actually opened, so a user who never looks at it
   // never spends a request on it.
-  if(t==='market'){fillMacroInputs();renderScorecard();renderSeasonal();renderHindsight();loadMarketData(false);}
+  if(t==='market'){fillMacroInputs();renderScorecard();renderSeasonal();renderHindsight();loadMarketData(false);loadFearGreed();}
   if(t==='map'){drawMap();renderRelList();}
   if(t==='command')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
@@ -7848,6 +7854,61 @@ function symbolNewsCard(sym,items,tag,move){
     '</details>'+
   '</div>';
 }
+/* ===== FEAR AND GREED =====
+   CNN's index, not ours. Loaded once a session when Market is opened, cached an hour at the worker.
+   Everything here is reported: no number is recomputed, nothing is scored against a rulebook, and
+   the card says whose measurement it is and that it feeds no verdict. */
+let fearGreed=null, _fgTried=false;
+async function loadFearGreed(force){
+  if(_fgTried&&!force)return;
+  _fgTried=true;
+  const code=accessCodeFor(USER);
+  if(!code)return;
+  try{
+    const base=(typeof INVITE_WORKER==='string'?INVITE_WORKER:'').replace(/\/+$/,'');
+    const r=await fetch(base+'/feargreed?code='+encodeURIComponent(code));
+    const j=await r.json();
+    if(r.ok&&j&&j.score!=null)fearGreed=j;
+  }catch(e){ /* the card simply does not appear */ }
+  renderFearGreed();
+}
+/* The dial. 0 is extreme fear, 100 extreme greed; the needle is the only drawn thing and it is
+   drawn to scale, so a glance is not misleading. */
+function fgBand(v){ return v<25?'Extreme fear':v<45?'Fear':v<55?'Neutral':v<75?'Greed':'Extreme greed'; }
+function fgColour(v){ return v<25?'#e5534b':v<45?'#d9a441':v<55?'var(--muted)':v<75?'#5ac27f':'#2fa36b'; }
+function renderFearGreed(){
+  const box=document.getElementById('fearGreedCard');
+  if(!box)return;
+  if(!fearGreed){ box.innerHTML=''; return; }
+  const f=fearGreed, col=fgColour(f.score);
+  const day=t=>{ if(!t)return ''; const d=new Date(t); return isNaN(d)?'':d.toISOString().slice(0,10); };
+  const delta=(now,then)=>{ if(then==null)return ''; const d=Math.round(now-then);
+    return '<span class="'+(d>0?'pos':d<0?'neg':'muted')+'">'+(d>0?'+':'')+d+'</span>'; };
+  box.className='card';
+  box.style.marginTop='16px';
+  box.innerHTML=
+    '<div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">Fear and greed</h3>'+
+      '<span class="muted" style="font-size:12px">'+esc(f.source)+(f.cached?' \u00b7 cached':'')+'</span></div>'+
+    '<div class="row" style="align-items:baseline;gap:14px;margin-top:10px;flex-wrap:wrap">'+
+      '<span class="num" style="font-size:44px;font-weight:800;line-height:1;color:'+col+'">'+Math.round(f.score)+'</span>'+
+      '<span style="font-size:17px;font-weight:600;color:'+col+'">'+esc(fgBand(f.score))+'</span>'+
+      '<span class="muted" style="font-size:12.5px">'+esc(day(f.at))+'</span></div>'+
+    '<div style="height:8px;border-radius:4px;margin:12px 0 6px;background:linear-gradient(90deg,#e5534b,#d9a441,#9aa0a6,#5ac27f,#2fa36b);position:relative">'+
+      '<span style="position:absolute;top:-4px;left:calc('+Math.max(0,Math.min(100,f.score))+'% - 2px);width:4px;height:16px;border-radius:2px;background:var(--text);box-shadow:0 0 0 2px var(--panel)"></span></div>'+
+    '<div class="row muted" style="font-size:11px;justify-content:space-between"><span>0 extreme fear</span><span>100 extreme greed</span></div>'+
+    '<table style="margin-top:14px;font-size:13px"><thead><tr><th>Reading</th><th>Score</th><th>What it measures</th><th>As at</th></tr></thead><tbody>'+
+      f.parts.map(p=>'<tr><td>'+esc(p.name)+'</td>'+
+        '<td class="num" style="color:'+fgColour(p.score)+';font-weight:600">'+Math.round(p.score)+'</td>'+
+        '<td class="muted">'+esc(p.what)+'</td>'+
+        '<td class="muted" style="font:11px/1.5 var(--mono)">'+esc(day(p.at))+'</td></tr>').join('')+
+    '</tbody></table>'+
+    '<div class="row muted" style="font-size:12.5px;margin-top:10px;gap:16px;flex-wrap:wrap">'+
+      '<span>vs a week ago '+delta(f.score,f.prev.week)+'</span>'+
+      '<span>vs a month ago '+delta(f.score,f.prev.month)+'</span>'+
+      '<span>vs a year ago '+delta(f.score,f.prev.year)+'</span></div>'+
+    '<p class="muted" style="font-size:11.5px;margin-top:10px;line-height:1.55">'+esc(f.note)+'</p>';
+}
+
 /* ===== WHAT IS HAPPENING, AND WHERE =====
    Headlines with a source and a time, nothing more. They are not scored, they do not reach a
    verdict, and the panel says so, because a news feed inside a tool that grades decisions will

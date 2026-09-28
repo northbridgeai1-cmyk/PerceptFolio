@@ -579,7 +579,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/quote', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/quote', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -854,6 +854,70 @@ async function handle(request, env) {
      one before, each a count of filers naming the issuer plus the first page of names as EDGAR
      returns them (not ranked by size: sizes live inside each filer's table). Display only, dated,
      cached a week; the source line names the overcount risk of a shared name. */
+  /* ---- GET /feargreed : the index, and the seven things it is made of ----
+     CNN publishes the Fear and Greed index as JSON for its own dashboard. It refuses a bare
+     request ("I'm a teapot. You're a bot."), so this presents the headers a browser would and
+     caches the answer for an hour, which is well inside how often the underlying series move.
+
+     THE COMPONENTS ARE THE POINT, not the headline number. A single 0-100 score with nothing
+     behind it is the sort of thing this terminal exists to argue with; seven named readings, each
+     with its own date, can be disagreed with. They are passed through exactly as CNN scores them,
+     and the panel says whose index it is: this is somebody else's measurement, reported, not a
+     PerceptFolio verdict, and it reaches no rulebook. */
+  const FG_PARTS = [
+    ['market_momentum_sp125', 'Momentum', 'The S&P 500 against its own 125-day average.'],
+    ['stock_price_strength', 'Highs vs lows', 'Stocks at 52-week highs against those at lows, on the NYSE.'],
+    ['stock_price_breadth', 'Breadth', 'Volume rising against volume falling.'],
+    ['put_call_options', 'Options', 'Puts bought against calls bought.'],
+    ['market_volatility_vix', 'Volatility', 'The VIX against its own 50-day average.'],
+    ['junk_bond_demand', 'Junk bonds', 'What investors are charging for the riskiest debt.'],
+    ['safe_haven_demand', 'Safe havens', 'Stocks against Treasuries over the last twenty days.'],
+  ];
+  if (url.pathname === '/feargreed' && request.method === 'GET') {
+    if (await tooMany(env, request, '/feargreed', 20)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const code = clean(url.searchParams.get('code'), 12).toUpperCase();
+    if (!(await activeGrant(code))) return json({ error: 'This needs a live access code.' }, 401, env);
+    const ck = 'fg:' + Math.floor(Date.now() / 3600000);
+    const hit = await env.PF_SYNC.get(ck);
+    if (hit) return json(Object.assign(JSON.parse(hit), { cached: true }), 200, env);
+
+    let d = null;
+    try {
+      const r = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://edition.cnn.com/',
+        },
+      });
+      if (!r.ok) return json({ error: 'The index answered ' + r.status + '.' }, 502, env);
+      d = await r.json();
+    } catch (e) { return json({ error: 'The index could not be reached.' }, 502, env); }
+
+    const num = v => (v == null || !isFinite(Number(v))) ? null : Math.round(Number(v) * 10) / 10;
+    const fg = d.fear_and_greed || {};
+    const body = {
+      score: num(fg.score),
+      rating: clean(fg.rating, 20) || null,
+      at: fg.timestamp || null,
+      /* What it read a week and a month ago, which is the only way a single number says anything:
+         37 on its own is noise, 37 after 60 a month ago is a change of weather. */
+      prev: { close: num(fg.previous_close), week: num(fg.previous_1_week), month: num(fg.previous_1_month), year: num(fg.previous_1_year) },
+      parts: FG_PARTS.map(([k, name, what]) => {
+        const c = d[k] || {};
+        return { id: k, name, what, score: num(c.score), rating: clean(c.rating, 20) || null, at: c.timestamp || null };
+      }).filter(x => x.score != null),
+      source: 'CNN Business Fear & Greed Index',
+      asOf: new Date().toISOString(),
+      cached: false,
+      note: 'CNN’s index, reported as published. Seven readings, each with its own date; the headline is their average. It is a measure of how the market is behaving, not of whether a company is worth owning, and it reaches no rulebook and no verdict here.',
+    };
+    if (body.score == null) return json({ error: 'The index did not return a score.' }, 502, env);
+    await env.PF_SYNC.put(ck, JSON.stringify(body), { expirationTtl: 7200 });
+    return json(body, 200, env);
+  }
+
   /* ---- GET /worldnews[?country=Name] : what is happening, and where ----
      Finnhub's news is markets and US companies; it has nothing for "what is going on in Nigeria".
      Google News publishes an RSS feed that does, free and without a key, so this proxies it. The
@@ -872,6 +936,27 @@ async function handle(request, env) {
      and date ride on every row so a reader can discount it themselves.
 
      Cached 30 minutes a query. Gated on a live access code, like every other data route. */
+  /* Google's RSS, to the same shape NewsAPI returns. */
+  const parseNewsRss = (xml) => {
+    const unesc = t => String(t || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+      .replace(/<[^>]+>/g, '').trim();
+    const pick = (block, tag) => { const m = block.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)<\\/' + tag + '>')); return m ? unesc(m[1]) : ''; };
+    const out = [];
+    for (const m of String(xml).matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+      const b = m[1];
+      /* Google appends " - Source" to every headline while also giving the source its own tag, so
+         the suffix is duplication and it is what makes a list of headlines unreadable at a glance. */
+      const title = pick(b, 'title').replace(/\s+-\s+[^-]{2,40}$/, '').trim();
+      const link = pick(b, 'link');
+      const source = pick(b, 'source');
+      const at = Date.parse(pick(b, 'pubDate')) || 0;
+      let host = '';
+      try { host = new URL(link).hostname.replace(/^www\./, ''); } catch (e) {}
+      if (title && link) out.push({ title, url: link, source: source || host, at });
+    }
+    return out;
+  };
   const WIRES = ['reuters.com', 'apnews.com', 'bbc.co.uk', 'bbc.com', 'bloomberg.com', 'ft.com', 'wsj.com',
     'nytimes.com', 'theguardian.com', 'aljazeera.com', 'cnbc.com', 'economist.com', 'nikkei.com',
     'scmp.com', 'dw.com', 'france24.com', 'npr.org', 'politico.com', 'axios.com', 'afp.com'];
@@ -880,39 +965,68 @@ async function handle(request, env) {
     const code = clean(url.searchParams.get('code'), 12).toUpperCase();
     if (!(await activeGrant(code))) return json({ error: 'World news needs a live access code.' }, 401, env);
     const country = clean(url.searchParams.get('country'), 60).replace(/[^A-Za-z \-'.]/g, '').trim();
-    const ck = 'wnews:' + (country ? country.toLowerCase() : '_world') + ':' + Math.floor(Date.now() / 1800000);
+    /* THE FEED IS PART OF THE KEY. Without it, setting NEWS_API_KEY changes nothing for half an
+       hour: the route keeps serving the free feed's answer out of the cache and looks as though the
+       key did not take. */
+    const apiKey = env.NEWS_API_KEY || '';
+    const ck = 'wnews:' + (apiKey ? 'api' : 'rss') + ':' + (country ? country.toLowerCase() : '_world') + ':' + Math.floor(Date.now() / 1800000);
     const hit = await env.PF_SYNC.get(ck);
     if (hit) return json(Object.assign(JSON.parse(hit), { cached: true }), 200, env);
 
-    const feed = country
-      ? 'https://news.google.com/rss/search?q=' + encodeURIComponent(country + ' when:7d') + '&hl=en-US&gl=US&ceid=US:en'
-      : 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en';
-    let xml = '';
-    try {
-      const r = await fetch(feed, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PerceptFolio/1.0)', 'Accept': 'application/rss+xml,application/xml' } });
-      if (!r.ok) return json({ error: 'The news feed answered ' + r.status + '.' }, 502, env);
-      xml = await r.text();
-    } catch (e) {
-      return json({ error: 'The news feed could not be reached.' }, 502, env);
+    /* TWO FEEDS, ONE ROUTE.
+       NEWS_API_KEY set: NewsAPI answers, with a publisher, a timestamp and a description per item.
+       NEWS_API_URL overrides the base, for a reseller or a proxy that speaks the same shapes.
+       Unset: Google News RSS, which is free, uncapped and current, and is what shipped first.
+
+       READ NEWSAPI'S OWN TERMS BEFORE SETTING THE KEY. Their free Developer plan is for
+       "development and testing": articles arrive a day late, the cap is 100 requests a day across
+       everything, and CORS is localhost only. Production and commercial use is the Business plan.
+       The cap is the sharp end here: 100 a day is the WHOLE terminal, not each person, which the
+       half-hour cache stretches but does not remove. This is the same licence question the market
+       data had, and it is the operator's to answer, so the code takes the key and says which feed
+       answered rather than deciding for them. */
+    let items = [];
+    let usedSource = 'Google News RSS';
+
+    if (apiKey) {
+      const base = (env.NEWS_API_URL || 'https://newsapi.org/v2').replace(/\/+$/, '');
+      const from = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      const api = country
+        ? base + '/everything?q=' + encodeURIComponent(country) + '&language=en&sortBy=publishedAt&pageSize=40&from=' + from
+        : base + '/top-headlines?category=general&language=en&pageSize=40';
+      try {
+        const r = await fetch(api, { headers: { 'X-Api-Key': apiKey, 'User-Agent': 'PerceptFolio/1.0 (research terminal)', 'Accept': 'application/json' } });
+        const j = await r.json().catch(() => null);
+        if (r.ok && j && Array.isArray(j.articles)) {
+          items = j.articles.map(a => ({
+            title: clean(a.title, 300),
+            url: clean(a.url, 500),
+            source: clean((a.source && a.source.name) || '', 80),
+            at: Date.parse(a.publishedAt || '') || 0,
+          })).filter(x => x.title && x.url);
+          usedSource = 'NewsAPI';
+        }
+        /* A refusal is not fatal: an exhausted quota or an expired key falls through to the free
+           feed rather than leaving the panel empty, and the answer says which one served it. */
+      } catch (e) { /* fall through to the free feed */ }
     }
 
-    const unesc = t => String(t || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
-      .replace(/<[^>]+>/g, '').trim();
-    const pick = (block, tag) => { const m = block.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)<\\/' + tag + '>')); return m ? unesc(m[1]) : ''; };
-    const items = [];
-    for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
-      const b = m[1];
-      /* Google appends " - Source" to every headline; the source has its own tag, so the suffix is
-         duplication and it is what makes a list of headlines unreadable at a glance. */
-      const title = pick(b, 'title').replace(/\s+-\s+[^-]{2,40}$/, '').trim();
-      const link = pick(b, 'link');
-      const source = pick(b, 'source');
-      const at = Date.parse(pick(b, 'pubDate')) || 0;
-      let host = '';
-      try { host = new URL(link).hostname.replace(/^www\./, ''); } catch (e) {}
-      if (title && link) items.push({ title, url: link, source: source || host, at });
+    if (!items.length) {
+      const feed = country
+        ? 'https://news.google.com/rss/search?q=' + encodeURIComponent(country + ' when:7d') + '&hl=en-US&gl=US&ceid=US:en'
+        : 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en';
+      let xml = '';
+      try {
+        const r = await fetch(feed, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PerceptFolio/1.0)', 'Accept': 'application/rss+xml,application/xml' } });
+        if (!r.ok) return json({ error: 'The news feed answered ' + r.status + '.' }, 502, env);
+        xml = await r.text();
+      } catch (e) {
+        return json({ error: 'The news feed could not be reached.' }, 502, env);
+      }
+      items = parseNewsRss(xml);
+      usedSource = 'Google News RSS';
     }
+
     const needle = country.toLowerCase();
     const scored = items.map(it => {
       let s = 0;
@@ -923,7 +1037,7 @@ async function handle(request, env) {
     }).sort((a, b) => b.s - a.s || b.it.at - a.it.at).map(x => x.it).slice(0, 30);
 
     const body = { country: country || null, items: scored, n: scored.length,
-      source: 'Google News RSS', asOf: new Date().toISOString(), cached: false,
+      source: usedSource, asOf: new Date().toISOString(), cached: false,
       note: country
         ? 'English-language coverage naming ' + country + ' in the last seven days, ordered by whether the headline names the country, then by the standing of the outlet, then by recency. Headlines, not analysis; each row carries its source.'
         : 'World headlines. Each row carries its source and time; nothing here feeds a verdict.' };

@@ -1484,7 +1484,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v141/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v142/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2844,14 +2844,52 @@ G('Nothing to type, nothing to download');
   t('it is contract-tested', fs.existsSync('test/whoami.mjs') && /a live session returns the code the door was opened with/.test(read('test/whoami.mjs')));
 }
 
+
+/* ==================== FEAR AND GREED ==================== */
+G('Somebody else\'s measurement, reported with its working');
+{
+  t('the worker proxies the index, with the headers it refuses a bare request without',
+    /url\.pathname === '\/feargreed'/.test(worker) && /production\.dataviz\.cnn\.io/.test(worker) && /'Referer': 'https:\/\/edition\.cnn\.com\/'/.test(worker));
+  t('it is gated on a live code, rate-limited and cached by the hour',
+    /tooMany\(env, request, '\/feargreed', 20\)/.test(worker) && /'fg:' \+ Math\.floor\(Date\.now\(\) \/ 3600000\)/.test(worker));
+  /* A single 0-100 score with nothing behind it is the kind of number this terminal exists to
+     argue with. The seven readings are what make it arguable. */
+  t('all seven components come through, each named and dated', (worker.match(/\['(market_momentum_sp125|stock_price_strength|stock_price_breadth|put_call_options|market_volatility_vix|junk_bond_demand|safe_haven_demand)'/g) || []).length === 7);
+  t('it carries what it read a week, a month and a year ago', /week: num\(fg\.previous_1_week\), month: num\(fg\.previous_1_month\), year: num\(fg\.previous_1_year\)/.test(worker));
+  t('the card names whose index it is and says it reaches no verdict',
+    /function renderFearGreed\(\)/.test(term) && /reaches no rulebook and no verdict/.test(worker) && /CNN Business Fear & Greed Index/.test(worker));
+  t('the card loads when Market is opened, once a session', /loadMarketData\(false\);loadFearGreed\(\);/.test(term) && /if\(_fgTried&&!force\)return;/.test(term));
+  t('it is contract-tested against the live index', fs.existsSync('test/feargreed.mjs') && /all seven components are passed through/.test(read('test/feargreed.mjs')));
+}
+
+/* ==================== NEWSAPI, IF A KEY IS SET ==================== */
+G('Two feeds, one route, and the answer says which served it');
+{
+  /* NewsAPI's free plan is for development: a day's delay, 100 requests a day across the whole
+     terminal, and localhost-only CORS. That is the operator's call, so the code takes the key and
+     reports which feed answered rather than deciding. */
+  t('a key switches the feed, and the base URL can point at a reseller',
+    /const apiKey = env\.NEWS_API_KEY \|\| '';/.test(worker) && /env\.NEWS_API_URL \|\| 'https:\/\/newsapi\.org\/v2'/.test(worker));
+  t('the key travels in a header, never in the query string', /'X-Api-Key': apiKey/.test(worker) && !/apiKey=' \+/.test(worker));
+  t('a spent quota or a dead key falls back to the free feed rather than emptying the panel',
+    /if \(!items\.length\) \{[\s\S]{0,400}?news\.google\.com/.test(worker));
+  /* Without this the key appears to do nothing for half an hour, because the cache still holds the
+     free feed's answer under the same name. */
+  t('the feed is part of the cache key', /'wnews:' \+ \(apiKey \? 'api' : 'rss'\)/.test(worker));
+  t('the answer names the feed that served it', /source: usedSource/.test(worker));
+  t('both paths are contract-tested', /with a key set, NewsAPI answers and says so/.test(read('test/worldnews.mjs')) && /a spent quota falls back to the free feed/.test(read('test/worldnews.mjs')));
+}
+
 /* ==================== THE WORLD, IN THE NEWS TAB ==================== */
 G('What is happening, and where');
 {
   /* Finnhub covers markets and US companies and has nothing for "what is going on in Nigeria".
      Google News publishes RSS that does, free and without a key; the browser cannot call it
      (no CORS header), so the worker proxies, ranks and caches it. */
-  t('the worker proxies a free feed rather than asking for another key',
-    /url\.pathname === '\/worldnews'/.test(worker) && /news\.google\.com\/rss/.test(worker) && !/NEWS_API_KEY/.test(worker));
+  /* The free feed is the default and needs no key at all; NEWS_API_KEY is opt-in and reported. */
+  t('the worker proxies a free feed by default, with no key required',
+    /url\.pathname === '\/worldnews'/.test(worker) && /news\.google\.com\/rss/.test(worker)
+    && /const apiKey = env\.NEWS_API_KEY \|\| '';/.test(worker) && /if \(!items\.length\) \{/.test(worker));
   t('world news is gated on a live code and rate-limited like every other data route',
     /tooMany\(env, request, '\/worldnews', 20\)/.test(worker) && /World news needs a live access code/.test(worker));
   /* A bare country name in a search feed drags in travel pieces, so the results are ordered: the
