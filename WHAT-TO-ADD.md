@@ -246,3 +246,9 @@ To go back to the free feed: `npx wrangler secret delete NEWS_API_KEY -c worker.
 - **"localStorage is capped at 5MB."** Correct, but the conclusion was stale: the book lives on the worker, and quota failure reclaims caches then pushes to the server.
 
 **Genuinely new and unresolved: the Tiingo redistribution question.** Internal commercial use and redistribution are separate licences. Serving closes and marks to a paying subscriber through `/history` and `/marks` may be redistribution. This needs reading the actual contract, not a code change. **It ranks above every feature**, beside the Finnhub commercial plan.
+
+**2026-09-28, "should it be for the general public?" — asked, and answered no.** The owner raised widening the terminal to everyone, then chose **A: keep $760, keep the audience narrow**. The arithmetic that settled it: $760/mo is $9,120/yr, about 11% of a median US household's gross income, so no member of the general public buys it at any framing. The price stays in `site/src/lib/config.ts`, `worker.js`, admin's quote and the welcome email, and the suite keeps checking they agree.
+
+**What follows from A.** Per-user data and aggregator fees are affordable at this price, so **live broker sync via SnapTrade or Plaid is now viable** where it would not be at public pricing. The quote-first flow stays: a person asks, the operator reads it and grants a code. No self-serve signup.
+
+**Do not reopen this** without new information. It has now been decided twice, on 2026-09-22 and again today.
