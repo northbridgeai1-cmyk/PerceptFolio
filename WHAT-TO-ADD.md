@@ -337,3 +337,25 @@ So the gate moved from **who is asking** to **what they say it is for**. `screen
 **What is proved and what is not.** `test/broker.mjs` (32 checks) verifies the canonical JSON and the HMAC against the documented algorithm and against Node's own crypto, which is the failure that would otherwise look exactly like a bad key, plus all three read-only enforcements. It does **not** prove the endpoints return what we expect; only a live key does, and the first connection is that test. Two notes for whoever hits it: `getUserHoldings` is 410 Gone for accounts created after 2026-05-11, and `SNAPTRADE_BASE` is a secret rather than a constant because the reference pages and the signing guide disagree about the `/api/v1` prefix.
 
 **To switch it on:** sign up at snaptrade.com, then `SNAPTRADE_CLIENT_ID` and `SNAPTRADE_CONSUMER_KEY` as worker secrets. Until then every `/broker/*` route answers 503 and the settings card says connections are not switched on yet.
+
+
+**2026-09-29, is the broker connection safe, and does it work?** Both asked, both answered, and the answering found three things.
+
+**Does it work.** `test/brokerlive.mjs` drives the real worker over all four routes against a **mock SnapTrade that verifies the signature the way SnapTrade does**: it recomputes the HMAC from the request it actually received, with its own canonicaliser written separately from the worker's, and answers 401 on a mismatch. Ten calls signed and accepted, none rejected. Link, status, sync and unlink all work; options, zero-quantity positions, dividends, fees and malformed rows are all skipped rather than guessed at. What it still cannot prove is that SnapTrade's live endpoints are shaped like the mock. Only a key proves that.
+
+**Is it safe. Three gaps found in my own code, all closed:**
+
+1. **The userSecret was stored in the clear.** KV is encrypted at rest by Cloudflare, so this was never about the disk; it was about what a leaked KV-scoped API token would be worth. It is now sealed with AES-GCM under a key derived from `SYNC_SECRET`, which lives in the worker's secrets and not in KV, so a namespace dump is ciphertext. One write path (`putBrokerRec`) and one read path (`brokerRec`), so no route can put a plaintext secret in by forgetting.
+2. **`/broker/status` was not rate limited**, while calling SnapTrade on every hit. A code is its holder's own, but that still let one account burn its own quota unboundedly and hammer a third party. Reads now take the looser bucket, writes keep the tight one.
+3. **A cancelled subscription left a live credential behind.** Somebody stops paying and we keep a key that reads their brokerage, which nobody would ever think to ask for back. `customer.subscription.deleted` now tears the connection down, best effort at SnapTrade and certain in KV. A **paused or past-due** account keeps its connection, because that lapses by itself and getting this backwards would make people reconnect over a failed card.
+
+**2026-09-29, API keys, so somebody's AI can read this.** What existed was one unnamed token for a spreadsheet. An assistant is not a spreadsheet: it gets pointed at things, kept for months, and occasionally needs taking away on its own. So a key now has:
+
+- a **name**, so you know which is which a year later, and an **id**, so revoking one does not revoke the rest. Without an id, DELETE still revokes everything, which is what a panic button should do;
+- a **scope**. The record is the published, hash-chained thing this product is judged on. The book is what someone owns and what it cost. `record` is the default and `book` must be asked for, behind a confirm that says what it exposes;
+- **bearer auth**, because anything that can send a header should. The query string stays, because Google Sheets IMPORTDATA cannot send one and breaking the integration that already exists to look tidy would be vandalism;
+- a **last-used** stamp, because a key nobody can account for should be revoked and you cannot tell which that is without it.
+
+**`GET /me/schema` is the part that makes it an AI feature rather than an endpoint.** An assistant pointed at an unfamiliar API guesses, and a guess against somebody's portfolio is the wrong kind of wrong. The schema states the endpoints, what this particular key may and may not reach, and the three things about this product a reader must not get wrong: marks are forward-only and never backfilled, there is no win rate on purpose, and **rows marked imported came from a broker or a CSV and are not calls this terminal made**. That last one is repeated in the book payload itself, because an agent that summarises one object would otherwise report somebody's broker history as this product's track record. That is the single worst thing this API could cause.
+
+Keys are capped at ten, stop reading the instant an account is paused, and an older bare token still reads the record and still cannot reach the book. Proved live in production: minted, read by bearer, refused the book, read its own schema, listed with its last-used time, revoked by id, dead. 42 checks in `test/apikeys.mjs`.

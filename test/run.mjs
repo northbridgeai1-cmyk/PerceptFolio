@@ -661,9 +661,24 @@ G('Invited users get sync and summaries without the master key');
 t('/usync exists and is keyed on the invite code', /url\.pathname === '\/usync'/.test(worker) &&
   /const ukey = 'uslot:' \+ code/.test(worker));
 t('a paused grant loses sync with everything else', /if \(!\(await activeGrant\(code\)\)\)/.test(worker));
-/* Each code addresses only its own key, so one user cannot read another's blob. */
-t('one code cannot reach another code\'s slot',
-  !/uslot:' \+ (?!code)/.test(worker));
+/* Each code addresses only its own key, so one user cannot read another's blob.
+   WIDENED 2026-09-29, WITHOUT WIDENING THE GUARANTEE. There are now two ways to name a slot: the
+   sync routes use the authenticated `code`, and /me uses `ident.slice(2)` taken from the API key's
+   own stored record. Both are the caller's own identity; neither is anything the caller typed. The
+   assertion is therefore on the SOURCE rather than on the spelling: every construction must be one
+   of those two, and none may be built from a query parameter. */
+t('one code cannot reach another code\'s slot', (() => {
+  const uses = worker.match(/uslot:' \+ [^,;)\n]+/g) || [];
+  /* The scan stops at the first ')', so the second form arrives as "ident.slice(2" without its
+     closing bracket. Matched as the scan actually yields it rather than as it reads in the source. */
+  const allowed = /^uslot:' \+ (code|ident\.slice\(2)$/;
+  return uses.length >= 2 && uses.every(u => allowed.test(u.trim()));
+})());
+t('and no slot is ever addressed by something the caller typed',
+  !/uslot:' \+ [^,;)\n]*(searchParams|body\.|params\.)/.test(worker));
+t('the identity behind an API key is read from the key record, never from the request',
+  /let ident = raw, scope = 'record', id = null;/.test(worker) &&
+  /const raw = await env\.PF_SYNC\.get\('tok:' \+ tok\);/.test(worker));
 t('the same 2MB ceiling and updatedAt contract as operator sync',
   /raw\.length > MAX_BYTES/.test(worker) && /typeof parsed\.updatedAt !== 'number'/.test(worker));
 
@@ -1608,7 +1623,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v153/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v154/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }

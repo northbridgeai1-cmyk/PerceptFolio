@@ -781,7 +781,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -1026,10 +1026,43 @@ async function handle(request, env) {
      reading them. Stable, so reconnecting finds the same user rather than making a second one. */
   async function brokerUserId(code) { return 'pf_' + (await sha256hex('pf-broker:' + code)).slice(0, 32); }
 
+  /* THE ONE CREDENTIAL WE HOLD, ENCRYPTED AT REST BY US AS WELL AS BY CLOUDFLARE.
+     KV is already encrypted at rest on Cloudflare's side, so this is not about the disk. It is about
+     what a KV-scoped API token is worth if one ever leaks: with this, a dump of the namespace is a
+     pile of ciphertext, because the key is derived from SYNC_SECRET, which lives in the worker's
+     secrets and not in KV. It costs one AES call per read and closes the one exposure where an
+     attacker has the data but not the secrets.
+
+     Derived rather than reused: SHA-256 over a label plus SYNC_SECRET, so the AES key is not the
+     same bytes as the bearer token that guards the operator routes. */
+  async function brokerCryptoKey() {
+    const raw = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('pf-broker-secret-v1:' + env.SYNC_SECRET));
+    return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  }
+  async function sealSecret(plain) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await brokerCryptoKey(), new TextEncoder().encode(plain));
+    return 'v1:' + b64bytes(iv) + ':' + b64bytes(ct);
+  }
+  async function openSecret(blob) {
+    if (typeof blob !== 'string' || !blob.startsWith('v1:')) return blob || null;   /* nothing sealed yet */
+    const [, ivB, ctB] = blob.split(':');
+    const bytes = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+    try {
+      const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes(ivB) }, await brokerCryptoKey(), bytes(ctB));
+      return new TextDecoder().decode(pt);
+    } catch (e) { return null; }   /* a secret we cannot open is a connection that must be remade */
+  }
   async function brokerRec(code) {
     const raw = await env.PF_SYNC.get('bro:' + code);
     if (!raw) return null;
-    try { return JSON.parse(raw); } catch (e) { return null; }
+    let rec; try { rec = JSON.parse(raw); } catch (e) { return null; }
+    if (rec && rec.userSecret) rec.userSecret = await openSecret(rec.userSecret);
+    return rec && rec.userSecret ? rec : null;
+  }
+  /* Written in one place so a plaintext secret cannot reach KV by a route that forgot to seal it. */
+  async function putBrokerRec(code, rec) {
+    await env.PF_SYNC.put('bro:' + code, JSON.stringify(Object.assign({}, rec, { userSecret: await sealSecret(rec.userSecret) })));
   }
   /* Registered once and remembered. registerUser hands back the userSecret exactly once and it
      cannot be fetched again, so losing it means the person reconnects from scratch. */
@@ -1040,7 +1073,7 @@ async function handle(request, env) {
     const j = await stFetch('POST', '/api/v1/snapTrade/registerUser', stQuery(), { userId });
     if (!j || !j.userSecret) throw new Error('The broker service did not return a user secret.');
     const rec = { userId, userSecret: j.userSecret, createdAt: Date.now(), lastSyncAt: null };
-    await env.PF_SYNC.put('bro:' + code, JSON.stringify(rec));
+    await putBrokerRec(code, rec);
     return rec;
   }
 
@@ -1048,7 +1081,11 @@ async function handle(request, env) {
     if (!brokerConfigured()) return json({ error: 'Broker connections are not switched on yet.' }, 503, env);
     const bcode = clean(url.searchParams.get('code'), 12).toUpperCase();
     if (!(await activeGrant(bcode))) return json({ error: 'Needs a live access code.' }, 401, env);
-    if (request.method === 'POST' && await tooMany(env, request, '/broker', 10)) {
+    /* BOTH METHODS, NOT JUST THE WRITES. /broker/status calls SnapTrade on every hit, so leaving it
+       unlimited meant an open door to spending somebody else's quota with nothing but a code that is
+       already theirs. The GET gets the looser bucket because the settings screen legitimately polls
+       it; the POSTs keep the tight one because each is up to twenty upstream calls. */
+    if (await tooMany(env, request, '/broker', request.method === 'POST' ? 10 : 30)) {
       return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
     }
 
@@ -1121,7 +1158,7 @@ async function handle(request, env) {
           }
         }
         rec.lastSyncAt = Date.now();
-        await env.PF_SYNC.put('bro:' + bcode, JSON.stringify(rec));
+        await putBrokerRec(bcode, rec);
         return json({
           ok: true, readOnly: true, syncedAt: rec.lastSyncAt,
           accounts: accounts.map(a => ({ id: a.id, name: a.name || '', institution: a.institution_name || '', number: maskAccount(a.number) })),
@@ -1243,13 +1280,89 @@ async function handle(request, env) {
      A token made by POST /token. What a spreadsheet wants: IMPORTDATA in Sheets, Power Query in
      Excel, one URL. The token reads; it cannot write, cannot open the terminal, and is revoked by
      DELETE /token. The record only: calls and marks; holdings are in the terminal's CSV. */
+  /* WHAT A KEY IS ALLOWED TO SEE, RESOLVED IN ONE PLACE.
+     Bearer first, because anything that can send a header should; the query string second, because
+     Google Sheets cannot. A record written by the older build is a bare ident string with no scope,
+     and is read as 'record', which is exactly what it could always reach. */
+  async function resolveToken(request, url) {
+    const auth = request.headers.get('Authorization') || '';
+    const fromHeader = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+    const tok = clean(fromHeader || url.searchParams.get('token'), 64);
+    if (!/^[0-9a-f]{48}$/.test(tok)) return { error: 'A key is 48 hex characters, sent as an Authorization: Bearer header or ?token=.', status: 400 };
+    const raw = await env.PF_SYNC.get('tok:' + tok);
+    if (!raw) return { error: 'That key is not live.', status: 401 };
+    let ident = raw, scope = 'record', id = null;
+    if (raw.startsWith('{')) { try { const o = JSON.parse(raw); ident = o.ident; scope = o.scope || 'record'; id = o.id || null; } catch (e) { return { error: 'That key is not live.', status: 401 }; } }
+    if (ident.startsWith('c:') && !(await activeGrant(ident.slice(2)))) return { error: 'The access behind this key is paused.', status: 401 };
+    /* Stamped so a person can see which keys are still in use before revoking one. Best effort: a
+       failed write must never cost somebody the answer they asked for. */
+    try {
+      const list = JSON.parse(await env.PF_SYNC.get('tokens:' + ident) || '[]');
+      const row = list.find(t => t.tok === tok);
+      if (row && (!row.used || Date.now() - row.used > 3600000)) { row.used = Date.now(); await env.PF_SYNC.put('tokens:' + ident, JSON.stringify(list)); }
+    } catch (e) { /* deliberately ignored */ }
+    return { ident, scope, id, tok };
+  }
+
+  /* ---- GET /me/schema : what this key can read, in a form an agent can act on ----
+     An assistant pointed at an unfamiliar API guesses, and a guess against somebody's portfolio is
+     the wrong kind of wrong. This says, in one document, which endpoints exist, what they return and
+     what this particular key is allowed to see, so the agent has no reason to invent any of it.
+     Behind the key rather than public, because the map is only useful to somebody already holding
+     one and there is no reason to publish the shape of a private API. */
+  if (url.pathname === '/me/schema' && request.method === 'GET') {
+    if (await tooMany(env, request, '/me', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    const a = await resolveToken(request, url);
+    if (a.error) return json({ error: a.error }, a.status, env);
+    return json({
+      name: 'PerceptFolio, read-only',
+      about: 'A research terminal that marks its own calls. This key reads; nothing here can write, trade or change anything.',
+      scope: a.scope,
+      auth: { preferred: 'Authorization: Bearer <key>', also: '?token=<key> for clients that cannot send headers, such as Google Sheets IMPORTDATA' },
+      endpoints: [
+        { path: '/me', returns: 'the record: every call with its price and the index at that instant, its marks on fixed horizons, and the hash chain', params: { format: 'json (default) or csv' } },
+        { path: '/me?include=book', returns: 'holdings, cash and the watchlist', requiresScope: 'book', available: a.scope === 'book' },
+        { path: '/me/schema', returns: 'this document' },
+      ],
+      readingTheRecord: {
+        marks: 'Horizons are days: 30, 90, 180, 365. A mark carries the price and the index on the day it was taken. Excess is the call’s return minus the index’s over the same window.',
+        missed: 'A mark flagged missed was not taken on its day and is never backfilled. Marks are forward-only by design.',
+        imported: 'Transactions flagged imported came from a broker or a CSV. They are history, NOT calls this terminal made, and they are not graded. Do not report them as the terminal’s record.',
+        honesty: 'There is no win rate here on purpose. Expectancy with its interval is the measure, and the terminal says when there is not enough evidence yet rather than filling the gap.',
+      },
+      limits: { requestsPerMinute: 30, writes: 'none: this API is read-only' },
+    }, 200, env);
+  }
+
   if (url.pathname === '/me' && request.method === 'GET') {
     if (await tooMany(env, request, '/me', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
-    const tok = clean(url.searchParams.get('token'), 64);
-    if (!/^[0-9a-f]{48}$/.test(tok)) return json({ error: 'A token is 48 hex characters.' }, 400, env);
-    const ident = await env.PF_SYNC.get('tok:' + tok);
-    if (!ident) return json({ error: 'That token is not live.' }, 401, env);
-    if (ident.startsWith('c:') && !(await activeGrant(ident.slice(2)))) return json({ error: 'The access behind this token is paused.' }, 401, env);
+    const a = await resolveToken(request, url);
+    if (a.error) return json({ error: a.error }, a.status, env);
+    const ident = a.ident;
+
+    /* ---- the book, when the key was given that scope ---- */
+    const include = clean(url.searchParams.get('include'), 12);
+    if (include === 'book' || include === 'all') {
+      if (a.scope !== 'book') return json({ error: 'This key reads the record only. Make a key with the book scope to read holdings.' }, 403, env);
+      if (!ident.startsWith('c:')) return json({ error: 'The book is only readable by an access code’s key.' }, 400, env);
+      const stored = await env.PF_SYNC.get('uslot:' + ident.slice(2));
+      if (!stored) return json({ ok: true, empty: true, note: 'Nothing has been synced to this account yet.' }, 200, env);
+      let book = {}; try { book = (JSON.parse(stored) || {}).data || {}; } catch (e) { book = {}; }
+      const out = {
+        ok: true, readOnly: true, updatedAt: book.syncedAt || null,
+        cash: book.cash || 0,
+        holdings: (book.holdings || []).map(h => ({ sym: h.sym, type: h.type || 'Stock', shares: h.shares, cost: h.cost, broker: h.broker || '' })),
+        watchlist: (book.watchlist || []).map(w => (typeof w === 'string' ? w : w.sym)).filter(Boolean),
+        /* Said in the payload, not only in the schema, because an agent that reads one object and
+           summarises it will otherwise present imported history as this terminal's own calls. */
+        note: 'Holdings and transactions marked imported came from a broker or a CSV. They are history, not calls this terminal made, and are not graded.',
+      };
+      if (include === 'all') {
+        const rec0 = JSON.parse(await env.PF_SYNC.get('rec:' + ident) || '{"calls":[],"reviews":[],"chain":null}');
+        out.calls = rec0.calls || []; out.reviews = rec0.reviews || []; out.chain = rec0.chain || null;
+      }
+      return json(out, 200, env);
+    }
     const rec = JSON.parse(await env.PF_SYNC.get('rec:' + ident) || '{"calls":[],"reviews":[],"chain":null}');
     if ((url.searchParams.get('format') || 'json') === 'csv') {
       const H = [30, 90, 180, 365];
@@ -1939,21 +2052,69 @@ async function handle(request, env) {
       return json({ ok: true }, 200, env);
     }
     /* ---- A4.7. POST /token -> a read-only token for /me; DELETE /token revokes every token ---- */
+    /* ===================== API KEYS, SO SOMEBODY ELSE'S SOFTWARE CAN READ THIS =====================
+       This began as one unnamed token for a spreadsheet: mint it, paste the URL into Sheets, done.
+       The owner's ask on 2026-09-29 was for people to point their own AI at the terminal, and an
+       agent is not a spreadsheet. Three things had to change and one had to stay.
+
+       NAMED, AND REVOCABLE ONE AT A TIME. A person who has given a key to an assistant, a script and
+       a spreadsheet cannot be told that withdrawing one means withdrawing all three. Each key now
+       carries a name and an id, and DELETE takes an id. Without one it still revokes everything,
+       which is what the panic button should do.
+
+       SCOPED, BECAUSE THE BOOK IS NOT THE RECORD. The record is the published, hash-chained thing
+       this product exists to be judged on, and handing it to a reader costs nothing. The book is
+       what somebody owns and what it cost them. A key that reads the record must not silently also
+       read the positions, so 'record' is the default and 'book' has to be asked for.
+
+       LAST USED, because a key nobody can account for is a key that should be revoked, and you
+       cannot tell which one that is without knowing when each was last seen.
+
+       WHAT STAYED: the token still works in the query string. Google Sheets IMPORTDATA cannot send
+       a header, and breaking that to look tidy would break the one integration that already exists.
+       Bearer is accepted and documented first, because everything that CAN send a header should. */
+    const SCOPES = ['record', 'book'];
     if (url.pathname === '/token' && request.method === 'POST') {
+      let body = {}; try { body = await request.json(); } catch (e) { /* a bare POST is still valid */ }
+      const name = clean(body && body.name, 40) || 'Unnamed key';
+      const scope = SCOPES.includes(clean(body && body.scope, 10)) ? clean(body.scope, 10) : 'record';
+      const list = JSON.parse(await env.PF_SYNC.get('tokens:' + ident) || '[]');
+      if (list.length >= 10) return json({ error: 'Ten keys is the limit. Revoke one first.' }, 409, env);
       const tok = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('');
-      await env.PF_SYNC.put('tok:' + tok, ident);
-      const list = JSON.parse(await env.PF_SYNC.get('tokens:' + ident) || '[]'); list.push({ tok, at: Date.now() }); await env.PF_SYNC.put('tokens:' + ident, JSON.stringify(list.slice(-10)));
-      return json({ ok: true, token: tok, url: (url.origin) + '/me?token=' + tok, csv: (url.origin) + '/me?token=' + tok + '&format=csv' }, 200, env);
+      const id = 'k_' + Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2, '0')).join('');
+      await env.PF_SYNC.put('tok:' + tok, JSON.stringify({ ident, scope, id }));
+      list.push({ id, tok, at: Date.now(), name, scope, used: null });
+      await env.PF_SYNC.put('tokens:' + ident, JSON.stringify(list.slice(-10)));
+      /* Shown once. There is no route that returns a key again, because a key that can be re-read is
+         a key that only has to leak once from anywhere it was ever displayed. */
+      return json({
+        ok: true, id, name, scope, token: tok,
+        url: url.origin + '/me?token=' + tok,
+        csv: url.origin + '/me?token=' + tok + '&format=csv',
+        bearer: 'Authorization: Bearer ' + tok,
+        schema: url.origin + '/me/schema?token=' + tok,
+      }, 200, env);
     }
     if (url.pathname === '/token' && request.method === 'DELETE') {
       const list = JSON.parse(await env.PF_SYNC.get('tokens:' + ident) || '[]');
+      const id = clean(url.searchParams.get('id'), 20);
+      if (id) {
+        const keep = [], gone = [];
+        for (const t of list) (t.id === id ? gone : keep).push(t);
+        for (const t of gone) await env.PF_SYNC.delete('tok:' + t.tok);
+        await env.PF_SYNC.put('tokens:' + ident, JSON.stringify(keep));
+        return json({ ok: true, revoked: gone.length }, gone.length ? 200 : 404, env);
+      }
       for (const t of list) await env.PF_SYNC.delete('tok:' + t.tok);
       await env.PF_SYNC.delete('tokens:' + ident);
       return json({ ok: true, revoked: list.length }, 200, env);
     }
     if (url.pathname === '/token' && request.method === 'GET') {
       const list = JSON.parse(await env.PF_SYNC.get('tokens:' + ident) || '[]');
-      return json({ tokens: list.map(t => ({ at: t.at, tail: t.tok.slice(-6) })) }, 200, env);
+      return json({ scopes: SCOPES, tokens: list.map(t => ({
+        id: t.id || null, name: t.name || 'Unnamed key', scope: t.scope || 'record',
+        at: t.at, used: t.used || null, tail: String(t.tok).slice(-6),
+      })) }, 200, env);
     }
 
     /* ---- /notify — A4.3. What this identity wants to be told by email. ---- */
@@ -2821,6 +2982,32 @@ async function mintCode(env, tier, email, extra) {
   return code;
 }
 
+/* Delete a broker connection from outside the request handler, where its helpers are not in scope.
+   Used when a subscription is cancelled. It signs its own request rather than reaching into the
+   handler, and it deletes our record whatever SnapTrade answers, because a credential we can no
+   longer justify holding must not survive a bad night on somebody else's API. */
+async function brokerForget(env, code) {
+  const raw = await env.PF_SYNC.get('bro:' + code);
+  await env.PF_SYNC.delete('bro:' + code);
+  if (!raw || !(env.SNAPTRADE_CLIENT_ID && env.SNAPTRADE_CONSUMER_KEY)) return { local: true, remote: false };
+  let rec; try { rec = JSON.parse(raw); } catch (e) { return { local: true, remote: false }; }
+  if (!rec || !rec.userId) return { local: true, remote: false };
+  try {
+    const query = 'clientId=' + encodeURIComponent(env.SNAPTRADE_CLIENT_ID) +
+      '&timestamp=' + Math.floor(Date.now() / 1000) + '&userId=' + encodeURIComponent(rec.userId);
+    const path = '/api/v1/snapTrade/deleteUser';
+    const content = '{"content":null,"path":' + JSON.stringify(path) + ',"query":' + JSON.stringify(query) + '}';
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.SNAPTRADE_CONSUMER_KEY),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(content));
+    const bytes = new Uint8Array(sigBuf); let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    const base = (env.SNAPTRADE_BASE || 'https://api.snaptrade.com').replace(/\/+$/, '');
+    const r = await fetch(base + path + '?' + query, { method: 'DELETE', headers: { 'Signature': btoa(bin), 'Accept': 'application/json' } });
+    return { local: true, remote: r.ok };
+  } catch (e) { return { local: true, remote: false }; }
+}
+
 /* Push subscription state onto the grant so /status and the gate see it without a Stripe call. */
 async function syncGrant(env, code, patch) {
   if (!code) return;
@@ -3362,6 +3549,14 @@ async function handleBilling(request, env, url) {
       await env.PF_SYNC.put('sub:' + customerId, JSON.stringify(sub));
       const patch = subPatch(status, cpe);
       await syncGrant(env, sub.code, patch);
+      /* THE RELATIONSHIP IS OVER, SO THE KEY TO THEIR BROKERAGE GOES WITH IT.
+         A paused or past-due account keeps its connection, because that lapses by itself and they
+         will be back. A cancelled one does not: holding a credential that can read somebody's
+         brokerage after they have stopped paying us to is not ours to keep, and nobody would ever
+         think to ask for it back. Best effort on SnapTrade's side, certain on ours. */
+      if (status === 'canceled' && sub.code) {
+        try { await brokerForget(env, sub.code); } catch (e) { /* ours is deleted regardless */ }
+      }
       return json({ ok: true, status }, 200, env);
     }
 

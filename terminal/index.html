@@ -2418,10 +2418,39 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <h3>Shared calls</h3>
     <div id="sharesBody"></div>
   </div>
+  <!-- ============ API KEYS (2026-09-29) ============
+       This was one unnamed token for a spreadsheet. The owner asked for keys people can give their
+       own AI, and an assistant is not a spreadsheet: it gets pointed at things, kept for months, and
+       occasionally needs taking away on its own.
+
+       So a key now has a NAME, so you know which is which a year from now; an ID, so revoking one
+       does not revoke the rest; and a SCOPE, because the record is the published thing this product
+       is judged on while the book is what you own and what it cost. Reading one must not silently
+       read the other, and the narrow scope is the default.
+
+       The key is shown ONCE. There is no route that returns it again, because a key that can be
+       re-read only has to leak once from anywhere it was ever displayed. -->
   <div class="card" style="margin-top:16px">
-    <h3>Read-only token, for a spreadsheet</h3>
-    <div class="row"><button class="btn btn-ghost btn-sm" onclick="makeToken()">Make a token</button><button class="btn btn-ghost btn-sm" onclick="revokeTokens()">Revoke all</button></div>
-    <div class="muted" id="tokenStatus" style="font-size:12.5px;margin-top:8px">One URL returns your record as JSON or CSV: Sheets IMPORTDATA, Excel Power Query. It reads only.</div>
+    <h3>API keys</h3>
+    <div class="muted" style="font-size:13px;line-height:1.6;margin-bottom:12px">
+      Give a key to an assistant, a script or a spreadsheet and it can read this account. Keys are
+      <b>read-only</b>: nothing holding one can change, trade or delete anything.
+    </div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
+      <input id="keyName" placeholder="What is it for? e.g. My assistant" maxlength="40" style="max-width:230px">
+      <select id="keyScope" style="max-width:190px">
+        <option value="record">The record only</option>
+        <option value="book">The record and the book</option>
+      </select>
+      <button class="btn btn-sm" onclick="makeToken()">Make a key</button>
+      <button class="btn btn-ghost btn-sm" onclick="revokeTokens()">Revoke all</button>
+    </div>
+    <div class="muted" style="font-size:12px;margin-top:8px">
+      <b>The record</b> is your calls, their marks and the hash chain. <b>The book</b> adds your
+      holdings, your cost basis and your cash. Give the narrower one unless the wider is needed.
+    </div>
+    <div id="tokenStatus" class="muted" style="font-size:12.5px;margin-top:10px"></div>
+    <div id="keyList" style="margin-top:10px"></div>
   </div>
   <!-- ============ YOUR BROKER, READ-ONLY (2026-09-29) ============
        Beside Import trades on purpose: these are the two ways history gets in, and the CSV is what
@@ -4181,7 +4210,7 @@ function showTab(t){
   if(t==='risk'){renderBenchmarks();renderRiskContrib();renderCounterfactual();renderSharpe();renderVaR();}
   /* refreshMarketDataCard on every open, not just at login: whether the worker answers changes
      when sync is configured or a custom domain starts resolving, and the card must follow. */
-  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();renderAudit();renderRecordCopyCard();renderSharesCard();fillSnapshotTabs();brokerStatus();}
+  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();renderAudit();renderRecordCopyCard();renderSharesCard();fillSnapshotTabs();brokerStatus();renderKeyList();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -17082,20 +17111,65 @@ function renderSharesCard(){
   const list=D.shares||[];
   el.innerHTML=list.length?'<table style="font-size:12.5px"><thead><tr><th>Call</th><th>Shared</th><th>Link</th><th></th></tr></thead><tbody>'+list.slice().reverse().map(x=>'<tr><td>'+esc((x.callId||'').split(':')[1]||x.callId)+'</td><td class="muted">'+esc(new Date(x.at).toISOString().slice(0,10))+'</td><td><a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.url.replace(/^https?:\/\//,''))+'</a></td><td><button class="btn btn-ghost btn-sm" onclick="withdrawShare(\''+esc(x.id)+'\')">Withdraw</button></td></tr>').join('')+'</tbody></table>':'<span class="muted" style="font-size:12.5px">None. History → a call → share.</span>';
 }
-/* A4.7. A read-only token for a spreadsheet. Shown once; revoke from here. */
+/* A4.7. Read-only API keys. Named, scoped, revocable one at a time, and shown exactly once. */
+async function renderKeyList(){
+  const el=document.getElementById('keyList'); if(!el)return;
+  try{
+    const t=await cronUrl('/token'); if(!t){ el.innerHTML=''; return; }
+    const r=await fetch(t.url,{headers:t.headers}); if(!r.ok){ el.innerHTML=''; return; }
+    const j=await r.json();
+    const list=j.tokens||[];
+    if(!list.length){ el.innerHTML='<span class="muted" style="font-size:12.5px">No keys yet.</span>'; return; }
+    /* Last used is shown because a key nobody can account for is a key that should be revoked, and
+       you cannot tell which one that is without it. */
+    el.innerHTML='<table class="tbl" style="font-size:12.5px"><thead><tr><th>Name</th><th>Reads</th><th>Ends</th><th>Made</th><th>Last used</th><th></th></tr></thead><tbody>'+
+      list.map(k=>'<tr>'+
+        '<td>'+esc(k.name||'Unnamed key')+'</td>'+
+        '<td>'+(k.scope==='book'?'record and book':'record')+'</td>'+
+        '<td class="muted" style="font-family:var(--mono)">…'+esc(k.tail||'')+'</td>'+
+        '<td class="muted">'+(k.at?new Date(k.at).toISOString().slice(0,10):'-')+'</td>'+
+        '<td class="muted">'+(k.used?new Date(k.used).toISOString().slice(0,10):'never')+'</td>'+
+        '<td><button class="btn btn-ghost btn-sm" onclick="revokeToken(\''+esc(k.id||'')+'\')">Revoke</button></td>'+
+      '</tr>').join('')+'</tbody></table>';
+  }catch(e){ el.innerHTML=''; }
+}
 async function makeToken(){
   const st=document.getElementById('tokenStatus');
+  const name=(document.getElementById('keyName')||{}).value||'';
+  const scope=(document.getElementById('keyScope')||{}).value||'record';
+  if(scope==='book'&&!confirm('This key will be able to read your holdings, your cost basis and your cash, as well as your record.\n\nOnly give it to software you would show your account to. You can revoke it here at any time.'))return;
   try{
     const t=await cronUrl('/token'); if(!t){ if(st)st.textContent='Needs an access code.'; return; }
-    const r=await fetch(t.url,{method:'POST',headers:t.headers}); const j=await r.json().catch(()=>({}));
+    const r=await fetch(t.url,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},t.headers),body:JSON.stringify({name:name.trim(),scope})});
+    const j=await r.json().catch(()=>({}));
     if(!r.ok){ if(st)st.textContent=j.error||('HTTP '+r.status); return; }
-    if(st)st.innerHTML='<div style="font-size:12.5px;line-height:1.7">Shown once; copy it now.<br>JSON: <code style="user-select:all">'+esc(j.url)+'</code><br>CSV for Sheets or Excel: <code style="user-select:all">'+esc(j.csv)+'</code></div>';
+    if(st)st.innerHTML='<div style="font-size:12.5px;line-height:1.8;border:1px solid var(--border);border-radius:8px;padding:10px 12px">'+
+      '<b>Shown once. Copy it now.</b><br>'+
+      'Key: <code style="user-select:all">'+esc(j.token)+'</code><br>'+
+      'For an assistant, send it as a header: <code style="user-select:all">'+esc(j.bearer)+'</code><br>'+
+      'It can read what it may do here: <code style="user-select:all">'+esc(j.schema)+'</code><br>'+
+      'For Sheets or Excel, which cannot send a header: <code style="user-select:all">'+esc(j.csv)+'</code>'+
+      '</div>';
+    const nm=document.getElementById('keyName'); if(nm)nm.value='';
     pushRecordCopy(true);
+    renderKeyList();
+  }catch(e){ if(st)st.textContent='Not reachable.'; }
+}
+async function revokeToken(id){
+  const st=document.getElementById('tokenStatus');
+  if(!id)return;
+  if(!confirm('Revoke this key? Anything using it stops reading immediately. Your other keys are untouched.'))return;
+  try{
+    const t=await cronUrl('/token'); if(!t)return;
+    const r=await fetch(t.url+'&id='+encodeURIComponent(id),{method:'DELETE',headers:t.headers});
+    if(st)st.textContent=r.ok?'Key revoked.':'Could not revoke that key.';
+    renderKeyList();
   }catch(e){ if(st)st.textContent='Not reachable.'; }
 }
 async function revokeTokens(){
   const st=document.getElementById('tokenStatus');
-  try{ const t=await cronUrl('/token'); if(!t)return; const r=await fetch(t.url,{method:'DELETE',headers:t.headers}); const j=await r.json().catch(()=>({})); if(st)st.textContent=r.ok?('Revoked '+(j.revoked||0)+' token'+(j.revoked===1?'':'s')+'.'):'Could not revoke.'; }catch(e){ if(st)st.textContent='Not reachable.'; }
+  if(!confirm('Revoke every key? Everything using one stops reading immediately.'))return;
+  try{ const t=await cronUrl('/token'); if(!t)return; const r=await fetch(t.url,{method:'DELETE',headers:t.headers}); const j=await r.json().catch(()=>({})); if(st)st.textContent=r.ok?('Revoked '+(j.revoked||0)+' key'+(j.revoked===1?'':'s')+'.'):'Could not revoke.'; renderKeyList(); }catch(e){ if(st)st.textContent='Not reachable.'; }
 }
 /* A4.3. Notices by email, kept on the worker under the code; the terminal only holds the mirror. */
 async function setNotify(kind,on){

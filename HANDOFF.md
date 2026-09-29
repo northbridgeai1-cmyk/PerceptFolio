@@ -208,6 +208,13 @@ All routes in `worker.js`. Data routes are gated on a live access code (`?code=`
 
 `bro:<CODE>` holds the broker connection: `{ userId, userSecret, createdAt, lastSyncAt }`. The
 `userId` is `pf_` plus a hash of the access code, so SnapTrade holds no email and no name of ours.
+**`userSecret` is sealed** as `v1:<b64 iv>:<b64 ciphertext>`, AES-GCM under a key derived from
+`SYNC_SECRET`, so a KV dump alone yields nothing. Written only through `putBrokerRec`, read only
+through `brokerRec`. Deleted when a subscription is **cancelled** (not when it is merely paused).
+
+`tok:<48 hex>` is an API key: `{ ident, scope, id }`, where scope is `record` or `book`. A bare
+string is a key from the older build and reads as `record`. `tokens:<ident>` is the owner's list,
+`[{ id, tok, at, name, scope, used }]`, capped at ten.
 
 
 | Prefix | Holds |
@@ -346,6 +353,10 @@ owner is faster and more reliable than this suite.
 - **SnapTrade is not switched on.** `SNAPTRADE_CLIENT_ID` and `SNAPTRADE_CONSUMER_KEY` are unset, so
   every `/broker/*` route answers 503 and the settings card says so. Nothing else is needed: the code
   is deployed and tested. SnapTrade's own free tier covers the first 5 connected accounts.
+- **The broker endpoints have never been called against SnapTrade itself.** `test/brokerlive.mjs`
+  drives all four routes against a mock that **verifies the HMAC the way SnapTrade does** and answers
+  401 on a mismatch, so a wrong signature fails there rather than in front of a customer. What that
+  cannot prove is that the live endpoints are shaped like the mock.
 - **The broker endpoints have never been called against a live key.** The signing is verified against
   the documented algorithm and Node's crypto in `test/broker.mjs`, and the parsers skip anything they
   do not recognise rather than guess, but the first real connection is the first real test. If
