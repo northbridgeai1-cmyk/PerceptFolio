@@ -606,6 +606,23 @@ small.src{color:var(--muted)}
    answerable in one glance; a card per item with a paragraph of reasoning buries three actions under
    a page of prose. Reasoning is one click away, not in your face. */
 .cmd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:4px;flex-wrap:wrap}
+/* ===== FOLDED SECTIONS (2026-09-29) =====
+   The three blocks that came off the removed Command screen landed at the foot of the Dashboard all
+   at once and made it read as a pile. They are all things you go to rather than things you watch, so
+   each is now a header you open.
+   The header is a real button, so it works from the keyboard and reads correctly to a screen reader,
+   and the summary line lives INSIDE it: a folded section still has to say whether anything needs
+   you, or folding it would be hiding the one thing it exists to tell you. */
+.fold-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.fold-toggle{display:flex;align-items:baseline;gap:9px;flex:1;min-width:0;background:none;border:0;padding:0;margin:0;
+  color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.fold-toggle:hover .fold-title{color:var(--brand2)}
+.fold-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.fold-title{font-weight:700;font-size:15px;white-space:nowrap}
+.fold-chev{font-family:var(--mono);font-size:11px;color:var(--muted);transition:transform .12s ease;display:inline-block;flex:none}
+.fold-toggle[aria-expanded="true"] .fold-chev{transform:rotate(90deg)}
+.fold-sum{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.fold-body{margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
 .cmd-list{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--panel)}
 .cmd-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
 .cmd-row:last-child{border-bottom:none}
@@ -1333,15 +1350,29 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
          the other in-card buttons. Its own record strip went with the furniture: the Dashboard has
          one at the top and two of the same strip on one screen was the duplication in visible form.
          The schedule stays, because a mark not taken on the day cannot be taken later. -->
+    <!-- FOLDED, 2026-09-29. All three of these arrived at the foot of the screen in one move when
+         Command was removed, and three open blocks stacked under the graphs is what "messy" meant.
+         Each is now a header you open.
+
+         THE QUEUE STAYS HONEST WHILE CLOSED. Its summary sits in the header, so a folded section
+         still says "3 need you" or "all clear". And when something is actually at priority 1, which
+         is money at risk, it opens itself: a stop that was hit is not allowed to be behind a click
+         somebody did not know to make. Closing it by hand is respected from then on. -->
     <div class="section-title">What needs you</div>
     <div class="card" id="queueCard">
-      <div class="row" style="justify-content:space-between;flex-wrap:wrap;align-items:center;gap:10px">
-        <div class="muted" id="cmdSub" style="font-size:13.5px">Press Run review to see what needs you.</div>
+      <div class="fold-head">
+        <button type="button" class="fold-toggle" id="queueToggle" aria-expanded="false" aria-controls="queueBody" onclick="toggleFold('queue')">
+          <span class="fold-chev" aria-hidden="true">▶</span>
+          <span class="fold-title">Today</span>
+          <span class="muted fold-sum" id="cmdSub">Press Run review to see what needs you.</span>
+        </button>
         <button class="btn btn-sm" onclick="runDailyReview()" id="cmdRunBtn">Run review</button>
       </div>
-      <div class="muted" id="cmdStatus" style="font-size:12px;margin-top:8px"><b>Not reviewed yet today.</b> Run review pulls prices, checks everything, and lists what needs you.</div>
-      <div id="marksDue" class="md"></div>
-      <div id="commandQueue"></div>
+      <div class="fold-body" id="queueBody" style="display:none">
+        <div class="muted" id="cmdStatus" style="font-size:12px"><b>Not reviewed yet today.</b> Run review pulls prices, checks everything, and lists what needs you.</div>
+        <div id="marksDue" class="md"></div>
+        <div id="commandQueue"></div>
+      </div>
     </div>
 
     <!-- The market scan. The queue above is about what you own and watch; this is about everything
@@ -1349,20 +1380,36 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
          allows, and shows only the names that cleared the buy bar or broke the sell bar you set.
          Everything it passed over is by definition neither. -->
     <div class="card" id="mktScanCard" style="margin-top:16px">
-      <div class="row" style="justify-content:space-between;flex-wrap:wrap;align-items:center">
-        <h3 style="margin:0">The market, against your bars</h3>
+      <div class="fold-head">
+        <button type="button" class="fold-toggle" id="scanToggle" aria-expanded="false" aria-controls="scanBody" onclick="toggleFold('scan')">
+          <span class="fold-chev" aria-hidden="true">▶</span>
+          <span class="fold-title">The market, against your bars</span>
+          <span class="muted fold-sum" id="mktScanNote"></span>
+        </button>
         <div class="row" style="gap:6px">
           <button class="btn btn-sm" id="mktScanBtn" onclick="startMarketScan()">Scan the market</button>
           <button class="btn btn-ghost btn-sm" id="mktScanStop" onclick="stopMarketScan()" style="display:none">Stop</button>
           <button class="btn btn-ghost btn-sm" onclick="clearMarketScan()" title="Forget what the scan found and start the walk again">Start over</button>
         </div>
       </div>
-      <div class="muted" id="mktScanNote" style="font-size:12.5px;margin-top:8px"></div>
-      <div id="mktScanBody" style="margin-top:10px"></div>
+      <div class="fold-body" id="scanBody" style="display:none">
+        <div id="mktScanBody"></div>
+      </div>
     </div>
     <!-- A6.3. Release dates: context AFTER the queue, never above it. The queue is what this part of
          the screen is for; a calendar above it is furniture in the way of the work. -->
-    <div id="econCal" class="md"></div>
+    <div class="card" id="econCalCard" style="margin-top:16px">
+      <div class="fold-head">
+        <button type="button" class="fold-toggle" id="calToggle" aria-expanded="false" aria-controls="calBody" onclick="toggleFold('cal')">
+          <span class="fold-chev" aria-hidden="true">▶</span>
+          <span class="fold-title">What the calendar has coming</span>
+          <span class="muted fold-sum" id="econCalSum"></span>
+        </button>
+      </div>
+      <div class="fold-body" id="calBody" style="display:none">
+        <div id="econCal" class="md"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -3857,6 +3904,11 @@ function setAuthMode(m){
 }
 function enterSession(){
   resetTransientState();
+  /* Fold state is per device and applied once a session, not on every tab switch: reapplying it
+     each time would shut a section the person had just opened. _foldTouched is cleared with it, so
+     switching account starts the priority-1 rule fresh rather than carrying somebody else's choice. */
+  _foldTouched={};
+  try{ applyFolds(); }catch(e){}
   /* Repairs anything already contaminated before a single statistic is computed from it. */
   try{ repairAllSeries(); }catch(e){}
   try{ renderSyncBlocked(); }catch(e){}
@@ -13712,6 +13764,45 @@ function toggleCmdRow(i){
   cmdOpen=(cmdOpen===i)?null:i;
   renderCommand();
 }
+/* ===================== FOLDED SECTIONS AT THE FOOT OF THE DASHBOARD (2026-09-29) =====================
+   Three blocks arrived here at once when Command was removed and made the screen read as a pile.
+   Each is now closed by default and opened by its header.
+
+   WHICH STATE IS REMEMBERED, AND WHERE. Per device, in localStorage, because whether somebody likes
+   the calendar open is a preference of the screen they are sitting at and not a fact about their
+   book. It is deliberately not synced: the book is on the server (see writeStore) and this is not
+   part of the book.
+
+   THE ONE CASE THAT OVERRIDES THE PREFERENCE. buildActionQueue marks money at risk as priority 1: a
+   stop hit, a limit crossed. Leaving that behind a click somebody did not know to make would be
+   using tidiness to hide the single thing this screen exists to say. So priority 1 opens the queue
+   itself, once, and a person who then closes it is taken at their word for the rest of the session. */
+const FOLD_KEY='pf_fold_v1';
+let _foldTouched={};
+function foldPrefs(){
+  try{ return JSON.parse(localStorage.getItem(FOLD_KEY))||{}; }catch(e){ return {}; }
+}
+function setFold(name,open,remember){
+  const body=document.getElementById(name+'Body'), btn=document.getElementById(name+'Toggle');
+  if(!body||!btn)return;
+  body.style.display=open?'':'none';
+  btn.setAttribute('aria-expanded',String(!!open));
+  if(remember){
+    _foldTouched[name]=true;
+    try{ const p=foldPrefs(); p[name]=!!open; localStorage.setItem(FOLD_KEY,JSON.stringify(p)); }catch(e){}
+  }
+}
+function foldIsOpen(name){
+  const b=document.getElementById(name+'Body');
+  return !!(b&&b.style.display!=='none');
+}
+function toggleFold(name){ setFold(name,!foldIsOpen(name),true); }
+/* Applied on entering a session and on switching account, so a remembered choice survives a reload
+   and a new device starts tidy. */
+function applyFolds(){
+  const p=foldPrefs();
+  ['queue','scan','cal'].forEach(n=>setFold(n,!!p[n],false));
+}
 function renderCommand(){
   const el=document.getElementById('commandQueue');
   if(!el)return;
@@ -13735,6 +13826,11 @@ function renderCommand(){
     bits.push(D.lastRefresh?'reviewed '+new Date(D.lastRefresh).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'not reviewed yet');
     sub.innerHTML=bits.join(' · ');
   }
+  /* MONEY AT RISK OPENS ITSELF. Priority 1 is a stop hit or a limit crossed, and leaving that behind
+     a click somebody did not know to make would be using tidiness to hide the one thing this screen
+     exists to say. Once only: _foldTouched records that the person has since had their own opinion
+     about this section, and from then on their opinion wins. */
+  if(q.some(a=>a.pri===1)&&!_foldTouched.queue)setFold('queue',true,false);
 
   if(!holdings.length&&!(D.watchlist||[]).length){
     el.innerHTML='<div class="cmd-list"><div class="cmd-empty muted">Nothing to review yet. Add what you own in <b>Portfolio</b>, or tickers you watch in <b>Lists</b>, then press <b>Run review</b>. <button class="btn btn-sm" style="margin-left:8px" onclick="showTab(\'portfolio\')">Open Portfolio</button></div></div>';
@@ -15638,17 +15734,22 @@ async function renderEconCal(){
       const r=await fetch(t.url,{headers:t.headers}); if(!r.ok){ el.innerHTML=''; return; }
       _econCal={at:Date.now(),doc:await r.json()};
     }
+    const card=document.getElementById('econCalCard'), sum=document.getElementById('econCalSum');
     const rel=(_econCal.doc.releases||[]).slice(0,10);
-    if(!rel.length){ el.innerHTML=''; return; }
+    /* A card with nothing in it is worse than no card. */
+    if(!rel.length){ el.innerHTML=''; if(card)card.style.display='none'; return; }
+    if(card)card.style.display='';
+    /* The header says the next one, so the fold is worth not opening most days. */
+    if(sum)sum.textContent=rel[0].name+' · '+rel[0].date+(rel.length>1?'  +'+(rel.length-1)+' more':'');
     /* Three lines, then the rest behind a summary. What is due this week is context worth a glance;
-       the whole month is a reference and belongs folded. */
+       the whole month is a reference and belongs folded. The old "Coming up" heading went with the
+       fold: the section now has a title of its own and two headings in a row read as a mistake. */
     const row=x=>'<tr><td>'+esc(x.name)+'</td><td class="muted" style="white-space:nowrap">'+esc(x.date)+'</td></tr>';
     const head=rel.slice(0,3), rest=rel.slice(3);
-    el.innerHTML='<div class="section-title" style="margin-top:4px">Coming up</div>'+
-      '<table style="font-size:12.5px"><tbody>'+head.map(row).join('')+'</tbody></table>'+
+    el.innerHTML='<table style="font-size:12.5px"><tbody>'+head.map(row).join('')+'</tbody></table>'+
       (rest.length?'<details class="aside"><summary>'+rest.length+' more in the next thirty days</summary><div><table style="font-size:12.5px"><tbody>'+rest.map(row).join('')+'</tbody></table></div></details>':'')+
       '<div class="muted" style="font-size:11px;margin-top:4px">'+esc(_econCal.doc.source||'')+'</div>';
-  }catch(e){ el.innerHTML=''; }
+  }catch(e){ el.innerHTML=''; const c=document.getElementById('econCalCard'); if(c)c.style.display='none'; }
 }
 /* A4.1. The calls-per-quarter meter. The record fills from every verdict change across the whole
    watchlist and from the model, not only from trades; a five-trades-a-year investor still logs

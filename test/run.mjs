@@ -287,6 +287,38 @@ t('the worker is what makes that true, not our restraint',
 t('a broker trade is history, never a graded call',
   /imported:true\}\);\n    addedTx\+\+;/.test(term) && /not calls this terminal made/.test(term));
 
+/* ============ THE FOOT OF THE DASHBOARD FOLDS (2026-09-29) ============
+   Three blocks landed here at once when Command was removed and the owner said it read as a pile.
+   Each is closed by default now. The thing worth protecting is that folding did not become hiding:
+   the queue's summary lives INSIDE the header, so a closed section still says "3 need you" or "all
+   clear", and money at risk opens the section by itself. */
+t('all three blocks at the foot are folds, closed in the markup',
+  ['queue', 'scan', 'cal'].every(n =>
+    new RegExp('id="' + n + 'Toggle"[^>]*aria-expanded="false"').test(term) &&
+    new RegExp('id="' + n + 'Body"[^>]*style="display:none"').test(term)));
+t('each header is a real button, so it works from the keyboard',
+  (term.match(/<button type="button" class="fold-toggle"/g) || []).length === 3);
+t('and says what it controls, for a screen reader',
+  ['queue', 'scan', 'cal'].every(n => new RegExp('aria-controls="' + n + 'Body"').test(term)));
+/* THE ONE THAT MATTERS: a closed queue still reports. */
+t('the queue summary sits inside the header, so closing it does not hide the answer', (() => {
+  const at = term.indexOf('id="queueToggle"');
+  const end = term.indexOf('</button>', at);
+  return at > 0 && term.slice(at, end).includes('id="cmdSub"');
+})());
+t('money at risk opens the queue by itself',
+  /if\(q\.some\(a=>a\.pri===1\)&&!_foldTouched\.queue\)setFold\('queue',true,false\);/.test(term));
+t('and a person who then closes it is taken at their word',
+  /_foldTouched\[name\]=true;/.test(term) && /function toggleFold\(name\)\{ setFold\(name,!foldIsOpen\(name\),true\); \}/.test(term));
+t('the choice is per device, in localStorage, and never enters the book',
+  /const FOLD_KEY='pf_fold_v1';/.test(term) &&
+  !/SHELL_FIELDS=\[[^\]]*fold/.test(term) &&
+  !/D\.fold|data\.fold/.test(term));
+t('folds are applied once a session, not on every tab switch',
+  /_foldTouched=\{\};\n  try\{ applyFolds\(\); \}catch\(e\)\{\}/.test(term));
+t('the calendar card hides itself rather than showing an empty box',
+  /if\(!rel\.length\)\{ el\.innerHTML=''; if\(card\)card\.style\.display='none'; return; \}/.test(term));
+
 t('the release calendar sits below the queue and folds after three lines', term.indexOf('<div id="commandQueue"></div>') < term.indexOf('<div id="econCal" class="md"></div>') && /const head=rel\.slice\(0,3\), rest=rel\.slice\(3\);/.test(term) && /more in the next thirty days/.test(term));
 t('the device cap is one constant, two, and the terminal shows the server\'s number', /const DEVICE_LIMIT = 2;/.test(worker) && !/limit: 2 \}/.test(worker) &&   /* the number is the constant, never a literal in an answer */ /lim=\(j&&j\.limit\)\|\|2/.test(term) && /on two devices: a desk and a pocket/.test(term));
 t('a full code names the screen that frees a slot', /On either of them open Settings, Sync across your devices, and forget the one you no longer use/.test(worker));
@@ -1623,7 +1655,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v154/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v155/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
