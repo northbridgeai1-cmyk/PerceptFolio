@@ -199,6 +199,35 @@ function copyBtn(text,label){
     </div>
   </div>
 
+  <!-- ============ A CODE FOR YOURSELF, AND FOR ANYONE WHO WORKS HERE (2026-09-29) ============
+       The tier existed from the start and there was no way to reach it. Every code came out of the
+       request queue, and the queue only fills when somebody submits the demo form, so the owner of
+       the product had to send themselves a sales enquiry and approve it to get into their own
+       terminal, and the button that approved it granted the tier meant for people who pay.
+
+       This is the free one. It never touches Stripe, it does not expire, and the gate gives it a
+       ten-year session, so it is signed in once a device and left alone. It is still listed, still
+       pausable, still revocable from the queue below, because a code the operator cannot see is a
+       code they cannot take back. -->
+  <div class="card" id="staffCard">
+    <div class="card-h">a free code, for you or your staff</div>
+    <div class="card-b">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:640px">
+        <div><label for="stEmail">Email</label><input id="stEmail" type="email" placeholder="you@perceptfolio.com"></div>
+        <div><label for="stName">Name</label><input id="stName" placeholder="Who it is for"></div>
+      </div>
+      <div class="row" style="margin-top:13px">
+        <button class="btn btn-p" onclick="issueStaffCode()" id="stBtn">Issue a free code</button>
+        <span class="dim" style="font-size:12px">No payment, no expiry, signed in once a device.</span>
+      </div>
+      <div class="msg" id="stMsg"></div>
+      <p class="dim" style="font-size:11.5px;margin-top:10px;line-height:1.55">
+        These are counted apart from clients on the licence line above, because the data plan question is
+        about serving people who are not us. They appear in the queue below as <b>employee</b> and can be
+        paused there like any other.</p>
+    </div>
+  </div>
+
   <div class="tabs" id="tabs" style="display:none">
     <button class="tab on" data-f="pending" onclick="setFilter('pending')">Pending <span class="tab-n" id="n-pending"></span></button>
     <button class="tab" data-f="accepted" onclick="setFilter('accepted')">Accepted <span class="tab-n" id="n-accepted"></span></button>
@@ -426,6 +455,28 @@ function render(){
             '</div></div>')+
     '</div>';
   }).join('');
+}
+
+/* The free tier, issued directly. Shown once in the page as well as emailed, because the operator is
+   usually issuing it to themselves and standing in front of the screen; waiting on an inbox to sign
+   into your own product would be a silly way to spend a minute. */
+async function issueStaffCode(){
+  const email=($('stEmail')||{}).value||'', name=($('stName')||{}).value||'';
+  const msg=$('stMsg'), btn=$('stBtn');
+  if(!email.trim())return show('stMsg','err','An email is needed: the code is sent there as well as shown here.');
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(base()+'/staffcode',{method:'POST',headers:hdrs(),body:JSON.stringify({email:email.trim(),name:name.trim()})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    show('stMsg','ok','Free code <b style="font-family:var(--mono);user-select:all">'+esc(j.code)+'</b> for '+esc(j.email)+
+      '. '+(j.mail&&j.mail.ok?'Emailed as well.':'The email did not send, so copy it from here.')+
+      ' Open <b>/enter/</b> and type it in.');
+    if($('stEmail'))$('stEmail').value='';
+    if($('stName'))$('stName').value='';
+    await load();
+  }catch(e){ show('stMsg','err','Failed: '+esc(e.message)); }
+  finally{ if(btn)btn.disabled=false; }
 }
 
 async function decide(id,decision){

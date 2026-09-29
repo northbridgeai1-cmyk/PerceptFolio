@@ -781,7 +781,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/staffcode', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -808,11 +808,23 @@ async function handle(request, env) {
          live grants the commercial Finnhub plan is bought. */
       body.data = { included: 'everyone', dataTiers: env.DATA_TIERS || null, warn: env.DATA_TIERS ? 'DATA_TIERS is set: accounts outside it are refused market data and are asked for their own Finnhub key. Delete the secret unless that is deliberate.' : null };
       try {
-        let live = 0, paused = 0;
+        /* STAFF ARE NOT CLIENTS, AND THE TRIGGER IS ABOUT CLIENTS.
+           The Finnhub question is whether data is being served to people who are not us. The
+           operator's own terminal and their staff's are internal use, which is what the personal
+           plan is for, so they are counted separately rather than pushing the threshold up by
+           existing. Both numbers are reported: if that reading is ever challenged, the figure that
+           would have tripped it is right there and nothing has been hidden. */
+        let live = 0, paused = 0, staff = 0;
         const g = await env.PF_SYNC.list({ prefix: 'grant:', limit: 1000 });
-        for (const k of g.keys) { const r = JSON.parse(await env.PF_SYNC.get(k.name) || 'null'); if (!r) continue; if (r.paused) paused++; else live++; }
-        body.licence = { liveGrants: live, pausedGrants: paused, buyCommercialFeedAt: LICENCE_AT, due: live >= LICENCE_AT,
-          note: live >= LICENCE_AT ? 'Live grants have reached ' + LICENCE_AT + '. Finnhub\'s personal plan no longer covers this; buy the commercial plan and keep serving data from the worker.' : null };
+        for (const k of g.keys) {
+          const r = JSON.parse(await env.PF_SYNC.get(k.name) || 'null'); if (!r) continue;
+          if (r.paused) { paused++; continue; }
+          if (String(r.tier || '') === 'employee') { staff++; continue; }
+          live++;
+        }
+        body.licence = { liveGrants: live, staffGrants: staff, pausedGrants: paused, buyCommercialFeedAt: LICENCE_AT, due: live >= LICENCE_AT,
+          countsStaffSeparately: true,
+          note: live >= LICENCE_AT ? 'Live client grants have reached ' + LICENCE_AT + '. Finnhub\'s personal plan no longer covers this; buy the commercial plan and keep serving data from the worker.' : null };
       } catch (e) {}
     }
     return json(body, 200, env);
@@ -2593,6 +2605,52 @@ async function handle(request, env) {
     }
     await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
     return json({ ok: true, decision, code, mail }, 200, env);
+  }
+
+  /* ---- POST /staffcode {email, name} — a free, permanent code for the operator and their people ----
+     THE GAP THIS CLOSES. 'employee' has been a real tier since the beginning: free, never sold, and
+     given a ten-year session by the gate. But there was no way to reach it. Every code came out of
+     /decide, /decide needs a req: record, and req: records only exist because somebody filled in the
+     demo form. So the owner of the product could not get into their own terminal without submitting
+     a sales enquiry to themselves and then approving it, and the only button on that screen granted
+     'personal', which is the tier meant for people who pay.
+
+     This mints the employee tier directly. Operator only: the bearer must be SYNC_SECRET, the same
+     key that reads the request queue and pauses accounts.
+
+     IT STILL WRITES A req: RECORD. Not for appearances: pausing, listing, the decision history and
+     the whole of admin key off req:, so a code that exists without one would be a code the operator
+     cannot see or revoke from the screen where they revoke things. Marked source 'staff' so the
+     licence count can tell it from a customer. */
+  if (url.pathname === '/staffcode' && request.method === 'POST') {
+    const authS = request.headers.get('Authorization') || '';
+    const tokS = authS.startsWith('Bearer ') ? authS.slice(7) : '';
+    if (!safeEqual(tokS, env.SYNC_SECRET)) return json({ error: 'Operator only.' }, 401, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const email = clean(body.email, 160).toLowerCase();
+    const who = clean(body.name, 120) || 'NorthBridge';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400, env);
+    /* Checked for the same reason a customer's is: the code arrives by email, and an address that
+       cannot receive one produces a code nobody can use and no sign of why. */
+    const deliver = await emailDeliverable(env, email);
+    if (!deliver.ok) return json({ error: deliver.why, suggest: deliver.suggest || null }, 400, env);
+
+    const id = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    const code = await mintCode(env, 'employee', email, { requestId: id });
+    const rec = {
+      id, email, who, call: '', status: 'employee', source: 'staff',
+      code, createdAt: Date.now(), decidedAt: Date.now(),
+      date: new Date().toISOString().slice(0, 10),
+      note: 'Issued directly from admin. Free, permanent, never sold.',
+      screen: { level: 'clear', hits: [] },
+    };
+    let mail = { attempted: false };
+    if (env.RESEND_API_KEY && env.MAIL_FROM) {
+      mail = await sendDecisionEmail(env, rec, 'employee', code, rec.note);
+      rec.mail = mail;
+    }
+    await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
+    return json({ ok: true, code, id, email, mail }, 200, env);
   }
 
   /* ---- POST /pause — suspend or restore an issued grant ----

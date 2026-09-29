@@ -371,3 +371,15 @@ All three are now closed by default and opened by a header: **Today** (the actio
 **Where the state lives.** `pf_fold_v1` in localStorage, per device, applied once per session in `enterSession` rather than on every tab switch, which would shut a section the person had just opened. Deliberately *not* in the book: whether somebody likes the calendar open is a fact about the screen they are sitting at, not about their portfolio, and the book is on the server now.
 
 The calendar card hides itself entirely when there is nothing coming, because a card with nothing in it is worse than no card. Its old inner "Coming up" heading went with the fold: the section has a title of its own and two headings in a row read as a mistake.
+
+**2026-09-29, the operator could not get into their own terminal without paying.** The owner asked how to get a free account as admin. The answer should have been trivial and was not.
+
+`employee` has been a real tier since the beginning: free, never sold, and given a **ten-year session** by the gate (`LIFETIME.employee`). It was unreachable. Every code came out of `/decide`; `/decide` requires a `req:` record; `req:` records only exist because somebody filled in the demo form. So the owner of the product had to submit a sales enquiry to themselves and approve it, and the only button on that screen granted `personal`, the tier meant for people who pay.
+
+**`POST /staffcode {email, name}`** mints the employee tier directly. Operator-only, bearer must be `SYNC_SECRET`. No Stripe, no expiry. Admin has a card for it above the queue: email, name, one button, code shown on screen and emailed, because the operator is usually issuing it to themselves while standing at the screen.
+
+**It still writes a `req:` record**, marked `source: 'staff'`. Not for appearances: pausing, listing and the whole of admin key off `req:`, so a code without one would be a code the operator cannot see or take back.
+
+**Staff are now counted apart from clients on the licence line.** The Finnhub threshold exists to answer "is data being served to people who are not us", and the operator's own terminal is internal use, which is what the personal plan covers. `/version` reports `liveGrants` and `staffGrants` separately and triggers on clients only, with `countsStaffSeparately: true` so the reading is stated rather than buried. **If that reading is ever challenged, the number that would have tripped it is right there.**
+
+11 checks in `test/staffcode.mjs`, including that the route is refused without the operator key, that the tier is never `personal`, that no `sub:` or `cust:` record is created, and that the tier survives redemption onto the durable grant.
