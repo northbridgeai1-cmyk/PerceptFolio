@@ -259,6 +259,34 @@ t('there is one date line on the Dashboard, not two',
   (term.match(/getElementById\('greetingText'\)/g)||[]).length >= 1 && !/cmdGreeting/.test(term));
 t('nothing still sends anyone to the screen that was removed', !/showTab\('command'\)/.test(term));
 
+/* ============ THE PUBLIC CLAIM AND THE CODE THAT KEEPS IT (2026-09-29) ============
+   The site used to say "no broker is connected and none will be". A broker can now be connected, so
+   that sentence had to go, and what replaced it is a narrower promise that the code actually keeps:
+   the connection is read-only and cannot transmit an order.
+
+   The danger in a change like that is drift in either direction. If the copy reverts, the site
+   understates what the product does. If the enforcement is relaxed, the site is telling people
+   something untrue about access to the account their money is in, which is the worse half. So this
+   pins BOTH ENDS TOGETHER: no page may claim there is no broker, every page that mentions one must
+   say read-only, and the worker must still be the thing that makes it so. */
+t('no page still claims that no broker is connected', (() => {
+  const strip = f => read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+  const pages = ['site/src/pages/Landing.tsx', 'site/src/pages/Subscription.tsx'].map(strip).join('\n');
+  return !/no broker is connected|does not connect to a broker|none will be/i.test(pages) &&
+    !/no broker connection/i.test(term.replace(/\/\*[\s\S]*?\*\//g, ''));
+})());
+t('every page that mentions a broker says the connection is read-only',
+  /connection is read-only: it cannot place, change or cancel an order/.test(read('site/src/pages/Subscription.tsx')) &&
+  /connected read-only, so it can read your account; it cannot move anything in it/.test(read('site/src/pages/Landing.tsx')));
+t('and the promise that was load-bearing is untouched: it never places a trade',
+  /It never places a trade/.test(read('site/src/pages/Subscription.tsx')) &&
+  /does not place trades/.test(read('site/src/pages/Landing.tsx')));
+t('the worker is what makes that true, not our restraint',
+  /connectionType: 'read'/.test(read('worker.js')) &&
+  /throw new Error\('This build is read-only and refused ' \+ path\)/.test(read('worker.js')));
+t('a broker trade is history, never a graded call',
+  /imported:true\}\);\n    addedTx\+\+;/.test(term) && /not calls this terminal made/.test(term));
+
 t('the release calendar sits below the queue and folds after three lines', term.indexOf('<div id="commandQueue"></div>') < term.indexOf('<div id="econCal" class="md"></div>') && /const head=rel\.slice\(0,3\), rest=rel\.slice\(3\);/.test(term) && /more in the next thirty days/.test(term));
 t('the device cap is one constant, two, and the terminal shows the server\'s number', /const DEVICE_LIMIT = 2;/.test(worker) && !/limit: 2 \}/.test(worker) &&   /* the number is the constant, never a literal in an answer */ /lim=\(j&&j\.limit\)\|\|2/.test(term) && /on two devices: a desk and a pocket/.test(term));
 t('a full code names the screen that frees a slot', /On either of them open Settings, Sync across your devices, and forget the one you no longer use/.test(worker));
@@ -1580,7 +1608,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v152/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v153/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }

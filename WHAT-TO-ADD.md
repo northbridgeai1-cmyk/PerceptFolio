@@ -318,3 +318,22 @@ So the gate moved from **who is asking** to **what they say it is for**. `screen
 **Proved in production, not only in the suite.** Three live requests: a retired teacher with their own savings came back `clear`; *"I trade on insider information"* came back `review` with the matched phrase; *"I am a compliance officer and I need to detect insider dealing"* came back `clear`. All three got a byte-identical reply.
 
 **A trap worth recording.** The patterns were first written through a Python heredoc that ate every `\b`, so they shipped into worker.js with literal backspace bytes and matched nothing. `node --check` passed, because the file was still valid JavaScript. Only `test/screen.mjs`, which lifts the function out and runs it on real sentences, caught it. **Regexes written from a script must be written from a raw string, and a filter must be tested by running it, never by reading it.**
+
+
+**2026-09-29, the broker connection, read-only.** The owner asked to connect a broker and have the terminal read the account and fill the book in. Built on **SnapTrade**, whose Build plan is free to five connected accounts, which is exactly the scale at which the Finnhub commercial plan also falls due.
+
+**The promise that had to change, and the one that did not.** Two pages said *"no broker is connected and none will be"*, and the landing page said *"does not connect to a broker"*. That was a broader promise than the one carrying the weight, which is that this thing never moves money. Both now say the connection is read-only and cannot place, change or cancel an order. **"It never places a trade" is untouched.**
+
+**Read-only three times over, so the sentence is true of the code and not of our restraint:**
+
+1. every connection is opened `connectionType: 'read'`, so SnapTrade issues a connection with no trading permission and the limit lives on their side of the wire;
+2. `stFetch` throws on any path whose segments include trade, trading, order or an order verb, matched by segment because *snapTrade* contains *trade* and blocking the login route would break the only thing that opens a read-only connection;
+3. nothing in the file references a trading endpoint, and there is no flag that turns any of it on. Trading would be a code change with a diff to read.
+
+**What leaves the system.** Never a broker password: with OAuth nobody sees one, and without it SnapTrade collects it and we never receive it. Their id for a subscriber is `pf_` plus a hash of the access code, so their records carry no email and no name. Account numbers come back masked to the last four. Disconnecting deletes our copy of the credential whether or not the remote delete succeeded, and says which happened.
+
+**The rule that did not bend.** Everything read from a broker is stored `imported: true` and **is never graded**, exactly as a CSV import is. It merges through the same duplicate key as the CSV so the two cannot drift apart. Holdings are **added, never overwritten**: a position already in the book may carry a cost basis the person typed from their own records, so a name already present is left alone and any disagreement about the share count is reported instead of silently resolved.
+
+**What is proved and what is not.** `test/broker.mjs` (32 checks) verifies the canonical JSON and the HMAC against the documented algorithm and against Node's own crypto, which is the failure that would otherwise look exactly like a bad key, plus all three read-only enforcements. It does **not** prove the endpoints return what we expect; only a live key does, and the first connection is that test. Two notes for whoever hits it: `getUserHoldings` is 410 Gone for accounts created after 2026-05-11, and `SNAPTRADE_BASE` is a secret rather than a constant because the reference pages and the signing guide disagree about the `/api/v1` prefix.
+
+**To switch it on:** sign up at snaptrade.com, then `SNAPTRADE_CLIENT_ID` and `SNAPTRADE_CONSUMER_KEY` as worker secrets. Until then every `/broker/*` route answers 503 and the settings card says connections are not switched on yet.

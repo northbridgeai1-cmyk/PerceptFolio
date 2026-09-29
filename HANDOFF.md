@@ -206,6 +206,10 @@ All routes in `worker.js`. Data routes are gated on a live access code (`?code=`
 
 ### KV keyspace (`PF_SYNC`)
 
+`bro:<CODE>` holds the broker connection: `{ userId, userSecret, createdAt, lastSyncAt }`. The
+`userId` is `pf_` plus a hash of the access code, so SnapTrade holds no email and no name of ours.
+
+
 | Prefix | Holds |
 |---|---|
 | `code:` | an issued code, 40-day TTL, burned on first use |
@@ -248,6 +252,7 @@ losing a mark is the worse failure.
 | CNN | fear and greed | none | refuses a bare request; the worker sends browser headers |
 | OpenStreetMap / Nominatim | the World view | none | see the trap in §9 |
 | Kronos (Modal) | the model view | `KRONOS_URL` + `KRONOS_TOKEN` | own service |
+| SnapTrade | the read-only broker connection: positions and buy/sell activity | `SNAPTRADE_CLIENT_ID` + `SNAPTRADE_CONSUMER_KEY` | Build plan free to 5 connected accounts, then $100/mo + $1 per connected user. **Every connection is opened `connectionType: 'read'`** |
 
 **`DATA_TIERS` must stay unset.** Set, it silently refuses paying accounts and the terminal asks
 them for their own key, which looks exactly like a broken product. This was live for a day once.
@@ -338,6 +343,16 @@ owner is faster and more reliable than this suite.
 - **`SUPPORT_LIVE` is false** in `site/src/lib/config.ts` until Email Routing forwards
   `support@perceptfolio.com`.
 - **Finnhub commercial plan** is due at 5 live grants.
+- **SnapTrade is not switched on.** `SNAPTRADE_CLIENT_ID` and `SNAPTRADE_CONSUMER_KEY` are unset, so
+  every `/broker/*` route answers 503 and the settings card says so. Nothing else is needed: the code
+  is deployed and tested. SnapTrade's own free tier covers the first 5 connected accounts.
+- **The broker endpoints have never been called against a live key.** The signing is verified against
+  the documented algorithm and Node's crypto in `test/broker.mjs`, and the parsers skip anything they
+  do not recognise rather than guess, but the first real connection is the first real test. If
+  requests come back 401, check `SNAPTRADE_BASE` first: the reference pages and the signing guide
+  disagree about whether `/api/v1` belongs in the path, so it is overridable by a secret rather than
+  hard-coded. **Do not use `getUserHoldings`** — it returns 410 Gone for accounts created after
+  2026-05-11, which is why this uses `listUserAccounts` + `/positions` + `/activities`.
 - **A trial cannot show the product's own claim, and the trial is three days.** The record needs
   marked calls before it says anything, and the only fast source of evidence, an imported broker CSV,
   is stored as `imported: true` and deliberately **never graded** (`applyTradesCsv`), because a call

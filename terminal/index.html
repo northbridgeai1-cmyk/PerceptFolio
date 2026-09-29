@@ -1020,7 +1020,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
         <li><span class="auth-dot"></span><div><b>A checklist, not a hunch</b><span>Twenty-two checks across quality, value and momentum. Every verdict shows which ones it passed.</span></div></li>
         <li><span class="auth-dot"></span><div><b>It grades itself</b><span>Every call is recorded and marked against the S&amp;P on a fixed horizon, displayed whether or not it flatters the system.</span></div></li>
         <li><span class="auth-dot"></span><div><b>Size, not just selection</b><span>What a trade does to your concentration, cash and market exposure, before the money moves.</span></div></li>
-        <li><span class="auth-dot"></span><div><b>Nothing is hidden</b><span>No black box, no broker connection, no trade placed on your behalf. It tells you; you decide.</span></div></li>
+        <li><span class="auth-dot"></span><div><b>Nothing is hidden</b><span>No black box, and no trade ever placed on your behalf. A broker can be connected read-only, to read your account and nothing more. It tells you; you decide.</span></div></li>
       </ul>
       <div class="auth-foot">Access by code. Yours arrived by email.</div>
     </div>
@@ -2422,6 +2422,35 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <h3>Read-only token, for a spreadsheet</h3>
     <div class="row"><button class="btn btn-ghost btn-sm" onclick="makeToken()">Make a token</button><button class="btn btn-ghost btn-sm" onclick="revokeTokens()">Revoke all</button></div>
     <div class="muted" id="tokenStatus" style="font-size:12.5px;margin-top:8px">One URL returns your record as JSON or CSV: Sheets IMPORTDATA, Excel Power Query. It reads only.</div>
+  </div>
+  <!-- ============ YOUR BROKER, READ-ONLY (2026-09-29) ============
+       Beside Import trades on purpose: these are the two ways history gets in, and the CSV is what
+       this falls back to for a broker that is not covered.
+
+       WHAT THE WORDS HAVE TO CARRY. This is the one screen in the product where somebody is about to
+       hand over access to the account their money is in. So it says, before the button and not after
+       it, exactly three things: the connection cannot place a trade, we never see the password, and
+       it can be removed here whenever they like. All three are true of the implementation rather
+       than aspirations about it: the worker opens every connection with connectionType 'read' and
+       throws on any order path, and Disconnect deletes our copy of the credential either way. -->
+  <div class="card" style="margin-top:16px">
+    <h3>Your broker</h3>
+    <div class="muted" style="font-size:13px;line-height:1.6;margin-bottom:12px">
+      Connect an account and the terminal reads your positions and your trades, and fills the book in
+      for you. <b>The connection is read-only: it cannot place, change or cancel an order.</b> Your
+      broker password is never sent to us, and you can disconnect here at any time.
+    </div>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn" id="broLinkBtn" onclick="brokerLink()">Connect a broker</button>
+      <button class="btn btn-ghost" id="broSyncBtn" onclick="brokerSync()" style="display:none">Sync now</button>
+      <button class="btn btn-ghost" id="broUnlinkBtn" onclick="brokerUnlink()" style="display:none">Disconnect</button>
+    </div>
+    <div class="muted" id="broStatus" style="font-size:12.5px;margin-top:10px">Not connected.</div>
+    <div id="broAccounts" style="margin-top:8px"></div>
+    <div class="muted" style="font-size:12px;margin-top:10px;opacity:.8">
+      Trades read from a broker are stored as history, the same as a CSV import. The record does not
+      grade them, because they are not calls this terminal made.
+    </div>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Backup / Restore</h3>
@@ -4152,7 +4181,7 @@ function showTab(t){
   if(t==='risk'){renderBenchmarks();renderRiskContrib();renderCounterfactual();renderSharpe();renderVaR();}
   /* refreshMarketDataCard on every open, not just at login: whether the worker answers changes
      when sync is configured or a custom domain starts resolving, and the card must follow. */
-  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();renderAudit();renderRecordCopyCard();renderSharesCard();fillSnapshotTabs();}
+  if(t==='settings'){fillPolicyInputs();renderRuleLog();refreshMarketDataCard();refreshCodeSyncOffer();renderAudit();renderRecordCopyCard();renderSharesCard();fillSnapshotTabs();brokerStatus();}
 }
 /* Global "jump to ticker" search in the header — works from any tab, for any ticker,
    whether or not it's a holding, on the watchlist, or a favorite. */
@@ -12192,6 +12221,143 @@ function applyTradesCsv(text){
     '. They are marked imported: history, not calls this terminal made.');
 }
 
+/* ===================== THE BROKER CONNECTION, FROM THIS SIDE (2026-09-29) =====================
+   The worker holds the keys, opens every connection read-only, and hands back rows already
+   normalised. Nothing here talks to a broker or to SnapTrade directly, which is why none of this
+   needs a secret and why a copy of this page saved to disk cannot reach anybody's account.
+
+   ONE MERGE PATH. What comes back is merged by the same rules as a broker CSV: the same duplicate
+   key, the same imported flag, the same refusal to let any of it become a graded call. If the two
+   ever disagree about what counts as the same trade, that is a bug in one place rather than a
+   difference between two features that look identical to the person using them.
+
+   HOLDINGS ARE ADDED, NEVER OVERWRITTEN. A position already in the book may carry a cost basis the
+   person typed from their own records, or a decided-at price a broker has never heard of. Replacing
+   that with the broker's average would destroy work silently to save a keystroke, so a name already
+   present is left exactly as it is and any disagreement about the share count is reported instead. */
+function brokerCode(){ return (typeof accessCodeFor==='function'&&USER)?(accessCodeFor(USER)||''):''; }
+function broBusy(on,msg){
+  ['broLinkBtn','broSyncBtn','broUnlinkBtn'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=!!on;});
+  if(msg){const s=document.getElementById('broStatus');if(s)s.textContent=msg;}
+}
+function renderBrokerAccounts(list){
+  const el=document.getElementById('broAccounts');
+  if(!el)return;
+  if(!list||!list.length){ el.innerHTML=''; return; }
+  el.innerHTML='<table class="tbl" style="margin-top:4px"><thead><tr><th>Broker</th><th>Account</th><th>Number</th></tr></thead><tbody>'+
+    list.map(a=>'<tr><td>'+esc(a.institution||'-')+'</td><td>'+esc(a.name||'-')+'</td><td class="muted" style="font-family:var(--mono)">'+esc(a.number||'-')+'</td></tr>').join('')+
+    '</tbody></table>';
+}
+function showBrokerState(j){
+  const st=document.getElementById('broStatus');
+  const connected=!!(j&&j.connected);
+  const sync=document.getElementById('broSyncBtn'), un=document.getElementById('broUnlinkBtn'), link=document.getElementById('broLinkBtn');
+  if(sync)sync.style.display=connected?'':'none';
+  if(un)un.style.display=connected?'':'none';
+  if(link)link.textContent=connected?'Connect another':'Connect a broker';
+  renderBrokerAccounts(j&&j.accounts);
+  if(!st)return;
+  if(j&&j.error){ st.innerHTML='<span class="neg">'+esc(j.error)+'</span>'; return; }
+  if(!connected){ st.textContent='Not connected.'; return; }
+  const n=(j.accounts||[]).length;
+  st.innerHTML='<span class="pos">Connected, read-only.</span> '+n+' account'+(n===1?'':'s')+
+    (j.lastSyncAt?' · last read '+new Date(j.lastSyncAt).toLocaleString():' · not read yet');
+}
+async function brokerStatus(){
+  const code=brokerCode();
+  if(!code)return;
+  try{
+    const r=await fetch(INVITE_WORKER+'/broker/status?code='+encodeURIComponent(code));
+    const j=await r.json();
+    /* 503 means the operator has not switched broker connections on. That is not the subscriber's
+       problem to solve and not an error to alarm them with, so the card simply says so. */
+    if(r.status===503){ const st=document.getElementById('broStatus'); if(st)st.textContent='Broker connections are not switched on yet.'; return; }
+    showBrokerState(j);
+  }catch(e){ /* the card is not worth an error bar; the buttons still work */ }
+}
+async function brokerLink(){
+  const code=brokerCode();
+  if(!code)return toast('Connecting a broker needs your access code: Settings → Access code.');
+  broBusy(true,'Opening your broker…');
+  try{
+    const r=await fetch(INVITE_WORKER+'/broker/link?code='+encodeURIComponent(code),{method:'POST'});
+    const j=await r.json();
+    if(!r.ok||!j.url)throw new Error(j.error||'The broker portal did not open.');
+    /* Their window, not ours: the portal takes a password on some brokers, and a password belongs in
+       a window whose address bar the person can read. Nothing is framed. */
+    window.open(j.url,'_blank','noopener');
+    broBusy(false,'Finish in the window that opened, then press Sync now.');
+    const sync=document.getElementById('broSyncBtn'); if(sync)sync.style.display='';
+    setTimeout(brokerStatus,15000);
+  }catch(e){ broBusy(false,''); toast(e.message); const st=document.getElementById('broStatus'); if(st)st.innerHTML='<span class="neg">'+esc(e.message)+'</span>'; }
+}
+async function brokerSync(){
+  const code=brokerCode();
+  if(!code)return;
+  broBusy(true,'Reading your account…');
+  try{
+    const r=await fetch(INVITE_WORKER+'/broker/sync?code='+encodeURIComponent(code),{method:'POST'});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||'That did not read.');
+    const res=mergeBrokerData(j);
+    broBusy(false,'');
+    showBrokerState({connected:true,accounts:j.accounts,lastSyncAt:j.syncedAt});
+    toast(res);
+  }catch(e){ broBusy(false,''); toast(e.message); }
+}
+/* Returns the sentence the toast shows, so the counting and the reporting cannot drift apart. */
+function mergeBrokerData(j){
+  let addedTx=0,dupeTx=0,addedH=0,keptH=0,differs=0;
+  if(!D.transactions)D.transactions=[];
+  const seen=new Set((D.transactions||[]).map(t=>[t.date,t.sym,t.action,t.shares,t.price].join('|')));
+  for(const t of (j.transactions||[])){
+    const key=[t.date,t.sym,t.action,t.shares,t.price].join('|');
+    if(seen.has(key)){ dupeTx++; continue; }
+    seen.add(key);
+    D.transactions.push({ts:new Date(t.date+'T12:00:00Z').getTime(),date:t.date,sym:t.sym,action:t.action,
+      type:'Stock',shares:t.shares,price:t.price,broker:t.broker||'',spy:null,
+      /* The same flag the CSV sets, for the same reason. */
+      imported:true});
+    addedTx++;
+  }
+  D.transactions.sort((a,b)=>(a.ts||0)-(b.ts||0));
+  if(D.transactions.length>2000)D.transactions=D.transactions.slice(D.transactions.length-2000);
+
+  if(!D.holdings)D.holdings=[];
+  for(const h of (j.holdings||[])){
+    const have=D.holdings.find(x=>String(x.sym||'').toUpperCase()===h.sym);
+    if(have){ keptH++; if(Math.abs((Number(have.shares)||0)-h.shares)>0.0001)differs++; continue; }
+    D.holdings.push({sym:h.sym,type:h.type||'Stock',shares:h.shares,
+      cost:(h.cost!=null&&isFinite(h.cost))?h.cost:0,broker:h.broker||'',addedAt:Date.now(),fromBroker:true});
+    addedH++;
+  }
+  saveDB(); renderAll();
+  const bits=[];
+  bits.push(addedH+' holding'+(addedH===1?'':'s')+' added');
+  if(keptH)bits.push(keptH+' already in your book, left as they are');
+  if(differs)bits.push(differs+' with a different share count, which you may want to check');
+  bits.push(addedTx+' trade'+(addedTx===1?'':'s')+' imported');
+  if(dupeTx)bits.push(dupeTx+' already there');
+  return bits.join(', ')+'. Trades are marked imported: history, not calls this terminal made.';
+}
+async function brokerUnlink(){
+  const code=brokerCode();
+  if(!code)return;
+  if(!confirm('Disconnect your broker?\n\nThe connection is removed and we delete the key that reads it. Everything already imported stays in your book.'))return;
+  broBusy(true,'Disconnecting…');
+  try{
+    const r=await fetch(INVITE_WORKER+'/broker/unlink?code='+encodeURIComponent(code),{method:'POST'});
+    const j=await r.json();
+    broBusy(false,'');
+    showBrokerState({connected:false});
+    /* Said plainly when the remote delete failed: ours is gone either way, but theirs is not, and a
+       person who asked to be disconnected is entitled to know which of those happened. */
+    toast(j&&j.removed===false
+      ? 'Disconnected here, and our key is deleted. The broker link may still show at your broker; remove it there too.'
+      : 'Disconnected. The key that read your account is deleted.');
+  }catch(e){ broBusy(false,''); toast(e.message); }
+}
+
 function importData(ev){
   const f=ev.target.files[0];if(!f)return;
   const r=new FileReader();
@@ -13310,8 +13476,10 @@ function renderTradeImpact(){
    you already configured firing on data already collected. Priority 1 is money at risk, 2 is policy
    breached, 3 is maintenance.
 
-   Deliberately NOT an execution system. It has no broker connection and never will from a static
-   page. It tells you what your rules flagged and shows the numbers; you decide and you trade. */
+   Deliberately NOT an execution system. A broker may now be connected, but only read-only: the
+   connection is opened carrying no trading rights and the worker refuses every order path, so
+   nothing here can reach an order however it is called. It tells you what your rules flagged and
+   shows the numbers; you decide and you trade. */
 /* ================= THE QUEUE IS NO LONGER SILENT =================
 
    An access request used to land in KV and wait, invisibly, until admin.html happened to be opened.

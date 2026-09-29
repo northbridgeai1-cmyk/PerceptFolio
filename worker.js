@@ -781,7 +781,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -920,6 +920,230 @@ async function handle(request, env) {
     const inv = JSON.parse(c);
     if (inv.paused) return null;
     return { code, tier: inv.tier || null, legacy: true };
+  }
+
+  /* ========================= THE BROKER CONNECTION (2026-09-29) =========================
+     The owner's ask: connect a broker, have it read the account, and fill the book in by itself.
+
+     WHAT CHANGED ON THE SITE, AND WHY IT HAD TO. Two pages said "no broker is connected and none
+     will be". That promise was broader than the one that mattered, which is that this thing never
+     moves money. The pages now say the connection is read-only and cannot transmit an order, and
+     everything below exists to make that sentence literally true rather than a matter of our own
+     restraint.
+
+     READ-ONLY, THREE TIMES OVER.
+       1. Every connection is opened with connectionType:'read'. SnapTrade then issues a connection
+          carrying no trading permission at all, so the limit lives on their side of the wire and
+          survives any mistake on ours.
+       2. stFetch throws on any path that looks like an order or a trade. There is no flag that
+          turns this off. Turning it on would be a code change with a diff to read, which is why it
+          is written this way rather than as a setting.
+       3. Nothing here references a trading endpoint, so there is nothing to enable by accident.
+
+     WHAT WE STORE, AND WHAT WE DO NOT. Never a broker password: where the broker supports OAuth
+     nobody sees one, and where it does not, SnapTrade collects it and we never receive it. We keep
+     a SnapTrade userId derived from the access code by hash, so their records carry no email and no
+     name of ours, and the userSecret they hand back, which is the credential for reading that one
+     person's connections. It sits under bro:<code> beside the book it belongs to.
+
+     THE RULE THAT DOES NOT BEND. Everything pulled in here arrives as history, never as a call this
+     terminal made. Trades come back marked imported, exactly as a broker CSV does, and the record
+     will not grade them. A connection makes the terminal useful on day one; it does not let anybody
+     claim a mark they did not earn. */
+  const SNAPTRADE_BASE = env.SNAPTRADE_BASE || 'https://api.snaptrade.com';
+  function brokerConfigured() { return !!(env.SNAPTRADE_CLIENT_ID && env.SNAPTRADE_CONSUMER_KEY); }
+
+  /* Canonical JSON as the signature requires: keys sorted at every level, no whitespace. A key whose
+     value is undefined is dropped rather than serialised, because JSON.stringify(undefined) returns
+     undefined and would otherwise put the literal text into the signed content. */
+  function canonJson(v) {
+    if (v === null || typeof v !== 'object') return JSON.stringify(v);
+    if (Array.isArray(v)) return '[' + v.map(canonJson).join(',') + ']';
+    const keys = Object.keys(v).filter(k => v[k] !== undefined).sort();
+    return '{' + keys.map(k => JSON.stringify(k) + ':' + canonJson(v[k])).join(',') + '}';
+  }
+  function b64bytes(buf) {
+    const b = new Uint8Array(buf);
+    let out = '';
+    for (let i = 0; i < b.length; i++) out += String.fromCharCode(b[i]);
+    return btoa(out);
+  }
+  async function sha256hex(text) {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(d)).map(x => x.toString(16).padStart(2, '0')).join('');
+  }
+  /* An account number is not ours to repeat back in full. Last four is what a person needs to tell
+     two accounts at the same broker apart, and is what their statement shows them. */
+  function maskAccount(n) {
+    const t = String(n == null ? '' : n).replace(/\s+/g, '');
+    return t.length > 4 ? '••••' + t.slice(-4) : (t || '');
+  }
+  /* SnapTrade nests the ticker one or two levels down depending on the endpoint, and an option leg
+     has no plain ticker at all. Anything that is not a plain equity symbol comes back empty and is
+     skipped by the caller: options are a thing this terminal publicly refuses to cover. */
+  function stSymbol(sym) {
+    if (!sym || typeof sym !== 'object') return '';
+    const raw = sym.symbol && typeof sym.symbol === 'object' ? sym.symbol.symbol : sym.symbol;
+    const t = String(raw || '').toUpperCase().trim();
+    return /^[A-Z][A-Z.\-]{0,7}$/.test(t) ? t : '';
+  }
+  /* Segment-matched, not substring-matched, because "snapTrade" contains "trade" and blocking the
+     login route would break the only thing that opens a read-only connection in the first place. */
+  const ST_FORBIDDEN = /(^|\/)(trade|trading|orders?|placeOrder|cancelOrder|impactOrder|previewOrder|placeForceOrder)(\/|$)/i;
+
+  /* One signed request. `query` is built by the caller and sent back byte for byte, because the
+     signature covers the raw query string and the documentation is explicit that it must not be
+     sorted, decoded or re-encoded on the way out. */
+  async function stFetch(method, path, query, bodyObj) {
+    if (ST_FORBIDDEN.test(path)) throw new Error('This build is read-only and refused ' + path);
+    const sigContent = canonJson({ content: bodyObj === undefined ? null : bodyObj, path, query });
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.SNAPTRADE_CONSUMER_KEY),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const sig = b64bytes(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(sigContent)));
+    const r = await fetch(SNAPTRADE_BASE.replace(/\/+$/, '') + path + '?' + query, {
+      method,
+      headers: Object.assign({ 'Signature': sig, 'Accept': 'application/json' },
+        bodyObj === undefined ? {} : { 'Content-Type': 'application/json' }),
+      body: bodyObj === undefined ? undefined : JSON.stringify(bodyObj),
+    });
+    let j = null; try { j = await r.json(); } catch (e) { /* handled below */ }
+    if (!r.ok) {
+      const detail = (j && (j.detail || j.message || j.code)) || ('HTTP ' + r.status);
+      const err = new Error(String(detail)); err.status = r.status; throw err;
+    }
+    return j;
+  }
+  /* clientId and timestamp on every call; userId and userSecret on the user-scoped ones. Built in
+     one place so the string that is signed is the string that is sent. */
+  function stQuery(extra) {
+    const parts = ['clientId=' + encodeURIComponent(env.SNAPTRADE_CLIENT_ID),
+                   'timestamp=' + Math.floor(Date.now() / 1000)];
+    for (const [k, v] of Object.entries(extra || {})) parts.push(k + '=' + encodeURIComponent(v));
+    return parts.join('&');
+  }
+  /* Their id for this person is a hash of the access code, so SnapTrade holds no email, no name and
+     nothing identifying the subscriber if their records are ever read by someone who should not be
+     reading them. Stable, so reconnecting finds the same user rather than making a second one. */
+  async function brokerUserId(code) { return 'pf_' + (await sha256hex('pf-broker:' + code)).slice(0, 32); }
+
+  async function brokerRec(code) {
+    const raw = await env.PF_SYNC.get('bro:' + code);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+  /* Registered once and remembered. registerUser hands back the userSecret exactly once and it
+     cannot be fetched again, so losing it means the person reconnects from scratch. */
+  async function brokerEnsureUser(code) {
+    const have = await brokerRec(code);
+    if (have && have.userSecret) return have;
+    const userId = await brokerUserId(code);
+    const j = await stFetch('POST', '/api/v1/snapTrade/registerUser', stQuery(), { userId });
+    if (!j || !j.userSecret) throw new Error('The broker service did not return a user secret.');
+    const rec = { userId, userSecret: j.userSecret, createdAt: Date.now(), lastSyncAt: null };
+    await env.PF_SYNC.put('bro:' + code, JSON.stringify(rec));
+    return rec;
+  }
+
+  if (url.pathname === '/broker' || url.pathname.startsWith('/broker/')) {
+    if (!brokerConfigured()) return json({ error: 'Broker connections are not switched on yet.' }, 503, env);
+    const bcode = clean(url.searchParams.get('code'), 12).toUpperCase();
+    if (!(await activeGrant(bcode))) return json({ error: 'Needs a live access code.' }, 401, env);
+    if (request.method === 'POST' && await tooMany(env, request, '/broker', 10)) {
+      return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    }
+
+    /* ---- POST /broker/link -> {url} : the connection portal, read-only ---- */
+    if (url.pathname === '/broker/link' && request.method === 'POST') {
+      try {
+        const rec = await brokerEnsureUser(bcode);
+        const j = await stFetch('POST', '/api/v1/snapTrade/login',
+          stQuery({ userId: rec.userId, userSecret: rec.userSecret }),
+          /* THE ONE LINE THAT MAKES THE PROMISE TRUE ON THEIR SIDE AS WELL AS OURS. */
+          { connectionType: 'read', connectionPortalVersion: 'v4' });
+        if (!j || !j.redirectURI) return json({ error: 'The broker portal did not open.' }, 502, env);
+        return json({ ok: true, url: j.redirectURI, readOnly: true }, 200, env);
+      } catch (e) { return json({ error: String(e.message || e) }, 502, env); }
+    }
+
+    /* ---- GET /broker/status : what is connected, and when it last read ---- */
+    if (url.pathname === '/broker/status' && request.method === 'GET') {
+      const rec = await brokerRec(bcode);
+      if (!rec) return json({ ok: true, connected: false }, 200, env);
+      try {
+        const accounts = (await stFetch('GET', '/api/v1/accounts', stQuery({ userId: rec.userId, userSecret: rec.userSecret }))) || [];
+        return json({
+          ok: true, connected: accounts.length > 0, readOnly: true, lastSyncAt: rec.lastSyncAt || null,
+          accounts: accounts.map(a => ({ id: a.id, name: a.name || '', institution: a.institution_name || '', number: maskAccount(a.number) })),
+        }, 200, env);
+      } catch (e) { return json({ ok: true, connected: false, error: String(e.message || e) }, 200, env); }
+    }
+
+    /* ---- POST /broker/sync : read positions and activity, hand back rows the terminal can merge ----
+       Nothing is written to the book here. The worker normalises and returns; the terminal decides
+       what is new, exactly as it does for a broker CSV, so there is one merge path and one set of
+       rules about what counts as a duplicate. */
+    if (url.pathname === '/broker/sync' && request.method === 'POST') {
+      const rec = await brokerRec(bcode);
+      if (!rec) return json({ error: 'No broker is connected to this account.' }, 400, env);
+      try {
+        const q = () => stQuery({ userId: rec.userId, userSecret: rec.userSecret });
+        const accounts = (await stFetch('GET', '/api/v1/accounts', q())) || [];
+        const holdings = [], transactions = [];
+        /* Thirteen months back: enough that the history screens say something on the first day,
+           small enough not to drag a decade through a free plan on the first press. */
+        const since = new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10);
+        for (const a of accounts.slice(0, 10)) {
+          const broker = a.institution_name || '';
+          let pos = [];
+          try { pos = (await stFetch('GET', '/api/v1/accounts/' + encodeURIComponent(a.id) + '/positions', q())) || []; }
+          catch (e) { /* one account refusing positions must not cost the others */ }
+          for (const p of (Array.isArray(pos) ? pos : [])) {
+            const sym = stSymbol(p.symbol);
+            const units = Number(p.units);
+            if (!sym || !isFinite(units) || units <= 0) continue;
+            holdings.push({ sym, shares: units, cost: Number(p.average_purchase_price) || null, broker, type: 'Stock' });
+          }
+          let act = null;
+          try {
+            act = await stFetch('GET', '/api/v1/accounts/' + encodeURIComponent(a.id) + '/activities',
+              stQuery({ userId: rec.userId, userSecret: rec.userSecret, startDate: since, offset: 0, limit: 1000 }));
+          } catch (e) { /* same reasoning */ }
+          const rows = Array.isArray(act) ? act : ((act && act.data) || []);
+          for (const t of rows) {
+            const kind = String(t.type || '').toUpperCase();
+            if (kind !== 'BUY' && kind !== 'SELL') continue;   /* dividends and fees are not decisions */
+            const sym = stSymbol(t.symbol);
+            const shares = Math.abs(Number(t.units) || 0);
+            const price = Number(t.price);
+            const date = String(t.trade_date || t.settlement_date || '').slice(0, 10);
+            if (!sym || !(shares > 0) || !(price > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+            transactions.push({ date, sym, action: kind, shares, price, broker });
+          }
+        }
+        rec.lastSyncAt = Date.now();
+        await env.PF_SYNC.put('bro:' + bcode, JSON.stringify(rec));
+        return json({
+          ok: true, readOnly: true, syncedAt: rec.lastSyncAt,
+          accounts: accounts.map(a => ({ id: a.id, name: a.name || '', institution: a.institution_name || '', number: maskAccount(a.number) })),
+          holdings, transactions,
+        }, 200, env);
+      } catch (e) { return json({ error: String(e.message || e) }, 502, env); }
+    }
+
+    /* ---- POST /broker/unlink : delete the SnapTrade user, and our record of it ---- */
+    if (url.pathname === '/broker/unlink' && request.method === 'POST') {
+      const rec = await brokerRec(bcode);
+      if (!rec) return json({ ok: true, removed: false }, 200, env);
+      let removed = true;
+      try { await stFetch('DELETE', '/api/v1/snapTrade/deleteUser', stQuery({ userId: rec.userId })); }
+      catch (e) { removed = false; }
+      /* Ours goes whatever theirs did: keeping a userSecret for a connection the person has asked to
+         be rid of is the worst of both outcomes. If the remote delete failed, the answer says so. */
+      await env.PF_SYNC.delete('bro:' + bcode);
+      return json({ ok: true, removed, local: true }, 200, env);
+    }
+
+    return json({ error: 'Not a broker route.' }, 404, env);
   }
 
   /* ---- Market data for every signed-in account: GET /data?code=&path=&... ----

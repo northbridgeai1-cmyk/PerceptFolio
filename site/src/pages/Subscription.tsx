@@ -56,7 +56,14 @@ export function Subscription() {
         <h2 id="h-not" className="mb-8">What it refuses to do</h2>
         <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[780px]:grid-cols-1" role="list">
           {([
-            ['It never places a trade', 'No broker is connected and none will be. The terminal reaches a verdict; moving money stays your act.'],
+            /* REWORDED 2026-09-29. This used to read "No broker is connected and none will be",
+               which was a broader promise than the one that mattered and than the one now kept. A
+               broker can be connected, read-only: it is opened with a permission carrying no trading
+               rights at all, so the limit is enforced by the broker's own connection and not by our
+               restraint, and the worker refuses any order path outright. The promise that was
+               actually load-bearing, that this thing never moves money, is unchanged, and is now
+               stated in terms of what the code does rather than what it declined to build. */
+            ['It never places a trade', 'You can connect a broker, and the connection is read-only: it cannot place, change or cancel an order. The terminal reaches a verdict; moving money stays your act.'],
             ['It never quotes a win rate', 'A win rate hides the size of the wins. The record reports expectancy, with the interval around it, and says when there is not enough evidence yet.'],
             ['It never edits the past', 'A mark is hashed into a chain whose head is posted daily to a server clock. Rewriting yesterday is visible to anyone holding the pack.'],
           ] as const).map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-display text-[16px] font-bold tracking-[-.01em]">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
