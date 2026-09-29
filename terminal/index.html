@@ -1273,18 +1273,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
   <!-- The dashboard. -->
   <div id="personalDashboardBody">
-    <!-- Start here. Three steps, each one a button that goes to the exact place, each ticked when it
-         is done. Stays on the Dashboard until the first review has run; after that the morning
-         routine is one line. The market-data step appears only where a key is actually needed. -->
-    <div id="welcomeCard" class="welcome-card" style="display:none">
-      <h2>Start here</h2>
-      <p class="muted" style="margin-bottom:16px">Three steps. Then every morning is one button.</p>
-      <div id="wcKeyStep" class="wc-step" style="margin-bottom:10px"><span class="step-num">0</span><div><b>Turn on prices.</b> Paste a free Finnhub key in Settings. Two minutes, no card. <button class="btn btn-sm btn-ghost" onclick="showTab('settings')">Open Settings</button></div></div>
-      <div class="wc-step" id="wcStep1" style="margin-bottom:10px"><span class="step-num wc-n">1</span><div><b>Add what you own.</b> Stocks, funds, and the cash you have to invest. <button class="btn btn-sm" onclick="showTab('portfolio')">Open Portfolio</button></div></div>
-      <div class="wc-step" id="wcStep2" style="margin-bottom:10px"><span class="step-num wc-n">2</span><div><b>Add a few tickers you are watching.</b> Optional. The terminal scores them for you. <button class="btn btn-sm btn-ghost" onclick="showTab('watchlist')">Open Lists</button></div></div>
-      <div class="wc-step" id="wcStep3" style="margin-bottom:6px"><span class="step-num wc-n">3</span><div><b>Press Run review.</b> It pulls prices, checks everything, and lists what needs you. It is under <b>What needs you</b>, at the foot of this screen.</div></div>
-      <p class="muted" style="font-size:12.5px;margin-top:12px">Lost? <a href="#" onclick="replayTour();return false">Show me around</a>, three screens, one minute.</p>
-    </div>
     <!-- E1. The monthly close. Appears on the 1st and stays until it is read. It keeps its place at
          the top while the queue moves to the foot: a once-a-month interruption has to be read before
          the month is carried on with, which is the opposite of the queue's job. -->
@@ -1305,6 +1293,24 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <div class="stat s-income"><span class="stat-label">Today's gain / loss</span><span class="stat-value" id="dToday">$0</span><span class="muted" id="dTodayPct" style="font-size:11px"></span></div>
       <div class="stat s-profit"><span class="stat-label">Total gain / loss</span><span class="stat-value" id="dGain">$0</span><span class="muted" id="dGainPct" style="font-size:11px"></span></div>
     </div>
+    <!-- MOVED BELOW THE NUMBERS (2026-09-29). Start here used to sit above everything, and with the
+         data-key nudge above that, the portfolio value was measured at 805px down the page: the one
+         number a person opens this screen for was below the fold on a laptop, behind scaffolding.
+         The checklist is still shown until the first review has run, which is the right condition;
+         it just no longer outranks the account it is helping you set up. -->
+    <!-- Start here. Three steps, each one a button that goes to the exact place, each ticked when it
+         is done. Stays on the Dashboard until the first review has run; after that the morning
+         routine is one line. The market-data step appears only where a key is actually needed. -->
+    <div id="welcomeCard" class="welcome-card" style="display:none">
+      <h2>Start here</h2>
+      <p class="muted" style="margin-bottom:16px">Three steps. Then every morning is one button.</p>
+      <div id="wcKeyStep" class="wc-step" style="margin-bottom:10px"><span class="step-num">0</span><div><b>Turn on prices.</b> Paste a free Finnhub key in Settings. Two minutes, no card. <button class="btn btn-sm btn-ghost" onclick="showTab('settings')">Open Settings</button></div></div>
+      <div class="wc-step" id="wcStep1" style="margin-bottom:10px"><span class="step-num wc-n">1</span><div><b>Add what you own.</b> Stocks, funds, and the cash you have to invest. <button class="btn btn-sm" onclick="showTab('portfolio')">Open Portfolio</button></div></div>
+      <div class="wc-step" id="wcStep2" style="margin-bottom:10px"><span class="step-num wc-n">2</span><div><b>Add a few tickers you are watching.</b> Optional. The terminal scores them for you. <button class="btn btn-sm btn-ghost" onclick="showTab('watchlist')">Open Lists</button></div></div>
+      <div class="wc-step" id="wcStep3" style="margin-bottom:6px"><span class="step-num wc-n">3</span><div><b>Press Run review.</b> It pulls prices, checks everything, and lists what needs you. It is under <b>What needs you</b>, at the foot of this screen.</div></div>
+      <p class="muted" style="font-size:12.5px;margin-top:12px">Lost? <a href="#" onclick="replayTour();return false">Show me around</a>, three screens, one minute.</p>
+    </div>
+
     <div class="card">
       <div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:12px">
         <div class="row" style="gap:6px">
@@ -11176,7 +11182,13 @@ function renderAll(){
 
   const gs=document.getElementById('greetingSub');
   if(gs){
-    if(isNew)gs.textContent='Let\'s get your portfolio set up below.';
+    /* isNew is true until the first review has run, which is a whole month of mornings for somebody
+       who added their holdings on day one and has not pressed the button yet. Telling them to get
+       their portfolio set up, under five holdings they can see, reads as software that has not
+       noticed them. Say the step that is actually outstanding. */
+    if(isNew)gs.textContent=done1
+      ? 'Press Run review, at the foot of this screen, to price your book and see what needs you.'
+      : 'Let\'s get your portfolio set up below.';
     /* "Nice." is gone. A one-day move is noise and congratulating the operator on it trains them to
        read noise as skill — the precise habit this app exists to break. State the number, then say
        what it is worth, which is nothing on its own. */
@@ -17926,7 +17938,16 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   function keyNudge(){
     try{
       if(typeof D==='undefined'||!D||!USER) return; var have=(typeof hasMarketData==='function')?hasMarketData():!!D.apiKey;
-      var host=document.getElementById('greetingText'); host=host&&host.parentElement; if(!host) return;
+      /* PLACED BELOW THE NUMBERS (2026-09-29), not above the date. This is a full-width card, and
+         sitting it at the very top made the first thing on the screen an errand rather than the
+         account: on a laptop it was part of why the portfolio value was measured below the fold.
+         It goes where the Start here checklist goes, which is where the other setup jobs live, and
+         it still disappears the moment a key exists. Falls back to the old host if that block is
+         not on the page, so nothing depends on a layout that could change again. */
+      var host=document.getElementById('welcomeCard'); host=host&&host.parentElement;
+      var before=document.getElementById('welcomeCard');
+      if(!host){ host=document.getElementById('greetingText'); host=host&&host.parentElement; before=host&&host.firstChild?host.firstChild.nextSibling:null; }
+      if(!host) return;
       var card=document.getElementById('pfKeyCard');
       if(have){ if(card) card.remove(); return; }
       if(card) return;
@@ -17934,7 +17955,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       card.innerHTML='<div style="font-weight:700;font-size:15px;margin-bottom:6px">Connect your free data key to see prices</div>'+
         '<div class="muted" style="font-size:13px"><a href="https://finnhub.io/register" target="_blank" rel="noopener">finnhub.io/register</a></div>'+
         '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="pfKeyInput" placeholder="Finnhub API key" style="flex:1;min-width:220px;font-family:var(--mono)" autocomplete="off"><button type="button" class="btn btn-p btn-sm" id="pfKeySave">Save and refresh</button></div>';
-      host.insertBefore(card,host.firstChild.nextSibling);
+      host.insertBefore(card,before||null);
       document.getElementById('pfKeySave').onclick=function(){ var v=(document.getElementById('pfKeyInput').value||'').trim(); if(!v) return; D.apiKey=v; if(typeof saveDB==='function') saveDB(); card.remove(); if(typeof refreshAll==='function') refreshAll(); else if(typeof loadMarketData==='function') loadMarketData(true); };
     }catch(e){}
   }
