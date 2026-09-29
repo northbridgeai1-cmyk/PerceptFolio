@@ -2287,6 +2287,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 <!-- SETTINGS -->
 <div id="tab-settings" class="tabs-hidden">
 
+
   <div class="card" id="installCard" style="display:none">
     <h3>Install PerceptFolio</h3>
     <button class="btn" id="installBtn" onclick="promptInstall()">Install app</button>
@@ -12351,8 +12352,20 @@ async function brokerStatus(){
     const r=await fetch(INVITE_WORKER+'/broker/status?code='+encodeURIComponent(code));
     const j=await r.json();
     /* 503 means the operator has not switched broker connections on. That is not the subscriber's
-       problem to solve and not an error to alarm them with, so the card simply says so. */
-    if(r.status===503){ const st=document.getElementById('broStatus'); if(st)st.textContent='Broker connections are not switched on yet.'; return; }
+       problem to solve and not an error to alarm them with. But a live button that answers "not
+       switched on" when pressed is worse than no button: it reads as broken software rather than as
+       a thing that is coming. So the button goes dead and says which it is. */
+    if(r.status===503){
+      const st=document.getElementById('broStatus');
+      const link=document.getElementById('broLinkBtn');
+      if(link){ link.disabled=true; link.textContent='Not available yet'; }
+      if(st)st.innerHTML='<span class="warn">Broker connections are not switched on for this terminal yet.</span> '+
+        'Everything else on this card works the moment they are. Nothing is wrong with your account.';
+      renderBrokerAccounts([]);
+      return;
+    }
+    const link=document.getElementById('broLinkBtn');
+    if(link&&link.disabled){ link.disabled=false; link.textContent='Connect a broker'; }
     showBrokerState(j);
   }catch(e){ /* the card is not worth an error bar; the buttons still work */ }
 }
@@ -19128,13 +19141,24 @@ header{border-bottom-color:var(--line)}
    without touching this code (unknown headings go to Advanced). The group is remembered on the
    device. A card another script hides for its own reason (the install card) keeps that. */
 (function(){
-  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|Rule change log)/i],['Accounts',/^(Copy holdings)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
+  /* 'API keys' added 2026-09-29, on the owner's ask for a tab holding the keys and the broker. It
+     goes in by heading like every other group, which is the whole point of this design: the two
+     cards were written months apart and neither needed touching for this. It sits before Advanced
+     because Advanced is the catch-all and matches everything. */
+  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|Rule change log)/i],['Accounts',/^(Copy holdings)/i],['API keys',/^(API keys|Your broker)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
   function groupOf(card){ var h=card.querySelector('h3'); var txt=h?h.textContent.trim():''; for(var i=0;i<GROUPS.length;i++)if(GROUPS[i][1].test(txt))return GROUPS[i][0]; return 'Advanced'; }
   function cards(){ var tab=document.getElementById('tab-settings'); return tab?Array.prototype.slice.call(tab.children).filter(function(el){ return el.classList&&(el.classList.contains('card')||el.classList.contains('addwrap')); }):[]; }
   window.showSettings=function(name){
     try{ localStorage.setItem('pf_settings_sec',name); }catch(e){}
     cards().forEach(function(c){ c.classList.toggle('set-hidden',groupOf(c)!==name); });
     document.querySelectorAll('.set-menu button').forEach(function(b){ b.classList.toggle('on',b.dataset.sec===name); });
+    /* The only group whose cards are drawn from the worker rather than from the book. Refreshed on
+       the way in, so opening it shows the keys that exist now and whether the broker is actually
+       connected, rather than whatever was true when Settings was last opened. */
+    if(name==='API keys'){
+      try{ if(typeof renderKeyList==='function')renderKeyList(); }catch(e){}
+      try{ if(typeof brokerStatus==='function')brokerStatus(); }catch(e){}
+    }
   };
   function build(){
     var tab=document.getElementById('tab-settings'); if(!tab||tab.querySelector('.set-menu'))return;

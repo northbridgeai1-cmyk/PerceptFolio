@@ -319,6 +319,40 @@ t('folds are applied once a session, not on every tab switch',
 t('the calendar card hides itself rather than showing an empty box',
   /if\(!rel\.length\)\{ el\.innerHTML=''; if\(card\)card\.style\.display='none'; return; \}/.test(term));
 
+/* ============ SETTINGS HAS AN API KEYS TAB (2026-09-29) ============
+   The owner asked for one holding the keys and the broker. Settings already grouped its cards by
+   their h3 heading, so this is a group added to that list and not a second mechanism beside it: a
+   first attempt built a parallel tab strip, which broke the existing one by making the cards
+   grandchildren of the pane its card scan walks. Pinned so that does not get repeated. */
+t('there is exactly one settings grouping mechanism', (() => {
+  const defs = (term.match(/window\.showSettings\s*=|function showSettings\(/g) || []).length;
+  return defs === 1 && /window\.showSettings=function\(name\)/.test(term);
+})());
+t('the API keys group exists, and takes both cards by their headings',
+  /\['API keys',\/\^\(API keys\|Your broker\)\/i\]/.test(term));
+t('it sits before the catch-all, or Advanced would swallow it',
+  term.indexOf("['API keys'") < term.indexOf("['Advanced',/./]"));
+t('the cards it names are still direct children of the settings pane, which is what the scan walks',
+  (() => {
+    const a = term.indexOf('id="tab-settings"');
+    const b = term.indexOf('<h3>API keys</h3>', a);
+    const between = term.slice(a, b);
+    /* No wrapper may be opened around the card runs: the scan reads tab.children. */
+    return b > a && !/<div class="setsec"/.test(between);
+  })());
+t('opening that group refreshes what it shows, since both cards read from the worker',
+  /if\(name==='API keys'\)\{/.test(term) &&
+  /if\(typeof renderKeyList==='function'\)renderKeyList\(\);/.test(term) &&
+  /if\(typeof brokerStatus==='function'\)brokerStatus\(\);/.test(term));
+/* A live button that answers "not switched on" reads as broken software rather than as a thing
+   that is coming, and the difference matters on the one card that asks for access to a brokerage. */
+t('the broker button goes dead, and says which it is, until the keys exist',
+  /link\.disabled=true; link\.textContent='Not available yet';/.test(term) &&
+  /Broker connections are not switched on for this terminal yet\./.test(term) &&
+  /Nothing is wrong with your account\./.test(term));
+t('and comes back by itself once they do',
+  /if\(link&&link\.disabled\)\{ link\.disabled=false; link\.textContent='Connect a broker'; \}/.test(term));
+
 t('the release calendar sits below the queue and folds after three lines', term.indexOf('<div id="commandQueue"></div>') < term.indexOf('<div id="econCal" class="md"></div>') && /const head=rel\.slice\(0,3\), rest=rel\.slice\(3\);/.test(term) && /more in the next thirty days/.test(term));
 t('the device cap is one constant, two, and the terminal shows the server\'s number', /const DEVICE_LIMIT = 2;/.test(worker) && !/limit: 2 \}/.test(worker) &&   /* the number is the constant, never a literal in an answer */ /lim=\(j&&j\.limit\)\|\|2/.test(term) && /on two devices: a desk and a pocket/.test(term));
 t('a full code names the screen that frees a slot', /On either of them open Settings, Sync across your devices, and forget the one you no longer use/.test(worker));
@@ -1655,7 +1689,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v155/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v156/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
