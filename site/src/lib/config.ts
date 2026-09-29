@@ -28,8 +28,7 @@ export const PLAN = { monthly: 760, yearly: 8360 } as const;
    screen on an operator device). The tour shows a still where there is one and the caption
    everywhere. */
 export const SCREENS: ReadonlyArray<{ id: string; name: string; asks: string; still?: boolean }> = [
-  { id: 'dashboard', name: 'Dashboard', asks: 'Where do things stand today?', still: true },
-  { id: 'command', name: 'Command', asks: 'What needs me this morning, in what order?' },
+  { id: 'dashboard', name: 'Dashboard', asks: 'Where do things stand today, and what needs me first?', still: true },
   { id: 'portfolio', name: 'Portfolio', asks: 'What do I own, at what cost, against which limits?' },
   { id: 'watchlist', name: 'Lists', asks: 'Which of the names I watch clear my bars?' },
   { id: 'history', name: 'History', asks: 'How do I actually behave: hold times, early sales, rule adherence?' },

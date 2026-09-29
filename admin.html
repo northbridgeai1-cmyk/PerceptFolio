@@ -90,6 +90,7 @@ tr:last-child td{border-bottom:none}
 .calls-w{border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-bottom:16px}
 .rr{font-weight:700}
 .pos{color:var(--green)}.neg{color:var(--red)}.warn{color:var(--amber)}.dim{color:var(--faint)}
+.req-flagged{outline:1px solid var(--red);outline-offset:-1px}
 .decide{border-top:1px solid var(--line);padding:14px 16px;background:var(--panel2)}
 .link-btn{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font:inherit;text-decoration:underline;text-underline-offset:.15em}
 .code{font:15px/1 var(--mono);letter-spacing:.12em;font-weight:700;color:var(--green);
@@ -341,7 +342,21 @@ function render(){
         '<td class="'+(m&&m.ok?'':'warn')+'">'+(m?(m.ok?'coherent':'target on wrong side of stop'):'-')+'</td>'+
       '</tr>';
     }).join('');
-    return '<div class="req" id="r-'+esc(r.id)+'">'+
+    /* THE FLAG, WHERE IT CANNOT BE MISSED. The worker screens what a request says the terminal would
+       be used FOR, never who is asking, and it only ever flags: it never refuses on its own, because
+       keyword matching on free text is wrong often enough that an automatic refusal would lose real
+       customers silently. This banner is the whole point of the mechanism. It quotes the matched
+       words so the operator can see for themselves that the match is either damning or nonsense. */
+    const sc=r.screen&&r.screen.level==='review'?r.screen:null;
+    const flagBanner=sc
+      ? '<div style="border:1px solid var(--red);border-left-width:3px;border-radius:6px;padding:10px 12px;margin:0 16px 12px">'+
+          '<b style="color:var(--red)">Flagged for review: '+esc(sc.hits.map(h=>h.label).join(', '))+'</b>'+
+          '<div class="dim" style="font-size:12px;margin-top:4px">Matched: '+sc.hits.map(h=>'<span style="font-family:var(--mono)">'+esc(h.phrase)+'</span>').join(', ')+'</div>'+
+          '<div class="dim" style="font-size:12px;margin-top:6px">Read what they wrote below. Granting needs a confirmation; denying does not.'+
+          (r.overriddenAt?' <b style="color:var(--yellow)">Overridden '+esc(new Date(r.overriddenAt).toLocaleString())+'.</b>':'')+'</div>'+
+        '</div>'
+      : '';
+    return '<div class="req'+(sc?' req-flagged':'')+'" id="r-'+esc(r.id)+'">'+
       '<div class="req-h">'+
         '<span class="pill p-'+esc(st)+'">'+esc(st)+'</span>'+
         (r.paused?'<span class="pill" style="background:rgba(217,164,65,.16);color:#e0bc72;border:1px solid rgba(217,164,65,.35)">paused</span>':'')+
@@ -374,7 +389,7 @@ function render(){
              : ''))+
       '</div>'+
       (st==='pending'
-        ? '<div class="decide">'+
+        ? flagBanner+'<div class="decide">'+
             '<label for="n-'+esc(r.id)+'">Note (optional, stored with the decision)</label>'+
             '<input id="n-'+esc(r.id)+'" placeholder="Why you decided this way">'+
             '<div class="row" style="margin-top:11px">'+
@@ -385,7 +400,7 @@ function render(){
               '<span class="dim" style="font-size:11.5px" id="s-'+esc(r.id)+'"></span>'+
             '</div>'+
           '</div>'
-        : '<div class="decide">'+
+        : flagBanner+'<div class="decide">'+
             (r.paused
               ? '<div class="paused-note"><b>Access paused.</b> '+
                 (r.code
@@ -420,8 +435,23 @@ async function decide(id,decision){
   if(st)st.textContent='Saving…';
   try{
     const rq=requests.find(x=>x.id===id)||{};
-    const r=await fetch(base()+'/decide',{method:'POST',headers:hdrs(),body:JSON.stringify({id,decision,note})});
-    const j=await r.json();
+    let r=await fetch(base()+'/decide',{method:'POST',headers:hdrs(),body:JSON.stringify({id,decision,note})});
+    let j=await r.json();
+    /* THE OVERRIDE IS A SECOND, DELIBERATE ACT. The worker refuses to mint a code for a flagged
+       request without it, and this is the only place that can send it: a confirm naming what was
+       matched, so the operator cannot grant one by muscle memory. Cancelling leaves the request
+       pending rather than denying it, because "I have not decided" is not "no". */
+    if(r.status===409&&j&&j.flagged){
+      const what=(j.hits||[]).map(h=>h.label+' ("'+h.phrase+'")').join('\n  ');
+      if(!confirm('This request was flagged:\n\n  '+what+'\n\nYou are about to issue an access code anyway. Only do this if you have read what they wrote and are satisfied.\n\nOK = issue the code. Cancel = leave it pending.')){
+        if(st)st.textContent='';
+        show('connMsg','err','Left pending. No code was issued.');
+        return;
+      }
+      const why=prompt('Optional: why is this one fine? Kept on the record.')||'';
+      r=await fetch(base()+'/decide',{method:'POST',headers:hdrs(),body:JSON.stringify({id,decision,note,override:true,overrideNote:why})});
+      j=await r.json();
+    }
     if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
     await load();
     if(j.code)show('connMsg','ok','Access granted. Code <b>'+esc(j.code)+'</b>. Single use, expires in 30 days. Opening the welcome email…');

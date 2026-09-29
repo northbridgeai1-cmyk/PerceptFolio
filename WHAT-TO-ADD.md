@@ -252,3 +252,69 @@ To go back to the free feed: `npx wrangler secret delete NEWS_API_KEY -c worker.
 **What follows from A.** Per-user data and aggregator fees are affordable at this price, so **live broker sync via SnapTrade or Plaid is now viable** where it would not be at public pricing. The quote-first flow stays: a person asks, the operator reads it and grants a code. No self-serve signup.
 
 **Do not reopen this** without new information. It has now been decided twice, on 2026-09-22 and again today.
+
+**2026-09-28, the book stopped being kept in the browser.** The owner's instruction, and it was overdue: until today `localStorage` held the whole thing and the worker was a mirror kept in step on a timer. Every device carried a full copy of the positions, the cost basis and the record, and a cleared browser or Safari's seven-day eviction took a copy of all of it away.
+
+Now the worker under `uslot:<code>` is the home, and the browser keeps exactly two things:
+
+1. **A shell of each profile** — email, access code, password hash, identity, the terms that were accepted. That is what the sign-in screen needs before there is any book to show. Built by naming the fields to keep (`SHELL_FIELDS`), so a field added to a profile later is left behind by default rather than written here by accident.
+2. **The one edit that has not been acknowledged yet**, under `pf_unsent_v1`. Keyed off the two stamps the book already carried — an edit is unsent exactly while `lastLocalEdit` is ahead of `syncedAt` — so it clears itself when the push lands, with no second place that has to remember to.
+
+So between a save and its push there is a book on the disk, and after the push there is not. That window is the alternative to losing a trade typed two seconds before the tab was closed. It is bounded by the push debounce, **shortened from 8s to 2.5s** because that debounce is now the length of time a change exists in only one place, and `pagehide` still flushes it.
+
+**Three things this forced, each of which was a real hazard:**
+
+- **A push must not leave a device that has not yet read the account.** After a reload `D` is a default book until the pull lands, and last-write-wins would make a blank record permanent over a real one. `_serverCopyUnknown` blocks every push until a pull resolves — including resolving to "nothing there yet" — and a pull that fails leaves it blocked and says so in a red bar with a Try again button, rather than silently.
+- **Opening now waits on the network**, because there is nothing local to draw. That wait is labelled on screen ("Bringing your book down from your account"), because an empty screen in that gap reads as an empty account, which is the most alarming thing this product could say to someone who has just paid.
+- **Turning sync off moves the book, it does not mute a timer.** `disableSync()` pushes what is unsent while there is still somewhere to push it, then drops the config, then writes the whole book to disk with `serverIsHome()` now false. The confirm text says which of the two homes is being chosen.
+
+**Who keeps their own copy, unchanged:** a device with no access code, a paused code, a book held for someone else (`managedBy`), and the sandbox. For those the browser *is* the only home and stripping it would destroy the account.
+
+**The export nag is now scoped.** `backupState()` returns nothing when the account holds an acknowledged copy, keyed on `syncedAt > 0` and not merely on the setting — a device with sync on that has never got a push through is still told to export.
+
+**Still in the browser, deliberately:** public market-data caches (`pf_popular_v1`, `pf_cycle_v1`, `pf_earn_v1`), the error log, the device id, the remembered email and the UI preferences. None of them is anyone's book.
+
+**Proved by running it, not by reading it.** `test/serverstore.mjs` lifts `writeStore`, `shellDB` and `SHELL_FIELDS` out of the file by name, runs them against a fake storage object with a book that has holdings, cash, marks and history in it, and asserts that after an acknowledged push no substring of any of it survives anywhere in that storage. `test/run.mjs` keeps pinning the shape; the behavioural claim needed a suite that actually looks at the bytes.
+
+**2026-09-28, the page a buyer lands on after paying.** It was `/thanks?type=purchase`: a heading, one paragraph, a button. The look was the smaller problem. The real one was that it **guessed**: it said "your code is on its way" because it had been loaded, which is evidence of nothing. A success URL is guessable, it stays in history, and a completed session can still have a payment that fails afterwards. While mail was unconfigured it said "check your email" about an email that was never sent.
+
+Now `/welcome` (`site/src/pages/Welcome.tsx`) asserts nothing and asks `GET /checkout/confirm?session_id=`, which asks Stripe whether the session was paid and asks KV whether the webhook minted a code and whether the code email went out. Three facts, three ticks, each either true or visibly not.
+
+- **The code is never on this page.** It is the only credential for the account, and anything the page can reach is reachable by anyone holding the session id out of a URL bar, a shared screen or a referrer header. The code goes to the address that paid. The page names that address **masked** (`maskEmail`), which answers the question a buyer actually has, which is "which of my inboxes".
+- **The webhook race is a state, not an error.** Stripe can redirect before the webhook lands. Paid-but-not-minted polls every two seconds, fifteen times, then stops and says to write in, rather than spinning forever or crying failure at a two-second gap.
+- **`mailed: null` is "not recorded", not "failed".** The webhook always attempts the send, so only an explicit `false` is evidence of failure. Records written before the flag existed would otherwise show a waiting dot that never resolves.
+- **`/thanks?type=purchase` hands over** rather than being kept in step, because sessions created before `/welcome` existed can still be completed days later.
+
+Route pinned by `test/welcome.mjs` (19 checks), including that the malformed-session-id refusal happens **before** Stripe is called, and that recording `mailed` can never be the reason a paid account has no code.
+
+
+**2026-09-29, three days free, with a card.** `TRIAL_DAYS = 3`, attached to the checkout session as `subscription_data[trial_period_days]`. The owner chose card-first over a no-card demo, and the reason is cost rather than caution: every account spends real money on market data from the first screen it opens, so a trial anyone can take with a throwaway address is a bill with no ceiling. A card also makes it self-enforcing, since Stripe moves the subscription to active by itself and the worker already treated `trialing` as fully live.
+
+**What it obliged.** A trial that becomes $760 without another click has to say so before the card is entered, and three days is short enough that forgetting is a normal thing to do. So the amount and the **date** appear in four places: Stripe's own checkout page (*"3 days free, then $760.00 per month starting October 2, 2026"*, total due today $0.00), the code email **above the code**, the `/welcome` page, and the quote the operator sends. The page takes the figure from `PLAN` rather than a literal, so it cannot drift from what Stripe will charge.
+
+**The webhook stopped assuming.** `checkout.session.completed` used to hard-code `subStatus: 'active'`, which was true only while there was no trial. It now reads the subscription from Stripe for the real status and `trial_end`. A failure to read falls back to the old assumption, because a paid account with no code is the direction that cannot be undone.
+
+**The no-price rule was scoped, not weakened.** `/welcome` is reached only by completing a checkout, and is where the charge must be stated; the marketing pages are still checked for a figure exactly as before. `test/run.mjs` now asserts both halves.
+
+**What this created, and it is not small.** The record needs marked calls before it says anything, and the trial is three days. The one fast source of evidence, an imported broker CSV, is deliberately never graded. See the open item in HANDOFF.md §11: the answer is a separate read-only view over imported history, not a relaxation of the forward-only rule.
+
+
+**2026-09-29, Command removed and its queue kept.** The owner cut Command; Dashboard and Command were answering the same question in two places, and a person opening the terminal in the morning had to choose. The queue itself is not redundant: it is the only screen that says a stop was hit or a limit was crossed, so it **moved onto the Dashboard rather than being deleted**, and it sits above the portfolio value for the same reason the record does. One date line now, not two. The tour is three screens. `SCREENS` is 13. Pinned under "COMMAND WAS MERGED, NOT DELETED", including that nothing still links to the removed screen.
+
+**Screener and Lists stay separate**, on the owner's reading: Screener analyses many names at once, Lists saves them for later. They are not the same job and merging them would cost the faster one.
+
+**2026-09-29, anyone may ask, and what they ask FOR is screened.** The form said "Business email" over a field placeheld `you@firm.com`, which told a private investor in two words that it was not for them. It always was: "Private investor" is a role and "My own capital" is a book type. The audience is narrow because of the price, not because of what anybody does for a living.
+
+So the gate moved from **who is asking** to **what they say it is for**. `screenRequest()` in worker.js matches statements of illegal intent (insider dealing, manipulation, wash trading, front-running, laundering, sanctions evasion, concealing funds, ponzi, tax evasion, operating unregistered, falsifying records).
+
+**It flags. It never refuses by itself, and that is the whole design.** *"I want to be sure I never front-run my clients"* and *"I front-run my clients"* share every word that matters, so an automatic refusal would lose real customers silently and the operator would never learn it happened. Therefore:
+
+- the request is **stored, always**, exactly as written; nobody is refused at the door;
+- the visitor gets **the same 200 and the same words** either way, so the filter cannot be probed by rewording;
+- `NOT_INTENT` clears a match preceded within 90 characters by avoid, never, prevent, detect, without, compliance, regulated, victim of, must not and the rest, which is what a careful professional writes;
+- admin shows the flag and **the words that matched**, in red, on the request card;
+- **`/decide` returns 409 and issues no code** for a flagged request unless called again with `override: true`. Denying needs no override, because denying is the safe direction. The override and its note are recorded on the request.
+
+**Proved in production, not only in the suite.** Three live requests: a retired teacher with their own savings came back `clear`; *"I trade on insider information"* came back `review` with the matched phrase; *"I am a compliance officer and I need to detect insider dealing"* came back `clear`. All three got a byte-identical reply.
+
+**A trap worth recording.** The patterns were first written through a Python heredoc that ate every `\b`, so they shipped into worker.js with literal backspace bytes and matched nothing. `node --check` passed, because the file was still valid JavaScript. Only `test/screen.mjs`, which lifts the function out and runs it on real sentences, caught it. **Regexes written from a script must be written from a raw string, and a filter must be tested by running it, never by reading it.**

@@ -1144,10 +1144,12 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 </defs></svg>
 
 <div id="app" style="display:none">
-<!-- B2. The whole product lives in this browser's localStorage. Safari evicts localStorage for
-     sites not visited in 7 days; a cleared cache does it anywhere; and the record being protected
-     cannot be rebuilt afterwards — the marks are forward-only by design. So the app nags, in
-     proportion to what would actually be lost. -->
+<!-- B2. This banner is what is left of the era when the whole product lived in this browser's
+     localStorage, where Safari's seven-day eviction and any cache clear could take a record that
+     cannot be rebuilt, the marks being forward-only by design.
+     A book kept on the account is not exposed to any of that, so the nag is now scoped to the
+     devices that really are the only copy: no access code, a paused one, a book held for someone
+     else, or the sandbox. See backupState(). -->
 <div id="backupBanner" style="display:none"></div>
 <header>
   <button id="sideToggle" onclick="toggleSidebar()" aria-label="Toggle sidebar" title="Collapse the sidebar  ·  [">
@@ -1227,7 +1229,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 <aside id="sidebar">
   <nav>
     <button data-tab="dashboard" class="active" onclick="showTab('dashboard')" data-tip="Dashboard"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-dash"/></svg></span><span class="lbl">Dashboard</span></button>
-    <button data-tab="command" id="navCommand" onclick="showTab('command')" data-tip="Command"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-command"/></svg></span><span class="lbl">Command</span></button>
     <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')" data-tip="Portfolio"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"/></svg></span><span class="lbl">Portfolio</span></button>
     <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Lists"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Lists</span></button>
     <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="History"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">History</span></button>
@@ -1247,46 +1248,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 </aside>
 <main id="main" tabindex="-1">
 
-<!-- COMMAND — the morning screen -->
-<div id="tab-command" class="tabs-hidden">
-  <!-- E1. The monthly close. Appears on the 1st and stays until it is read. -->
-  <div id="monthlyClose" style="display:none"></div>
-  <div class="cmd-head">
-    <div>
-      <div class="greeting" id="cmdGreeting">Good morning</div>
-      <div class="muted" id="cmdSub" style="font-size:13.5px;margin-top:2px">Press Run review to see what needs you.</div>
-    </div>
-    <button class="btn" onclick="runDailyReview()" id="cmdRunBtn">Run review</button>
-  </div>
-  <div class="muted" id="cmdStatus" style="font-size:12px;margin-bottom:10px"><b>Not reviewed yet today.</b> Run review pulls prices, checks everything, and lists what needs you.</div>
-  <!-- The track record sits above the actions on purpose. Anything that tells you what to do should
-       have to state, in the same breath, how often it has been right. -->
-  <div id="cmdRecord" class="rec"></div>
-  <!-- The schedule sits beside the record because it is the thing that keeps the record
-       honest: a mark not taken on the day cannot be taken later. -->
-  <div id="marksDue" class="md"></div>
-  <div id="commandQueue"></div>
-  <!-- The market scan. The queue above is about what you own and watch; this is about everything
-       else that is listed. It walks the whole US listing in the background at the pace the data
-       allows, and shows only the names that cleared the buy bar or broke the sell bar you set.
-       Everything it passed over is by definition neither. -->
-  <div class="card" id="mktScanCard" style="margin-top:16px">
-    <div class="row" style="justify-content:space-between;flex-wrap:wrap;align-items:center">
-      <h3 style="margin:0">The market, against your bars</h3>
-      <div class="row" style="gap:6px">
-        <button class="btn btn-sm" id="mktScanBtn" onclick="startMarketScan()">Scan the market</button>
-        <button class="btn btn-ghost btn-sm" id="mktScanStop" onclick="stopMarketScan()" style="display:none">Stop</button>
-        <button class="btn btn-ghost btn-sm" onclick="clearMarketScan()" title="Forget what the scan found and start the walk again">Start over</button>
-      </div>
-    </div>
-    <div class="muted" id="mktScanNote" style="font-size:12.5px;margin-top:8px"></div>
-    <div id="mktScanBody" style="margin-top:10px"></div>
-  </div>
-  <!-- A6.3. Release dates: context AFTER the queue, never above it. The queue is what the screen
-       is for; a calendar that pushes it below the fold is furniture in the way of the work. -->
-  <div id="econCal" class="md"></div>
-</div>
-
 <!-- DASHBOARD -->
 <div id="tab-dashboard">
   <div id="greetingBlock">
@@ -1304,9 +1265,13 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <div id="wcKeyStep" class="wc-step" style="margin-bottom:10px"><span class="step-num">0</span><div><b>Turn on prices.</b> Paste a free Finnhub key in Settings. Two minutes, no card. <button class="btn btn-sm btn-ghost" onclick="showTab('settings')">Open Settings</button></div></div>
       <div class="wc-step" id="wcStep1" style="margin-bottom:10px"><span class="step-num wc-n">1</span><div><b>Add what you own.</b> Stocks, funds, and the cash you have to invest. <button class="btn btn-sm" onclick="showTab('portfolio')">Open Portfolio</button></div></div>
       <div class="wc-step" id="wcStep2" style="margin-bottom:10px"><span class="step-num wc-n">2</span><div><b>Add a few tickers you are watching.</b> Optional. The terminal scores them for you. <button class="btn btn-sm btn-ghost" onclick="showTab('watchlist')">Open Lists</button></div></div>
-      <div class="wc-step" id="wcStep3" style="margin-bottom:6px"><span class="step-num wc-n">3</span><div><b>Press Run review.</b> It pulls prices, checks everything, and lists what needs you. <button class="btn btn-sm btn-ghost" onclick="showTab('command')">Open Command</button></div></div>
-      <p class="muted" style="font-size:12.5px;margin-top:12px">Lost? <a href="#" onclick="replayTour();return false">Show me around</a>, four screens, one minute.</p>
+      <div class="wc-step" id="wcStep3" style="margin-bottom:6px"><span class="step-num wc-n">3</span><div><b>Press Run review.</b> It pulls prices, checks everything, and lists what needs you. It is under <b>What needs you</b>, at the foot of this screen.</div></div>
+      <p class="muted" style="font-size:12.5px;margin-top:12px">Lost? <a href="#" onclick="replayTour();return false">Show me around</a>, three screens, one minute.</p>
     </div>
+    <!-- E1. The monthly close. Appears on the 1st and stays until it is read. It keeps its place at
+         the top while the queue moves to the foot: a once-a-month interruption has to be read before
+         the month is carried on with, which is the opposite of the queue's job. -->
+    <div id="monthlyClose" style="display:none"></div>
     <!-- THE RECORD SITS ABOVE THE PORTFOLIO VALUE, deliberately.
          What this screen led with before was a number that goes up when the market goes up. It
          tells the operator nothing about whether their judgment is any good, and reading it every
@@ -1354,6 +1319,50 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <button class="btn" onclick="runDailyReview()" id="refreshBtn">Refresh data</button>
       <span class="muted" id="lastRefresh"></span>
     </div>
+
+    <!-- ============ WHAT NEEDS YOU, AT THE FOOT OF THE SCREEN (2026-09-29, owner's call) ============
+         This arrived from the removed Command screen and first sat above the portfolio value, on the
+         argument that what needs you beats what it is worth. The owner moved it here, and the reading
+         behind that is the better one: the Dashboard is read top to bottom as a standing report, and
+         the queue is what you act on having read it, not before.
+
+         MADE TO FIT, which was the other half of the instruction. It arrived wearing the furniture of
+         a screen it used to head: a full-width bar with its own large heading and its own big button,
+         which looks like a page title halfway down a page. It is now a section title and a card, the
+         same two things every other block on this screen is made of, and the button is btn-sm like
+         the other in-card buttons. Its own record strip went with the furniture: the Dashboard has
+         one at the top and two of the same strip on one screen was the duplication in visible form.
+         The schedule stays, because a mark not taken on the day cannot be taken later. -->
+    <div class="section-title">What needs you</div>
+    <div class="card" id="queueCard">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;align-items:center;gap:10px">
+        <div class="muted" id="cmdSub" style="font-size:13.5px">Press Run review to see what needs you.</div>
+        <button class="btn btn-sm" onclick="runDailyReview()" id="cmdRunBtn">Run review</button>
+      </div>
+      <div class="muted" id="cmdStatus" style="font-size:12px;margin-top:8px"><b>Not reviewed yet today.</b> Run review pulls prices, checks everything, and lists what needs you.</div>
+      <div id="marksDue" class="md"></div>
+      <div id="commandQueue"></div>
+    </div>
+
+    <!-- The market scan. The queue above is about what you own and watch; this is about everything
+         else that is listed. It walks the whole US listing in the background at the pace the data
+         allows, and shows only the names that cleared the buy bar or broke the sell bar you set.
+         Everything it passed over is by definition neither. -->
+    <div class="card" id="mktScanCard" style="margin-top:16px">
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;align-items:center">
+        <h3 style="margin:0">The market, against your bars</h3>
+        <div class="row" style="gap:6px">
+          <button class="btn btn-sm" id="mktScanBtn" onclick="startMarketScan()">Scan the market</button>
+          <button class="btn btn-ghost btn-sm" id="mktScanStop" onclick="stopMarketScan()" style="display:none">Stop</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearMarketScan()" title="Forget what the scan found and start the walk again">Start over</button>
+        </div>
+      </div>
+      <div class="muted" id="mktScanNote" style="font-size:12.5px;margin-top:8px"></div>
+      <div id="mktScanBody" style="margin-top:10px"></div>
+    </div>
+    <!-- A6.3. Release dates: context AFTER the queue, never above it. The queue is what this part of
+         the screen is for; a calendar above it is furniture in the way of the work. -->
+    <div id="econCal" class="md"></div>
   </div>
 </div>
 
@@ -2606,6 +2615,10 @@ function loadDB(){
   try{DB=JSON.parse(localStorage.getItem(STORE_KEY))||{profiles:{}};}catch(e){DB={profiles:{}};}
   if(!DB.profiles||typeof DB.profiles!=='object')DB.profiles={};
   _profileCount=Object.keys(DB.profiles).length;
+  /* An edit that never reached the worker, from a tab that was closed or a browser that crashed
+     inside the push window. Read here and held aside; finishLogin decides whether it is newer than
+     what the worker has before anything is done with it. */
+  try{ _pending=JSON.parse(localStorage.getItem(PENDING_KEY))||null; }catch(e){ _pending=null; }
 }
 
 /* ---- The only write path ----
@@ -2618,9 +2631,71 @@ function loadDB(){
    all end the same way. If a write would reduce the number of profiles and the caller did not say
    it was deleting one, that write does not happen. Refusing to save is recoverable. Saving over
    an account is not. */
+/* ============ WHERE THE BOOK LIVES: THE WORKER, NOT THIS BROWSER (2026-09-28) ============
+   The owner's instruction: the book is not to be kept in the browser.
+
+   It used to be. localStorage held the whole thing and the worker was a mirror kept in step on a
+   timer, so every device carried a full copy of the positions, the cost basis and the record, and a
+   browser that was cleared or evicted took a copy of all of it away.
+
+   Now the worker is the home and this browser keeps two things, neither of which is the book:
+
+     1  a SHELL of each profile: the email, the access code, the password hash, the identity, the
+        terms that were accepted. That is what the sign-in screen needs before there is any book to
+        show. No holdings, no cash, no calls, no record, no marks, no cached prices.
+     2  the ONE edit that has not yet been acknowledged by the worker, under PENDING_KEY, deleted
+        the moment the push lands.
+
+   So between a save and its push there is a book on this disk, and after the push there is not.
+   That window is the alternative to losing a trade typed two seconds before the tab was closed, and
+   it is the honest cost of not keeping the book here. It is bounded by the push debounce, and
+   pagehide flushes it.
+
+   WHAT THIS BUYS. Clearing this browser loses nothing. Safari's seven-day eviction loses nothing. A
+   borrowed machine keeps no positions. The storage-full path stops being a data-loss path, because
+   there is no longer enough here to fill anything.
+
+   WHAT IT COSTS, said plainly rather than hidden. Opening the terminal now waits on the network,
+   because there is nothing local to draw. That wait is shown as itself. And a device that cannot
+   reach the worker cannot be allowed to push, or a blank shell would overwrite a real book under
+   last-write-wins; _serverCopyUnknown is the flag that refuses it. */
+const PENDING_KEY='pf_unsent_v1';
+let _pending=null;                       // an unsent edit found on disk at boot
+let _serverCopyUnknown=false;            // true until a pull has told us what the worker holds
+/* Only true when there is somewhere else for the book to be. A device with no code, a paused code,
+   a book held for someone else, or the sandbox account all keep their data locally as before: for
+   them the browser IS the only home, and stripping it would destroy the account. */
+function serverIsHome(){
+  if(typeof syncActive!=='function'||!syncActive())return false;
+  if(typeof isDemoUser==='function'&&isDemoUser())return false;
+  return true;
+}
+/* A profile with its book taken out. Listed by name rather than by deleting `data`, so a field added
+   to a profile later is left behind by default instead of being written here by accident. */
+const SHELL_FIELDS=['pinHash','accountType','userId','invite','inviteCode','code','createdAt',
+  'broughtAt','acceptedTerms','codeSyncTold','codeSyncDeclined','managedBy'];
+function shellDB(){
+  const out={profiles:{}};
+  Object.keys(DB.profiles||{}).forEach(e=>{
+    const p=DB.profiles[e]||{}, keep={};
+    SHELL_FIELDS.forEach(k=>{ if(p[k]!==undefined)keep[k]=p[k]; });
+    out.profiles[e]=keep;
+  });
+  return out;
+}
 /* THE ONE PLACE localStorage IS WRITTEN. Both the first attempt and every retry above go through
    here, so the profile-count guard cannot be stepped around by adding another write. */
-function writeStore(){ localStorage.setItem(STORE_KEY,JSON.stringify(DB)); }
+function writeStore(){
+  if(!serverIsHome()){ localStorage.setItem(STORE_KEY,JSON.stringify(DB)); return; }
+  localStorage.setItem(STORE_KEY,JSON.stringify(shellDB()));
+  /* UNSENT, AND ONLY UNSENT. The one test for that is already stamped on the book: saveDB sets
+     lastLocalEdit on every change and syncPush sets syncedAt on every acknowledgement, so an edit is
+     unsent exactly while lastLocalEdit is ahead of syncedAt. Keying the pending copy off that makes
+     it clear itself the moment the push lands, with no second place that has to remember to. */
+  const unsent=!!(USER&&D&&(D.lastLocalEdit||0)>(D.syncedAt||0));
+  if(unsent)localStorage.setItem(PENDING_KEY,JSON.stringify({user:USER,at:D.lastLocalEdit,data:D}));
+  else try{ localStorage.removeItem(PENDING_KEY); }catch(e){}
+}
 function persistDB(opts){
   const o=opts||{};
   const n=Object.keys(DB.profiles||{}).length;
@@ -3464,10 +3539,25 @@ async function finishLogin(email){
        pull is still on the wire. The person then gets a beginner's walkthrough over their own
        twenty positions a second before those positions appear. So the tour is held until the pull
        has landed, and asked again afterwards, when the answer is true. */
-    syncPull(false)
-      .then(r=>{ if(!r.applied&&!r.pushedInstead&&r.empty&&bookHasContent(D))return syncPush(); })
-      .catch(e=>setSyncStatus('✗ '+e.message,'neg'))
-      .finally(()=>{ _firstPull=false; try{ maybeStartTour(); }catch(e){} });
+    /* TWO DIFFERENT OPENINGS, AND THE DIFFERENCE IS WHETHER THERE IS ANYTHING HERE.
+       With the book held on the worker there is nothing here after a reload, so the pull is not a
+       refresh of a copy already on screen: it IS the book, and a push before it lands would put a
+       default record over the real one. So that case forces the pull, blocks pushes until it
+       resolves, and says on screen that it is waiting.
+       A device still keeping its own copy (no code, a paused code, a book held for someone else, the
+       sandbox) keeps the old unblocking behaviour, because there the local copy is the account and
+       a slow worker must never stand between a person and their own data. */
+    if(serverIsHome()&&!bookHasContent(D)){
+      _serverCopyUnknown=true;
+      bringBookDown()
+        .catch(e=>{ setSyncStatus('✗ '+e.message,'neg'); showBookUnreachable(e); })
+        .finally(()=>{ _firstPull=false; try{ maybeStartTour(); }catch(e){} });
+    }else{
+      syncPull(false)
+        .then(r=>{ if(!r.applied&&!r.pushedInstead&&r.empty&&bookHasContent(D))return syncPush(); })
+        .catch(e=>setSyncStatus('✗ '+e.message,'neg'))
+        .finally(()=>{ _firstPull=false; try{ maybeStartTour(); }catch(e){} });
+    }
   }
   /* No sync on this device: nothing is coming, so release the tour rather than suppress it. */
   if(!syncActive()&&_firstPull){ _firstPull=false; try{ maybeStartTour(); }catch(e){} }
@@ -3527,7 +3617,7 @@ function resetTransientState(){
   const ss=document.getElementById('scorecardSummary');if(ss)ss.innerHTML='';
   /* The record strip, the drift table and the trade-impact panel are all per-account. Leaving any of
      them on screen after a switch would show one client's numbers under another client's name. */
-  const cr=document.getElementById('cmdRecord');if(cr)cr.innerHTML='';
+  const cr=document.getElementById('dashRecord');if(cr)cr.innerHTML='';
   const db=document.getElementById('driftBody');if(db)db.innerHTML='';
   const dc=document.getElementById('driftCount');if(dc)dc.textContent='';
   const ti=document.getElementById('tradeImpact');if(ti)ti.innerHTML='';
@@ -3765,9 +3855,6 @@ const TOUR=[
   { tab:'dashboard', tag:'Dashboard', cls:'t-blue',
     q:'Where things stand.',
     body:'What you own is worth this much today. The graph starts empty, because the terminal only knows what happens from the day you start. It fills in from here.' },
-  { tab:'command', tag:'Command', cls:'t-blue',
-    q:'Your morning, in one button.',
-    body:'Press <b>Run review</b>. The terminal pulls prices, checks everything you own and watch, and lists what needs you. Most days the list is empty. That is the right answer, not a problem.' },
   { tab:'portfolio', tag:'Portfolio', cls:'t-green',
     q:'What you own, and how much to buy.',
     body:'Add your holdings here. Before you buy more, <b>Before You Trade</b> shows what the purchase does to your concentration and your cash. Being right about the company and wrong about the size is how accounts end.' },
@@ -4057,7 +4144,7 @@ function showTab(t){
   /* Only News keeps a timer, and only while it is the open tab. */
   if(t==='news')newsLiveOn(); else newsLiveOff();
   if(t==='map'){drawMap();renderRelList();}
-  if(t==='command')renderCommand();
+  if(t==='dashboard')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
   if(t==='risk')renderAttribution();
   if(t==='projections')renderHerizen();
@@ -11888,6 +11975,11 @@ function backupState(){
   if(typeof isDemoUser==='function'&&isDemoUser())return null;   // sandbox data is disposable
   const hasData=(D.holdings||[]).length>0||(D.calls||[]).length>0||(D.transactions||[]).length>0;
   if(!hasData)return null;
+  /* ASKING FOR A BACKUP OF SOMETHING ALREADY KEPT ELSEWHERE IS NOISE, AND NOISE TEACHES PEOPLE TO
+     DISMISS THE BANNER THAT WILL ONE DAY MATTER. The condition is deliberately the acknowledgement
+     and not merely the setting: syncedAt is set only when the worker confirmed a write, so a device
+     that has sync switched on but has never actually got a push through is still told to export. */
+  if(typeof serverIsHome==='function'&&serverIsHome()&&(D.syncedAt||0)>0&&!_serverCopyUnknown)return null;
   const last=D.lastExportAt||0;
   const days=last?(Date.now()-last)/86400000:null;
   if(!last)return{level:'never'};
@@ -13426,11 +13518,9 @@ function toggleCmdRow(i){
 function renderCommand(){
   const el=document.getElementById('commandQueue');
   if(!el)return;
-  const g=document.getElementById('cmdGreeting'),sub=document.getElementById('cmdSub');
-  const hour=new Date().getHours();
-  const period=hour<5?'evening':hour<12?'morning':hour<17?'afternoon':'evening';
-  const name=(D.displayName&&D.displayName.trim().split(' ')[0])||(USER?USER.split('@')[0]:'');
-  if(g)g.textContent=dateLine();
+  /* The greeting moved out: the Dashboard's own date line sits above this, and two of them was the
+     visible half of the duplication that got Command removed. */
+  const sub=document.getElementById('cmdSub');
 
   renderRecordStrip();
   renderMarksDue();
@@ -16055,7 +16145,10 @@ async function runSelfTest(){
 function renderRecordStrip(){
   if(!D)return;
   const html=recordStripHTML();
-  ['cmdRecord','dashRecord'].forEach(id=>{
+  /* One strip, on the Dashboard. There were two ids here while Command was its own screen and each
+     screen carried one; after the merge both landed on the same page and rendered the same strip
+     twice. The loop stays because it costs nothing and reads as the list it is. */
+  ['dashRecord'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.innerHTML=html;
   });
@@ -16599,6 +16692,10 @@ function enableCodeSync(){
   if(!inv)return toast('This profile has no invite code on record.');
   syncCfg={url:INVITE_WORKER,code:inv};
   localStorage.setItem(SYNC_CFG_KEY,JSON.stringify(syncCfg));
+  /* serverIsHome() is true from here, so this write is what takes the book off this disk. It is safe
+     to do before the push because the same write leaves the book under PENDING_KEY, and syncNow
+     below is what turns that into a copy on the account. */
+  persistDB();
   setSyncStatus('Connecting with your invite code…');
   refreshMarketDataCard();refreshCodeSyncOffer();
   syncNow();
@@ -16610,15 +16707,27 @@ function refreshCodeSyncOffer(){
   const demo=(typeof isDemoUser==='function'&&isDemoUser());
   el.style.display=(inv&&!syncActive()&&!demo)?'block':'none';
 }
-function disableSync(){
+/* TURNING THIS OFF MOVES THE BOOK, IT DOES NOT JUST MUTE A TIMER.
+   While sync is on, the worker is the only place the book is kept and this browser holds a shell.
+   Switching off therefore has to put the book back onto this device in the same breath, or the
+   account would appear to empty itself. So: push what is unsent while there is still somewhere to
+   push it, then drop the config, then write the whole book to disk with serverIsHome() now false.
+   The wording says which of the two homes is being chosen, because that is the actual decision. */
+async function disableSync(){
   try{ const p=DB.profiles[USER]; if(p&&codeSyncActive()){ p.codeSyncDeclined=Date.now(); persistDB(); } }catch(e){}
-  if(!confirm('Turn off sync on this device? Your data stays here and stays in the cloud, this device just stops talking to it.'))return;
+  if(!confirm('Keep this book on this device instead of on your account?\n\nRight now it is kept on your account, which is what lets you sign in on another device and what survives this browser being cleared. Turn that off and this browser becomes the only copy: clearing it, or Safari evicting it after a week unopened, loses the book.\n\nYour account keeps the copy it already has.'))return;
+  try{ if(syncActive()&&!isDemoUser())await syncPush(); }catch(e){ /* said below; the local write is what matters now */ }
   localStorage.removeItem(SYNC_CFG_KEY);
   syncCfg=null;
+  /* serverIsHome() is false from here, so this is the write that puts the whole book on disk. */
+  if(USER&&D&&DB.profiles[USER]){ DB.profiles[USER].data=D; persistDB(); }
+  _pending=null; try{ localStorage.removeItem(PENDING_KEY); }catch(e){}
+  _serverCopyUnknown=false;
+  bookBanner('');
   renderSyncDevices([]);
-  setSyncStatus('Sync is off on this device.');
+  setSyncStatus('Kept on this device only.');
   refreshMarketDataCard();
-  toast('Sync turned off here.');
+  toast('This book is now kept on this device only.');
 }
 function syncPayloadFromD(){
   // Straight copy of the profile. Nothing device-specific lives in D, so nothing needs stripping.
@@ -17139,6 +17248,63 @@ async function syncFetch(method,slot,body){
   }
   return res.json();
 }
+/* ===== THE BOOK IS ON ITS WAY, AND THAT IS VISIBLE =====
+   Nothing is kept on this disk, so between opening the terminal and the pull landing there is
+   genuinely no book to draw. An empty screen in that gap reads as an empty account, which is the
+   single most alarming thing this product could say to someone who has just paid for it. So the gap
+   is labelled, and a failure to cross it is labelled differently and louder. */
+function bookBanner(html,cls){
+  let el=document.getElementById('bookArriving');
+  if(!html){ if(el)el.remove(); return; }
+  if(!el){
+    el=document.createElement('div'); el.id='bookArriving'; el.setAttribute('role','status');
+    el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:9000;padding:9px 14px;text-align:center;font-family:var(--mono);font-size:12.5px;line-height:1.5';
+    document.body.appendChild(el);
+  }
+  const bad=cls==='neg';
+  el.style.background=bad?'#38100f':'#0f1e2b';
+  el.style.color=bad?'#ffbcbc':'#cfe3f5';
+  el.style.borderBottom='1px solid '+(bad?'#7d2a29':'#26445e');
+  el.innerHTML=html;
+}
+/* A pull that failed is not an empty account, and the difference has to be said out loud, because
+   the consequence is that nothing can be saved until it is fixed. */
+function showBookUnreachable(e){
+  _serverCopyUnknown=true;
+  bookBanner('Your book is kept on your account, and this device could not reach it just now. '+
+    '<b>Nothing will be saved over it</b> until it arrives. '+
+    '<button type="button" onclick="retryBookPull()" style="margin-left:8px;font:inherit;padding:2px 9px;border:1px solid currentColor;border-radius:5px;background:transparent;color:inherit;cursor:pointer">Try again</button>'+
+    '<div style="opacity:.75;margin-top:3px">'+esc(String((e&&e.message)||e||''))+'</div>','neg');
+}
+/* The edit that never landed. It is only newer than the worker's copy if it was stamped after the
+   last acknowledgement, and if it is not, it is a stale copy of something already saved and is
+   dropped rather than replayed over newer work from the other device. */
+function applyPendingEdit(){
+  if(!_pending||!_pending.data||_pending.user!==USER)return false;
+  const at=_pending.at||0;
+  if(at<=(D.syncedAt||0)){ _pending=null; try{ localStorage.removeItem(PENDING_KEY); }catch(e){} return false; }
+  D=mergeRecordInto(Object.assign(defaultData(),_pending.data),D);
+  D.lastLocalEdit=at;
+  if(DB.profiles[USER])DB.profiles[USER].data=D;
+  _pending=null;
+  persistDB();
+  enterSession();
+  toast('A change from last time had not reached your account yet. It has now.');
+  return true;
+}
+/* Pulls the book, releases the push guard, replays anything unsent, and clears the banner. Shared by
+   the first open and the Try again button so both take exactly the same path. */
+async function bringBookDown(){
+  bookBanner('Bringing your book down from your account\u2026');
+  await syncPull(true);
+  _serverCopyUnknown=false;
+  const replayed=applyPendingEdit();
+  bookBanner('');
+  if(replayed||bookHasContent(D))await syncPush();
+}
+async function retryBookPull(){
+  try{ await bringBookDown(); }catch(e){ showBookUnreachable(e); }
+}
 async function syncPush(){
   /* THE GUARD THAT MATTERS. The test account's credentials are public, so if it could push, anyone
      holding a sync key could overwrite the real portfolio with demo holdings — and last-write-wins
@@ -17146,6 +17312,12 @@ async function syncPush(){
   if(isDemoUser()){setSyncStatus('Test account. Sync is disabled here.','muted');return{skipped:true};}
   if(syncBlockedReason()){setSyncStatus(syncBlockedMessage(),'muted');return{skipped:true,blocked:true};}
   if(!syncActive()||!D)return;
+  /* THE GUARD THAT THE SERVER-HELD BOOK CREATES. Nothing is kept on this disk any more, so a reload
+     starts from an empty shell and D is a default book until the pull lands. Pushing that would put
+     a blank record over a real one, and last-write-wins would make it permanent. So no push may
+     leave here until a pull has said what the worker holds. Cleared in finishLogin, whatever the
+     pull's answer is, including "nothing yet". */
+  if(_serverCopyUnknown){setSyncStatus('Waiting for your book to arrive before saving up.','muted');return{skipped:true,unknown:true};}
   const slot=await syncSlotId();
   /* One extra read before every push. Without it this device's copy of the record overwrites
      whatever the Worker or another device stamped since, which is the exact loss D4 exists to
@@ -17159,8 +17331,10 @@ async function syncPush(){
   await syncFetch('PUT',slot,JSON.stringify(payload));
   D.syncedAt=stamp;
   DB.profiles[USER].data=D;
+  /* syncedAt is now ahead of lastLocalEdit, so this write is what removes the pending copy. */
+  _pending=null;
   persistDB();
-  setSyncStatus('✓ Synced '+new Date(stamp).toLocaleTimeString());
+  setSyncStatus('✓ Saved to your account '+new Date(stamp).toLocaleTimeString());
 }
 /* force=true skips the "are you sure" and always takes the cloud copy. */
 async function syncPull(force){
@@ -17220,7 +17394,11 @@ async function syncNow(){
   }finally{syncing=false;}
 }
 /* saveDB() fires on nearly every interaction. Cloudflare's KV free tier allows 1,000 writes a day,
-   so pushing on every save would burn through it in an afternoon. This waits for a lull instead. */
+   so pushing on every save would burn through it in an afternoon. This waits for a lull instead.
+   SHORTENED FROM EIGHT SECONDS TO TWO AND A HALF (2026-09-28), because the debounce is now the exact
+   length of time a change exists only in this browser. Eight seconds of that was acceptable when the
+   browser was the home and the push was a backup; it is not when the push is the save. Two and a
+   half still collapses a burst of typing into one write, so the quota argument above survives. */
 function scheduleSync(){
   if(isDemoUser())return;   // nothing queued, so nothing can fire after a tab switch either
   if(syncBlockedReason())return;              // F1: the timer is the path a hidden button misses
@@ -17228,7 +17406,7 @@ function scheduleSync(){
   if(syncTimer)clearTimeout(syncTimer);
   syncTimer=setTimeout(()=>{
     syncPush().catch(e=>setSyncStatus('✗ '+e.message,'neg'));
-  },8000);
+  },2500);
 }
 function flushSync(){
   if(!syncActive()||!syncTimer)return;
@@ -17369,7 +17547,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 /* Sidebar disclosure (see the v2-surface styles). */
 (function(){
   var nav=document.querySelector('nav'); if(!nav) return;
-  var ADV=['command','watchlist','market','news','map','world','screener','risk','projections','alerts','clients'];
+  var ADV=['watchlist','market','news','map','world','screener','risk','projections','alerts','clients'];
   ADV.forEach(function(t){ var b=nav.querySelector('button[data-tab="'+t+'"]'); if(b) b.classList.add('pf-adv'); });
   var more=document.createElement('button'); more.type='button'; more.className='pf-more'; more.setAttribute('data-tip','More');
   more.innerHTML='<span class="ico"><svg viewBox="0 0 24 24"><use href="#i-chev"/></svg></span><span class="lbl">More</span>';

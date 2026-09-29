@@ -118,14 +118,18 @@ email, role, what you run) -> *the problem*. FormSubmit delivers it and the work
 
 ## 5. The terminal
 
-`terminal/index.html`. One file, no framework, no build. Edit it directly. 15 tab panes
-(`id="tab-…"`), 14 of which are in `SCREENS` in `site/src/lib/config.ts` — that list is what the
+`terminal/index.html`. One file, no framework, no build. Edit it directly. 14 tab panes
+(`id="tab-…"`), 13 of which are in `SCREENS` in `site/src/lib/config.ts` — that list is what the
 site advertises and **must stay in step with the tabs**.
+
+**Command was removed on 2026-09-29** because it and the Dashboard answered the same question in two
+places. Its action queue was **moved, not deleted**: it is the only screen that says a stop was hit or
+a limit was crossed. It now sits at the top of the Dashboard, above the portfolio value. Pinned in
+`test/run.mjs` under "COMMAND WAS MERGED, NOT DELETED".
 
 | Tab | Answers |
 |---|---|
-| dashboard | Where do things stand today? |
-| command | What needs me this morning, in what order? |
+| dashboard | Where do things stand today, and what needs me first? (the action queue moved here from Command, 2026-09-29) |
 | portfolio | What do I own, at what cost, against which limits? |
 | watchlist | *(shown as "Lists")* Which of the names I watch clear my bars? |
 | history | How do I actually behave: hold times, early sales, rule adherence? |
@@ -156,6 +160,10 @@ copy of the page or an expired session. An account opened this way is keyed
 `<code>@code.perceptfolio` and is labelled "Code ABCDE-12345", never greeted as a name.
 
 ### Where the data lives
+
+**Changed 2026-09-28: the worker, not the browser.** `localStorage` keeps a profile shell
+(`SHELL_FIELDS`) and the single unacknowledged edit (`pf_unsent_v1`), nothing else. See
+`serverIsHome()`, `writeStore()` and `test/serverstore.mjs`, and the long note in WHAT-TO-ADD.md.
 
 **On the worker, under the access code.** `uslot:<code>` holds the whole profile. The browser keeps
 a copy for speed and offline. Sync is on by default for any profile with a code, pulls on sign-in,
@@ -313,14 +321,31 @@ owner is faster and more reliable than this suite.
 - **The news watcher still emails.** The owner asked for a notification from the terminal instead,
   which is built (`setNewsAlerts` / `announceNews`, fires while the terminal is open). The `*/15`
   cron still runs and tries to email. Either give it Web Push properly, or remove the cron.
-- **No mail is configured.** `RESEND_API_KEY` and `MAIL_FROM` are unset, so every notice falls back
-  to Cloudflare Email Routing, which only delivers to a **verified destination address** on the
-  account. Notices to a subscriber's own address need Resend.
-- **`STRIPE_PRICE_BUSINESS_MONTHLY` and `..._YEARLY` are dead secrets** for a plan that no longer
-  exists. Safe to delete.
+- ~~**No mail is configured.**~~ **Done 2026-09-28.** `RESEND_API_KEY` and `MAIL_FROM` are set and
+  proved with a real send (`/request` returns `notified: "sent"`). Resend delivers to any address;
+  the Email Routing fallback in `sendPlain` remains for a worker with no Resend key.
+- ~~**Stripe is test mode.**~~ **Live from 2026-09-29.** Live restricted key, both live prices, live
+  webhook with **Events from: Your account**. `/checkout` returns `cs_live_` sessions.
+- **The card statement says "Terminal", not PerceptFolio.** Stripe's checkout page names the product
+  `Terminal`, and the statement descriptor follows the account setting. A $760 line item from a name
+  the buyer does not recognise is how a chargeback starts. Set the descriptor to `PERCEPTFOLIO` in
+  Stripe → Settings → Business → Public details. **Cheapest unfixed money risk on the list.**
+- **The 3-day trial has no day-2 reminder.** `TRIAL_DAYS = 3` in worker.js; Stripe charges on day 4
+  on its own. Nothing warns the buyer the day before. This is both the decent thing and the single
+  largest reducer of disputes on an auto-converting trial. Stripe can send it (Settings → Billing →
+  Subscriptions and emails → trial ending) or the `40 21` cron can.
+- ~~**`STRIPE_PRICE_BUSINESS_*` are dead secrets.**~~ **Deleted 2026-09-29.**
 - **`SUPPORT_LIVE` is false** in `site/src/lib/config.ts` until Email Routing forwards
   `support@perceptfolio.com`.
 - **Finnhub commercial plan** is due at 5 live grants.
+- **A trial cannot show the product's own claim, and the trial is three days.** The record needs
+  marked calls before it says anything, and the only fast source of evidence, an imported broker CSV,
+  is stored as `imported: true` and deliberately **never graded** (`applyTradesCsv`), because a call
+  this terminal did not make must never appear as one it marked. That rule is right and should stay.
+  What is missing is a second, clearly separate read-only view over imported history, which answers
+  "how did your past decisions actually do" without entering the hash-chained record. Without it a
+  trialist sees "not enough data yet" for all three days. **This is now the highest-value product
+  gap, because the trial created it.**
 - Notifications reach a terminal that is **open**, including a background tab. Not a closed one.
   That needs Web Push and a VAPID key pair on the worker.
 

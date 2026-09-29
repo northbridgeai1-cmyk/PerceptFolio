@@ -227,6 +227,38 @@ t('the calls-a-quarter meter projects nothing under a fortnight and counts the w
 t('a review says where it has got to, and both buttons come back to their own labels', /function reviewProgress\(sym,n,total\)/.test(term) && /reviewProgress\(s,\+\+done,toScore\.length\)/.test(term) && /paced to stay inside the data limit/.test(term) && /\(_reviewBtns\|\|\[\]\)\.forEach\(x=>\{ x\.b\.disabled=false; x\.b\.textContent=x\.label; \}\)/.test(term) && /id="refreshBtn"/.test(term));
 t('Finnhub calls wait their turn under the minute ceiling and a 429 is retried once', /const FH_PER_MIN=55;/.test(term) && /function fhWait\(\)/.test(term) && /const w=fhWait\(\); if\(w\)await sleep\(w\);/.test(term) && (term.match(/if\(_retried\)throw new Error\('RATE_LIMIT'\); await sleep\(2500\); return fh\(path,true\);/g) || []).length === 2);
 t('a failed score says which failure it was, never "No data" for a rate limit', /sc\.error==='RATE_LIMIT'\?'Not scored yet, too many at once'/.test(term) && /sc\.error==='NO_KEY'\?'Needs market data'/.test(term) && !/if\(sc\.error\)return\{label:'No data'/.test(term));
+/* ==================== COMMAND WAS MERGED, NOT DELETED (2026-09-29) ====================
+   The owner removed Command because it and the Dashboard were answering the same question in two
+   places. The queue itself is not redundant: it is the only screen that says a stop was hit or a
+   limit was crossed, and deleting it would have removed the safety net along with the duplication.
+   So these check the merge rather than the deletion. */
+t('the Command screen is gone from the terminal, the nav and the advertised screens',
+  !/id="tab-command"/.test(term) && !/navCommand/.test(term) && !/data-tab="command"/.test(term) &&
+  !/'command'/.test(read('site/src/lib/config.ts')));
+t('its action queue survived, inside the Dashboard',
+  term.indexOf('<div id="tab-dashboard">') < term.indexOf('<div id="commandQueue"></div>') &&
+  term.indexOf('<div id="commandQueue"></div>') < term.indexOf('<div id="tab-portfolio"'));
+/* MOVED TO THE FOOT ON 2026-09-29, on the owner's instruction, and the reading behind it is the
+   better one: the Dashboard is read top to bottom as a standing report, and the queue is what you act
+   on having read it, not before. Pinned in the new direction so the old placement cannot drift back
+   in unnoticed. */
+t('and it sits at the foot, below the portfolio value and the graphs',
+  term.indexOf('<div id="commandQueue"></div>') > term.indexOf('id="dTotal"') &&
+  term.indexOf('<div id="commandQueue"></div>') > term.indexOf('id="signalsList"'));
+t('it is dressed as a section and a card like everything else on that screen, not as a page head',
+  /<div class="section-title">What needs you<\/div>\s*\n\s*<div class="card" id="queueCard">/.test(term) &&
+  !/class="cmd-head"/.test(term));
+t('the record strip is rendered once, not twice on the same screen',
+  (term.match(/id="dashRecord"/g)||[]).length === 1 && !/id="cmdRecord"/.test(term) &&
+  /\['dashRecord'\]\.forEach/.test(term));
+t('the walkthrough points at where the button actually is',
+  /It is under <b>What needs you<\/b>, at the foot of this screen\./.test(term));
+t('the Run review button came with it',
+  term.indexOf('id="cmdRunBtn"') < term.indexOf('<div id="commandQueue"></div>'));
+t('there is one date line on the Dashboard, not two',
+  (term.match(/getElementById\('greetingText'\)/g)||[]).length >= 1 && !/cmdGreeting/.test(term));
+t('nothing still sends anyone to the screen that was removed', !/showTab\('command'\)/.test(term));
+
 t('the release calendar sits below the queue and folds after three lines', term.indexOf('<div id="commandQueue"></div>') < term.indexOf('<div id="econCal" class="md"></div>') && /const head=rel\.slice\(0,3\), rest=rel\.slice\(3\);/.test(term) && /more in the next thirty days/.test(term));
 t('the device cap is one constant, two, and the terminal shows the server\'s number', /const DEVICE_LIMIT = 2;/.test(worker) && !/limit: 2 \}/.test(worker) &&   /* the number is the constant, never a literal in an answer */ /lim=\(j&&j\.limit\)\|\|2/.test(term) && /on two devices: a desk and a pocket/.test(term));
 t('a full code names the screen that frees a slot', /On either of them open Settings, Sync across your devices, and forget the one you no longer use/.test(worker));
@@ -900,14 +932,49 @@ G('A rename must throw, not wipe');
 t('the key literal is asserted at boot', /if\(STORE_KEY!=='quantfolio_v1'\)\{[\s\S]{0,160}?throw new Error/.test(term));
 t('the assertion refuses to boot rather than warning', /Refusing to boot/.test(term));
 /* A guard on saveDB protected nothing while ten call sites wrote localStorage directly. */
-/* Exactly one: inside persistDB. A blanket rewrite once pointed persistDB's own write back at
-   itself, which the assertion below is shaped to catch as well as the original leak. */
+/* Still exactly one FUNCTION, now with two writes inside it: the shell, and the unsent edit. The
+   assertion is therefore on containment rather than on a count of one — every localStorage write of
+   either key has to fall inside writeStore's body, which is what makes the profile-count guard and
+   the quota catch in persistDB unbypassable. Written as "outside the body, there are none" so that
+   adding a write anywhere else in the file fails this, whatever it looks like. */
+const _wsBody = (() => {
+  const at = term.indexOf('function writeStore(){');
+  if (at < 0) return null;
+  const end = term.indexOf('\n}', at);
+  return end < 0 ? null : term.slice(at, end + 2);
+})();
+t('writeStore still exists as the one write function', !!_wsBody);
 t('the store is written from exactly one place',
-  (term.match(/localStorage\.setItem\(STORE_KEY/g)||[]).length === 1);
+  !!_wsBody &&
+  (_wsBody.match(/localStorage\.setItem\(STORE_KEY/g)||[]).length === 2 &&
+  (term.match(/localStorage\.setItem\(STORE_KEY/g)||[]).length === 2);
+t('the unsent-edit copy is written from that same one place and nowhere else',
+  !!_wsBody &&
+  (_wsBody.match(/localStorage\.setItem\(PENDING_KEY/g)||[]).length === 1 &&
+  (term.match(/localStorage\.setItem\(PENDING_KEY/g)||[]).length === 1);
 t('that one place is reached only through the guarded path, not by recursing into it',
-  /function writeStore\(\)\{ localStorage\.setItem\(STORE_KEY,JSON\.stringify\(DB\)\); \}/.test(term) &&
   (term.match(/writeStore\(\)/g)||[]).length === 3 &&
+  !/function writeStore\(\)\{[\s\S]{0,700}?writeStore\(\);/.test(term) &&
   !/function persistDB\(opts\)\{[\s\S]{0,900}?\n\s*persistDB\(\);/.test(term));
+/* THE BOOK ITSELF MUST NOT BE IN THE SHELL. The shell is built by naming the fields to keep, so the
+   test names the fields that must never appear: a `data` key would put the whole book back. */
+t('the shell written to disk carries no book',
+  /const SHELL_FIELDS=\[/.test(term) &&
+  !/SHELL_FIELDS=\[[^\]]*'data'/.test(term) &&
+  /SHELL_FIELDS\.forEach\(k=>\{ if\(p\[k\]!==undefined\)keep\[k\]=p\[k\]; \}\)/.test(term));
+/* The unsent copy has to disappear on its own when the push lands, or "not kept in the browser" is
+   false for as long as the tab stays open. It is keyed off the two stamps, not off a caller. */
+t('the unsent copy exists only while the edit is unsent',
+  /const unsent=!!\(USER&&D&&\(D\.lastLocalEdit\|\|0\)>\(D\.syncedAt\|\|0\)\)/.test(term) &&
+  /else try\{ localStorage\.removeItem\(PENDING_KEY\); \}catch\(e\)\{\}/.test(term));
+/* A device that could not read the account must not write to it: D is a default book at that point
+   and last-write-wins would make the overwrite permanent. */
+t('no push leaves a device that has not yet read the account',
+  /let _serverCopyUnknown=false;/.test(term) &&
+  /if\(_serverCopyUnknown\)\{setSyncStatus\('Waiting for your book to arrive before saving up\.'/.test(term));
+t('a book still held only on this device keeps being written here in full',
+  /if\(!serverIsHome\(\)\)\{ localStorage\.setItem\(STORE_KEY,JSON\.stringify\(DB\)\); return; \}/.test(term) &&
+  /function serverIsHome\(\)\{[\s\S]{0,300}?isDemoUser\(\)\)return false;/.test(term));
 t('every write goes through the guarded path', (term.match(/persistDB\(/g)||[]).length >= 10);
 t('the profile count is captured from what was actually on disk', /_profileCount=Object\.keys\(DB\.profiles\)\.length/.test(term));
 t('a write that would lose a profile is refused', /n<_profileCount&&!o\.deleting/.test(term));
@@ -1294,11 +1361,25 @@ G('M3: the public site, same rules as the page it replaces');
   /* Comments are stripped first: the figure is explained at length in the source of config.ts and
      Subscription.tsx, which is where an explanation belongs, and a comment ships to nobody. What
      must not exist is a rendered one. */
+  /* SCOPED, NOT WEAKENED (2026-09-29). The rule is that nobody is shown a figure before a person has
+     read what they run and replied with one. /welcome is the other side of that: it is reached only
+     by completing a Stripe checkout, and it is where a three-day trial has to state what will be
+     charged and when. Saying the price there is not selling, it is the disclosure that makes the
+     trial honest, and leaving it out to satisfy this test would be the actual harm.
+     So the marketing pages are checked as before, and /welcome is checked for the opposite. */
+  const MARKETING = f => !/pages\/Welcome\.tsx$/.test(f);
+  const shippedMarketing = walk('site/src').filter(f => /\.(tsx|ts)$/.test(f) && MARKETING(f))
+    .map(f => fs.readFileSync(f, 'utf8')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
   t('site: no page renders a price, and Pricing.tsx is gone', (() => {
-    const shipped = src.replace(/\/\*[\s\S]*?\*\//g, '');
     return !fs.existsSync(path.join(ROOT, 'site/src/pages/Pricing.tsx'))
-      && !/PLAN\.(monthly|yearly)/.test(shipped)
-      && !/\$\s?760|8,360|8360/.test(shipped.replace(/export const PLAN[^;]*;/, ''));
+      && !/PLAN\.(monthly|yearly)/.test(shippedMarketing)
+      && !/\$\s?760|8,360|8360/.test(shippedMarketing.replace(/export const PLAN[^;]*;/, ''));
+  })());
+  t('site: the one page that must show a figure is the one reached only by paying', (() => {
+    const w = read('site/src/pages/Welcome.tsx');
+    return /PLAN\.yearly/.test(w) && /PLAN\.monthly/.test(w)
+      && /unless you cancel before then/.test(w)
+      && /const trialing = !!\(c && c\.status === 'trialing' && c\.trialEnd\);/.test(w);
   })());
   t('site: the subscription page sells what is included and ends in the one action', /What is included/.test(read('site/src/pages/Subscription.tsx')) && (read('site/src/pages/Subscription.tsx').match(/Request a demo/g) || []).length >= 2);
   t('site: /pricing still resolves, so old links and the sitemap do not 404', /path="\/pricing" element=\{<Subscription \/>\}/.test(read('site/src/main.tsx')) && /path="\/subscription" element=\{<Subscription \/>\}/.test(read('site/src/main.tsx')));
@@ -1315,12 +1396,27 @@ G('M3: the public site, same rules as the page it replaces');
       && f.indexOf('Tell us about yourself') > f.indexOf('Have you used PerceptFolio before?')
       && f.indexOf('Tell us what you are trying to do') > f.indexOf('Tell us about yourself');
   })());
-  t('site: the form asks for a business email, a role and what they run', /label="Business email"/.test(read('site/src/components/RequestForm.tsx')) && /const ROLES =/.test(read('site/src/components/RequestForm.tsx')) && /const BOOKS =/.test(read('site/src/components/RequestForm.tsx')));
+  /* ANYONE MAY ASK (2026-09-29). "Business email", over a field placeheld you@firm.com, told a private
+     investor in two words that the form was not for them. It always was: Private investor is a role
+     and My own capital is a book type. The audience is narrow because of the price, not because of
+     what anybody does for a living, and the operator makes that call after reading the request, not
+     the form by discouraging them from finishing it. What IS screened is what the terminal would be
+     used for, on the worker, and never who is asking: see test/screen.mjs. */
+  t('site: the form asks for an email, a role and what they run, and does not require a business one', (() => {
+    const f = read('site/src/components/RequestForm.tsx');
+    /* Comments are stripped before the negative half: the reason the old label was wrong is written
+       out at the top of that file, which is where an explanation belongs, and it quotes the words it
+       is explaining. What must not exist is a rendered one. */
+    const shipped = f.replace(/\/\*[\s\S]*?\*\//g, '');
+    return /label="Email"/.test(shipped) && !/label="Business email"/.test(shipped) && !/you@firm\.com/.test(shipped)
+      && /const ROLES =/.test(f) && /const BOOKS =/.test(f)
+      && /'Private investor'/.test(f) && /'My own capital'/.test(f);
+  })());
   t('site: stages two and three stay closed until the first is answered', /\{holder && holder !== 'code' && <>/.test(read('site/src/components/RequestForm.tsx')));
   t('site: the positioning sentence is on the landing page and in the PRD (A0.0)', /Bloomberg tells you everything that is happening\. PerceptFolio tells you whether your decisions worked\./.test(read('site/src/pages/Landing.tsx')) && /Bloomberg tells you everything that is happening\. PerceptFolio tells you whether your decisions worked\./.test(read('PRD.md')));
   t('site: the data tile says market data is built in, not bring your own key (A1.4)', /Market data, built in/.test(read('site/src/pages/Landing.tsx')) && !/Bring your own data key/.test(read('site/src/pages/Landing.tsx')));
   t('site: the record mechanism is on the page with a verify link (A5.2)', /Hash-chained/.test(read('site/src/pages/Landing.tsx')) && /Server-clocked/.test(read('site/src/pages/Landing.tsx')) && /href="\/verify\/"/.test(read('site/src/pages/Landing.tsx')));
-  t('site: the screens are named by the decision each answers (A5.3)', /SCREENS\.map/.test(read('site/src/pages/Landing.tsx')) && (read('site/src/lib/config.ts').match(/\{ id: '[a-z]+', name:/g) || []).length === 14 && !/Clients/.test(read('site/src/lib/config.ts')));
+  t('site: the screens are named by the decision each answers (A5.3)', /SCREENS\.map/.test(read('site/src/pages/Landing.tsx')) && (read('site/src/lib/config.ts').match(/\{ id: '[a-z]+', name:/g) || []).length === 13 && !/Clients/.test(read('site/src/lib/config.ts')));
   t('site: the time-to-evidence line sits under the empty scorecard (A5.5)', /calls a quarter, against the roughly 138 the interval needs/.test(read('site/src/pages/Landing.tsx')));
   t('site: a security sheet and the flat-quarter statement are routed and linked (A2.6, A2.7, A5.6)', /path="\/security"/.test(read('site/src/main.tsx')) && /path="\/flat-quarter"/.test(read('site/src/main.tsx')) && /to="\/security"/.test(read('site/src/components/Footer.tsx')));
   t('site: the support address is one constant, behind a flag until Email Routing exists (A1.5)', /SUPPORT_LIVE \? 'support@perceptfolio\.com' : CONTACT/.test(read('site/src/lib/config.ts')) && /mailto:' \+ SUPPORT/.test(read('site/src/components/Footer.tsx')) && /fetch\(WORKER \+ '\/version'/.test(read('site/src/components/Footer.tsx')));
@@ -1484,7 +1580,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v149/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v152/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2092,13 +2188,18 @@ t('and are restored with their original label', /b\.textContent=b\.dataset\.onli
 /* Empty states on the panels that were blank. */
 t('the analyzer states its empty state in one line', /<div class="empty">Nothing analysed yet\.<\/div>/.test(term));
 t('the command tab explains what a review does', /<b>Not reviewed yet today\.<\/b> Run review pulls prices, checks everything, and lists what needs you\./.test(term));
-/* First run: the door opens on the set-up form with the code filled in; the Dashboard carries Start here with three steps that tick off; the tour is four screens. */
+/* First run: the door opens on the set-up form with the code filled in; the Dashboard carries Start
+   here with three steps that tick off; the tour is three screens.
+   THREE, NOT FOUR, SINCE 2026-09-29. Command was removed and its action queue moved onto the
+   Dashboard, so the tour stop that said "your morning, in one button" was pointing at a screen that
+   no longer exists; the button it describes is now at the top of the Dashboard. */
 /* The form is now the FALLBACK, not the first thing a new device meets: a browser holding a live
    session opens straight on the book. What is left for a saved copy of this page, or an expired
    session, is the old set-up form with the door code filled in. */
 t('a device with no session falls back to the set-up form, code filled in', /function defaultAuthMode\(\)/.test(term) && /setAuthMode\(n\?'in':'up'\)/.test(term) && /openFromSession\(\)\.then\(opened=>\{ if\(!opened\)defaultAuthMode\(\); \}\)/.test(term));
 t('Start here: three steps, each a button, ticked when done, shown until the first review has run', /<h2>Start here<\/h2>/.test(term) && /id="wcStep1"/.test(term) && /id="wcStep3"/.test(term) && /const done1=D\.holdings\.length>0, done2=\(D\.watchlist\|\|\[\]\)\.length>0, done3=!!D\.lastRefresh;/.test(term) && /el\.classList\.toggle\('wc-done',!!ok\)/.test(term));
-t('the tour is four screens in plain sentences', (() => { const t0 = term.indexOf('const TOUR=['); const t1 = term.indexOf('];\nlet tourAt=0;'); const body = term.slice(t0, t1); return (body.match(/\{ tab:'/g) || []).length === 4 && /Your morning, in one button\./.test(body); })());
+t('the tour is three screens in plain sentences, and none of them is a screen that was removed', (() => { const t0 = term.indexOf('const TOUR=['); const t1 = term.indexOf('];\nlet tourAt=0;'); const body = term.slice(t0, t1); return (body.match(/\{ tab:'/g) || []).length === 3 && !/tab:'command'/.test(body) && /Where things stand\./.test(body); })());
+t('the offer to show you around counts the same screens the tour has', /Show me around<\/a>, three screens, one minute\./.test(term));
 t('the audit shows a skeleton rather than a blank panel while it computes',
   /id="auditBody"[^>]*aria-busy="true"/.test(term));
 

@@ -16,8 +16,16 @@ import { WORKER, CONTACT } from '@/lib/config';
    separates a firm that already subscribes from a stranger, which is the difference between a reply
    and a different reply.
 
-   Stage 2 asks for a business email, a role and what they run. Free text was friendlier and told
-   the operator almost nothing; a role and a book type is what makes the reply specific.
+   Stage 2 asks for an email, a role and what they run. Free text was friendlier and told the
+   operator almost nothing; a role and a book type is what makes the reply specific.
+
+   ANYONE MAY ASK (2026-09-29). It used to say "Business email" above a field placeheld with
+   you@firm.com, which told a private investor, in the only two words that mattered, that the form
+   was not for them. It always was: "Private investor" is the fifth role and "My own capital" is the
+   first book type. The audience is narrow because of the price, not because of what anybody does for
+   a living, and the form should make the operator's decision, not make it in advance by discouraging
+   the person from finishing it. What is screened is what the terminal would be used FOR, on the
+   worker, and never who is asking.
 
    Stage 3 is the only question that matters: the problem. One box, no format, stored verbatim.
 
@@ -109,15 +117,15 @@ export function RequestForm() {
             <F id="role" label="Your role"><select id="role" name="role" required defaultValue="" className={sel}><option value="" disabled>Choose one</option>{ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select></F>
           </div>
           <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
-            <F id="email" label="Business email"><Input id="email" name="email" type="email" required placeholder="you@firm.com" autoComplete="email" inputMode="email" onBlur={checkEmail} />
+            <F id="email" label="Email"><Input id="email" name="email" type="email" required placeholder="you@example.com" autoComplete="email" inputMode="email" onBlur={checkEmail} />
               {mailWarn ? <p className="mt-[6px] text-[13.5px] text-red">{mailWarn}</p> : null}</F>
-            <F id="firm" label="Firm" opt><Input id="firm" name="firm" maxLength={120} autoComplete="organization" /></F>
+            <F id="firm" label="Firm or company" opt><Input id="firm" name="firm" maxLength={120} autoComplete="organization" /></F>
           </div>
           <F id="runs" label="What you run"><select id="runs" name="runs" required defaultValue="" className={sel}><option value="" disabled>Choose one</option>{BOOKS.map(b => <option key={b} value={b}>{b}</option>)}</select></F>
         </Step>
 
         <Step n={3} title="Tell us what you are trying to do">
-          <F id="book" label="The book"><Textarea id="book" name="book" required rows={2} className="min-h-[72px]" placeholder="Roughly how large, how many positions, what style: concentrated long, long/short, income, sector focus." /></F>
+          <F id="book" label="The book"><Textarea id="book" name="book" required rows={2} className="min-h-[72px]" placeholder="Roughly how large, how many positions, what style. Your own savings is a perfectly good answer." /></F>
           <F id="who" label="The decision you keep having to make"><Textarea id="who" name="who" required placeholder="What you keep having to decide, and what a written record of it would change." /></F>
           <F id="call" label="A call you would stand behind" opt><Textarea id="call" name="call" rows={2} className="min-h-[64px]" placeholder="e.g. BUY NVDA, target 260, stop 190, by 2027-03-01" /></F>
           <F id="when" label="Best time to talk" opt><Input id="when" name="when" maxLength={120} placeholder="Weekday mornings, US Eastern" /></F>

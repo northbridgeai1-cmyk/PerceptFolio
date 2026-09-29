@@ -738,6 +738,9 @@ async function handle(request, env) {
     const record = {
       id, email, who, call, calls,
       status: 'pending',
+      /* Screened on what it says it is for, never on who is asking. Stored with the request so admin
+         can show it and /decide can refuse to issue a code without a conscious override. */
+      screen: screenRequest([who, call].filter(Boolean).join('\n')),
       createdAt: Date.now(),
       date: new Date().toISOString().slice(0, 10),
       ip: ip.slice(0, 45),
@@ -752,11 +755,18 @@ async function handle(request, env) {
     let notified = { attempted: false };
     if (env.OPERATOR_EMAIL) {
       const q = quoteFor();
-      notified = await sendPlain(env, env.OPERATOR_EMAIL, `Demo request from ${email}`,
-        `${email}\n\nWho and what they run:\n${who}\n${call ? '\nA call they would stand behind:\n' + call + '\n' : ''}\nSuggested quote:\n${q.text}\n\nDecide in admin: ${(env.SITE_URL || 'https://perceptfolio.com')}/admin.html`);
+      const flagged = record.screen && record.screen.level === 'review';
+      const flagLine = flagged
+        ? `** FLAGGED FOR REVIEW: ${record.screen.hits.map(h => h.label).join(', ')} **\nMatched: ${record.screen.hits.map(h => '"' + h.phrase + '"').join(', ')}\nNo code can be issued for this request without an explicit override in admin.\n\n`
+        : '';
+      notified = await sendPlain(env, env.OPERATOR_EMAIL, `${flagged ? '[FLAGGED] ' : ''}Demo request from ${email}`,
+        `${flagLine}${email}\n\nWho and what they run:\n${who}\n${call ? '\nA call they would stand behind:\n' + call + '\n' : ''}\nSuggested quote:\n${q.text}\n\nDecide in admin: ${(env.SITE_URL || 'https://perceptfolio.com')}/admin.html`);
     }
     /* notified says whether the operator was told, so a test from the form shows where mail stands:
-       sent, failed (with the reason), or not configured. Nothing about the visitor is echoed. */
+       sent, failed (with the reason), or not configured. Nothing about the visitor is echoed.
+       AND NOTHING ABOUT THE SCREENING IS ECHOED EITHER. A flagged request gets the same 200 and the
+       same words as any other, because a response that differed would turn the filter into something
+       anyone could probe by rewording until it went quiet, which is worse than not having one. */
     return json({ ok: true, id, notified: notified.attempted ? (notified.ok ? 'sent' : 'failed: ' + (notified.error || notified.status || 'unknown')) : 'not configured' }, 200, env);
   }
 
@@ -771,7 +781,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -2158,6 +2168,21 @@ async function handle(request, env) {
     if (!stored) return json({ error: 'No such request.' }, 404, env);
     const rec = JSON.parse(stored);
 
+    /* THE FLAG IS A STOP, NOT A VETO. Denying a flagged request needs no override, because denying is
+       the safe direction. Issuing a code for one does: the operator has to send override:true, which
+       is them saying they read what was written and it is fine. The refusal names what was matched,
+       so it is a thing to read rather than a wall. Recorded on the request either way. */
+    const flagged = rec.screen && rec.screen.level === 'review';
+    if (flagged && decision !== 'denied' && !body.override) {
+      return json({
+        error: 'This request was flagged and no code can be issued until it is reviewed.',
+        flagged: true,
+        hits: rec.screen.hits,
+        howToProceed: 'Read what they wrote. If it is fine, send the same decision again with override:true.',
+      }, 409, env);
+    }
+    if (flagged && decision !== 'denied') { rec.overriddenAt = Date.now(); rec.overrideNote = clean(body.overrideNote, 500) || null; }
+
     rec.status = decision;
     rec.decidedAt = Date.now();
     rec.note = note;
@@ -2315,8 +2340,22 @@ const GRACE_DAYS = 7;
 const PRICE = { monthly: 760, yearly: 8360 };
 function quoteFor() {
   return { plan: 'terminal', monthly: PRICE.monthly, yearly: PRICE.yearly, discountPct: 0,
-    text: `The terminal: $${PRICE.monthly} a month, or $${PRICE.yearly.toLocaleString()} a year (one month free). One person, one book, your own rules; the record, its server copy if you want it, and the evidence pack. Fourteen-day refund on any payment.\nSupport by email on weekdays, US Eastern, answered the same or the next business day. The site and the service run on Cloudflare's network; the footer of the site measures whether the service is answering; an incident is told to you by email.` };
+    text: `The terminal: $${PRICE.monthly} a month, or $${PRICE.yearly.toLocaleString()} a year (one month free). ${TRIAL_DAYS} days first, with a card but no charge; it bills on day ${TRIAL_DAYS + 1} unless cancelled, and cancelling is one click. One person, one book, your own rules; the record, its server copy if you want it, and the evidence pack. Fourteen-day refund on any payment.\nSupport by email on weekdays, US Eastern, answered the same or the next business day. The site and the service run on Cloudflare's network; the footer of the site measures whether the service is answering; an incident is told to you by email.` };
 }
+
+/* ===== THE THREE DAYS (2026-09-29) =====
+   A card is taken at the start and nothing is charged until day four. That is the owner's choice
+   over a no-card trial, and the reason is cost rather than caution: every account on this terminal
+   spends real money on market data from the first screen it opens, so a trial anyone can take with
+   a throwaway address is a bill with no ceiling. A card also makes the trial self-enforcing. Stripe
+   moves the subscription from trialing to active on its own, the worker already treats both as
+   fully live, and the subscription events already carry the failure cases.
+
+   WHAT THIS OBLIGES US TO SAY. A trial that turns into $760 without another click has to state, in
+   plain words and before the card is entered, what will be charged and when. Stripe's own checkout
+   page says it; so does the code email, the welcome page and the quote. Three days is short enough
+   that "I forgot" is a real thing that will happen to somebody, so the date is given as a date. */
+const TRIAL_DAYS = 3;
 
 function billingConfigured(env) {
   return !!(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET);
@@ -2336,6 +2375,17 @@ async function stripe(env, path, params) {
   return { ok: r.ok, status: r.status, j };
 }
 
+/* Retrieving is a GET, and stripe() above is POST-only because until now nothing needed to read
+   anything back. The success page does: it has to say whether the payment actually went through
+   rather than assume it from having been redirected. */
+async function stripeGet(env, path) {
+  const r = await fetch('https://api.stripe.com/v1' + path, {
+    headers: { 'Authorization': 'Bearer ' + env.STRIPE_SECRET_KEY, 'Stripe-Version': '2024-06-20' },
+  });
+  let j = null; try { j = await r.json(); } catch (e) { /* handled by caller */ }
+  return { ok: r.ok, status: r.status, j };
+}
+
 /* Verify a Stripe-Signature header: t=<unix>,v1=<hex>. HMAC-SHA256 over "<t>.<raw body>" with
    the endpoint secret, constant-time compare, five-minute tolerance against replay. */
 async function verifyStripeSignature(rawBody, header, secret) {
@@ -2350,17 +2400,32 @@ async function verifyStripeSignature(rawBody, header, secret) {
   return { ok: safeEqual(hex, v1), why: 'signature' };
 }
 
+/* THE FIRST THING THIS EMAIL SAYS IS WHAT WILL BE TAKEN AND WHEN.
+   The code is what the reader wants and the charge is what they need, so the charge goes above the
+   code rather than in a closing paragraph. A three-day trial is short enough that forgetting is a
+   normal thing to do, so the date is written out as a date and the way to stop it is in the same
+   breath. Nothing here is conditional on the reader being the kind of person who reads to the end. */
 function purchaseEmailBody(rec, code, siteUrl) {
   const plan = (rec.plan || '').includes('yearly') ? 'the terminal, yearly' : 'the terminal, monthly';
+  const amount = (rec.plan || '').includes('yearly') ? '$' + PRICE.yearly.toLocaleString() : '$' + PRICE.monthly;
+  const trialing = rec.status === 'trialing' && rec.trialEnd;
+  const when = trialing ? new Date(rec.trialEnd).toUTCString().replace(/ GMT$/, ' UTC') : '';
+  const head = trialing
+    ? `Your ${TRIAL_DAYS} days start now. Nothing has been charged.
+
+    ${amount} will be charged on ${when}, unless you cancel before then.
+
+Cancelling takes one click in your customer portal, reachable from the terminal's settings, and you keep the terminal until the ${TRIAL_DAYS} days are up.`
+    : `Thank you. Your plan: ${plan}.`;
   return {
-    subject: 'Your PerceptFolio access code',
-    text: `Thank you. Your plan: ${plan}.
+    subject: trialing ? `Your PerceptFolio access code, and your ${TRIAL_DAYS} days` : 'Your PerceptFolio access code',
+    text: `${head}
 
 Your access code is:
 
     ${code}
 
-Open ${siteUrl}/enter/ and type it in. It works on every device you own and stays yours for as long as the subscription runs. Keep it private; anyone holding it can open your terminal.
+Open ${siteUrl}/enter/ and type it in. It works on two devices and stays yours for as long as the subscription runs. Your book is kept on your account rather than in the browser, so it follows you between them. Keep the code private; anyone holding it can open your terminal.
 
 Billing, invoices and cancellation are in your customer portal, reachable from the terminal's settings. If anything is wrong, reply to this email.
 
@@ -2413,6 +2478,14 @@ async function sendPlain(env, to, subject, text) {
    The lookup is DNS-over-HTTPS at Cloudflare's own resolver, cached a week a domain, so the same
    twenty domains everybody uses cost one lookup each. A resolver that cannot be reached ACCEPTS
    the address: refusing a real customer because DNS was slow is the worse failure. */
+/* Enough to recognise, not enough to harvest: first letter, the length hidden, the domain kept
+   because "was it the gmail or the work one" is the actual question a buyer has. */
+function maskEmail(e) {
+  const s = String(e || '');
+  const at = s.lastIndexOf('@');
+  if (at < 1) return '';
+  return s[0] + '\u2022\u2022\u2022\u2022' + s.slice(at);
+}
 const DISPOSABLE = ['mailinator.com', 'guerrillamail.com', '10minutemail.com', 'tempmail.com',
   'throwawaymail.com', 'yopmail.com', 'trashmail.com', 'sharklasers.com', 'getnada.com',
   'temp-mail.org', 'fakeinbox.com', 'maildrop.cc', 'dispostable.com', 'mintemail.com'];
@@ -2453,6 +2526,65 @@ async function emailDeliverable(env, email) {
   if (deliverable === null) return { ok: true, unchecked: true };   // resolver down: never block a real buyer
   try { await env.PF_SYNC.put(ck, deliverable ? '1' : '0', { expirationTtl: 7 * 86400 }); } catch (e) {}
   return deliverable ? { ok: true } : { ok: false, why: 'Nothing at ' + domain + ' can receive mail. Check the spelling.' };
+}
+
+/* ============================ SCREENING WHAT A REQUEST SAYS IT IS FOR ============================
+   Anyone may ask. That is the owner's rule and it did not change: a private individual asking with a
+   Gmail address is as welcome as a fund, and the form no longer implies otherwise.
+
+   What is screened is not WHO asks but WHAT THEY SAY THEY WANT IT FOR. This is a research terminal
+   for securities, so a request that describes insider dealing, manipulation, laundering or evading
+   sanctions is a request to be part of something this cannot be part of, whoever is asking.
+
+   THIS FLAGS. IT DOES NOT REFUSE BY ITSELF, AND THAT IS THE WHOLE DESIGN.
+   Keyword matching on free text is wrong often. "I want to be sure I never front-run my own clients"
+   and "I want to front-run my clients" share every word that matters. An automatic refusal on that
+   evidence would silently lose real customers and tell them nothing, and the operator would never
+   learn it happened. So:
+
+     - the request is STORED, always, exactly as written. Nobody is refused at the door.
+     - the reply is the same reply everyone gets, so the filter cannot be probed by rewording.
+     - the operator sees the flag and the matched phrase in admin, in red.
+     - /decide REFUSES to issue a code for a flagged request unless it is called again with
+       override:true, which is the operator saying they read it and it is fine.
+
+   The negative-context check below is the part that does the real work: the same phrase preceded by
+   avoid, never, prevent, detect, without, compliance and so on is what a careful professional writes,
+   and is not evidence of anything. It is not clever and it will not catch a determined liar. It is
+   not meant to. It is meant to make sure a person reads the ones that are worth reading. */
+const ILLEGAL_PATTERNS = [
+  [/\binsider (?:trading|dealing|information|tips?)\b/i, 'insider dealing'],
+  [/\bmaterial non[- ]?public\b/i, 'material non-public information'],
+  [/\bpump[- ]and[- ]dump\b/i, 'pump and dump'],
+  [/\b(?:market|price|stock) manipulation\b/i, 'market manipulation'],
+  [/\b(?:wash trad|spoof|layering|painting the tape|ramp the (?:price|stock))/i, 'manipulative trading'],
+  [/\bfront[- ]run(?:ning|s|ned)?\b/i, 'front-running'],
+  [/\b(?:money )?launder(?:ing|ed)?\b/i, 'money laundering'],
+  [/\b(?:evad|avoid|bypass|circumvent|get around|dodge|skirt)\w* (?:the )?sanctions?\b/i, 'evading sanctions'],
+  [/\b(?:hide|hiding|conceal(?:ing)?|disguise|shelter) (?:the |my |our )?(?:funds?|money|assets|proceeds|ownership|cash)\b/i, 'concealing funds'],
+  [/\b(?:stolen|illicit|dirty|laundered) (?:funds?|money|assets|crypto|coin)\b/i, 'illicit funds'],
+  [/\bponzi\b|\bpyramid scheme\b/i, 'ponzi or pyramid scheme'],
+  [/\btax (?:evasion|fraud)\b|\bevad\w* tax(?:es)?\b/i, 'tax evasion'],
+  [/\b(?:unregistered|unlicen[cs]ed) (?:broker|dealer|fund|advis[eo]r)\b/i, 'operating unregistered'],
+  [/\bmanag\w* (?:other people'?s?|client) money\b[\s\S]{0,60}?\bwithout\b[\s\S]{0,40}?\b(?:licen[cs]e|registration|regulat)/i, 'managing money unlicensed'],
+  [/\b(?:falsif|forg)\w*[\s\S]{0,25}?\b(?:statements?|records?|returns?|accounts?)\b/i, 'falsifying records'],
+];
+/* A phrase inside one of these is somebody describing what they are careful NOT to do. Checked over
+   the ninety characters before the match, which is long enough to hold a clause and short enough not
+   to reach back into an unrelated sentence. */
+const NOT_INTENT = /\b(?:avoid(?:ing)?|never|not|no|prevent(?:ing)?|detect(?:ing)?|spot(?:ting)?|without|against|prohibit\w*|forbid\w*|illegal|unlawful|complian\w*|regulated|audit\w*|legitimate|legal(?:ly)?|report(?:ing)?|surveillance|protect\w*|guard\w*|risk of|accused|victim of|must not|do not|does not)\b/i;
+
+function screenRequest(text) {
+  const t = String(text || '');
+  const hits = [];
+  for (const [re, label] of ILLEGAL_PATTERNS) {
+    const m = re.exec(t);
+    if (!m) continue;
+    const before = t.slice(Math.max(0, m.index - 90), m.index);
+    if (NOT_INTENT.test(before)) continue;
+    hits.push({ label, phrase: m[0].slice(0, 60) });
+  }
+  return { level: hits.length ? 'review' : 'clear', hits };
 }
 
 /* Mint a code the way /decide does: a 30-day code record that the first /enter burns into a
@@ -2877,17 +3009,66 @@ async function handleBilling(request, env, url) {
       mode: 'subscription',
       'line_items[0][price]': price,
       'line_items[0][quantity]': 1,
-      success_url: `${site}/thanks.html?type=purchase&session_id={CHECKOUT_SESSION_ID}`,
+      /* The page that receives this asks /checkout/confirm what actually happened, so the link has
+         to carry the session id. Stripe substitutes it; the braces are its template, not ours. */
+      success_url: `${site}/welcome?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${site}/#request`,
       allow_promotion_codes: 'true',
       'automatic_tax[enabled]': 'true',
       'metadata[plan]': plan,
       'metadata[tier]': P.tier,
+      /* Stripe collects the card, charges nothing now, and bills on day four by itself. It also
+         renders the trial terms and the first charge date on its own checkout page, which is the
+         disclosure that matters most because it is the one in front of the card field. */
+      'subscription_data[trial_period_days]': TRIAL_DAYS,
     };
 
     const r = await stripe(env, '/checkout/sessions', params);
     if (!r.ok || !r.j || !r.j.url) return json({ error: 'Stripe did not return a checkout page.', detail: r.j && r.j.error && r.j.error.message }, 502, env);
     return json({ url: r.j.url }, 200, env);
+  }
+
+  /* ---- GET /checkout/confirm?session_id=cs_... ----
+     WHAT THE SUCCESS PAGE IS ALLOWED TO SAY. Being redirected to a success URL is not evidence of
+     payment: the URL is guessable, it is in the buyer's history, and a session can be completed with
+     a payment that later fails. So the page asserts nothing and asks here instead, and this answers
+     from Stripe and from what the webhook stored, which are the two authorities that exist.
+
+     THE CODE IS NOT IN THIS RESPONSE, AND THAT IS DELIBERATE. It is the only credential for the
+     account. The session id sits in a browser's address bar and history and leaks through a referrer,
+     so anything reachable with it is effectively public; a code handed out at this route would be a
+     $760-a-month account handed to whoever saw the URL over a shoulder. The code goes by email, to
+     the address that paid, and the page says which address rather than what the code is.
+
+     The email comes back masked for the same reason: enough for "yes, that is my address", not
+     enough to be an address harvested from a guessed session id.
+
+     Rate limited, because it is unauthenticated and it calls Stripe. */
+  if (url.pathname === '/checkout/confirm' && request.method === 'GET') {
+    if (!billingConfigured(env)) return json({ error: 'Billing is not configured.' }, 503, env);
+    const sid = clean(url.searchParams.get('session_id'), 120);
+    /* Shape-checked before a network call, so a scan costs nothing. */
+    if (!/^cs_(test|live)_[A-Za-z0-9]{10,}$/.test(sid)) return json({ error: 'Not a checkout session.' }, 400, env);
+    if (await tooMany(env, request, '/checkout/confirm', 20)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+
+    const r = await stripeGet(env, '/checkout/sessions/' + encodeURIComponent(sid));
+    if (!r.ok || !r.j) return json({ error: 'That checkout could not be looked up.' }, 502, env);
+    const sess = r.j;
+    const paid = sess.payment_status === 'paid' || sess.status === 'complete';
+    const email = (sess.customer_details && sess.customer_details.email) || sess.customer_email || '';
+    const plan = (sess.metadata && sess.metadata.plan) || '';
+
+    /* PROVISIONED IS THE WEBHOOK'S ANSWER, NOT STRIPE'S. Stripe can say paid a second before our
+       webhook has minted anything, and the page needs to tell those two states apart: one is "your
+       code is in your inbox", the other is "wait four seconds". */
+    let provisioned = false, mailed = null, trialEnd = null, status = null;
+    if (sess.customer) {
+      const rec = await env.PF_SYNC.get('sub:' + sess.customer);
+      if (rec) { try { const o = JSON.parse(rec); provisioned = !!o.code; mailed = o.mailed === undefined ? null : !!o.mailed; trialEnd = o.trialEnd || null; status = o.status || null; } catch (e) { /* a malformed record is not provisioned */ } }
+    }
+    /* THE CHARGE DATE IS NOT A DETAIL. Someone three days from a $760 charge is owed the date on the
+       page they land on, not only in an email they may not have opened yet. */
+    return json({ ok: true, paid, provisioned, mailed, email: maskEmail(email), plan, trialDays: TRIAL_DAYS, trialEnd, status }, 200, env);
   }
 
   /* ---- POST /stripe/webhook ---- */
@@ -2913,11 +3094,36 @@ async function handleBilling(request, env, url) {
       if (!customerId || !email) return json({ error: 'Session has no customer or email.' }, 400, env);
       if (await env.PF_SYNC.get('sub:' + customerId)) return json({ ok: true, duplicate: 'customer' }, 200, env);
 
-      const code = await mintCode(env, tier, email, { subscriptionId, customerId, subStatus: 'active' });
-      await env.PF_SYNC.put('sub:' + customerId, JSON.stringify({ customerId, subscriptionId, email, plan: md.plan || null, tier, status: 'active', currentPeriodEnd: null, code, createdAt: Date.now() }));
+      /* ASK, DO NOT ASSUME. This used to hard-code 'active', which was true only while there was no
+         trial. Now the same event arrives for a subscription that is trialing and will not be paid
+         for three days, and the difference decides what the code email and the welcome page say.
+         One extra call, at the one moment in a subscription's life when an extra call is affordable.
+         A failure here falls back to the old assumption rather than leaving a paid account with no
+         code, which is the direction that cannot be undone. */
+      let subStatus = 'active', trialEnd = null, periodEnd = null;
+      if (subscriptionId) {
+        try {
+          const sr = await stripeGet(env, '/subscriptions/' + encodeURIComponent(subscriptionId));
+          if (sr.ok && sr.j) {
+            subStatus = sr.j.status || 'active';
+            trialEnd = sr.j.trial_end ? sr.j.trial_end * 1000 : null;
+            periodEnd = sr.j.current_period_end ? sr.j.current_period_end * 1000 : null;
+          }
+        } catch (e) { /* the fallback above is deliberate */ }
+      }
+      const code = await mintCode(env, tier, email, { subscriptionId, customerId, subStatus, trialEnd });
+      await env.PF_SYNC.put('sub:' + customerId, JSON.stringify({ customerId, subscriptionId, email, plan: md.plan || null, tier, status: subStatus, trialEnd, currentPeriodEnd: periodEnd, code, createdAt: Date.now() }));
       await env.PF_SYNC.put('cust:' + code, customerId);
-      const body = purchaseEmailBody({ plan: md.plan || '' }, code, site);
+      const body = purchaseEmailBody({ plan: md.plan || '', trialEnd, status: subStatus }, code, site);
       const mail = await sendPlain(env, email, body.subject, body.text);
+      /* RECORDED, BECAUSE THE BUYER IS ABOUT TO ASK. The success page can then say "check your inbox"
+         or "the email did not go out, here is how to get your code", which are different sentences
+         and only one of them is true at a time. Written after the code is stored, so a failure here
+         can never be the reason a paid account has no code. */
+      try {
+        const cur = await env.PF_SYNC.get('sub:' + customerId);
+        if (cur) { const o = JSON.parse(cur); o.mailed = !!(mail.attempted && mail.ok); await env.PF_SYNC.put('sub:' + customerId, JSON.stringify(o)); }
+      } catch (e) { /* the subscription and the code are already stored; this is a nicety */ }
       return json({ ok: true, provisioned: true, tier, mail: mail.attempted ? (mail.ok ? 'sent' : 'failed') : 'not configured' }, 200, env);
     }
 
