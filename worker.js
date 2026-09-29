@@ -781,7 +781,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/staffcode', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/staffcode', '/forget', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -2605,6 +2605,97 @@ async function handle(request, env) {
     }
     await env.PF_SYNC.put('req:' + id, JSON.stringify(rec));
     return json({ ok: true, decision, code, mail }, 200, env);
+  }
+
+  /* ---- POST /forget {id} — delete an account and everything hanging off it ----
+     The operator asked to be able to delete an account from admin. This is the one route in the
+     system that destroys a person's data on purpose, so it is written to be boring and complete.
+
+     IT REFUSES WHILE MONEY IS STILL MOVING. If Stripe says the subscription is active, trialing or
+     past due, this answers 409 and does nothing. Deleting somebody's book while their card is still
+     being charged is the worst outcome available here, and silently cancelling their billing from a
+     button labelled Delete is the second worst: a data action must not quietly become a financial
+     one. Cancel it in Stripe, or pause the account, then come back. `force` exists for the case
+     where the operator knows the subscription is already dead and Stripe disagrees, and it comes
+     back in the answer so it is never a silent override.
+
+     THE BROKER CONNECTION GOES FIRST, through brokerForget, which also asks SnapTrade to delete the
+     user. A credential that can read somebody's brokerage must not outlive the account it belonged
+     to, and it is the one piece of this that lives on somebody else's server.
+
+     WHAT IS REMOVED: the book, the record, the marks, the call registry, the chain, the notice
+     preferences, the news-seen log, every API key, the shares and their index, the grant, the
+     unredeemed code, the Stripe customer mapping, the device list, the broker connection, and the
+     request row itself. The answer lists the keys it deleted rather than saying "done", because
+     afterwards there is nothing left to check it against. */
+  if (url.pathname === '/forget' && request.method === 'POST') {
+    const authF = request.headers.get('Authorization') || '';
+    const tokF = authF.startsWith('Bearer ') ? authF.slice(7) : '';
+    if (!safeEqual(tokF, env.SYNC_SECRET)) return json({ error: 'Operator only.' }, 401, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const id = clean(body.id, 40);
+    const stored = await env.PF_SYNC.get('req:' + id);
+    if (!stored) return json({ error: 'No such account.' }, 404, env);
+    const rec = JSON.parse(stored);
+    const code = rec.code || null;
+
+    /* Money first. custId is held for the deletion below: the sub: record carries their email and
+       their code, so a delete that leaves it behind is not a delete. */
+    let custId = null;
+    if (code) {
+      custId = await env.PF_SYNC.get('cust:' + code);
+      if (custId) {
+        const subRaw = await env.PF_SYNC.get('sub:' + custId);
+        if (subRaw) {
+          let sub = null; try { sub = JSON.parse(subRaw); } catch (e) {}
+          const liveStatus = sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'past_due');
+          if (liveStatus && !body.force) {
+            return json({
+              error: 'This account still has ' + (/^[aeiou]/i.test(sub.status) ? 'an ' : 'a ') + sub.status + ' subscription. Cancel it in Stripe first, or pause the account instead.',
+              billing: { status: sub.status, customerId: custId, subscriptionId: sub.subscriptionId || null },
+              howToProceed: 'Cancel in Stripe, then delete here. Send force:true only if you know the subscription is already dead.',
+            }, 409, env);
+          }
+        }
+      }
+    }
+
+    const removed = [];
+    const drop = async k => { await env.PF_SYNC.delete(k); removed.push(k); };
+
+    if (code) {
+      const ident = 'c:' + code;
+      /* The broker first, because it is the only part that lives on somebody else's server. */
+      let broker = null;
+      try { broker = await brokerForget(env, code); } catch (e) { broker = { local: true, remote: false }; }
+
+      /* Every API key, then the list itself. */
+      try {
+        const keys = JSON.parse(await env.PF_SYNC.get('tokens:' + ident) || '[]');
+        for (const t of keys) if (t && t.tok) await drop('tok:' + t.tok);
+      } catch (e) { /* a malformed list still gets its index dropped below */ }
+
+      /* Shares are keyed by a random id, so they are found through this account's own index. */
+      try {
+        const mine = JSON.parse(await env.PF_SYNC.get('shares:' + ident) || '[]');
+        for (const sh of mine) if (sh && sh.id) await drop('share:' + sh.id);
+      } catch (e) { /* same */ }
+
+      for (const k of ['uslot:' + code, 'grant:' + code, 'code:' + code, 'cust:' + code,
+                       'udev:' + code,
+                       'rec:' + ident, 'cmarks:' + ident, 'creg:' + ident, 'chain:' + ident,
+                       'notify:' + ident, 'newsseen:' + ident, 'tokens:' + ident, 'shares:' + ident]) await drop(k);
+      /* The Stripe mirror carries their email and their code. Stripe itself remains the record of
+         the money, which is theirs to keep and ours to stop holding a copy of. */
+      if (custId) await drop('sub:' + custId);
+
+      await drop('req:' + id);
+      return json({ ok: true, deleted: true, code, broker, forced: !!body.force, removed }, 200, env);
+    }
+
+    /* A request that was never granted has no code and nothing hanging off it. */
+    await drop('req:' + id);
+    return json({ ok: true, deleted: true, code: null, removed }, 200, env);
   }
 
   /* ---- POST /staffcode {email, name} — a free, permanent code for the operator and their people ----

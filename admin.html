@@ -231,6 +231,11 @@ function copyBtn(text,label){
   <div class="tabs" id="tabs" style="display:none">
     <button class="tab on" data-f="pending" onclick="setFilter('pending')">Pending <span class="tab-n" id="n-pending"></span></button>
     <button class="tab" data-f="accepted" onclick="setFilter('accepted')">Accepted <span class="tab-n" id="n-accepted"></span></button>
+    <!-- Active and Paused split what Accepted lumps together. Accepted stays, because it is the
+         answer to "did we let this person in", which is a different question from "are they in
+         right now" and is the one the decision history is for. -->
+    <button class="tab" data-f="active" onclick="setFilter('active')">Active <span class="tab-n" id="n-active"></span></button>
+    <button class="tab" data-f="paused" onclick="setFilter('paused')">Paused <span class="tab-n" id="n-paused"></span></button>
     <button class="tab" data-f="denied" onclick="setFilter('denied')">Denied <span class="tab-n" id="n-denied"></span></button>
     <button class="tab" data-f="all" onclick="setFilter('all')">All <span class="tab-n" id="n-all"></span></button>
   </div>
@@ -337,18 +342,22 @@ function render(){
      still counts as granted. */
   /* One plan, so one accepted state. 'personal' and 'business' are what grants recorded before
      2026-09-22; both still count as granted, and nothing new writes them. */
-  const isAccepted=r=>r.status==='granted'||r.status==='personal'||r.status==='business';
-  const match=r=>filter==='all'?true
-    :filter==='pending'?(r.status||'pending')==='pending'
-    :filter==='accepted'?isAccepted(r)
-    :filter==='denied'?r.status==='denied':true;
-  const rows=requests.filter(match);
-
-  const count=f=>requests.filter(r=>f==='all'?true
+  /* 'employee' added 2026-09-29 with the free staff code. It was missing, so a code the operator
+     issued to themselves was granted, live, and invisible in every view except All. */
+  const isAccepted=r=>r.status==='granted'||r.status==='personal'||r.status==='business'||r.status==='employee';
+  const isActive=r=>isAccepted(r)&&!r.paused;
+  const isPaused=r=>isAccepted(r)&&!!r.paused;
+  const test=(f,r)=>f==='all'?true
     :f==='pending'?(r.status||'pending')==='pending'
     :f==='accepted'?isAccepted(r)
-    :r.status==='denied').length;
-  ['pending','accepted','denied','all'].forEach(f=>{
+    :f==='active'?isActive(r)
+    :f==='paused'?isPaused(r)
+    :f==='denied'?r.status==='denied':true;
+  const match=r=>test(filter,r);
+  const rows=requests.filter(match);
+
+  const count=f=>requests.filter(r=>test(f,r)).length;
+  ['pending','accepted','active','paused','denied','all'].forEach(f=>{
     const el=$('n-'+f); if(el)el.textContent=count(f);
   });
   if(!rows.length){
@@ -449,7 +458,15 @@ function render(){
               (isAccepted(r)&&r.code
                 ? '<button class="btn btn-sm" onclick="clearHold(\''+esc(r.code)+'\',\''+esc(r.id)+'\')" title="Let them sign in again now, without waiting out the day">Let them sign in now</button>'
                 : '')+
-              '<button class="btn btn-r btn-sm" onclick="wipe(\''+esc(r.id)+'\')">Remove record</button>'+
+              '<button class="btn btn-sm" onclick="wipe(\''+esc(r.id)+'\')" title="Forget the paperwork only. Their code keeps working.">Remove record</button>'+
+              /* TWO DIFFERENT THINGS, AND THEY USED TO LOOK LIKE ONE. Remove record forgets the
+                 paperwork and leaves the code working, which is right for tidying a queue and wrong
+                 for getting rid of an account. Delete account ends the access and destroys the book,
+                 the record, the keys and the broker connection. Only offered where there is an
+                 account to delete. */
+              (isAccepted(r)&&r.code
+                ? '<button class="btn btn-r btn-sm" onclick="deleteAccount(\''+esc(r.id)+'\',\''+esc(r.code)+'\')" title="End access and destroy their data. Cannot be undone.">Delete account</button>'
+                : '')+
               '<span class="spacer"></span>'+
               '<span class="dim" style="font-size:11.5px" id="s-'+esc(r.id)+'"></span>'+
             '</div></div>')+
@@ -529,8 +546,46 @@ async function setPaused(id,paused){
   }catch(e){ if(st)st.textContent=''; show('connMsg','err','Failed: '+esc(e.message)); }
 }
 
+/* THE ONE ACTION HERE THAT CANNOT BE UNDONE.
+   Two gates, on purpose. The first says in words what goes and states that the person is not told,
+   because they are not: nothing here emails them, and an operator who wants them to know has to say
+   so themselves. The second asks for the code to be typed, which is the difference between deciding
+   to delete this account and clicking OK on a dialog while thinking about something else.
+
+   The worker refuses while Stripe still shows a live subscription. That comes back as a 409 with the
+   status in it, and it is shown as it is rather than as "failed": deleting a book while the card is
+   still being charged is the outcome this whole route exists to avoid. */
+async function deleteAccount(id,code){
+  const rq=requests.find(x=>x.id===id)||{};
+  if(!confirm('Delete this account permanently?\n\n'+
+    (rq.email?rq.email+'\n':'')+'Code '+code+'\n\n'+
+    'This destroys their book, their record and marks, their hash chain, every API key they made, '+
+    'their shared calls and their broker connection. Their code stops working.\n\n'+
+    'It cannot be undone, and they are not told. Nothing here emails them.'))return;
+  const typed=prompt('Type the code to confirm:\n\n'+code);
+  if(typed===null)return;
+  if(String(typed).trim().toUpperCase()!==String(code).toUpperCase())
+    return show('connMsg','err','That did not match. Nothing was deleted.');
+  try{
+    const r=await fetch(base()+'/forget',{method:'POST',headers:hdrs(),body:JSON.stringify({id})});
+    const j=await r.json();
+    if(r.status===409&&j.billing){
+      show('connMsg','err','Not deleted. The subscription is <b>'+esc(j.billing.status)+'</b>. '+
+        esc(j.howToProceed||'')+(j.billing.subscriptionId?' ('+esc(j.billing.subscriptionId)+')':''));
+      return;
+    }
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    await load();
+    const brokerNote=j.broker&&j.broker.local
+      ? (j.broker.remote?' Broker connection deleted at SnapTrade too.'
+                        :' Our broker key is gone; SnapTrade did not confirm, so check there.')
+      : '';
+    show('connMsg','ok','Account '+esc(code)+' deleted. '+(j.removed||[]).length+' records removed.'+brokerNote);
+  }catch(e){show('connMsg','err','Delete failed: '+esc(e.message));}
+}
+
 async function wipe(id){
-  if(!confirm('Remove this record permanently? The invite code, if one was issued, stays valid.'))return;
+  if(!confirm('Remove this record permanently?\n\nThis forgets the paperwork only. Their code keeps working and their account is untouched. To end the access as well, use Delete account.'))return;
   try{
     const r=await fetch(base()+'/requests?id='+encodeURIComponent(id),{method:'DELETE',headers:hdrs()});
     const j=await r.json();

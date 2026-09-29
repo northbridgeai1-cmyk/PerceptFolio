@@ -527,11 +527,37 @@ t('the approval email points at a real sign-in URL',
 /* ==================== ADMIN QUEUE — tabs, pause, two emails ==================== */
 G('Access queue: four views, a pause that states its own limits, and both emails');
 
-t('four filter tabs exist', /data-f="pending"/.test(admin) && /data-f="accepted"/.test(admin) &&
-  /data-f="denied"/.test(admin) && /data-f="all"/.test(admin));
+t('six filter tabs exist', ['pending','accepted','active','paused','denied','all']
+  .every(f => new RegExp('data-f="' + f + '"').test(admin)));
 t('a paused grant still counts as accepted, not denied',
-  /const isAccepted=r=>r\.status==='granted'\|\|r\.status==='personal'\|\|r\.status==='business'/.test(admin));
-t('each tab shows a count', /\['pending','accepted','denied','all'\]\.forEach/.test(admin));
+  /const isAccepted=r=>r\.status==='granted'\|\|r\.status==='personal'\|\|r\.status==='business'\|\|r\.status==='employee'/.test(admin));
+/* 'employee' was missing until 2026-09-29, so a free code the operator issued to themselves was
+   granted, live, and invisible everywhere except All. */
+t('a staff code counts as accepted too', /r\.status==='employee'/.test(admin));
+t('Active and Paused split what Accepted lumps together',
+  /const isActive=r=>isAccepted\(r\)&&!r\.paused;/.test(admin) &&
+  /const isPaused=r=>isAccepted\(r\)&&!!r\.paused;/.test(admin));
+t('each tab shows a count, from the same predicate the view uses',
+  /\['pending','accepted','active','paused','denied','all'\]\.forEach/.test(admin) &&
+  /const count=f=>requests\.filter\(r=>test\(f,r\)\)\.length;/.test(admin));
+/* Two buttons that used to look like one. */
+t('removing the record and deleting the account are different buttons, and say so',
+  /Forget the paperwork only\. Their code keeps working\./.test(admin) &&
+  /End access and destroy their data\. Cannot be undone\./.test(admin));
+t('deleting asks for the code to be typed, not just an OK',
+  /const typed=prompt\('Type the code to confirm/.test(admin) &&
+  /!==String\(code\)\.toUpperCase\(\)/.test(admin));
+t('and the operator is told nobody is emailed', /they are not told\. Nothing here emails them\./.test(admin));
+t('the worker will not delete an account that is still being charged',
+  /const liveStatus = sub && \(sub\.status === 'active' \|\| sub\.status === 'trialing' \|\| sub\.status === 'past_due'\);/.test(worker) &&
+  /Cancel it in Stripe first, or pause the account instead\./.test(worker));
+t('a forced delete is reported back, never silent', /forced: !!body\.force/.test(worker));
+t('deleting takes the API keys themselves, not only the index',
+  /for \(const t of keys\) if \(t && t\.tok\) await drop\('tok:' \+ t\.tok\);/.test(worker));
+t('and the Stripe mirror, which carries their email',
+  /if \(custId\) await drop\('sub:' \+ custId\);/.test(worker));
+t('and the broker credential, at SnapTrade as well as here',
+  /broker = await brokerForget\(env, code\);/.test(worker));
 
 t('the worker refuses a paused code', /if \(inv\.paused\) return json/.test(worker));
 t('only a granted request can be paused', /Only a granted request can be paused/.test(worker));
