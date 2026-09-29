@@ -287,6 +287,31 @@ t('the worker is what makes that true, not our restraint',
 t('a broker trade is history, never a graded call',
   /imported:true\}\);\n    addedTx\+\+;/.test(term) && /not calls this terminal made/.test(term));
 
+/* ============ PORTFOLIO: WHAT YOU OWN, THEN THE TOOLS (2026-09-29) ============
+   Measured the same way as the Dashboard. The holdings table sat at 533px behind a trade calculator,
+   a cash field and six filter controls: you opened Portfolio and met three things you do TO the book
+   before the book itself. The two tools moved below it and four of the six filters fold, which put
+   the table at 278px with every holding on the first screen.
+
+   THE COUNT ON THE BUTTON IS THE SAFETY PROPERTY, not the fold. A filter left on while its control
+   is hidden is how somebody reads a partial book as the whole one. */
+t('the holdings table comes before the trade sizer and the cash field',
+  term.indexOf('id="holdingsTable"') < term.indexOf('Before you trade: what this does to the portfolio') &&
+  term.indexOf('id="holdingsTable"') < term.indexOf('<h3>Cash available to invest</h3>'));
+t('search and the gain/loss mode stay visible; the other four fold',
+  term.indexOf('id="pfFilterQ"') < term.indexOf('id="pfFilterMore"') &&
+  /<div class="row" id="pfFilterMore" style="display:none;margin-top:10px">/.test(term) &&
+  ['pfFilterType','pfFilterBroker','pfFilterSignal','pfFilterMine'].every(id =>
+    term.indexOf('id="' + id + '"') > term.indexOf('id="pfFilterMore"')));
+t('the button says how many filters are on, so a filtered book cannot look like the whole one',
+  /btn\.textContent=n\?\('Filters · '\+n\+' on'\):'Filters';/.test(term));
+t('and a set filter opens the panel by itself',
+  /if\(n&&box\.style\.display==='none'\)box\.style\.display='';/.test(term));
+t('the count refreshes on every render, since the selects call renderAll',
+  /try\{ renderPortfolioFilterToggle\(\); \}catch\(e\)\{\}/.test(term));
+t('clearing the filters closes the panel again',
+  /const box=document\.getElementById\('pfFilterMore'\); if\(box\)box\.style\.display='none';/.test(term));
+
 /* ============ THE ACCOUNT OUTRANKS THE SCAFFOLDING (2026-09-29) ============
    Measured, not judged: with the data-key card and the Start here checklist both above it, the
    portfolio value sat 805px down the page, below the fold on a laptop. The one number a person
@@ -1736,7 +1761,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v157/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v158/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }

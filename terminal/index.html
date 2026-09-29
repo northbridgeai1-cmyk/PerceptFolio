@@ -1454,32 +1454,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     </div>
   </div>
   </div>
-  <!-- TRADE IMPACT — the sizing step the app never had -->
-  <div class="card" style="margin-top:16px">
-    <h3>Before you trade: what this does to the portfolio</h3>
-    <div class="row">
-      <input id="tiTicker" placeholder="Ticker" style="max-width:130px" oninput="renderTradeImpact()">
-      <select id="tiSide" style="max-width:110px" onchange="renderTradeImpact()">
-        <option value="buy">Buy</option><option value="sell">Sell</option>
-      </select>
-      <input id="tiAmount" type="number" step="any" placeholder="$ amount" style="max-width:160px" oninput="renderTradeImpact()">
-      <button class="btn btn-ghost btn-sm" onclick="tiUseMax()">Largest size your policy allows</button>
-    </div>
-    <div class="row" style="margin-top:8px">
-      <label class="row" style="gap:6px;align-items:center;font-size:13px;color:var(--muted)">
-        <input type="checkbox" id="tiFromCash" checked style="width:auto" onchange="renderTradeImpact()"> Funded from cash
-      </label>
-    </div>
-    <div id="tradeImpact" style="margin-top:14px"></div>
-  </div>
-
-  <div class="card" style="margin-top:16px">
-    <h3>Cash available to invest</h3>
-    <div class="row">
-      <input id="cashInput" type="number" step="any" placeholder="$ amount" style="max-width:180px">
-      <button class="btn btn-ghost" onclick="setCash()">Update cash</button>
-    </div>
-  </div>
   <!-- A3.1 to A3.5. The review sheet: what changed since the last review, each line with its source
        and date, then the assumptions marked by hand. The terminal never marks an assumption. -->
   <div class="addwrap" id="reviewWrap">
@@ -1573,6 +1547,19 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <div class="card" style="margin-bottom:14px">
     <div class="row">
       <input id="pfFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderAll()">
+      <!-- FOUR OF THE SIX FILTERS FOLD (2026-09-29). Search and the gain/loss mode are the two
+           anybody touches; type, broker, verdict and my-call are for a book big enough to need
+           narrowing, and a person with a dozen holdings was reading a control panel to get to a
+           twelve-row table. The toggle says how many are set, so a filtered view can never look
+           like the whole book with rows quietly missing. -->
+      <button type="button" class="btn btn-ghost btn-sm" id="pfFilterToggle" aria-expanded="false" aria-controls="pfFilterMore" onclick="togglePortfolioFilters()">Filters</button>
+      <div class="spacer"></div>
+      <select id="pfGlMode" style="max-width:190px" onchange="renderAll()" title="What the Gain/Loss column shows">
+        <option value="total">Gain/Loss: Total</option>
+        <option value="today">Gain/Loss: Today</option>
+      </select>
+    </div>
+    <div class="row" id="pfFilterMore" style="display:none;margin-top:10px">
       <select id="pfFilterType" style="max-width:130px" onchange="renderAll()">
         <option value="All">All types</option><option value="Stock">Stock</option><option value="ETF">ETF</option><option value="Fund">Mutual Fund</option>
       </select>
@@ -1584,11 +1571,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
         <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
       </select>
       <button class="btn-ghost btn btn-sm" onclick="clearPortfolioFilters()">Clear</button>
-      <div class="spacer"></div>
-      <select id="pfGlMode" style="max-width:190px" onchange="renderAll()" title="What the Gain/Loss column shows">
-        <option value="total">Gain/Loss: Total</option>
-        <option value="today">Gain/Loss: Today</option>
-      </select>
     </div>
   </div>
   <div class="card" style="overflow-x:auto">
@@ -1612,7 +1594,38 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
 
   <!-- QUALITY DRIFT -->
-  <div class="section-title">Quality drift, which businesses are getting better or worse</div>
+  
+  <!-- MOVED BELOW WHAT YOU OWN (2026-09-29). These two sat above the holdings table and pushed it to
+       533px: you opened Portfolio and met a trade calculator and a cash field before the positions
+       you came to look at. Both are things you do TO the book, so they read better after it. Same
+       reasoning as the Dashboard, where the setup checklist was outranking the portfolio value. -->
+  <!-- TRADE IMPACT — the sizing step the app never had -->
+  <div class="card" style="margin-top:16px">
+    <h3>Before you trade: what this does to the portfolio</h3>
+    <div class="row">
+      <input id="tiTicker" placeholder="Ticker" style="max-width:130px" oninput="renderTradeImpact()">
+      <select id="tiSide" style="max-width:110px" onchange="renderTradeImpact()">
+        <option value="buy">Buy</option><option value="sell">Sell</option>
+      </select>
+      <input id="tiAmount" type="number" step="any" placeholder="$ amount" style="max-width:160px" oninput="renderTradeImpact()">
+      <button class="btn btn-ghost btn-sm" onclick="tiUseMax()">Largest size your policy allows</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="row" style="gap:6px;align-items:center;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="tiFromCash" checked style="width:auto" onchange="renderTradeImpact()"> Funded from cash
+      </label>
+    </div>
+    <div id="tradeImpact" style="margin-top:14px"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Cash available to invest</h3>
+    <div class="row">
+      <input id="cashInput" type="number" step="any" placeholder="$ amount" style="max-width:180px">
+      <button class="btn btn-ghost" onclick="setCash()">Update cash</button>
+    </div>
+  </div>
+<div class="section-title">Quality drift, which businesses are getting better or worse</div>
   <div class="card">
     <div class="row" style="margin-bottom:12px">
       <select id="driftWindow" style="max-width:190px" onchange="renderDrift()">
@@ -6214,10 +6227,35 @@ function removeWatch(i){
   if(sym)allLists().forEach(l=>{ if(l.syms)l.syms=l.syms.filter(x=>x!==sym); });
   saveDB();renderAll();
 }
+/* The four folded filters, and the count on the button.
+   THE COUNT IS THE POINT, not the fold. A filter that is set while its control is hidden is how a
+   person ends up reading a partial book as if it were the whole one, so the button says how many are
+   on, and the panel opens itself whenever any of them is. Clearing closes it again. */
+const PF_FILTERS=['pfFilterType','pfFilterBroker','pfFilterSignal','pfFilterMine'];
+function portfolioFiltersOn(){
+  return PF_FILTERS.filter(id=>{const el=document.getElementById(id);return el&&el.value&&el.value!=='All';}).length;
+}
+function renderPortfolioFilterToggle(){
+  const btn=document.getElementById('pfFilterToggle'), box=document.getElementById('pfFilterMore');
+  if(!btn||!box)return;
+  const n=portfolioFiltersOn();
+  if(n&&box.style.display==='none')box.style.display='';
+  const open=box.style.display!=='none';
+  btn.setAttribute('aria-expanded',String(open));
+  btn.textContent=n?('Filters · '+n+' on'):'Filters';
+  btn.classList.toggle('is-on',!!n);
+}
+function togglePortfolioFilters(){
+  const box=document.getElementById('pfFilterMore');
+  if(!box)return;
+  box.style.display=(box.style.display==='none')?'':'none';
+  renderPortfolioFilterToggle();
+}
 function clearPortfolioFilters(){
   ['pfFilterQ'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['pfFilterType','pfFilterBroker','pfFilterSignal','pfFilterMine'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='All';});
   // Gain/Loss mode is a view preference, not a filter. Clear leaves it alone on purpose.
+  const box=document.getElementById('pfFilterMore'); if(box)box.style.display='none';
   renderAll();
 }
 function clearWatchlistFilters(){
@@ -11144,6 +11182,10 @@ function renderAll(){
   /* Market data is built in for a signed-in account; the key step only appears where it is true. */
   if(wc){ const ks=document.getElementById('wcKeyStep'), built=hasMarketData(); if(ks)ks.style.display=built?'none':''; wc.querySelectorAll('.wc-n').forEach((n,i)=>{ n.textContent=String(built?i+1:i+2); });
     [['wcStep1',done1],['wcStep2',done2],['wcStep3',done3]].forEach(([id,ok])=>{ const el=document.getElementById(id); if(!el)return; el.classList.toggle('wc-done',!!ok); const n=el.querySelector('.step-num'); if(n&&ok)n.textContent='✓'; }); }
+
+  /* The filter selects call renderAll, so the count on the Filters button is refreshed here rather
+     than at each call site. Guarded: renderAll runs on screens where that button does not exist. */
+  try{ renderPortfolioFilterToggle(); }catch(e){}
 
   /* dashboard numbers */
   let value=0,costTotal=0;
