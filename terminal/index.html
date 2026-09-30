@@ -635,13 +635,28 @@ small.src{color:var(--muted)}
 @media (max-width:600px){ .survey-card h2{font-size:22px} .survey-wrap{padding:16px} }
 /* The front door. One line, scrolls sideways on a phone rather than wrapping into a block that
    pushes the money down the page. */
-.doorRow{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:0 0 4px;margin:0 0 18px;-webkit-overflow-scrolling:touch}
-.doorRow::-webkit-scrollbar{display:none}
+/* WRAPS, DOES NOT SCROLL (2026-09-29, second pass). The first version was one sideways-scrolling
+   line, which reads as tidy and fails the only job it has: the first real person to see it said he
+   did not know where the buttons were, because half of them were off the right edge. A chip nobody
+   can see is worse than no chip, since the screen looks complete while it is not.
+   My walker could not catch this. It reads the DOM, where an off-screen chip is present and
+   clickable; a person has to be able to see the thing. Two lines of visible chips beats one line of
+   hidden ones every time. */
+.doorRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 18px}
 .doorLabel{flex:none;font-size:13px;color:var(--muted);padding-right:2px}
 .doorChip{flex:none;background:var(--panel);border:1px solid var(--border);border-radius:999px;
   padding:7px 14px;font:inherit;font-size:13.5px;color:var(--text);cursor:pointer;white-space:nowrap}
 .doorChip:hover{border-color:var(--brand2);color:var(--brand2)}
 .doorChip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* On a phone eight chips at desktop size stack to seven rows and push the portfolio value most of a
+   screen down. Tighter type and padding pack them two to a row without hiding any, which is the
+   whole point: the first person to see this could not find the buttons because they were off-screen,
+   and shrinking them is a better answer than scrolling them away again. */
+@media (max-width:600px){
+  .doorRow{gap:6px}
+  .doorLabel{width:100%;margin-bottom:2px}
+  .doorChip{padding:6px 11px;font-size:12.5px}
+}
 .fold-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fold-toggle{display:flex;align-items:baseline;gap:9px;flex:1;min-width:0;background:none;border:0;padding:0;margin:0;
   color:var(--text);font:inherit;text-align:left;cursor:pointer}
@@ -1276,9 +1291,9 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 <aside id="sidebar">
   <nav>
     <button data-tab="dashboard" class="active" onclick="showTab('dashboard')" data-tip="Today"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-dash"/></svg></span><span class="lbl">Today</span></button>
-    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')" data-tip="What I own"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"/></svg></span><span class="lbl">What I own</span></button>
-    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Watching"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Watching</span></button>
-    <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="My track record"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">My track record</span></button>
+    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')" data-tip="Portfolio"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"/></svg></span><span class="lbl">Portfolio</span></button>
+    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Lists"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Lists</span></button>
+    <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="History"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">History</span></button>
     <div class="nav-sep"></div>
     <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="The market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">The market</span></button>
     <button data-tab="news" id="navNews" onclick="showTab('news')" data-tip="News"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-news"/></svg></span><span class="lbl">News</span></button>
@@ -1287,8 +1302,8 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Find stocks"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Find stocks</span></button>
     <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Check a stock"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Check a stock</span></button>
     <div class="nav-sep"></div>
-    <button data-tab="risk" id="navRisk" onclick="showTab('risk')" data-tip="What could go wrong"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"/></svg></span><span class="lbl">What could go wrong</span></button>
-    <button data-tab="projections" id="navProjections" onclick="showTab('projections')" data-tip="What could happen"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"/></svg></span><span class="lbl">What could happen</span></button>
+    <button data-tab="risk" id="navRisk" onclick="showTab('risk')" data-tip="Risk"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"/></svg></span><span class="lbl">Risk</span></button>
+    <button data-tab="projections" id="navProjections" onclick="showTab('projections')" data-tip="Projections"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"/></svg></span><span class="lbl">Projections</span></button>
     <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')" data-tip="Alerts"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-alerts"/></svg></span><span class="lbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
     <!-- SETTINGS IN THE NAV (2026-09-29). Sixty simulated people tried to reach it and NOT ONE did,
          at any knowledge level: it lived behind the avatar, and an avatar does not read as settings.
@@ -4120,7 +4135,7 @@ const TOUR=[
   { tab:'dashboard', tag:'Today', cls:'t-blue',
     q:'This is where you start each time.',
     body:'What you own is worth this much today, and anything that needs you is at the bottom under <b>What needs you</b>. The graph starts empty because the terminal only knows what happens from the day you begin. It fills in from here.' },
-  { tab:'portfolio', tag:'What I own', cls:'t-green',
+  { tab:'portfolio', tag:'Portfolio', cls:'t-green',
     q:'Put in what you already own.',
     body:'Add holdings by hand, bring them in from your broker, or drop in a spreadsheet. Underneath, <b>How much should I put in?</b> shows what a purchase does to your money before you make it. Being right about the company and wrong about the size is how accounts end.' },
   { tab:'screener', tag:'Find stocks', cls:'t-amber',
@@ -4129,7 +4144,7 @@ const TOUR=[
   { tab:'analyzer', tag:'Check a stock', cls:'t-violet',
     q:'Is this company any good?',
     body:'Type a name. You get twenty-two checks: twelve on the business, six on the price, four on whether the market agrees. Read the rows that failed, not only the score. The score is just a summary of those rows.' },
-  { tab:'history', tag:'My track record', cls:'t-blue',
+  { tab:'history', tag:'History', cls:'t-blue',
     q:'This is the part nobody else does.',
     body:'Every call you make is scored later against the market, on a fixed date, and never changed afterwards. It will say <b>not enough yet</b> for a while, and that is honest rather than broken. Come back in a few months and it will tell you whether your rules are any good.' }
 ];
@@ -4413,7 +4428,18 @@ function showTab(t){
   // never spends a request on it.
   if(t==='market'){fillMacroInputs();renderScorecard();renderSeasonal();renderHindsight();loadMarketData(false);loadFearGreed();}
   /* Only News keeps a timer, and only while it is the open tab. */
-  if(t==='news')newsLiveOn(); else newsLiveOff();
+  /* NEWS LOADS ITSELF (2026-09-29). Clicking News and being handed a button called "Load my
+     positions" is the friction the first real user named: he expected to see news, and instead got
+     homework. Once per session and only when there is nothing to show, so it never re-fetches over
+     headlines already on screen and never spends the data allowance twice.
+     It still cannot run without market data, which loadNews already handles by saying so. */
+  if(t==='news'){
+    newsLiveOn();
+    if(!_newsAutoLoaded && typeof hasMarketData==='function' && hasMarketData()){
+      _newsAutoLoaded=true;
+      try{ loadNews(false); }catch(e){}
+    }
+  } else newsLiveOff();
   if(t==='map'){drawMap();renderRelList();}
   if(t==='dashboard')renderCommand();
   if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
@@ -7999,6 +8025,8 @@ function moveOver(sym,days){
   if(!a||!(a.p>0)||a.d===now.d)return null;
   return{pct:(now.p-a.p)/a.p*100,from:a.d,to:now.d};
 }
+/* Once a session: see the News tab branch in showTab. */
+let _newsAutoLoaded=false;
 async function loadNews(force){
   const btn=document.getElementById('newsLoadBtn'),st=document.getElementById('newsStatus');
   if(!hasMarketData()){toast('Market data needs either a Finnhub key in Settings, or sync set up against a worker that holds one.');showTab('settings');return;}
@@ -18273,7 +18301,10 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   ADV.forEach(function(t){ var b=nav.querySelector('button[data-tab="'+t+'"]'); if(b) b.classList.add('pf-adv'); });
   var more=document.createElement('button'); more.type='button'; more.className='pf-more'; more.setAttribute('data-tip','More');
   more.innerHTML='<span class="ico"><svg viewBox="0 0 24 24"><use href="#i-chev"/></svg></span><span class="lbl">More</span>';
-  var hist=nav.querySelector('button[data-tab="history"]'); (hist&&hist.parentNode===nav)?nav.insertBefore(more,hist.nextSibling):nav.appendChild(more);
+  /* AT THE BOTTOM (2026-09-29). It used to be planted after History, halfway down the list, which
+     reads as a separator between two groups rather than as the way to see the rest. A control that
+     reveals what is below it belongs below. */
+  nav.appendChild(more);
   function set(compact){ nav.classList.toggle('pf-compact',compact); more.setAttribute('aria-expanded',String(!compact)); more.querySelector('.lbl').textContent=compact?'More':'Less'; try{localStorage.setItem('pf_nav_compact',compact?'1':'0');}catch(e){} }
   var stored=null; try{stored=localStorage.getItem('pf_nav_compact');}catch(e){}
   set(stored===null?true:stored==='1');

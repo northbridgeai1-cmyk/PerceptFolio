@@ -346,8 +346,13 @@ t('every chip goes somewhere real',
   /function goHowMuch\(\)\{/.test(term));
 /* It must not undo the earlier work: the portfolio value was dragged below the fold once already by
    things placed above it, which is why this is one line of chips and not a card. */
-t('the front door does not push the money back below the fold',
-  /\.doorRow\{display:flex;align-items:center;gap:8px;overflow-x:auto/.test(term) &&
+/* REWRITTEN after the first real user (2026-09-29). The row used to scroll sideways, which looked
+   tidy and hid half the chips off the right edge; he said he did not know where the buttons were.
+   My walker could not catch it: it reads the DOM, where an off-screen chip is present and clickable.
+   It wraps now. Two lines of visible chips beat one line of hidden ones. */
+t('every chip is visible, because the row wraps instead of scrolling',
+  /\.doorRow\{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 18px\}/.test(term) &&
+  !/\.doorRow\{[^}]*overflow-x:auto/.test(term) &&
   term.indexOf('id="doorRow"') < term.indexOf('id="dTotal"'));
 
 /* ============ FIVE QUESTIONS BEFORE ANYTHING ELSE (2026-09-29) ============
@@ -969,9 +974,20 @@ G('Lists: an organisational layer that cannot lose tickers');
 
 /* Relabelled 2026-09-29 to the words people searched for. The tab id stays 'watchlist'; only what
    a human reads changed. */
-t('the tab is labelled in plain words, and the id is unchanged',
-  /<button data-tab="watchlist"[^>]*data-tip="Watching"/.test(term) &&
-  />Watching<\/span>/.test(term));
+/* PUT BACK 2026-09-29. I renamed five tabs to words that scored better in the walk, and the first
+   real person said he understood the originals better: History, Portfolio, Lists, Risk, Projections.
+   A label that a simulation matches and a human does not is a worse label. The ones nobody objected
+   to stayed: Today, Find stocks, Check a stock. */
+t('the tabs he understood keep the names he understood',
+  /<button data-tab="watchlist"[^>]*data-tip="Lists"/.test(term) &&
+  /<button data-tab="history"[^>]*data-tip="History"/.test(term) &&
+  /<button data-tab="portfolio"[^>]*data-tip="Portfolio"/.test(term) &&
+  /<button data-tab="risk"[^>]*data-tip="Risk"/.test(term) &&
+  /<button data-tab="projections"[^>]*data-tip="Projections"/.test(term));
+t('and the plain ones nobody objected to stayed plain',
+  /<button data-tab="screener"[^>]*data-tip="Find stocks"/.test(term) &&
+  /<button data-tab="analyzer"[^>]*data-tip="Check a stock"/.test(term) &&
+  /<button data-tab="dashboard"[^>]*data-tip="Today"/.test(term));
 t('lists are additive to watchlist, which keeps its shape',
   /lists:\[\],/.test(term) && /watchlist:\[\],/.test(term));
 /* The whole safety argument: two dozen features read D.watchlist, so it must stay a flat array. */
@@ -1856,7 +1872,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v161/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v162/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2489,7 +2505,7 @@ t('every stop is named for the label actually on the button', (() => {
     new RegExp('data-tab="' + tab + '"[^>]*data-tip="' + tag + '"').test(term));
 })());
 t('and it ends on the record, which is the part nobody else does',
-  /tab:'history', tag:'My track record'/.test(term));
+  /tab:'history', tag:'History'/.test(term));
 t('the offer to show you around counts the same screens the tour has', /Show me around<\/a>, five screens, one minute\./.test(term));
 t('the audit shows a skeleton rather than a blank panel while it computes',
   /id="auditBody"[^>]*aria-busy="true"/.test(term));
@@ -3299,7 +3315,13 @@ G('Nothing to type, nothing to download');
 G('The feed was never the slow part: nobody was watching it');
 {
   /* 1. Live while you are looking. */
-  t('News refreshes itself while it is the open tab', /const NEWS_LIVE_MS=90000;/.test(term) && /function newsLiveOn\(\)/.test(term) && /if\(t==='news'\)newsLiveOn\(\); else newsLiveOff\(\);/.test(term));
+  t('News refreshes itself while it is the open tab', /const NEWS_LIVE_MS=90000;/.test(term) && /function newsLiveOn\(\)/.test(term) && /if\(t==='news'\)\{\s*\n\s*newsLiveOn\(\);/.test(term) && /\} else newsLiveOff\(\);/.test(term));
+  /* The first real person to use this said he clicked News and expected news, not a button called
+     "Load my positions". Once a session, and only when nothing is on screen, so it never re-fetches
+     over headlines already there. */
+  t('and it loads itself the first time, rather than handing over homework',
+    /let _newsAutoLoaded=false;/.test(term) &&
+    /if\(!_newsAutoLoaded && typeof hasMarketData==='function' && hasMarketData\(\)\)\{/.test(term));
   /* A timer left running behind a hidden tab spends the market-data allowance on a page nobody is
      reading, and on a shared key that is somebody else's bill. */
   t('the timer stops on a hidden tab, on blur, and on leaving News',
