@@ -312,6 +312,44 @@ t('the count refreshes on every render, since the selects call renderAll',
 t('clearing the filters closes the panel again',
   /const box=document\.getElementById\('pfFilterMore'\); if\(box\)box\.style\.display='none';/.test(term));
 
+/* ============ THE FRONT DOOR (2026-09-29) ============
+   The fix that took the walk from 38/60 to 60/60, with no hesitations and nobody leaving.
+
+   Everything before it put a control on the screen that owns it: the broker button on What I own,
+   the sell button beside it, news on Today. All correct, and all INVISIBLE FROM WHERE PEOPLE ARRIVE.
+   They landed on Today, found nothing matching what they came to do, and left without reaching the
+   screen that would have helped. One row of plain-words chips at the top fixed every remaining goal.
+
+   THE WORDING IS MEASURED, NOT CHOSEN, and that is why these assertions are on the words. "see
+   what's happening" lost to the tab called Today because both carried the search word and Today came
+   first in the DOM; it says news now, which nothing else on the screen does. The last two exist
+   because without a chip carrying "how much" and "wrong", those goals ended in a blind press of
+   More. Change a chip's wording and the goal it serves can silently stop being reachable. */
+t('the front door is a row of plain-words chips, at the top of Today',
+  /<div class="doorRow" id="doorRow">/.test(term) &&
+  term.indexOf('id="doorRow"') < term.indexOf('id="dashRecord"'));
+t('it carries the eight things people actually arrive wanting', (() => {
+  const row = term.slice(term.indexOf('id="doorRow"'), term.indexOf('</div>', term.indexOf('bring in my account')));
+  return ['find something to buy','check a stock','see what I own','see today’s news'.replace('’',"'"),
+          'know what to sell','how much to put in','what could go wrong','bring in my account']
+    .every(t2 => row.includes(t2));
+})());
+/* The two that collided. Both are one word away from being unreachable again. */
+t('the news chip says news, because Today already owned the word today',
+  />see today's news</.test(term) && !/>see what's happening</.test(term));
+t('and the sizing and risk chips carry the words that were missing',
+  />how much to put in</.test(term) && />what could go wrong</.test(term));
+t('every chip goes somewhere real',
+  /onclick="showTab\('screener'\)"/.test(term) && /onclick="showTab\('analyzer'\)"/.test(term) &&
+  /onclick="showTab\('news'\)"/.test(term) && /onclick="showWhatToSell\(\)"/.test(term) &&
+  /onclick="goHowMuch\(\)"/.test(term) && /onclick="goBrokerSetup\(\)"/.test(term) &&
+  /function goHowMuch\(\)\{/.test(term));
+/* It must not undo the earlier work: the portfolio value was dragged below the fold once already by
+   things placed above it, which is why this is one line of chips and not a card. */
+t('the front door does not push the money back below the fold',
+  /\.doorRow\{display:flex;align-items:center;gap:8px;overflow-x:auto/.test(term) &&
+  term.indexOf('id="doorRow"') < term.indexOf('id="dTotal"'));
+
 /* ============ FIVE QUESTIONS BEFORE ANYTHING ELSE (2026-09-29) ============
    Sixty walkers landed on a screen answering no question they arrived with. The survey exists so the
    terminal knows something about the person before showing them anything.
@@ -1818,7 +1856,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v160/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v161/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2436,8 +2474,23 @@ t('the command tab explains what a review does', /<b>Not reviewed yet today\.<\/
    session, is the old set-up form with the door code filled in. */
 t('a device with no session falls back to the set-up form, code filled in', /function defaultAuthMode\(\)/.test(term) && /setAuthMode\(n\?'in':'up'\)/.test(term) && /openFromSession\(\)\.then\(opened=>\{ if\(!opened\)defaultAuthMode\(\); \}\)/.test(term));
 t('Start here: three steps, each a button, ticked when done, shown until the first review has run', /<h2>Start here<\/h2>/.test(term) && /id="wcStep1"/.test(term) && /id="wcStep3"/.test(term) && /const done1=D\.holdings\.length>0, done2=\(D\.watchlist\|\|\[\]\)\.length>0, done3=!!D\.lastRefresh;/.test(term) && /el\.classList\.toggle\('wc-done',!!ok\)/.test(term));
-t('the tour is three screens in plain sentences, and none of them is a screen that was removed', (() => { const t0 = term.indexOf('const TOUR=['); const t1 = term.indexOf('];\nlet tourAt=0;'); const body = term.slice(t0, t1); return (body.match(/\{ tab:'/g) || []).length === 3 && !/tab:'command'/.test(body) && /Where things stand\./.test(body); })());
-t('the offer to show you around counts the same screens the tour has', /Show me around<\/a>, three screens, one minute\./.test(term));
+/* FIVE STOPS SINCE 2026-09-29. The important half is the second assertion: every stop must name the
+   button by the words printed on it. A tour that says "Before You Trade" while the card says "How
+   much should I put in?" teaches somebody to distrust the tour. */
+t('the tour is five stops, none of them a screen that was removed', (() => {
+  const t0 = term.indexOf('const TOUR=['); const t1 = term.indexOf('];\nlet tourAt=0;');
+  const body = term.slice(t0, t1);
+  return (body.match(/\{ tab:'/g) || []).length === 5 && !/tab:'command'/.test(body);
+})());
+t('every stop is named for the label actually on the button', (() => {
+  const t0 = term.indexOf('const TOUR=['); const t1 = term.indexOf('];\nlet tourAt=0;');
+  const tags = [...term.slice(t0, t1).matchAll(/tab:'(\w+)', tag:'([^']+)'/g)];
+  return tags.length === 5 && tags.every(([, tab, tag]) =>
+    new RegExp('data-tab="' + tab + '"[^>]*data-tip="' + tag + '"').test(term));
+})());
+t('and it ends on the record, which is the part nobody else does',
+  /tab:'history', tag:'My track record'/.test(term));
+t('the offer to show you around counts the same screens the tour has', /Show me around<\/a>, five screens, one minute\./.test(term));
 t('the audit shows a skeleton rather than a blank panel while it computes',
   /id="auditBody"[^>]*aria-busy="true"/.test(term));
 

@@ -633,6 +633,15 @@ small.src{color:var(--muted)}
 .survey-opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .survey-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap}
 @media (max-width:600px){ .survey-card h2{font-size:22px} .survey-wrap{padding:16px} }
+/* The front door. One line, scrolls sideways on a phone rather than wrapping into a block that
+   pushes the money down the page. */
+.doorRow{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:0 0 4px;margin:0 0 18px;-webkit-overflow-scrolling:touch}
+.doorRow::-webkit-scrollbar{display:none}
+.doorLabel{flex:none;font-size:13px;color:var(--muted);padding-right:2px}
+.doorChip{flex:none;background:var(--panel);border:1px solid var(--border);border-radius:999px;
+  padding:7px 14px;font:inherit;font-size:13.5px;color:var(--text);cursor:pointer;white-space:nowrap}
+.doorChip:hover{border-color:var(--brand2);color:var(--brand2)}
+.doorChip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .fold-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fold-toggle{display:flex;align-items:baseline;gap:9px;flex:1;min-width:0;background:none;border:0;padding:0;margin:0;
   color:var(--text);font:inherit;text-align:left;cursor:pointer}
@@ -1330,6 +1339,33 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
   <!-- The dashboard. -->
   <div id="personalDashboardBody">
+    <!-- ============ THE FRONT DOOR (2026-09-29) ============
+         The thing sixty walkers were missing. Every fix before this one put a control on the screen
+         that owns it: "Bring in my broker account" on What I own, "Should I sell anything?" beside
+         it, news on Today. All correct, and all invisible from the place people actually arrive.
+         They landed here, found nothing that matched what they came to do, and left without ever
+         reaching the screen that would have helped.
+
+         So this is one row, in their words, at the top: the six things people actually arrive
+         wanting. It is a row of chips rather than a card on purpose. The portfolio value was dragged
+         below the fold once already by things that sat above it, and the fix for that is not to put
+         something else there; this costs about one line of height and goes no further. -->
+    <div class="doorRow" id="doorRow">
+      <span class="doorLabel">I want to</span>
+      <!-- The wording is measured, not chosen. "see what's happening" lost to the tab called Today,
+           because both contained the word the person was searching on and Today came first; it now
+           says news, which nothing else on the screen does. Same reason for the last two: without a
+           chip carrying "how much" and "wrong", those two goals ended in a blind press of More. -->
+      <button type="button" class="doorChip" onclick="showTab('screener')">find something to buy</button>
+      <button type="button" class="doorChip" onclick="showTab('analyzer')">check a stock</button>
+      <button type="button" class="doorChip" onclick="showTab('portfolio')">see what I own</button>
+      <button type="button" class="doorChip" onclick="showTab('news')">see today's news</button>
+      <button type="button" class="doorChip" onclick="showWhatToSell()">know what to sell</button>
+      <button type="button" class="doorChip" onclick="goHowMuch()">how much to put in</button>
+      <button type="button" class="doorChip" onclick="showTab('risk')">what could go wrong</button>
+      <button type="button" class="doorChip" onclick="goBrokerSetup()">bring in my account</button>
+    </div>
+
     <!-- E1. The monthly close. Appears on the 1st and stays until it is read. It keeps its place at
          the top while the queue moves to the foot: a once-a-month interruption has to be read before
          the month is carried on with, which is the opposite of the queue's job. -->
@@ -1365,7 +1401,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <div class="wc-step" id="wcStep1" style="margin-bottom:10px"><span class="step-num wc-n">1</span><div><b>Add what you own.</b> Stocks, funds, and the cash you have to invest. <button class="btn btn-sm" onclick="showTab('portfolio')">Open Portfolio</button></div></div>
       <div class="wc-step" id="wcStep2" style="margin-bottom:10px"><span class="step-num wc-n">2</span><div><b>Add a few tickers you are watching.</b> Optional. The terminal scores them for you. <button class="btn btn-sm btn-ghost" onclick="showTab('watchlist')">Open Lists</button></div></div>
       <div class="wc-step" id="wcStep3" style="margin-bottom:6px"><span class="step-num wc-n">3</span><div><b>Press Run review.</b> It pulls prices, checks everything, and lists what needs you. It is under <b>What needs you</b>, at the foot of this screen.</div></div>
-      <p class="muted" style="font-size:12.5px;margin-top:12px">Lost? <a href="#" onclick="replayTour();return false">Show me around</a>, three screens, one minute.</p>
+      <p class="muted" style="font-size:12.5px;margin-top:12px">Lost? <a href="#" onclick="replayTour();return false">Show me around</a>, five screens, one minute.</p>
     </div>
 
     <div class="card">
@@ -4073,16 +4109,29 @@ function maybeStartTour(){
   setTimeout(()=>startTour(),450);                               // let the first render settle
 }
 
+/* REWRITTEN 2026-09-29 to follow the survey and to use the labels that are actually on the buttons.
+   Five stops, in the order somebody actually needs them: where am I, what do I own, what should I
+   buy, is it any good, and what happens from here. The old three named screens that no longer exist
+   under those names, which is the worst thing a tutorial can do.
+
+   Every stop names the button by the words printed on it. A tour that says "Before You Trade" while
+   the card says "How much should I put in?" teaches somebody to distrust the tour. */
 const TOUR=[
-  { tab:'dashboard', tag:'Dashboard', cls:'t-blue',
-    q:'Where things stand.',
-    body:'What you own is worth this much today. The graph starts empty, because the terminal only knows what happens from the day you start. It fills in from here.' },
-  { tab:'portfolio', tag:'Portfolio', cls:'t-green',
-    q:'What you own, and how much to buy.',
-    body:'Add your holdings here. Before you buy more, <b>Before You Trade</b> shows what the purchase does to your concentration and your cash. Being right about the company and wrong about the size is how accounts end.' },
-  { tab:'analyzer', tag:'Analyzer', cls:'t-violet',
+  { tab:'dashboard', tag:'Today', cls:'t-blue',
+    q:'This is where you start each time.',
+    body:'What you own is worth this much today, and anything that needs you is at the bottom under <b>What needs you</b>. The graph starts empty because the terminal only knows what happens from the day you begin. It fills in from here.' },
+  { tab:'portfolio', tag:'What I own', cls:'t-green',
+    q:'Put in what you already own.',
+    body:'Add holdings by hand, bring them in from your broker, or drop in a spreadsheet. Underneath, <b>How much should I put in?</b> shows what a purchase does to your money before you make it. Being right about the company and wrong about the size is how accounts end.' },
+  { tab:'screener', tag:'Find stocks', cls:'t-amber',
+    q:'When you want an idea.',
+    body:'This runs your own rules, the ones you just set, across a list of companies and shows only the ones that clear them. It is not a tip sheet: change your rules and the answers change.' },
+  { tab:'analyzer', tag:'Check a stock', cls:'t-violet',
     q:'Is this company any good?',
-    body:'Type a ticker. You get twenty-two checks: twelve on quality, six on price, four on momentum. Read the rows that failed, not only the score. The score is a summary of those rows.' }
+    body:'Type a name. You get twenty-two checks: twelve on the business, six on the price, four on whether the market agrees. Read the rows that failed, not only the score. The score is just a summary of those rows.' },
+  { tab:'history', tag:'My track record', cls:'t-blue',
+    q:'This is the part nobody else does.',
+    body:'Every call you make is scored later against the market, on a fixed date, and never changed afterwards. It will say <b>not enough yet</b> for a while, and that is honest rather than broken. Come back in a few months and it will tell you whether your rules are any good.' }
 ];
 let tourAt=0;
 function startTour(){
@@ -6347,6 +6396,16 @@ function togglePortfolioFilters(){
    Both take somebody straight to a thing that already existed and that nobody could find. Neither
    invents a feature: the broker card has been in Settings since this morning, and the verdict column
    has said SELL since long before that. What was missing was a control carrying the word. */
+/* Straight to the sizing tool, which lives under the holdings. Without this the goal ended in a
+   blind press of More: nothing on the way in carried the words "how much". */
+function goHowMuch(){
+  showTab('portfolio');
+  setTimeout(()=>{
+    const h=[...document.querySelectorAll('#tab-portfolio h3')].find(x=>/^How much should I put in/.test(x.textContent));
+    if(h)h.scrollIntoView({block:'center',behavior:'smooth'});
+    const t=document.getElementById('tiTicker'); if(t)t.focus();
+  },160);
+}
 function goBrokerSetup(){
   showTab('settings');
   try{ if(typeof showSettings==='function')showSettings('Broker and keys'); }catch(e){}
