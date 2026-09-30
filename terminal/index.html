@@ -613,6 +613,26 @@ small.src{color:var(--muted)}
    The header is a real button, so it works from the keyboard and reads correctly to a screen reader,
    and the summary line lives INSIDE it: a folded section still has to say whether anything needs
    you, or folding it would be hiding the one thing it exists to tell you. */
+/* The survey overlay. Deliberately plain: one question at a time, big targets, no chrome to read. */
+.survey-wrap{position:fixed;inset:0;z-index:10000;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto}
+.survey-card{width:100%;max-width:560px}
+.survey-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.survey-step{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.08em}
+.survey-skip{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.survey-skip:hover{color:var(--text)}
+.survey-bar{height:3px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:26px}
+.survey-bar i{display:block;height:100%;background:var(--brand2);transition:width .25s ease}
+.survey-card h2{font-size:26px;line-height:1.25;margin:0 0 8px;letter-spacing:-.01em}
+.survey-sub{color:var(--muted);font-size:14.5px;line-height:1.6;margin:0 0 22px}
+.survey-opts{display:grid;gap:10px}
+.survey-opt{display:block;width:100%;text-align:left;padding:15px 16px;border:1px solid var(--border);border-radius:10px;
+  background:var(--panel);color:var(--text);font:inherit;font-size:15.5px;cursor:pointer;line-height:1.45}
+.survey-opt:hover{border-color:var(--brand2)}
+.survey-opt b{display:block;font-size:16px;margin-bottom:2px}
+.survey-opt span{color:var(--muted);font-size:13.5px}
+.survey-opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.survey-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap}
+@media (max-width:600px){ .survey-card h2{font-size:22px} .survey-wrap{padding:16px} }
 .fold-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fold-toggle{display:flex;align-items:baseline;gap:9px;flex:1;min-width:0;background:none;border:0;padding:0;margin:0;
   color:var(--text);font:inherit;text-align:left;cursor:pointer}
@@ -1268,6 +1288,38 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </nav>
   <div class="side-foot"><span class="lbl">Press <b>[</b> to collapse</span></div>
 </aside>
+<!-- ============ FIVE QUESTIONS, BEFORE ANYTHING ELSE (2026-09-29) ============
+     The owner's brief: a person who has never touched stocks should answer a short survey first, and
+     the terminal should learn their rules from it.
+
+     WHY A SURVEY AND NOT ADVICE. Every answer sets one of THEIR OWN limits, in D.policy, which is the
+     rulebook the whole terminal already checks against. Nothing here recommends anything. The
+     difference matters legally and it matters honestly: this is preference capture, and the words are
+     chosen so it reads that way to the person answering.
+
+     WHY IT COMES FIRST. Sixty walkers landed on a screen that answered no question they arrived with.
+     The survey exists so the terminal knows something about them before showing them anything. It is
+     skippable, because forcing somebody through five questions to look at a product is its own kind
+     of rude, and the skip is recorded so the terminal knows the rules are defaults, not choices.
+
+     Plain words only. No percentages asked of somebody who does not think in percentages: the answers
+     are sentences and the numbers are derived from them. -->
+<div id="surveyWrap" class="survey-wrap" style="display:none" role="dialog" aria-modal="true" aria-labelledby="surveyQ">
+  <div class="survey-card">
+    <div class="survey-top">
+      <span class="survey-step" id="surveyStep">1 of 5</span>
+      <button type="button" class="survey-skip" onclick="skipSurvey()">Skip for now</button>
+    </div>
+    <div class="survey-bar"><i id="surveyBar" style="width:20%"></i></div>
+    <h2 id="surveyQ">.</h2>
+    <p class="survey-sub" id="surveySub"></p>
+    <div id="surveyOpts" class="survey-opts"></div>
+    <div class="survey-foot">
+      <button type="button" class="btn btn-ghost btn-sm" id="surveyBack" onclick="surveyBack()">Back</button>
+      <span class="muted" style="font-size:12px">Nothing here is advice. Your answers become your own rules, and you can change any of them later in Settings.</span>
+    </div>
+  </div>
+</div>
 <main id="main" tabindex="-1">
 
 <!-- DASHBOARD -->
@@ -4010,6 +4062,13 @@ function accountLooksNew(){
 function maybeStartTour(){
   if(!D||D.tourSeen)return;
   if(_firstPull)return;                        // the book may be arriving; ask again when it has
+  /* THE SURVEY COMES FIRST, AND THE TOUR FOLLOWS IT.
+     Asked in this order because they answer different questions: the survey tells the terminal about
+     the person, the tour tells the person about the terminal. A tour given before the rulebook knows
+     anything is a tour of somebody else's settings. finishSurvey calls the tour itself, so nothing
+     here has to sequence them; this only gets out of the way while the survey is open or pending. */
+  if(surveyNeeded()){ startSurvey(); return; }
+  if(document.getElementById('surveyWrap') && document.getElementById('surveyWrap').style.display==='flex') return;
   if(!accountLooksNew()){ D.tourSeen=true; saveDB(); return; }   // quietly mark, don't nag
   setTimeout(()=>startTour(),450);                               // let the first render settle
 }
@@ -13107,6 +13166,129 @@ function policy(){
     cashTarget:isFinite(p.cashTarget)?p.cashTarget:3,
     riskPerTrade:isFinite(p.riskPerTrade)?p.riskPerTrade:2,
     risk:p.risk||'moderate',exclusions:p.exclusions||''};
+}
+/* ===================== THE FIVE QUESTIONS =====================
+   Each answer writes a real number into D.policy, the same rulebook Settings edits and the same one
+   the action queue checks against. There is no separate survey store: a second copy of somebody's
+   preferences is a second thing to disagree with the first.
+
+   The numbers are derived rather than asked, because a person who has never bought a share does not
+   know what 8% of a portfolio feels like, and asking would be asking them to guess. What they can
+   answer is how they would feel if it dropped. */
+const SURVEY = [
+  { q: 'How would you feel if this money dropped by a fifth?',
+    sub: 'Everything below follows from this one. There is no right answer.',
+    opts: [
+      { t: 'I would not sleep', d: 'Keep me well away from anything that swings hard.',
+        set: { risk: 'conservative', maxPosition: 5, cashTarget: 15, riskPerTrade: 1 } },
+      { t: 'I would not enjoy it', d: 'Steady, with a bit of room to grow.',
+        set: { risk: 'moderate', maxPosition: 10, cashTarget: 5, riskPerTrade: 2 } },
+      { t: 'That is the deal', d: 'I expect big moves in both directions.',
+        set: { risk: 'aggressive', maxPosition: 20, cashTarget: 2, riskPerTrade: 4 } },
+    ] },
+  { q: 'How much of your money would you put into one company?',
+    sub: 'Being right about the company and wrong about the size is how accounts end.',
+    opts: [
+      { t: 'A small slice', d: 'No more than a twentieth in any one name.', set: { maxPosition: 5 } },
+      { t: 'About a tenth', d: 'Ten or so holdings.', set: { maxPosition: 10 } },
+      { t: 'I back my best ideas hard', d: 'A fifth in one name is fine by me.', set: { maxPosition: 20 } },
+    ] },
+  { q: 'How much do you want kept in cash?',
+    sub: 'Cash you have not invested. It is what lets you buy when something gets cheap.',
+    opts: [
+      { t: 'Almost none', d: 'Put it to work.', set: { cashTarget: 2 } },
+      { t: 'A little, for opportunities', d: 'Around a twentieth.', set: { cashTarget: 5 } },
+      { t: 'A decent buffer', d: 'Around a sixth, so a bad month is not a problem.', set: { cashTarget: 15 } },
+    ] },
+  { q: 'Is there anything you will not invest in?',
+    sub: 'Pick any that apply. The terminal will never put these in front of you.',
+    multi: true,
+    opts: [
+      { t: 'Tobacco', set: { _ex: 'tobacco' } },
+      { t: 'Weapons and defence', set: { _ex: 'weapons' } },
+      { t: 'Gambling', set: { _ex: 'gambling' } },
+      { t: 'Fossil fuels', set: { _ex: 'fossil fuels' } },
+      { t: 'Nothing in particular', set: { _exClear: true } },
+    ] },
+  { q: 'How often will you actually look at this?',
+    sub: 'It changes what the terminal puts in front of you, and nothing else.',
+    opts: [
+      { t: 'Most days', d: 'Show me what changed.', set: { cadence: 'daily' } },
+      { t: 'Once a week or so', d: 'Save it up for me.', set: { cadence: 'weekly' } },
+      { t: 'Now and then', d: 'Only tell me when something needs doing.', set: { cadence: 'rare' } },
+    ] },
+];
+let _sv = { i: 0, answers: {}, ex: [] };
+
+function surveyNeeded(){
+  if(!D) return false;
+  if(typeof isDemoUser==='function' && isDemoUser()) return false;
+  return !D.surveyDone && !D.surveySkipped;
+}
+function startSurvey(force){
+  if(!D) return;
+  if(!force && !surveyNeeded()) return;
+  _sv = { i: 0, answers: {}, ex: [] };
+  const w=document.getElementById('surveyWrap'); if(!w) return;
+  w.style.display='flex';
+  renderSurvey();
+}
+function renderSurvey(){
+  const step=SURVEY[_sv.i]; if(!step) return finishSurvey();
+  document.getElementById('surveyStep').textContent=(_sv.i+1)+' of '+SURVEY.length;
+  document.getElementById('surveyBar').style.width=Math.round(((_sv.i+1)/SURVEY.length)*100)+'%';
+  document.getElementById('surveyQ').textContent=step.q;
+  document.getElementById('surveySub').textContent=step.sub||'';
+  const back=document.getElementById('surveyBack'); if(back)back.style.visibility=_sv.i?'visible':'hidden';
+  const box=document.getElementById('surveyOpts');
+  box.innerHTML=step.opts.map((o,idx)=>'<button type="button" class="survey-opt" onclick="surveyPick('+idx+')">'+
+    '<b>'+esc(o.t)+'</b>'+(o.d?'<span>'+esc(o.d)+'</span>':'')+'</button>').join('')+
+    (step.multi?'<button type="button" class="btn btn-sm" style="margin-top:4px" onclick="surveyNext()">Done with this one</button>':'');
+  const first=box.querySelector('.survey-opt'); if(first)first.focus();
+}
+function surveyPick(idx){
+  const step=SURVEY[_sv.i], o=step.opts[idx];
+  if(o.set._exClear){ _sv.ex=[]; return surveyNext(); }
+  if(o.set._ex){
+    const k=o.set._ex;
+    if(_sv.ex.includes(k)) _sv.ex=_sv.ex.filter(x=>x!==k); else _sv.ex.push(k);
+    /* Multi-select: show what is chosen rather than moving on, so two can be picked. */
+    const btns=document.querySelectorAll('#surveyOpts .survey-opt');
+    if(btns[idx]) btns[idx].style.borderColor=_sv.ex.includes(k)?'var(--brand2)':'var(--border)';
+    return;
+  }
+  Object.assign(_sv.answers, o.set);
+  surveyNext();
+}
+function surveyNext(){ _sv.i++; if(_sv.i>=SURVEY.length) finishSurvey(); else renderSurvey(); }
+function surveyBack(){ if(_sv.i>0){ _sv.i--; renderSurvey(); } }
+/* Skipping is a recorded answer, not a silent one: the rulebook is then defaults rather than theirs,
+   and the terminal must not later claim these were their choices. */
+function skipSurvey(){
+  D.surveySkipped=Date.now();
+  saveDB();
+  const w=document.getElementById('surveyWrap'); if(w)w.style.display='none';
+  toast('Skipped. The terminal is using safe defaults; set your own any time in Settings.');
+}
+function finishSurvey(){
+  const a=_sv.answers;
+  D.policy=Object.assign({}, D.policy||{}, {
+    risk: a.risk || (D.policy&&D.policy.risk) || 'moderate',
+    maxPosition: isFinite(a.maxPosition)?a.maxPosition:10,
+    cashTarget: isFinite(a.cashTarget)?a.cashTarget:5,
+    riskPerTrade: isFinite(a.riskPerTrade)?a.riskPerTrade:2,
+    exclusions: _sv.ex.join(', '),
+  });
+  D.cadence=a.cadence||'weekly';
+  D.surveyDone=Date.now();
+  saveDB();
+  const w=document.getElementById('surveyWrap'); if(w)w.style.display='none';
+  try{ fillPolicyInputs(); }catch(e){}
+  renderAll();
+  /* Straight into the walkthrough: the survey told the terminal about them, the tour tells them about
+     the terminal, and splitting those by a day means neither lands. */
+  setTimeout(()=>{ try{ if(typeof replayTour==='function') replayTour(); }catch(e){} }, 400);
+  toast('Your rules are set. You can change any of them in Settings.');
 }
 function fillPolicyInputs(){
   const p=policy();

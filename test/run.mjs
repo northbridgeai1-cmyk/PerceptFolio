@@ -312,6 +312,37 @@ t('the count refreshes on every render, since the selects call renderAll',
 t('clearing the filters closes the panel again',
   /const box=document\.getElementById\('pfFilterMore'\); if\(box\)box\.style\.display='none';/.test(term));
 
+/* ============ FIVE QUESTIONS BEFORE ANYTHING ELSE (2026-09-29) ============
+   Sixty walkers landed on a screen answering no question they arrived with. The survey exists so the
+   terminal knows something about the person before showing them anything.
+
+   THE LINE THAT MATTERS: it captures preferences, it does not give advice. Every answer writes into
+   D.policy, the rulebook Settings already edits and the queue already checks, so there is exactly one
+   copy of somebody's preferences and no second thing to disagree with the first. */
+t('the survey writes into the real rulebook, not a store of its own',
+  /D\.policy=Object\.assign\(\{\}, D\.policy\|\|\{\}, \{/.test(term) &&
+  !/D\.survey(Answers|Prefs)\s*=/.test(term));
+t('every number it sets is one Settings can show and change', (() => {
+  const fin = term.slice(term.indexOf('function finishSurvey()'), term.indexOf('function fillPolicyInputs()'));
+  return ['risk', 'maxPosition', 'cashTarget', 'riskPerTrade', 'exclusions'].every(k => fin.includes(k + ':'));
+})());
+t('it asks in sentences, never in percentages',
+  /How would you feel if this money dropped by a fifth\?/.test(term) &&
+  !/what percent|% of your portfolio/i.test(term.slice(term.indexOf('const SURVEY = ['), term.indexOf('let _sv ='))));
+t('it says out loud that none of it is advice',
+  /Nothing here is advice\. Your answers become your own rules/.test(term));
+t('skipping is recorded, so defaults are never passed off as their choices',
+  /D\.surveySkipped=Date\.now\(\);/.test(term) &&
+  /using safe defaults/.test(term));
+/* Order: the survey tells the terminal about the person, the tour tells the person about the
+   terminal. A tour given first is a tour of somebody else's settings. */
+t('the survey comes before the tour, and the tour waits for it',
+  /if\(surveyNeeded\(\)\)\{ startSurvey\(\); return; \}/.test(term) &&
+  term.indexOf('if(surveyNeeded()){ startSurvey(); return; }') < term.indexOf('setTimeout(()=>startTour(),450)'));
+t('and finishing it hands straight over to the tour',
+  /if\(typeof replayTour==='function'\) replayTour\(\);/.test(term.slice(term.indexOf('function finishSurvey()'))));
+t('the sandbox is left out of it', /if\(typeof isDemoUser==='function' && isDemoUser\(\)\) return false;/.test(term));
+
 /* ============ THE ACCOUNT OUTRANKS THE SCAFFOLDING (2026-09-29) ============
    Measured, not judged: with the data-key card and the Start here checklist both above it, the
    portfolio value sat 805px down the page, below the fold on a laptop. The one number a person
@@ -1787,7 +1818,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v159/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v160/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
