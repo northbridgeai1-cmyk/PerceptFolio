@@ -657,6 +657,11 @@ small.src{color:var(--muted)}
   .doorLabel{width:100%;margin-bottom:2px}
   .doorChip{padding:6px 11px;font-size:12.5px}
 }
+/* One thin row above the headlines, not a panel. It wraps rather than scrolling, for the same
+   reason the front-door chips do: a control a person cannot see is not a control. */
+.news-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 0 12px;margin-bottom:4px;border-bottom:1px solid var(--border)}
+.news-sep{width:1px;height:18px;background:var(--border);flex:none}
+@media (max-width:600px){ .news-bar{gap:6px} .news-bar input{max-width:120px !important} }
 .fold-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fold-toggle{display:flex;align-items:baseline;gap:9px;flex:1;min-width:0;background:none;border:0;padding:0;margin:0;
   color:var(--text);font:inherit;text-align:left;cursor:pointer}
@@ -1300,7 +1305,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <button data-tab="map" id="navMap" onclick="showTab('map')" data-tip="Supply chain"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg></span><span class="lbl">Supply chain</span></button>
     <button data-tab="world" id="navWorld" onclick="showTab('world')" data-tip="World"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-world"/></svg></span><span class="lbl">World</span></button>
     <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Find stocks"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Find stocks</span></button>
-    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Check a stock"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Check a stock</span></button>
+    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Analyze"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Analyze</span></button>
     <div class="nav-sep"></div>
     <button data-tab="risk" id="navRisk" onclick="showTab('risk')" data-tip="Risk"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"/></svg></span><span class="lbl">Risk</span></button>
     <button data-tab="projections" id="navProjections" onclick="showTab('projections')" data-tip="Projections"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"/></svg></span><span class="lbl">Projections</span></button>
@@ -1372,7 +1377,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
            says news, which nothing else on the screen does. Same reason for the last two: without a
            chip carrying "how much" and "wrong", those two goals ended in a blind press of More. -->
       <button type="button" class="doorChip" onclick="showTab('screener')">find something to buy</button>
-      <button type="button" class="doorChip" onclick="showTab('analyzer')">check a stock</button>
+      <button type="button" class="doorChip" onclick="showTab('analyzer')">analyze a stock</button>
       <button type="button" class="doorChip" onclick="showTab('portfolio')">see what I own</button>
       <button type="button" class="doorChip" onclick="showTab('news')">see today's news</button>
       <button type="button" class="doorChip" onclick="showWhatToSell()">know what to sell</button>
@@ -2147,33 +2152,36 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 
 <!-- NEWS -->
 <div id="tab-news" class="tabs-hidden">
-  <div class="card">
-    <div class="row" style="flex-wrap:wrap;margin-bottom:10px">
-      <input id="newsSearch" placeholder="Search any ticker…" style="max-width:190px"
-        onkeydown="if(event.key==='Enter')searchNews()">
-      <button class="btn" onclick="searchNews()">Search</button>
-      <div class="spacer"></div>
-      <span class="muted" id="newsStatus" style="font-size:12px"></span>
+  <!-- ============ THE NEWS FILLS THE PAGE (2026-09-30) ============
+       The owner: "when they open News, they expect to see the news all over the page." What was here
+       was a control panel: a search box, three window buttons, a button called "Load my positions", a
+       world-headlines row and a country box, all above an empty space saying no news was loaded.
+       Somebody arriving to read the news met six controls and no news.
+
+       So: one thin row, and everything below it is headlines. The window buttons are chips because
+       they are a filter, not an action. "Load my positions" became Refresh, since the tab now loads
+       itself on open, and a button offering to do the thing that already happened is how software
+       teaches people to distrust it. World and country moved into the same row instead of owning a
+       section above the news. -->
+  <div class="news-bar">
+    <input id="newsSearch" placeholder="Any ticker…" style="max-width:150px"
+      onkeydown="if(event.key==='Enter')searchNews()">
+    <button class="btn btn-sm" onclick="searchNews()">Search</button>
+    <span class="news-sep"></span>
+    <div class="row" style="gap:2px">
+      <button class="btn btn-ghost btn-sm nw-win on" data-win="1" onclick="setNewsWindow(1)">Today</button>
+      <button class="btn btn-ghost btn-sm nw-win" data-win="7" onclick="setNewsWindow(7)">Week</button>
+      <button class="btn btn-ghost btn-sm nw-win" data-win="30" onclick="setNewsWindow(30)">Month</button>
     </div>
-    <div class="row" style="flex-wrap:wrap">
-      <div class="row" style="gap:2px">
-        <button class="btn btn-ghost btn-sm nw-win on" data-win="1" onclick="setNewsWindow(1)">Today</button>
-        <button class="btn btn-ghost btn-sm nw-win" data-win="7" onclick="setNewsWindow(7)">Week</button>
-        <button class="btn btn-ghost btn-sm nw-win" data-win="30" onclick="setNewsWindow(30)">Month</button>
-      </div>
-      <div class="spacer"></div>
-      <button class="btn btn-ghost" id="newsLoadBtn" onclick="loadNews(true)">Load my positions</button>
-    </div>
-    <!-- THE WORLD. Finnhub covers markets and US companies and has nothing for "what is going on in
-         Nigeria", so this reads Google News through the worker. Kept in its own row, under its own
-         heading, because it is context and never an input to a verdict. -->
-    <div class="row" style="flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-      <button class="btn btn-ghost" onclick="loadWorldNews('')">World headlines</button>
-      <input id="worldCountry" placeholder="Or a country: Japan, Nigeria, Chile…" style="max-width:250px"
-             onkeydown="if(event.key==='Enter')loadWorldNews()">
-      <button class="btn" onclick="loadWorldNews()">Show</button>
-      <span class="muted" id="worldNewsStatus" style="font-size:12px"></span>
-    </div>
+    <span class="news-sep"></span>
+    <button class="btn btn-ghost btn-sm" onclick="loadWorldNews('')">World</button>
+    <input id="worldCountry" placeholder="A country…" style="max-width:150px"
+           onkeydown="if(event.key==='Enter')loadWorldNews()">
+    <button class="btn btn-ghost btn-sm" onclick="loadWorldNews()">Show</button>
+    <div class="spacer"></div>
+    <span class="muted" id="newsStatus" style="font-size:12px"></span>
+    <span class="muted" id="worldNewsStatus" style="font-size:12px"></span>
+    <button class="btn btn-ghost btn-sm" id="newsLoadBtn" onclick="loadNews(true)">Refresh</button>
   </div>
   <div id="worldNewsBody" style="margin-top:16px"></div>
   <div id="newsBody" style="margin-top:16px"><div class="empty" style="text-align:left;line-height:1.7"><b>No news loaded yet.</b><br><span style="font-size:12.5px">News is fetched on demand so it does not spend your Finnhub quota in the background. Press Refresh, or open a ticker from Portfolio. Headlines are shown as context only: this product never turns a headline into a buy or sell verdict, because a model asked to justify a verdict from headlines will always find a reason.</span></div></div>
@@ -2252,6 +2260,22 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     </div>
   </div>
   <div id="analyzerResult"><div class="empty">Nothing analysed yet.</div></div>
+
+  <!-- ============ ANALYZE THE WHOLE BOOK (2026-09-30) ============
+       The owner: "in there I can analize my portfolio, see what I should keep and what I should
+       remove." Everything needed already existed and was scattered: the 22 checks run per name, the
+       verdict column knows which are sells, and the policy knows the size limits. Nobody was ever
+       going to assemble that by opening each holding one at a time.
+       It reads what is already scored and says nothing about what is not. A holding with no analysis
+       is listed as unreviewed, not as a keep: silence is not a verdict. -->
+  <div class="card" style="margin-top:16px" id="bookReviewCard">
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;align-items:center;gap:10px">
+      <h3 style="margin:0">Analyze my portfolio</h3>
+      <button class="btn" onclick="analyzeBook()" id="bookReviewBtn">What should I keep?</button>
+    </div>
+    <div class="muted" style="font-size:13px;margin-top:8px">Runs every holding you own against your own rules and sorts them into keep, look at, and think about selling.</div>
+    <div id="bookReviewBody" style="margin-top:14px"></div>
+  </div>
   <div class="card" style="margin-top:16px">
     <h3>Compare two stocks</h3>
     <div class="row">
@@ -4141,7 +4165,7 @@ const TOUR=[
   { tab:'screener', tag:'Find stocks', cls:'t-amber',
     q:'When you want an idea.',
     body:'This runs your own rules, the ones you just set, across a list of companies and shows only the ones that clear them. It is not a tip sheet: change your rules and the answers change.' },
-  { tab:'analyzer', tag:'Check a stock', cls:'t-violet',
+  { tab:'analyzer', tag:'Analyze', cls:'t-violet',
     q:'Is this company any good?',
     body:'Type a name. You get twenty-two checks: twelve on the business, six on the price, four on whether the market agrees. Read the rows that failed, not only the score. The score is just a summary of those rows.' },
   { tab:'history', tag:'History', cls:'t-blue',
@@ -10366,6 +10390,69 @@ function notify(title,body){
 }
 
 /* ================= ANALYZER UI ================= */
+/* ===================== ANALYZE THE WHOLE BOOK (2026-09-30) =====================
+   Three buckets, in the words somebody asked the question in: keep it, look at it, think about
+   selling. Each row carries the one-line reason, because a verdict without a reason is a tip, and a
+   tip is the thing this product exists not to be.
+
+   IT SCORES WHAT IS NOT SCORED, rather than guessing. A holding with no analysis yet is not a keep;
+   it is unreviewed, and it says so and offers to fix it. Silence is not a verdict.
+
+   IT ALSO CHECKS SIZE, which the per-name verdict cannot see. A company can pass all 22 checks and
+   still be too much of somebody's money, and that is the failure the owner's rulebook exists to
+   catch: right about the company, wrong about the size. */
+async function analyzeBook(){
+  const body=document.getElementById('bookReviewBody'), btn=document.getElementById('bookReviewBtn');
+  if(!body)return;
+  const hold=(D.holdings||[]).filter(h=>h.sym);
+  if(!hold.length){ body.innerHTML='<div class="empty">Nothing in your book yet. Add what you own in Portfolio first.</div>'; return; }
+  if(btn){btn.disabled=true;btn.textContent='Looking…';}
+  body.innerHTML='<div class="muted" style="font-size:13px">Scoring '+hold.length+' holding'+(hold.length===1?'':'s')+'…</div>';
+  /* Anything unscored is scored now, one at a time, so a first run is useful rather than empty. */
+  for(const h of hold){
+    if(h.type==='Stock'&&!D.analyses[h.sym]){
+      try{ await analyzeStock(h.sym); }catch(e){ /* one bad ticker must not stop the rest */ }
+    }
+  }
+  const p=policy();
+  const total=hold.reduce((a,h)=>a+((h.price??h.cost)*h.shares),0)+(D.cash||0);
+  const rows=hold.map(h=>{
+    const val=(h.price??h.cost)*h.shares;
+    const pct=total>0?(val/total*100):0;
+    const sc=h.type==='Stock'?D.analyses[h.sym]:null;
+    const v=sc?verdictOf(sc,true,h.sym):null;
+    const tooBig=pct>p.maxPosition;
+    let bucket, why;
+    if(!sc){ bucket='unreviewed'; why='Not scored yet.'; }
+    else if(v&&v.key==='sell'){ bucket='sell'; why=v.why||('Your rules say '+v.label.toLowerCase()+'.'); }
+    else if(tooBig){ bucket='look'; why='This is '+pct.toFixed(1)+'% of your money and your limit is '+p.maxPosition+'%.'; }
+    else if(v&&v.key==='watch'){ bucket='look'; why=v.label+'.'; }
+    else { bucket='keep'; why=v?(v.label+'.'):'Passes your rules.'; }
+    return {sym:h.sym, pct, bucket, why, val};
+  });
+  const group=(k)=>rows.filter(r=>r.bucket===k).sort((a,b)=>b.pct-a.pct);
+  const money=v=>pmask(fmt$(v));
+  const block=(title,cls,note,list)=>!list.length?'':
+    '<div style="margin-top:16px"><div class="section-title" style="margin-top:0">'+title+' <span class="muted" style="font-weight:400">'+list.length+'</span></div>'+
+    '<div class="muted" style="font-size:12.5px;margin:-6px 0 10px">'+note+'</div>'+
+    '<table class="tbl" style="font-size:13px"><tbody>'+list.map(r=>
+      '<tr><td style="white-space:nowrap"><b>'+esc(r.sym)+'</b></td>'+
+      '<td class="muted" style="white-space:nowrap">'+r.pct.toFixed(1)+'% · '+money(r.val)+'</td>'+
+      '<td>'+esc(r.why)+'</td>'+
+      '<td style="text-align:right"><button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(r.sym)+'\')">Open</button></td></tr>').join('')+
+    '</tbody></table></div>';
+  const keep=group('keep'), look=group('look'), sell=group('sell'), un=group('unreviewed');
+  body.innerHTML=
+    '<div class="muted" style="font-size:13px">Against your own rules: at most '+p.maxPosition+'% in one name, '+p.risk+' risk.'+
+      (p.exclusions?' Avoiding '+esc(p.exclusions)+'.':'')+'</div>'+
+    block('Think about selling','neg','Your rules say these no longer qualify. It is your call, not the terminal’s.',sell)+
+    block('Worth a look','warn','Not a sell. Either too much of your money, or the price has run ahead of the business.',look)+
+    block('Keep','pos','Still passes everything you asked for.',keep)+
+    block('Not reviewed','muted','No score yet, which is not the same as a pass.',un)+
+    '<div class="muted" style="font-size:11.5px;margin-top:14px">This is your rulebook applied to your holdings. Change the rules in Settings and these answers change. Nothing here is advice and nothing is a recommendation to buy or sell.</div>';
+  if(btn){btn.disabled=false;btn.textContent='Check again';}
+}
+
 async function analyzeStock(symArg){
   const sym=(symArg||document.getElementById('aTicker').value).trim().toUpperCase();
   if(!sym)return;

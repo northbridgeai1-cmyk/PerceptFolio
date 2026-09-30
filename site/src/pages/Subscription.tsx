@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { StartButton, PriceLine } from '@/components/StartButton';
 import { SCREENS } from '@/lib/config';
 
 /* WHAT A SUBSCRIPTION INCLUDES. No number (owner's decision, 2026-09-27).
@@ -27,7 +27,11 @@ export function Subscription() {
       <p className="mb-3 font-mono text-[12px] font-semibold uppercase tracking-[.14em] text-accent">The terminal</p>
       <h1 className="mb-4 max-w-[18ch]">One subscription. One person. Everything in it.</h1>
       <p className="lede max-w-[62ch]">For the person who makes the call and is expected to explain it, sometimes months later. Ask for a demo and the reply carries the price, the terms, and a plain answer if this is not the right tool for your work.</p>
-      <div className="mt-8"><Button asChild variant="primary" size="lg"><Link to="/#request">Request a demo</Link></Button></div>
+      <PriceLine className="lede mt-6 max-w-[62ch]" />
+      <div className="mt-8 flex flex-wrap gap-4">
+        <StartButton plan="personal-monthly" label={'Start monthly'} />
+        <StartButton plan="personal-yearly" label={'Start yearly'} />
+      </div>
 
       <section className="mt-16 border-t border-line pt-10" aria-labelledby="h-inc">
         <h2 id="h-inc" className="mb-2">What is included</h2>
@@ -86,7 +90,7 @@ export function Subscription() {
       <section className="mt-16 rounded-[12px] border border-line bg-panel p-8" aria-labelledby="h-cta">
         <h2 id="h-cta" className="mb-3 text-[28px]">See it on your own positions</h2>
         <p className="mb-6 max-w-[58ch] text-dim">A demo run on the names you actually hold, then the price and the terms by email. A person at NorthBridge reads every request.</p>
-        <Button asChild variant="primary" size="lg"><Link to="/#request">Request a demo</Link></Button>
+        <StartButton />
       </section>
     </main>
   );

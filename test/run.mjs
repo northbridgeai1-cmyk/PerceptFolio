@@ -330,7 +330,7 @@ t('the front door is a row of plain-words chips, at the top of Today',
   term.indexOf('id="doorRow"') < term.indexOf('id="dashRecord"'));
 t('it carries the eight things people actually arrive wanting', (() => {
   const row = term.slice(term.indexOf('id="doorRow"'), term.indexOf('</div>', term.indexOf('bring in my account')));
-  return ['find something to buy','check a stock','see what I own','see today’s news'.replace('’',"'"),
+  return ['find something to buy','analyze a stock','see what I own','see today’s news'.replace('’',"'"),
           'know what to sell','how much to put in','what could go wrong','bring in my account']
     .every(t2 => row.includes(t2));
 })());
@@ -986,7 +986,7 @@ t('the tabs he understood keep the names he understood',
   /<button data-tab="projections"[^>]*data-tip="Projections"/.test(term));
 t('and the plain ones nobody objected to stayed plain',
   /<button data-tab="screener"[^>]*data-tip="Find stocks"/.test(term) &&
-  /<button data-tab="analyzer"[^>]*data-tip="Check a stock"/.test(term) &&
+  /<button data-tab="analyzer"[^>]*data-tip="Analyze"/.test(term) &&
   /<button data-tab="dashboard"[^>]*data-tip="Today"/.test(term));
 t('lists are additive to watchlist, which keeps its shape',
   /lists:\[\],/.test(term) && /watchlist:\[\],/.test(term));
@@ -1601,7 +1601,9 @@ G('M3: the public site, same rules as the page it replaces');
   /* One primary in the hero and one text link beside it. "I have a code" is gone (owner,
      2026-09-22): the email that carries the code carries the link to the terminal with it, so a
      second button on the page was a door nobody arrives at. */
-  t('site: one primary in the hero, a text link beside it, and no code button', /variant="primary" size="lg"><a href="#request">Request a demo<\/a>/.test(src) && !/I have a code/.test(src) && /or try it on real history first/.test(src) && (read('site/src/pages/Landing.tsx').match(/variant="primary"/g) || []).length === 1);
+  /* SELF-SERVE SINCE 2026-09-30. The hero button used to open a demo-request form; it opens Stripe
+     now. One filled button still, and still one only. */
+  t('site: one primary in the hero, a text link beside it, and no code button', /<StartButton \/>/.test(read('site/src/pages/Landing.tsx')) && !/I have a code/.test(src) && /or try it on real history first/.test(src) && (read('site/src/pages/Landing.tsx').match(/<StartButton/g) || []).length === 2);
   /* FormSubmit delivers the request; the visitor has nothing to send. Opening their mail app made
      an arrived request look like a failed one. */
   t('the request form never opens a mail app', !/mailto:/.test(read('site/src/components/RequestForm.tsx')) && !/mailFallback/.test(read('site/src/components/RequestForm.tsx')) && /formsubmit\.co\/ajax\//.test(read('site/src/components/RequestForm.tsx')) && /Nothing else to send/.test(src));
@@ -1609,10 +1611,9 @@ G('M3: the public site, same rules as the page it replaces');
   /* ONE ACTION, EVERY PAGE (2026-09-27). The header carries a single filled button and it is always
      the same one. The subscriber's row above it is where an existing holder signs in, so the two
      audiences no longer read past each other. */
-  t('site: the nav has exactly one primary, and it is the demo unless you have entered', (() => {
+  t('site: the nav has exactly one primary, and it starts a subscription unless you have entered', (() => {
     const nv = read('site/src/components/Nav.tsx');
-    return (nv.match(/variant="primary"/g) || []).length === 2
-      && /Request a demo<\/Link>/.test(nv) && /Resume session<\/a>/.test(nv) && !/onPricing/.test(nv);
+    return /<StartButton size="sm" label="Start free"/.test(nv) && !/Request a demo/.test(nv);
   })());
   /* The utility row carries the three things that are not the sale: the way back in, support, and
      the language. The language moved up here because the primary row could not fit a logo, links,
@@ -1624,7 +1625,13 @@ G('M3: the public site, same rules as the page it replaces');
       && nv.indexOf("mailto:' + SUPPORT") > util && nv.indexOf("mailto:' + SUPPORT") < primary
       && nv.indexOf('data-lang-toggle') > util && nv.indexOf('data-lang-toggle') < primary;
   })());
-  t('site: the subscription page is quote-first, one action, no self-serve checkout', /Request a demo<\/Link>/.test(read('site/src/pages/Subscription.tsx')) && !/checkout\(/.test(read('site/src/pages/Subscription.tsx')));
+  /* REVERSED 2026-09-30, on the owner's instruction: no demo, no queue, no quote. The page sells.
+     There were two questionnaires, one to qualify a buyer for a price that is now printed, and one
+     inside the terminal that sets their rules. Only the second survives. */
+  t('site: the subscription page sells directly, with both plans', (() => {
+    const u = read('site/src/pages/Subscription.tsx');
+    return /<StartButton plan="personal-monthly"/.test(u) && /<StartButton plan="personal-yearly"/.test(u) && !/Request a demo/.test(u);
+  })());
   /* One plan. REPRICED 2026-09-29 to $39 a month or $390 a year, after a non-investor walked the
      terminal and the audience widened. The old number assumed a narrow professional buyer; value
      tracks portfolio size, and at $760 nobody outside that buyer could justify it. No second plan,
@@ -1645,18 +1652,23 @@ G('M3: the public site, same rules as the page it replaces');
   const MARKETING = f => !/pages\/Welcome\.tsx$/.test(f);
   const shippedMarketing = walk('site/src').filter(f => /\.(tsx|ts)$/.test(f) && MARKETING(f))
     .map(f => fs.readFileSync(f, 'utf8')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
-  t('site: no page renders a price, and Pricing.tsx is gone', (() => {
-    return !fs.existsSync(path.join(ROOT, 'site/src/pages/Pricing.tsx'))
-      && !/PLAN\.(monthly|yearly)/.test(shippedMarketing)
-      && !/\$\s?39\b|\$\s?390\b/.test(shippedMarketing.replace(/export const PLAN[^;]*;/, ''));
+  /* The price is on the page now. The old rule was made for a $760 product sold to a narrow
+     audience; at $39 hiding the number only looks like there is something to hide. It is rendered
+     from PLAN in one component, so the site and the worker cannot drift apart. */
+  t('site: the price is rendered, from the one config, in one place', (() => {
+    const sb = read('site/src/components/StartButton.tsx');
+    return !fs.existsSync(path.join(ROOT, 'site/src/pages/Pricing.tsx')) &&
+      /\$\{PLAN\.monthly\} a month/.test(sb) && /\$\{PLAN\.yearly\} a year/.test(sb) &&
+      /import \{ WORKER, PLAN, SUPPORT \}/.test(sb);
   })());
+  t('site: and the months-free claim is computed, never written', /Math\.round\(\(PLAN\.monthly \* 12 - PLAN\.yearly\) \/ PLAN\.monthly\)/.test(read('site/src/components/StartButton.tsx')));
   t('site: the one page that must show a figure is the one reached only by paying', (() => {
     const w = read('site/src/pages/Welcome.tsx');
     return /PLAN\.yearly/.test(w) && /PLAN\.monthly/.test(w)
       && /unless you cancel before then/.test(w)
       && /const trialing = !!\(c && c\.status === 'trialing' && c\.trialEnd\);/.test(w);
   })());
-  t('site: the subscription page sells what is included and ends in the one action', /What is included/.test(read('site/src/pages/Subscription.tsx')) && (read('site/src/pages/Subscription.tsx').match(/Request a demo/g) || []).length >= 2);
+  t('site: the subscription page sells what is included and ends in the one action', /What is included/.test(read('site/src/pages/Subscription.tsx')) && (read('site/src/pages/Subscription.tsx').match(/<StartButton/g) || []).length >= 3);
   t('site: /pricing still resolves, so old links and the sitemap do not 404', /path="\/pricing" element=\{<Subscription \/>\}/.test(read('site/src/main.tsx')) && /path="\/subscription" element=\{<Subscription \/>\}/.test(read('site/src/main.tsx')));
   /* "Business email" is a field label on the demo form, not the tier that was removed. */
   t('site: nothing on the site says Personal, Business, seats or apply', !/\bPersonal\b|\bBusiness\b(?! email)|seats for a firm|\/apply/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')) && !fs.existsSync(path.join(ROOT, 'site/src/pages/Apply.tsx')));
@@ -1872,7 +1884,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v162/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v163/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -3445,7 +3457,11 @@ G('What is happening, and where');
   t('the panel says it feeds no verdict, and every row carries its source and time',
     /Not scored, and it feeds no verdict/.test(term) && /function renderWorldNews\(\)/.test(term));
   t('links to other people\'s sites open safely', /target="_blank" rel="noopener noreferrer"/.test(term));
-  t('the News tab offers the world and a country box', /onclick="loadWorldNews\(''\)">World headlines<\/button>/.test(term) && /id="worldCountry"/.test(term));
+  /* The controls compacted to one row on 2026-09-30: somebody arriving to read the news met six
+     controls and no news. World and country survive, in that row rather than above the headlines. */
+  t('the News tab still offers the world and a country box', /onclick="loadWorldNews\(''\)">World<\/button>/.test(term) && /id="worldCountry"/.test(term));
+  t('and the controls are one thin row, not a panel above the news',
+    /<div class="news-bar">/.test(term) && /\.news-bar\{display:flex;align-items:center;gap:8px;flex-wrap:wrap/.test(term));
   t('it is contract-tested against the live feed', fs.existsSync('test/worldnews.mjs') && /country: returns coverage and puts the ones naming it first/.test(read('test/worldnews.mjs')));
 }
 

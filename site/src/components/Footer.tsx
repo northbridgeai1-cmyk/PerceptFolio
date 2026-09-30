@@ -21,7 +21,7 @@ export function Footer() {
             <Link to="/" aria-label="PerceptFolio home" className="inline-flex items-center gap-[10px] text-text no-underline text-[17px]"><Mark /><Wordmark /></Link>
             <p className="mt-3 max-w-[70ch] text-[13.5px] leading-[1.6] text-faint">PerceptFolio is research software. It applies rules you set to public data and records the result. It is not a registered investment adviser or broker, takes no custody of assets, and nothing on this site or in the terminal is a recommendation to buy or sell any security.</p>
           </div>
-          <div className="flex flex-wrap gap-[6px] md:justify-end"><L to="/#record">Record</L><L to="/#who">Who it's for</L><L to="/subscription">The terminal</L><L to="/security">Security</L><L to="/#faq">Questions</L><L to="/#request">Request a demo</L></div>
+          <div className="flex flex-wrap gap-[6px] md:justify-end"><L to="/#record">Record</L><L to="/#who">Who it's for</L><L to="/subscription">The terminal</L><L to="/security">Security</L><L to="/#faq">Questions</L><L to="/#request">Start</L></div>
         </div>
         <div className="mt-6 flex flex-wrap justify-between gap-4 border-t border-line pt-4 text-[13px] text-faint">
           <span>© {new Date().getFullYear()} NorthBridge Financial · <a href={'mailto:' + SUPPORT}>{SUPPORT}</a> · <Status /></span>

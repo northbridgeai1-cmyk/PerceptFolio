@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { StartButton } from '@/components/StartButton';
 import { Mark, Wordmark } from '@/components/Logo';
 import { SUPPORT } from '@/lib/config';
 
@@ -13,7 +14,7 @@ import { SUPPORT } from '@/lib/config';
      utility row   the people who already pay: sign in, and support. Small, quiet, above the line.
      primary row   the people who do not: what the thing is, then ONE action.
 
-   One action, everywhere, in one phrase: Request a demo. It is the only filled button on the site.
+   One action, everywhere, in one phrase: Start free. It is the only filled button on the site.
    Pricing has left the nav with the price itself; what a subscription includes is a product page
    now, not a number. A browser that has entered before gets Resume session in place of the demo
    button, because someone already inside is not being sold to. */
@@ -48,7 +49,7 @@ export function Nav() {
             <Link to="/security" className={link}>Security</Link>
             {entered
               ? <Button asChild variant="primary" className="ml-2"><a href="/terminal/">Resume session</a></Button>
-              : <Button asChild variant="primary" className="ml-2"><Link to="/#request">Request a demo</Link></Button>}
+              : <StartButton size="sm" label="Start free" className="ml-2" />}
           </div>
         </div>
       </nav>
