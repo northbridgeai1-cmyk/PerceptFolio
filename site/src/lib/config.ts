@@ -18,10 +18,10 @@ export const SUPPORT = SUPPORT_LIVE ? 'support@perceptfolio.com' : CONTACT;
    PRICE and admin's quote draft, and the suite checks that all three match. Rendering it is what
    stopped, not keeping it.
 
-   One plan (owner's decision, 2026-09-22): the terminal, $760 a month or $8,360 a year, one
+   One plan. REPRICED 2026-09-29 to $39 a month or $390 a year, one
    person, quote-first. There is no second plan and no seat price. The worker's PRICE must agree
    with these numbers; the suite checks both. */
-export const PLAN = { monthly: 760, yearly: 8360 } as const;
+export const PLAN = { monthly: 39, yearly: 390 } as const;
 
 /* A5.3. The screens, and the decision each one answers. `still` is true where /preview/<id>.html
    exists (a snapshot of that screen on the sandbox account, made with Settings → Snapshot this

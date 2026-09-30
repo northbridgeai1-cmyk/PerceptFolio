@@ -1534,9 +1534,12 @@ G('M3: the public site, same rules as the page it replaces');
       && nv.indexOf('data-lang-toggle') > util && nv.indexOf('data-lang-toggle') < primary;
   })());
   t('site: the subscription page is quote-first, one action, no self-serve checkout', /Request a demo<\/Link>/.test(read('site/src/pages/Subscription.tsx')) && !/checkout\(/.test(read('site/src/pages/Subscription.tsx')));
-  /* One plan (2026-09-22): the terminal, $760 a month or $8,360 a year. No second plan, no seats,
+  /* One plan. REPRICED 2026-09-29 to $39 a month or $390 a year, after a non-investor walked the
+     terminal and the audience widened. The old number assumed a narrow professional buyer; value
+     tracks portfolio size, and at $760 nobody outside that buyer could justify it. No second plan,
+     no seats,
      no Founding label; the site never says Personal or Business. */
-  t('site: one plan in one config, still matching the worker', /export const PLAN = \{ monthly: 760, yearly: 8360 \} as const;/.test(read('site/src/lib/config.ts')) && !/PLANS|Founding|seatsIncluded/.test(read('site/src/lib/config.ts')));
+  t('site: one plan in one config, still matching the worker', /export const PLAN = \{ monthly: 39, yearly: 390 \} as const;/.test(read('site/src/lib/config.ts')) && !/PLANS|Founding|seatsIncluded/.test(read('site/src/lib/config.ts')));
   /* QUOTE ONLY (2026-09-27). No page renders a figure; the reply carries it. PLAN stays the one
      place the number is written, for the worker and admin to agree with, and ships to nobody. */
   /* Comments are stripped first: the figure is explained at length in the source of config.ts and
@@ -1554,7 +1557,7 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: no page renders a price, and Pricing.tsx is gone', (() => {
     return !fs.existsSync(path.join(ROOT, 'site/src/pages/Pricing.tsx'))
       && !/PLAN\.(monthly|yearly)/.test(shippedMarketing)
-      && !/\$\s?760|8,360|8360/.test(shippedMarketing.replace(/export const PLAN[^;]*;/, ''));
+      && !/\$\s?39\b|\$\s?390\b/.test(shippedMarketing.replace(/export const PLAN[^;]*;/, ''));
   })());
   t('site: the one page that must show a figure is the one reached only by paying', (() => {
     const w = read('site/src/pages/Welcome.tsx');
@@ -1601,7 +1604,7 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: the time-to-evidence line sits under the empty scorecard (A5.5)', /calls a quarter, against the roughly 138 the interval needs/.test(read('site/src/pages/Landing.tsx')));
   t('site: a security sheet and the flat-quarter statement are routed and linked (A2.6, A2.7, A5.6)', /path="\/security"/.test(read('site/src/main.tsx')) && /path="\/flat-quarter"/.test(read('site/src/main.tsx')) && /to="\/security"/.test(read('site/src/components/Footer.tsx')));
   t('site: the support address is one constant, behind a flag until Email Routing exists (A1.5)', /SUPPORT_LIVE \? 'support@perceptfolio\.com' : CONTACT/.test(read('site/src/lib/config.ts')) && /mailto:' \+ SUPPORT/.test(read('site/src/components/Footer.tsx')) && /fetch\(WORKER \+ '\/version'/.test(read('site/src/components/Footer.tsx')));
-  t('the worker tells the operator on every request, with the one suggested quote', /Demo request from \$\{email\}/.test(worker) && /Suggested quote:\\n\$\{q\.text\}/.test(worker) && /const PRICE = \{ monthly: 760, yearly: 8360 \};/.test(worker) && /The terminal: \$\$\{PRICE\.monthly\} a month/.test(worker));
+  t('the worker tells the operator on every request, with the one suggested quote', /Demo request from \$\{email\}/.test(worker) && /Suggested quote:\\n\$\{q\.text\}/.test(worker) && /const PRICE = \{ monthly: 39, yearly: 390 \};/.test(worker) && /The terminal: \$\$\{PRICE\.monthly\} a month/.test(worker));
   t('there is no member-code route and no seat to mint one for', !/decide\/members/.test(worker) && !/seatCodes/.test(worker) && !/minSeats/.test(worker));
   /* One plan (2026-09-22): admin grants access or denies it. No seats, no member codes, no second
      price, and nothing in the operator's hands that offers a business terminal. */
@@ -1611,7 +1614,24 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: skeleton before the demo deals; shimmer stops under reduced motion', /<Skeleton/.test(read('site/src/components/Demo.tsx')) && /prefers-reduced-motion: reduce\) \{ html \{ scroll-behavior: auto; \} \*, \*::before, \*::after \{ animation: none !important/.test(read('site/src/index.css')));
   t('site: Archivo self-hosted, never a font CDN', /url\("\/fonts\/Archivo\.woff2"\)/.test(read('site/src/index.css')) && !/fonts\.googleapis/.test(src + read('site/index.html')) && fs.existsSync('site/public/fonts/Archivo.woff2'));
   t('site: legal pages say software, not advice, and fourteen-day refunds', /not a registered investment adviser or broker-dealer/.test(src) && /Fourteen days from any payment/.test(src));
-  t('site: the price comes from one config and matches the worker', /monthly: 760, yearly: 8360/.test(read('site/src/lib/config.ts')) && /const PRICE = \{ monthly: 760, yearly: 8360 \};/.test(worker));
+  /* Written as one pair read from both files rather than two literals, so the next reprice changes
+     one line here instead of four and cannot leave the two sides disagreeing. */
+  t('site: the price comes from one config and matches the worker', (() => {
+    const site = (read('site/src/lib/config.ts').match(/monthly: (\d+), yearly: (\d+)/) || []).slice(1).join('/');
+    const wk = (worker.match(/const PRICE = \{ monthly: (\d+), yearly: (\d+) \};/) || []).slice(1).join('/');
+    return site === '39/390' && wk === site;
+  })());
+  /* The yearly discount is arithmetic, not a slogan. At $760/$8,360 it was one month free; at
+     $39/$390 it is two, and a claim about somebody's money that is off by a month is the kind of
+     wrong that gets noticed at the till. Checked rather than trusted. */
+  t('site: the yearly saving claim matches the arithmetic', (() => {
+    const m = +(worker.match(/const PRICE = \{ monthly: (\d+)/) || [])[1];
+    const y = +(worker.match(/const PRICE = \{ monthly: \d+, yearly: (\d+) \}/) || [])[1];
+    const months = (m * 12 - y) / m;
+    const claimed = /a year \(two months free\)/.test(worker) ? 2 : /a year \(one month free\)/.test(worker) ? 1 : null;
+    return Number.isInteger(months) && claimed === months;
+  })());
+
   /* THE STALE-BUNDLE TRAP (2026-09-27). assemble.mjs copied site/dist and trusted it, so editing a
      .tsx, assembling and deploying shipped the PREVIOUS bundle with every check still passing:
      the suite reads the source, and the source was right. It now builds when the source is newer. */

@@ -2867,14 +2867,14 @@ const PLANS = {
 };
 const GRACE_DAYS = 7;
 
-/* One plan (owner's decision, 2026-09-22): the terminal, $760 a month or $8,360 a year, for one
+/* One plan. REPRICED 2026-09-29 from $760/$8,360 to $39/$390, for one
    person. site/src/lib/config.ts carries the same two numbers; the suite checks they agree. There
    is no second plan to choose between and no seat count to quote; the operator's reply is the
    binding price. */
-const PRICE = { monthly: 760, yearly: 8360 };
+const PRICE = { monthly: 39, yearly: 390 };
 function quoteFor() {
   return { plan: 'terminal', monthly: PRICE.monthly, yearly: PRICE.yearly, discountPct: 0,
-    text: `The terminal: $${PRICE.monthly} a month, or $${PRICE.yearly.toLocaleString()} a year (one month free). ${TRIAL_DAYS} days first, with a card but no charge; it bills on day ${TRIAL_DAYS + 1} unless cancelled, and cancelling is one click. One person, one book, your own rules; the record, its server copy if you want it, and the evidence pack. Fourteen-day refund on any payment.\nSupport by email on weekdays, US Eastern, answered the same or the next business day. The site and the service run on Cloudflare's network; the footer of the site measures whether the service is answering; an incident is told to you by email.` };
+    text: `The terminal: $${PRICE.monthly} a month, or $${PRICE.yearly.toLocaleString()} a year (two months free). ${TRIAL_DAYS} days first, with a card but no charge; it bills on day ${TRIAL_DAYS + 1} unless cancelled, and cancelling is one click. One person, one book, your own rules; the record, its server copy if you want it, and the evidence pack. Fourteen-day refund on any payment.\nSupport by email on weekdays, US Eastern, answered the same or the next business day. The site and the service run on Cloudflare's network; the footer of the site measures whether the service is answering; an incident is told to you by email.` };
 }
 
 /* ===== THE THREE DAYS (2026-09-29) =====
@@ -2885,7 +2885,7 @@ function quoteFor() {
    moves the subscription from trialing to active on its own, the worker already treats both as
    fully live, and the subscription events already carry the failure cases.
 
-   WHAT THIS OBLIGES US TO SAY. A trial that turns into $760 without another click has to state, in
+   WHAT THIS OBLIGES US TO SAY. A trial that turns into a charge without another click has to state, in
    plain words and before the card is entered, what will be charged and when. Stripe's own checkout
    page says it; so does the code email, the welcome page and the quote. Three days is short enough
    that "I forgot" is a real thing that will happen to somebody, so the date is given as a date. */
@@ -3597,7 +3597,7 @@ async function handleBilling(request, env, url) {
      THE CODE IS NOT IN THIS RESPONSE, AND THAT IS DELIBERATE. It is the only credential for the
      account. The session id sits in a browser's address bar and history and leaks through a referrer,
      so anything reachable with it is effectively public; a code handed out at this route would be a
-     $760-a-month account handed to whoever saw the URL over a shoulder. The code goes by email, to
+     paid account handed to whoever saw the URL over a shoulder. The code goes by email, to
      the address that paid, and the page says which address rather than what the code is.
 
      The email comes back masked for the same reason: enough for "yes, that is my address", not
@@ -3626,7 +3626,7 @@ async function handleBilling(request, env, url) {
       const rec = await env.PF_SYNC.get('sub:' + sess.customer);
       if (rec) { try { const o = JSON.parse(rec); provisioned = !!o.code; mailed = o.mailed === undefined ? null : !!o.mailed; trialEnd = o.trialEnd || null; status = o.status || null; } catch (e) { /* a malformed record is not provisioned */ } }
     }
-    /* THE CHARGE DATE IS NOT A DETAIL. Someone three days from a $760 charge is owed the date on the
+    /* THE CHARGE DATE IS NOT A DETAIL. Someone three days from a charge is owed the date on the
        page they land on, not only in an email they may not have opened yet. */
     return json({ ok: true, paid, provisioned, mailed, email: maskEmail(email), plan, trialDays: TRIAL_DAYS, trialEnd, status }, 200, env);
   }
