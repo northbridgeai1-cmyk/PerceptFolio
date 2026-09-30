@@ -295,8 +295,8 @@ t('a broker trade is history, never a graded call',
 
    THE COUNT ON THE BUTTON IS THE SAFETY PROPERTY, not the fold. A filter left on while its control
    is hidden is how somebody reads a partial book as the whole one. */
-t('the holdings table comes before the trade sizer and the cash field',
-  term.indexOf('id="holdingsTable"') < term.indexOf('Before you trade: what this does to the portfolio') &&
+t('the holdings table comes before the sizing tool and the cash field',
+  term.indexOf('id="holdingsTable"') < term.indexOf('<h3>How much should I put in?</h3>') &&
   term.indexOf('id="holdingsTable"') < term.indexOf('<h3>Cash available to invest</h3>'));
 t('search and the gain/loss mode stay visible; the other four fold',
   term.indexOf('id="pfFilterQ"') < term.indexOf('id="pfFilterMore"') &&
@@ -374,8 +374,10 @@ t('there is exactly one settings grouping mechanism', (() => {
   const defs = (term.match(/window\.showSettings\s*=|function showSettings\(/g) || []).length;
   return defs === 1 && /window\.showSettings=function\(name\)/.test(term);
 })());
-t('the API keys group exists, and takes both cards by their headings',
-  /\['API keys',\/\^\(API keys\|Your broker\)\/i\]/.test(term));
+/* Renamed 'Broker and keys' 2026-09-29: sixty walkers hunting for "bring in my account" met the
+     word broker nowhere on the way in, so it now appears in the group name itself. */
+  t('the broker and keys group exists, and takes both cards by their headings',
+  /\['Broker and keys',\/\^\(API keys\|Your broker\)\/i\]/.test(term));
 t('it sits before the catch-all, or Advanced would swallow it',
   term.indexOf("['API keys'") < term.indexOf("['Advanced',/./]"));
 t('the cards it names are still direct children of the settings pane, which is what the scan walks',
@@ -387,7 +389,7 @@ t('the cards it names are still direct children of the settings pane, which is w
     return b > a && !/<div class="setsec"/.test(between);
   })());
 t('opening that group refreshes what it shows, since both cards read from the worker',
-  /if\(name==='API keys'\)\{/.test(term) &&
+  /if\(name==='Broker and keys'\)\{/.test(term) &&
   /if\(typeof renderKeyList==='function'\)renderKeyList\(\);/.test(term) &&
   /if\(typeof brokerStatus==='function'\)brokerStatus\(\);/.test(term));
 /* A live button that answers "not switched on" reads as broken software rather than as a thing
@@ -896,7 +898,11 @@ G('defaultData must keep every key — a missing one is silent data loss');
 /* ==================== LISTS ==================== */
 G('Lists: an organisational layer that cannot lose tickers');
 
-t('the tab is labelled Lists', /<span class="lbl">Lists<\/span>/.test(term));
+/* Relabelled 2026-09-29 to the words people searched for. The tab id stays 'watchlist'; only what
+   a human reads changed. */
+t('the tab is labelled in plain words, and the id is unchanged',
+  /<button data-tab="watchlist"[^>]*data-tip="Watching"/.test(term) &&
+  />Watching<\/span>/.test(term));
 t('lists are additive to watchlist, which keeps its shape',
   /lists:\[\],/.test(term) && /watchlist:\[\],/.test(term));
 /* The whole safety argument: two dozen features read D.watchlist, so it must stay a flat array. */
@@ -1781,7 +1787,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v158/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v159/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }

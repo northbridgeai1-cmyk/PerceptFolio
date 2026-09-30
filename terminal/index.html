@@ -1157,6 +1157,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <symbol id="i-projections" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
   <symbol id="i-alerts" viewBox="0 0 24 24"><path d="M18 8.5A6 6 0 0 0 6 8.5c0 7-2.5 8.5-2.5 8.5h17S18 15.5 18 8.5"/><path d="M13.7 20.5a2 2 0 0 1-3.4 0"/></symbol>
   <symbol id="i-clients" viewBox="0 0 24 24"><path d="M16 20.5v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3.6"/><path d="M22 20.5v-2a4 4 0 0 0-3-3.8"/><path d="M16.5 3.7a4 4 0 0 1 0 6.6"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><polyline points="14.5 18 8.5 12 14.5 6"/></symbol>
 </defs></svg>
 
@@ -1245,21 +1246,25 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 <div id="shell">
 <aside id="sidebar">
   <nav>
-    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')" data-tip="Dashboard"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-dash"/></svg></span><span class="lbl">Dashboard</span></button>
-    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')" data-tip="Portfolio"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"/></svg></span><span class="lbl">Portfolio</span></button>
-    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Lists"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Lists</span></button>
-    <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="History"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">History</span></button>
+    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')" data-tip="Today"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-dash"/></svg></span><span class="lbl">Today</span></button>
+    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')" data-tip="What I own"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"/></svg></span><span class="lbl">What I own</span></button>
+    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Watching"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Watching</span></button>
+    <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="My track record"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">My track record</span></button>
     <div class="nav-sep"></div>
-    <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="Market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">Market</span></button>
+    <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="The market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">The market</span></button>
     <button data-tab="news" id="navNews" onclick="showTab('news')" data-tip="News"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-news"/></svg></span><span class="lbl">News</span></button>
-    <button data-tab="map" id="navMap" onclick="showTab('map')" data-tip="Map"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg></span><span class="lbl">Map</span></button>
+    <button data-tab="map" id="navMap" onclick="showTab('map')" data-tip="Supply chain"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg></span><span class="lbl">Supply chain</span></button>
     <button data-tab="world" id="navWorld" onclick="showTab('world')" data-tip="World"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-world"/></svg></span><span class="lbl">World</span></button>
-    <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Screener"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Screener</span></button>
-    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Analyzer"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Analyzer</span></button>
+    <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Find stocks"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Find stocks</span></button>
+    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Check a stock"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Check a stock</span></button>
     <div class="nav-sep"></div>
-    <button data-tab="risk" id="navRisk" onclick="showTab('risk')" data-tip="Risk"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"/></svg></span><span class="lbl">Risk</span></button>
-    <button data-tab="projections" id="navProjections" onclick="showTab('projections')" data-tip="Projections"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"/></svg></span><span class="lbl">Projections</span></button>
+    <button data-tab="risk" id="navRisk" onclick="showTab('risk')" data-tip="What could go wrong"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"/></svg></span><span class="lbl">What could go wrong</span></button>
+    <button data-tab="projections" id="navProjections" onclick="showTab('projections')" data-tip="What could happen"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"/></svg></span><span class="lbl">What could happen</span></button>
     <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')" data-tip="Alerts"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-alerts"/></svg></span><span class="lbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
+    <!-- SETTINGS IN THE NAV (2026-09-29). Sixty simulated people tried to reach it and NOT ONE did,
+         at any knowledge level: it lived behind the avatar, and an avatar does not read as settings.
+         The professional scrolled seven times and then opened More in desperation. -->
+    <button data-tab="settings" id="navSettings" onclick="showTab('settings')" data-tip="Settings"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-settings"/></svg></span><span class="lbl">Settings</span></button>
   </nav>
   <div class="side-foot"><span class="lbl">Press <b>[</b> to collapse</span></div>
 </aside>
@@ -1364,6 +1369,21 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
          still says "3 need you" or "all clear". And when something is actually at priority 1, which
          is money at risk, it opens itself: a stop that was hit is not allowed to be behind a click
          somebody did not know to make. Closing it by hand is respected from then on. -->
+    <!-- WHAT'S HAPPENING, ON THE SCREEN CALLED TODAY (2026-09-29).
+         A level 0 looking for "what is going on today" clicked Today, correctly, and found no news
+         on it. The label was right and the screen did not deliver, which is worse than a bad label:
+         they had no reason to look anywhere else. This carries the headline count and the way in. -->
+    <div class="section-title">What's happening today</div>
+    <div class="card" id="dashNewsCard">
+      <div class="fold-head">
+        <div class="fold-toggle" style="cursor:default">
+          <span class="fold-title">News about what you own</span>
+          <span class="muted fold-sum" id="dashNewsSum">Open News to see the headlines for your holdings.</span>
+        </div>
+        <button class="btn btn-sm" onclick="showTab('news')">Open News</button>
+      </div>
+    </div>
+
     <div class="section-title">What needs you</div>
     <div class="card" id="queueCard">
       <div class="fold-head">
@@ -1421,7 +1441,16 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 
 <!-- PORTFOLIO -->
 <div id="tab-portfolio" class="tabs-hidden">
-  <div class="tab-actions"><button class="btn-add" onclick="openAdd('add-holding')"><span class="plus">+</span> Add holding</button></div>
+  <!-- TWO DOORS THE WALKERS COULD NOT FIND (2026-09-29).
+       "Bring in my account": the word broker appeared nowhere on the way in, so people scrolled and
+       then guessed. It belongs here, where holdings are, not only inside Settings.
+       "Should I sell this": nothing anywhere said sell. A professional scrolled seven times before
+       guessing. The verdict column has said SELL all along; nothing pointed at it. -->
+  <div class="tab-actions" style="gap:8px;flex-wrap:wrap">
+    <button class="btn-add" onclick="openAdd('add-holding')"><span class="plus">+</span> Add holding</button>
+    <button class="btn btn-ghost btn-sm" onclick="goBrokerSetup()">Bring in my broker account</button>
+    <button class="btn btn-ghost btn-sm" onclick="showWhatToSell()">Should I sell anything?</button>
+  </div>
   <div class="addwrap" id="add-holding">
   <div class="card" style="position:relative">
     <button class="add-close" onclick="closeAddModal()" title="Close">✕</button>
@@ -1601,7 +1630,11 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
        reasoning as the Dashboard, where the setup checklist was outranking the portfolio value. -->
   <!-- TRADE IMPACT — the sizing step the app never had -->
   <div class="card" style="margin-top:16px">
-    <h3>Before you trade: what this does to the portfolio</h3>
+    <!-- RENAMED 2026-09-29. Sixty walkers looking for "how much should I put in" never found this,
+         at any level, because its title contained none of those words. The old title described what
+         the card computes; the new one asks the question the person arrived with. -->
+    <h3>How much should I put in?</h3>
+    <div class="muted" style="font-size:13px;margin:-4px 0 12px">Type what you are thinking of buying and it shows what that does to your money before you do it.</div>
     <div class="row">
       <input id="tiTicker" placeholder="Ticker" style="max-width:130px" oninput="renderTradeImpact()">
       <select id="tiSide" style="max-width:110px" onchange="renderTradeImpact()">
@@ -6250,6 +6283,40 @@ function togglePortfolioFilters(){
   if(!box)return;
   box.style.display=(box.style.display==='none')?'':'none';
   renderPortfolioFilterToggle();
+}
+/* THE TWO DOORS ADDED FOR THE WALKERS (2026-09-29).
+   Both take somebody straight to a thing that already existed and that nobody could find. Neither
+   invents a feature: the broker card has been in Settings since this morning, and the verdict column
+   has said SELL since long before that. What was missing was a control carrying the word. */
+function goBrokerSetup(){
+  showTab('settings');
+  try{ if(typeof showSettings==='function')showSettings('Broker and keys'); }catch(e){}
+  setTimeout(()=>{ const c=[...document.querySelectorAll('#tab-settings h3')].find(h=>/^Your broker/.test(h.textContent));
+    if(c)c.scrollIntoView({block:'center',behavior:'smooth'}); },120);
+}
+/* Filters the holdings to what the rulebook currently says to sell, and says so out loud rather than
+   silently narrowing the table. If nothing is a sell, that IS the answer and it says it. */
+function showWhatToSell(){
+  showTab('portfolio');
+  const sel=document.getElementById('pfFilterSignal');
+  if(sel){ sel.value='sell'; renderAll(); }
+  setTimeout(()=>{
+    /* Counted the same way the table filters, through verdictOf, so the sentence and the rows can
+       never disagree. A holding with no analysis yet has no verdict and is not a sell. */
+    const n=(D.holdings||[]).filter(h=>{
+      const sc=h.type==='Stock'?D.analyses[h.sym]:null;
+      const v=sc?verdictOf(sc,true,h.sym):null;
+      return v&&v.key==='sell';
+    }).length;
+    const unscored=(D.holdings||[]).filter(h=>h.type==='Stock'&&!D.analyses[h.sym]).length;
+    const t=document.getElementById('holdingsTable');
+    if(t)t.scrollIntoView({block:'center',behavior:'smooth'});
+    /* An unscored holding is not a 'no'. Saying nothing is a sell while half the book has never been
+       reviewed would be the terminal answering a question it has not actually asked. */
+    toast(n ? ('Showing the ' + n + ' your rules say to sell.')
+      : unscored ? ('Nothing is a sell yet, but ' + unscored + ' holding' + (unscored===1?' has':'s have') + ' not been reviewed. Press Run review on Today first.')
+      : 'Nothing in your book is a sell right now, by your own rules.');
+  },150);
 }
 function clearPortfolioFilters(){
   ['pfFilterQ'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -17957,7 +18024,11 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
 /* Sidebar disclosure (see the v2-surface styles). */
 (function(){
   var nav=document.querySelector('nav'); if(!nav) return;
-  var ADV=['watchlist','market','news','map','world','screener','risk','projections','alerts','clients'];
+  /* WHAT HIDES BEHIND "More" (rewritten 2026-09-29). Find stocks, Watching and News came out of
+     here: the walker showed people opening More as a last resort, not as navigation, and those three
+     were the screens they were hunting for. What is left is the deep end, which is where a beginner
+     does not need to go on day one. */
+  var ADV=['market','map','world','risk','projections','alerts','clients'];
   ADV.forEach(function(t){ var b=nav.querySelector('button[data-tab="'+t+'"]'); if(b) b.classList.add('pf-adv'); });
   var more=document.createElement('button'); more.type='button'; more.className='pf-more'; more.setAttribute('data-tip','More');
   more.innerHTML='<span class="ico"><svg viewBox="0 0 24 24"><use href="#i-chev"/></svg></span><span class="lbl">More</span>';
@@ -19208,7 +19279,7 @@ header{border-bottom-color:var(--line)}
      goes in by heading like every other group, which is the whole point of this design: the two
      cards were written months apart and neither needed touching for this. It sits before Advanced
      because Advanced is the catch-all and matches everything. */
-  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|Rule change log)/i],['Accounts',/^(Copy holdings)/i],['API keys',/^(API keys|Your broker)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
+  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|Rule change log)/i],['Accounts',/^(Copy holdings)/i],['Broker and keys',/^(API keys|Your broker)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
   function groupOf(card){ var h=card.querySelector('h3'); var txt=h?h.textContent.trim():''; for(var i=0;i<GROUPS.length;i++)if(GROUPS[i][1].test(txt))return GROUPS[i][0]; return 'Advanced'; }
   function cards(){ var tab=document.getElementById('tab-settings'); return tab?Array.prototype.slice.call(tab.children).filter(function(el){ return el.classList&&(el.classList.contains('card')||el.classList.contains('addwrap')); }):[]; }
   window.showSettings=function(name){
@@ -19218,7 +19289,7 @@ header{border-bottom-color:var(--line)}
     /* The only group whose cards are drawn from the worker rather than from the book. Refreshed on
        the way in, so opening it shows the keys that exist now and whether the broker is actually
        connected, rather than whatever was true when Settings was last opened. */
-    if(name==='API keys'){
+    if(name==='Broker and keys'){
       try{ if(typeof renderKeyList==='function')renderKeyList(); }catch(e){}
       try{ if(typeof brokerStatus==='function')brokerStatus(); }catch(e){}
     }
