@@ -822,6 +822,27 @@ async function handle(request, env) {
           if (String(r.tier || '') === 'employee') { staff++; continue; }
           live++;
         }
+        /* WHAT STRIPE WOULD ACTUALLY CHARGE (2026-10-05).
+           A walkthrough found the site advertising $39 while Stripe billed $760, and nothing in this
+           codebase could see it: the site reads PLAN, the worker reads PRICE, the suite checks those
+           agree, and the only number that bills lives in Stripe. So it is reported here beside the
+           other two things that are invisible from outside and expensive to miss. */
+        if (billingConfigured(env)) {
+          body.billing = { advertised: { monthly: PRICE.monthly, yearly: PRICE.yearly }, stripe: {}, agrees: true };
+          for (const [k, v] of [['monthly', 'STRIPE_PRICE_PERSONAL_MONTHLY'], ['yearly', 'STRIPE_PRICE_PERSONAL_YEARLY']]) {
+            const id = env[v];
+            if (!id) { body.billing.stripe[k] = 'not set'; body.billing.agrees = false; continue; }
+            try {
+              const pr = await stripeGet(env, '/prices/' + encodeURIComponent(id));
+              if (pr.ok && pr.j && typeof pr.j.unit_amount === 'number') {
+                const amt = pr.j.unit_amount / 100;
+                body.billing.stripe[k] = amt;
+                if (amt !== PRICE[k]) body.billing.agrees = false;
+              } else { body.billing.stripe[k] = 'could not read'; }
+            } catch (e) { body.billing.stripe[k] = 'could not read'; }
+          }
+          if (!body.billing.agrees) body.billing.warn = 'Stripe would charge a different amount from the one on the site. Checkout is refusing the sale until the price IDs are corrected.';
+        }
         body.licence = { liveGrants: live, staffGrants: staff, pausedGrants: paused, buyCommercialFeedAt: LICENCE_AT, due: live >= LICENCE_AT,
           countsStaffSeparately: true,
           note: live >= LICENCE_AT ? 'Live client grants have reached ' + LICENCE_AT + '. Finnhub\'s personal plan no longer covers this; buy the commercial plan and keep serving data from the worker.' : null };
@@ -3557,13 +3578,48 @@ async function handleBilling(request, env, url) {
 
   /* ---- POST /checkout {plan} -> {url} ---- */
   if (url.pathname === '/checkout' && request.method === 'POST') {
-    if (!billingConfigured(env)) return json({ error: 'Billing is not open yet. Request a demo and we will let you know.' }, 503, env);
+    if (!billingConfigured(env)) return json({ error: 'Billing is not switched on yet.' }, 503, env);
     let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
     const plan = clean(body.plan, 24);
     const P = PLANS[plan];
     if (!P) return json({ error: 'Unknown plan.' }, 400, env);
     const price = env[P.priceVar];
     if (!price) return json({ error: 'That plan is not configured.' }, 503, env);
+
+    /* ============ THE PRICE ON THE PAGE MUST BE THE PRICE ON THE CARD (2026-10-05) ============
+       A walkthrough found the site advertising $39 while Stripe charged $760: the price IDs still
+       pointed at the old plan. Nothing caught it, because nothing was looking. The site reads PLAN,
+       the worker reads PRICE, the suite checks those two agree, and all three were right; the only
+       number that actually bills lives in Stripe, where none of them could see it.
+
+       So it is checked here, against Stripe itself, before a session exists. A mismatch refuses the
+       sale and names both figures. Overcharging somebody by twenty times is not a thing to recover
+       from gracefully afterwards; it is a thing not to do.
+
+       Cached for an hour so this is one extra call a day rather than one a visitor, and a lookup
+       that fails lets the sale through: Stripe being unreachable is not evidence of a wrong price,
+       and refusing every sale over a network blip is its own failure. */
+    const want = Math.round((plan.includes('yearly') ? PRICE.yearly : PRICE.monthly) * 100);
+    const ck = 'pricechk:' + price;
+    let known = null;
+    try { known = await env.PF_SYNC.get(ck); } catch (e) { /* cache is an optimisation, never a gate */ }
+    if (known === null) {
+      try {
+        const pr = await stripeGet(env, '/prices/' + encodeURIComponent(price));
+        if (pr.ok && pr.j && typeof pr.j.unit_amount === 'number') {
+          known = String(pr.j.unit_amount);
+          await env.PF_SYNC.put(ck, known, { expirationTtl: 3600 });
+        }
+      } catch (e) { /* see above: a failed lookup does not block the sale */ }
+    }
+    if (known !== null && Number(known) !== want) {
+      return json({
+        error: 'This plan is misconfigured and the sale has been stopped rather than charging you the wrong amount.',
+        advertised: '$' + (want / 100).toFixed(2),
+        wouldCharge: '$' + (Number(known) / 100).toFixed(2),
+        howToProceed: 'Write to ' + (env.OPERATOR_EMAIL || 'support') + '. Nothing has been charged.',
+      }, 503, env);
+    }
 
     const params = {
       mode: 'subscription',

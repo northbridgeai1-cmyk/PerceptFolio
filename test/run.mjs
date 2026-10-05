@@ -940,7 +940,7 @@ t('the dead version-skew fallback is gone', !/queue is mid-update/.test(idx));
    a mail app after a request had already arrived read as "that did not work, send it yourself". */
 t('the request is delivered to the inbox by FormSubmit, with a worker copy for admin and no mail app',
   /formsubmit\.co\/ajax\/'\+PF\.contact/.test(idx) && /_honey:''/.test(idx) && /keepalive:true\}\)\.catch\(\(\)=>\{\}\)/.test(idx) && !/mailto/.test(idx));
-t('neither landing page nor the thanks page opens a mail app', !/mailto/.test(idx) && !/mailto/.test(read('site/src/components/RequestForm.tsx')) && !/Email the branch/.test(read('thanks.html')));
+t('neither landing page nor the thanks page opens a mail app', !/mailto/.test(idx) && !/Email the branch/.test(read('thanks.html')));
 t('the CSP allows the FormSubmit endpoint on both the page and the Pages gate', /connect-src 'self' https:\/\/\*\.workers\.dev https:\/\/finnhub\.io https:\/\/formsubmit\.co;/.test(idx) && /'https:\/\/formsubmit\.co'\]/.test(read('functions/_middleware.js')));
 t('the request asks for the detail that speeds the reply, and for no plan or seat count', ['rqName','rqRole','rqFirm','rqBook','rqWho','rqWhen'].every(id => new RegExp('id="' + id + '"').test(idx)) && /Best time to talk/.test(idx) && !/rqSeats/.test(idx) && !/name=plan/.test(idx));
 
@@ -1596,8 +1596,7 @@ G('M3: the public site, same rules as the page it replaces');
      It must still never appear in the selling copy. */
   t('site: "sign in" appears only where it addresses a subscriber',
     !/sign in/i.test(read('site/src/pages/Landing.tsx').replace(/\/\*[\s\S]*?\*\//g, '').toLowerCase())
-    && /Already have a code\? <\/span>Sign in/.test(read('site/src/components/Nav.tsx'))
-    && /Sign in with your code/.test(read('site/src/components/RequestForm.tsx')));
+    && /Already have a code\? <\/span>Sign in/.test(read('site/src/components/Nav.tsx')));
   /* One primary in the hero and one text link beside it. "I have a code" is gone (owner,
      2026-09-22): the email that carries the code carries the link to the terminal with it, so a
      second button on the page was a door nobody arrives at. */
@@ -1606,8 +1605,11 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: one primary in the hero, a text link beside it, and no code button', /<StartButton \/>/.test(read('site/src/pages/Landing.tsx')) && !/I have a code/.test(src) && /or try it on real history first/.test(src) && (read('site/src/pages/Landing.tsx').match(/<StartButton/g) || []).length === 2);
   /* FormSubmit delivers the request; the visitor has nothing to send. Opening their mail app made
      an arrived request look like a failed one. */
-  t('the request form never opens a mail app', !/mailto:/.test(read('site/src/components/RequestForm.tsx')) && !/mailFallback/.test(read('site/src/components/RequestForm.tsx')) && /formsubmit\.co\/ajax\//.test(read('site/src/components/RequestForm.tsx')) && /Nothing else to send/.test(src));
-  t('site: how to get in, three steps under the hero, and the code holder\'s way in above the nav', /1\. Ask/.test(src) && /3\. Enter/.test(src) && /href="\/enter\/"[\s\S]{0,220}?Sign in<\/a>/.test(read('site/src/components/Nav.tsx')));
+  /* The three steps were rewritten on 2026-10-05. A walkthrough found them still describing a person
+     reading every request and replying with a price, weeks after the demo and the quote were
+     deleted: stale copy that contradicts the button beside it tells somebody the thing they just did
+     was not the way in. */
+  t('site: how to get in, three steps under the hero, and the code holder\'s way in above the nav', /1\. Start/.test(src) && /3\. Five questions/.test(src) && !/A person at NorthBridge reads every one/.test(src) && /href="\/enter\/"[\s\S]{0,220}?Sign in<\/a>/.test(read('site/src/components/Nav.tsx')));
   /* ONE ACTION, EVERY PAGE (2026-09-27). The header carries a single filled button and it is always
      the same one. The subscriber's row above it is where an existing holder signs in, so the two
      audiences no longer read past each other. */
@@ -1672,34 +1674,20 @@ G('M3: the public site, same rules as the page it replaces');
   t('site: /pricing still resolves, so old links and the sitemap do not 404', /path="\/pricing" element=\{<Subscription \/>\}/.test(read('site/src/main.tsx')) && /path="\/subscription" element=\{<Subscription \/>\}/.test(read('site/src/main.tsx')));
   /* "Business email" is a field label on the demo form, not the tier that was removed. */
   t('site: nothing on the site says Personal, Business, seats or apply', !/\bPersonal\b|\bBusiness\b(?! email)|seats for a firm|\/apply/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')) && !fs.existsSync(path.join(ROOT, 'site/src/pages/Apply.tsx')));
-  t('site: the request form asks no plan and no seat count', !/name="plan"/.test(read('site/src/components/RequestForm.tsx')) && !/id="seats"/.test(read('site/src/components/RequestForm.tsx')));
   t('site: no competitor is named anywhere (A1.6)', !/Koyfin|Godel|YCharts|COMPARISONS/.test(src));
   /* THE DEMO REQUEST QUALIFIES IN THREE STAGES (2026-09-27): route, then who, then the problem. A
      code holder is sent to the door instead of being handed a sales form. */
-  t('site: the form routes a code holder to the door before asking anything else', (() => {
-    const f = read('site/src/components/RequestForm.tsx');
-    return /Have you used PerceptFolio before\?/.test(f)
-      && /holder === 'code'/.test(f) && /href="\/enter\/">Sign in with your code/.test(f)
-      && f.indexOf('Tell us about yourself') > f.indexOf('Have you used PerceptFolio before?')
-      && f.indexOf('Tell us what you are trying to do') > f.indexOf('Tell us about yourself');
-  })());
+/* The demo request form was deleted on 2026-09-30 when the site became self-serve, and the
+   assertions describing it went with it. What they protected still matters and is covered elsewhere:
+   that no page opens a mail app (above), that a code holder is sent to the door rather than to a
+   sales form (the Nav's subscriber row), and that the one surviving questionnaire is the in-terminal
+   survey, checked under "FIVE QUESTIONS BEFORE ANYTHING ELSE". */
   /* ANYONE MAY ASK (2026-09-29). "Business email", over a field placeheld you@firm.com, told a private
      investor in two words that the form was not for them. It always was: Private investor is a role
      and My own capital is a book type. The audience is narrow because of the price, not because of
      what anybody does for a living, and the operator makes that call after reading the request, not
      the form by discouraging them from finishing it. What IS screened is what the terminal would be
      used for, on the worker, and never who is asking: see test/screen.mjs. */
-  t('site: the form asks for an email, a role and what they run, and does not require a business one', (() => {
-    const f = read('site/src/components/RequestForm.tsx');
-    /* Comments are stripped before the negative half: the reason the old label was wrong is written
-       out at the top of that file, which is where an explanation belongs, and it quotes the words it
-       is explaining. What must not exist is a rendered one. */
-    const shipped = f.replace(/\/\*[\s\S]*?\*\//g, '');
-    return /label="Email"/.test(shipped) && !/label="Business email"/.test(shipped) && !/you@firm\.com/.test(shipped)
-      && /const ROLES =/.test(f) && /const BOOKS =/.test(f)
-      && /'Private investor'/.test(f) && /'My own capital'/.test(f);
-  })());
-  t('site: stages two and three stay closed until the first is answered', /\{holder && holder !== 'code' && <>/.test(read('site/src/components/RequestForm.tsx')));
   t('site: the positioning sentence is on the landing page and in the PRD (A0.0)', /Bloomberg tells you everything that is happening\. PerceptFolio tells you whether your decisions worked\./.test(read('site/src/pages/Landing.tsx')) && /Bloomberg tells you everything that is happening\. PerceptFolio tells you whether your decisions worked\./.test(read('PRD.md')));
   t('site: the data tile says market data is built in, not bring your own key (A1.4)', /Market data, built in/.test(read('site/src/pages/Landing.tsx')) && !/Bring your own data key/.test(read('site/src/pages/Landing.tsx')));
   t('site: the record mechanism is on the page with a verify link (A5.2)', /Hash-chained/.test(read('site/src/pages/Landing.tsx')) && /Server-clocked/.test(read('site/src/pages/Landing.tsx')) && /href="\/verify\/"/.test(read('site/src/pages/Landing.tsx')));
@@ -1896,7 +1884,23 @@ G('Stripe does the money; the worker does the access');
   t('webhook signatures are verified in constant time with a five-minute tolerance', /verifyStripeSignature/.test(worker) && /Math\.abs\(Date\.now\(\) \/ 1000 - t\) > 300/.test(worker) && /safeEqual\(hex, v1\)/.test(worker));
   t('webhook events are idempotent by id', /'evt:' \+ ev\.id/.test(worker));
   t('a second completion for the same customer never mints a second code', /if \(await env\.PF_SYNC\.get\('sub:' \+ customerId\)\) return json\(\{ ok: true, duplicate: 'customer' \}/.test(worker));
-  t('prices live in Stripe Price IDs from env; no amount is ever posted', /priceVar: 'STRIPE_PRICE_/.test(worker) && !/unit_amount/.test(worker));
+  /* The point was never that unit_amount is a forbidden word: it is that this worker must not SEND
+     an amount, because a price posted from here is a price a client could change. Reading Stripe's
+     own amount back is the opposite, and it is what stops the site advertising one figure while the
+     card is charged another, which a walkthrough found happening on 2026-10-04. So: no amount in any
+     outgoing parameter, and the read is required. */
+  t('prices live in Stripe Price IDs from env; no amount is ever posted',
+    /priceVar: 'STRIPE_PRICE_/.test(worker) &&
+    !/'line_items\[0\]\[price_data\]/.test(worker) &&
+    !/unit_amount':/.test(worker) && !/unit_amount:/.test(worker));
+  t('and the advertised price is checked against the one Stripe would charge',
+    /const want = Math\.round\(\(plan\.includes\('yearly'\) \? PRICE\.yearly : PRICE\.monthly\) \* 100\);/.test(worker) &&
+    /if \(known !== null && Number\(known\) !== want\)/.test(worker) &&
+    /the sale has been stopped rather than charging you the wrong amount/.test(worker));
+  /* Fail-open on purpose: Stripe being unreachable is not evidence of a wrong price, and refusing
+     every sale over a network blip is its own failure. */
+  t('a price lookup that fails lets the sale through rather than blocking it',
+    /if \(known === null\) \{/.test(worker) && /known !== null &&/.test(worker));
   t('there is one plan to check out on, and no application to gate it', /'personal-monthly'/.test(worker) && /'personal-yearly'/.test(worker) && !/apptok:/.test(worker) && !/business-yearly/.test(worker));
   t('past_due grants a grace window and lapses on its own', /GRACE_DAYS = 7/.test(worker) && /graceUntil: Date\.now\(\) \+ GRACE_DAYS/.test(worker) && /reason: rec\.paused \? 'paused' : lapsed \? 'lapsed' : 'active'/.test(worker));
   t('no billing without both Stripe secrets (fails closed)', /function billingConfigured\(env\)[\s\S]{0,120}STRIPE_SECRET_KEY && env\.STRIPE_WEBHOOK_SECRET/.test(worker));
@@ -2959,7 +2963,10 @@ t('a throwaway is refused, because the code outlives the inbox', /const DISPOSAB
    was slow is the worse failure. */
 t('a resolver that cannot be reached accepts rather than blocks', /if \(deliverable === null\) return \{ ok: true, unchecked: true \};/.test(worker));
 t('a domain is looked up once a week, not once a visitor', /'mx:' \+ domain/.test(worker) && /expirationTtl: 7 \* 86400/.test(worker));
-t('the form says it on blur, and the server checks again on submit', /onBlur=\{checkEmail\}/.test(read('site/src/components/RequestForm.tsx')) && /\/checkemail\?email=/.test(read('site/src/components/RequestForm.tsx')));
+/* The address check went with the form. /checkemail still exists on the worker and is still
+   covered by test/email.mjs; Stripe collects the address at checkout now, so nothing on the site
+   calls it. It is kept rather than deleted: it is the staff-code path's only defence against a code
+   being minted for an address that cannot receive it. */
 t('it is contract-tested', fs.existsSync('test/email.mjs') && /a near-miss is refused WITH the correction/.test(read('test/email.mjs')));
 /* THE HEADLINE NUMBER SHOWS ITS WORKING. Two outside reviewers challenged the 138 independently:
    one asked whether it was derived at all, the other said it must not be shown as a magic number

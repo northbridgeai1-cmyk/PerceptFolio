@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { StartButton } from '@/components/StartButton';
 import { WORKER, SUPPORT, PLAN } from '@/lib/config';
 
 /* THE PAGE STRIPE SENDS A BUYER TO (route: /welcome).
@@ -154,7 +154,9 @@ export function Welcome() {
       {/* ---- what to do next, and it is always the same door ---- */}
       <div className="mt-9 flex flex-wrap items-center gap-4">
         <Button asChild variant="primary" size="lg"><a href="/enter/">Sign in with your code</a></Button>
-        {!sid && <Button asChild variant="secondary" size="lg"><Link to="/#request">Request a demo</Link></Button>}
+        {/* Somebody landing here without a session has not bought anything yet, so the second button
+            starts a subscription rather than asking them to request a demo that no longer exists. */}
+        {!sid && <StartButton />}
       </div>
 
       {/* ---- the one line that is allowed to be a sentence, because it is an instruction ---- */}

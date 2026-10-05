@@ -1583,10 +1583,16 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </select>
       <button class="btn" onclick="addHolding()">Add</button>
     </div>
+    <!-- OFF BY DEFAULT SINCE 2026-10-05. It was ticked, and the first thing anybody does here is
+         enter something they ALREADY OWN, which is not a purchase out of cash they have not recorded
+         yet. The walkthrough hit a red "more than your $0 cash" that never once said to untick the
+         box causing it, and the fix was invisible: the warning named the symptom and not the cause.
+         Now: off by default, the label says what each state means, and the warning points at the box. -->
     <div class="row" style="margin-top:8px">
       <label class="row" style="gap:6px;align-items:center;font-size:13px;color:var(--muted)">
-        <input type="checkbox" id="hDeductCash" checked style="width:auto"> Take this out of my cash
+        <input type="checkbox" id="hDeductCash" style="width:auto" onchange="updateBuyPreview()"> Pay for this out of my cash
       </label>
+      <span class="muted" style="font-size:12.5px">Leave this off for something you already own. Tick it when you are buying now.</span>
       <span class="muted" id="buyPreview" style="font-size:13px"></span>
     </div>
   </div>
@@ -5183,7 +5189,9 @@ function updateBuyPreview(){
   el.innerHTML=(b.unit==='dollars'
       ? '= <b>'+b.shares+'</b> shares'
       : '= <b>'+fmt$(b.spend)+'</b>')
-    +(short?' <span class="neg">- more than your '+fmt$(cash)+' cash</span>':'');
+    /* Name the cause, not the symptom. "More than your $0 cash" is true and useless when the box
+       causing it is a checkbox the person never saw. */
+    +(short?' <span class="neg">- more than your '+fmt$(cash)+' cash. Untick "Pay for this out of my cash" if you already own it.</span>':'');
 }
 function addHolding(){
   const t=document.getElementById('hTicker').value.trim().toUpperCase();
@@ -5194,7 +5202,7 @@ function addHolding(){
   const sh=b.shares, cost=b.price, spend=b.spend;
   const deduct=(document.getElementById('hDeductCash')||{}).checked;
   if(deduct&&spend>(D.cash||0)+1e-9){
-    if(!confirm('This costs '+fmt$(spend)+' but you only have '+fmt$(D.cash||0)+' in cash.\n\nOK = buy anyway and let cash go negative.\nCancel = go back (untick "Take this out of my cash" to record a purchase made with outside money).'))return;
+    if(!confirm('This costs '+fmt$(spend)+' but you only have '+fmt$(D.cash||0)+' in cash.\n\nOK = buy anyway and let cash go negative.\nCancel = go back, and untick "Pay for this out of my cash" if this is something you already own.'))return;
   }
   const wasEmpty=(D.holdings||[]).length===0;
   /* Runs only after a holding is successfully added, so it is the honest place to close the
@@ -5213,7 +5221,7 @@ function addHolding(){
     if(broker)existing.broker=broker;
     existing.price=null;existing.manualPrice=false;existing.autoFailed=false;
     applyCash();
-    recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,decided:decidedPrice(),
+    recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,decided:decidedPrice(), imported:!deduct||undefined,
       note:'Added to existing position, '+prevShares+' sh @ $'+prevCost.toFixed(2)+' -> '+totalShares+' sh @ $'+existing.cost.toFixed(2)+(deduct?' · paid from cash':'')});
     clearForm();updateBuyPreview();
     recordHistorySnapshot();saveDB();renderAll();
@@ -5224,8 +5232,15 @@ function addHolding(){
   }
   D.holdings.push({sym:t,type,shares:sh,cost,broker,price:null,manualPrice:false,priceDate:null,autoFailed:false});
   applyCash();
-  recordTransaction({action:'buy',sym:t,type,shares:sh,price:cost,broker,decided:decidedPrice(),
-                     note:'Opened position'+(deduct?' · paid from cash':'')});
+  /* WHAT THIS IS, AND WHAT IT IS NOT (2026-10-05). Entering something you already own was being
+     written into the ledger as a purchase made today, so a book carried from another broker arrived
+     as a day of fictional buying and the history screens read it as behaviour. The cash box is the
+     only signal available about which happened, and it is now the right way round: ticked means a
+     purchase now, unticked means it was already there. Anything already owned is marked imported,
+     the same flag a broker CSV and a broker sync use, so the record will not grade it either. */
+  recordTransaction(deduct
+    ? {action:'buy',sym:t,type,shares:sh,price:cost,broker,decided:decidedPrice(),note:'Opened position · paid from cash'}
+    : {action:'buy',sym:t,type,shares:sh,price:cost,broker,decided:decidedPrice(),imported:true,note:'Already owned when this account started'});
   clearForm();updateBuyPreview();
   recordHistorySnapshot();saveDB();renderAll();
   const tail=deduct?' Cash is now '+fmt$(D.cash||0)+'.':'';

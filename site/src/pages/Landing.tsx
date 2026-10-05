@@ -34,7 +34,11 @@ export function Landing() {
         <TerminalDashboard />
         <div className="wrap">
           <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[780px]:grid-cols-1" role="list" aria-label="How to get in, in three steps">
-            {[['1. Ask', 'Three short questions at the bottom of this page. A person at NorthBridge reads every one and replies by email.'], ['2. See it', 'A demo of the terminal run on your own positions, and the price and terms in writing.'], ['3. Enter', 'Your access code arrives by email, with the link straight to the terminal. Type the code, choose a password for your device, and it is yours.']].map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-sans text-[15px] font-bold tracking-normal">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
+            {/* REWRITTEN 2026-10-05. A walkthrough found this still describing a person reading every
+                request and replying with a price, three weeks after the demo, the queue and the quote
+                were deleted. Stale copy that contradicts the button beside it is worse than no copy:
+                it tells somebody the thing they just did was not the way in. */}
+            {[['1. Start', 'Press the button above. Card, three days free, nothing charged until the fourth.'], ['2. Your code arrives', 'By email, within a minute, with the link straight to the terminal. Nobody reviews anything and there is nothing to apply for.'], ['3. Five questions', 'Inside, the terminal asks five short questions and sets its rules from your answers. Change any of them later in Settings.']].map(([t, d]) => <div key={t} className="bg-panel p-5" role="listitem"><h3 className="mb-2 font-sans text-[15px] font-bold tracking-normal">{t}</h3><p className="text-[14.5px] leading-[1.6] text-dim">{d}</p></div>)}
           </div>
         </div>
       </header>
@@ -89,7 +93,7 @@ export function Landing() {
       </div></section>
 
       <section id="screens" className="sec" aria-labelledby="h-screens"><div className="wrap">
-        <h2 id="h-screens" className="mb-3">Fifteen screens. Each answers one question.</h2>
+        <h2 id="h-screens" className="mb-3">{SCREENS.length} screens. Each answers one question.</h2>
         <p className="lede mb-8">The dashboard above is the real one, on a sample account. The rest are named here by the decision they exist for.</p>
         <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[960px]:grid-cols-2 max-[600px]:grid-cols-1" role="list" aria-label="The screens and the question each answers">
           {SCREENS.map(s => <div key={s.id} className="bg-panel p-5" role="listitem"><div className="mb-[6px] flex items-baseline justify-between gap-3"><h3 className="font-sans text-[15px] font-bold tracking-normal">{s.name}</h3>{s.still && <span className="font-mono text-[10.5px] uppercase tracking-[.08em] text-faint">shown above</span>}</div><p className="text-[14.5px] leading-[1.6] text-dim">{s.asks}</p></div>)}
