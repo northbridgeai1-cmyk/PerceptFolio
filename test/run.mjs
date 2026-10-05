@@ -1879,7 +1879,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v164/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v165/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -3299,10 +3299,17 @@ t('it steps from cheapest to dearest and stops as soon as the write lands',
 /* THE BROWSER IS A CACHE, THE SERVER IS THE HOME (2026-09-27). A browser can be too full to take
    another byte even with every cache emptied. The same change is already destined for the worker
    under this account's code, and the worker has room, so it goes now instead of in eight seconds. */
+/* The success now toasts rather than raising a banner. A walkthrough on 2026-10-04 called the
+   green bar frightening, and it was right to: a full-width bar across the bottom of the screen
+   headed "This browser has no room left" is the shape of something that needs doing, it appeared
+   after every save, and Not now did not keep it away because the next save raised it again. The
+   save had succeeded. What this assertion protects is unchanged: the change reaches the server
+   rather than being lost, and the person is told. */
 t('a change the browser cannot hold is pushed to the server instead of lost',
   /if\(!_rescuing&&typeof syncActive==='function'&&syncActive\(\)/.test(term)
   && /\.then\(\(\)=>syncPush\(\)\)/.test(term)
-  && /showSaveFailure\(quota,err,'rescued'\)/.test(term)
+  && /toast\('Saved to your account\. This browser is out of room/.test(term)
+  && !/showSaveFailure\(quota,err,'rescued'\)/.test(term)
   && /showSaveFailure\(quota,err,'rescuing'\)/.test(term));
 t('the rescue cannot start a second rescue inside itself', /let _rescuing=false;/.test(term) && /\.finally\(\(\)=>\{ _rescuing=false; \}\)/.test(term));
 t('a rescued save is not red and asks for nothing', /el\.style\.background=rescued\?'var\(--green,#1f7a4d\)':'var\(--red,#e5534b\)';/.test(term) && /Saved to your account on the server\./.test(term));

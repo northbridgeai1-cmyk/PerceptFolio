@@ -192,6 +192,8 @@ header>.logo{text-decoration:none;flex:none}
   content:"";position:absolute;left:-2px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--brand2)}
 #sidebar nav button:active{transform:translateY(.5px)}
 .nav-sep{height:1px;background:var(--border);margin:8px 8px;flex:none}
+/* Shown only in the phone rail; see the media query below. */
+.shortlbl{display:none}
 .side-foot{flex:none;padding:10px 10px 2px;font:10px/1.4 var(--mono);color:var(--muted);opacity:.5;letter-spacing:.05em}
 .side-foot b{color:var(--text);font-weight:600}
 
@@ -398,6 +400,10 @@ body.is-demo #app::before{content:"TEST ACCOUNT. Sandbox data, sync disabled. No
 .th-quality{color:var(--green)!important}
 .th-value{color:var(--accent)!important}
 .th-momentum{color:var(--yellow)!important}
+/* Named th-ai when the column header said AI. It says Verdict, and the verdict is this person's own
+   checklist arithmetic with no model anywhere near it, so the class name is the last trace of a
+   claim the product spends the rest of its surface area refusing to make. Kept as a selector
+   because four tables and the sort code reference it; the meaning is stated here instead. */
 .th-ai{color:var(--brand2)!important}
 .th-mine{color:var(--c-mine)!important}
 .th-profit{color:var(--c-profit)!important}
@@ -906,9 +912,20 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   #sidebar{width:52px!important;padding:8px 4px;
     top:0;height:auto;position:sticky;align-self:stretch;
     padding-left:calc(4px + env(safe-area-inset-left))}
+  /* LABELS ON THE PHONE RAIL (2026-10-05). A walkthrough on 2026-10-04 reported the sidebar as
+     icons with no labels, and on a phone that was the whole truth: the long labels are hidden here
+     because a 222px drawer eats half the screen, and the header's section name is hidden too
+     because there is no room for it beside the search box. So on a phone nothing anywhere named
+     the screen you were on, and the navigation was fourteen glyphs. Each button now carries a
+     one-word label short enough for a 56px rail, which is why they are their own strings rather
+     than a truncation of the long ones: "Supply chain" cannot be shortened by a text-overflow
+     rule into anything a person would read. */
   #sidebar .lbl{display:none}
-  #sidebar nav button{justify-content:center;padding:11px 0}
+  #sidebar{width:56px!important}
+  #sidebar nav button{flex-direction:column;justify-content:center;gap:3px;padding:8px 0}
   #sidebar nav button .ico{font-size:18px}
+  #sidebar nav button .shortlbl{display:block;font-size:9.5px;line-height:1;letter-spacing:.01em;
+    max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #sideToggle{display:none}
   .nav-sep{margin:6px 8px}
   .badge{position:absolute;top:5px;right:5px;margin-left:0}
@@ -1303,25 +1320,25 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 <div id="shell">
 <aside id="sidebar">
   <nav>
-    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')" data-tip="Today"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-dash"/></svg></span><span class="lbl">Today</span></button>
-    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')" data-tip="Portfolio"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"/></svg></span><span class="lbl">Portfolio</span></button>
-    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Lists"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Lists</span></button>
-    <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="History"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">History</span></button>
+    <button data-tab="dashboard" class="active" onclick="showTab('dashboard')" data-tip="Today"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-dash"/></svg></span><span class="lbl">Today</span><span class="shortlbl">Today</span></button>
+    <button data-tab="portfolio" id="navPortfolio" onclick="showTab('portfolio')" data-tip="Portfolio"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-portfolio"/></svg></span><span class="lbl">Portfolio</span><span class="shortlbl">Mine</span></button>
+    <button data-tab="watchlist" id="navWatchlist" onclick="showTab('watchlist')" data-tip="Lists"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-watch"/></svg></span><span class="lbl">Lists</span><span class="shortlbl">Lists</span></button>
+    <button data-tab="history" id="navHistory" onclick="showTab('history')" data-tip="History"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-history"/></svg></span><span class="lbl">History</span><span class="shortlbl">History</span></button>
     <div class="nav-sep"></div>
-    <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="The market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">The market</span></button>
-    <button data-tab="news" id="navNews" onclick="showTab('news')" data-tip="News"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-news"/></svg></span><span class="lbl">News</span></button>
-    <button data-tab="map" id="navMap" onclick="showTab('map')" data-tip="Supply chain"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg></span><span class="lbl">Supply chain</span></button>
-    <button data-tab="world" id="navWorld" onclick="showTab('world')" data-tip="World"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-world"/></svg></span><span class="lbl">World</span></button>
-    <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Find stocks"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Find stocks</span></button>
-    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Analyze"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Analyze</span></button>
+    <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="The market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">The market</span><span class="shortlbl">Market</span></button>
+    <button data-tab="news" id="navNews" onclick="showTab('news')" data-tip="News"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-news"/></svg></span><span class="lbl">News</span><span class="shortlbl">News</span></button>
+    <button data-tab="map" id="navMap" onclick="showTab('map')" data-tip="Supply chain"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg></span><span class="lbl">Supply chain</span><span class="shortlbl">Chain</span></button>
+    <button data-tab="world" id="navWorld" onclick="showTab('world')" data-tip="World"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-world"/></svg></span><span class="lbl">World</span><span class="shortlbl">World</span></button>
+    <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Find stocks"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Find stocks</span><span class="shortlbl">Find</span></button>
+    <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Analyze"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Analyze</span><span class="shortlbl">Check</span></button>
     <div class="nav-sep"></div>
-    <button data-tab="risk" id="navRisk" onclick="showTab('risk')" data-tip="Risk"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"/></svg></span><span class="lbl">Risk</span></button>
-    <button data-tab="projections" id="navProjections" onclick="showTab('projections')" data-tip="Projections"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"/></svg></span><span class="lbl">Projections</span></button>
-    <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')" data-tip="Alerts"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-alerts"/></svg></span><span class="lbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
+    <button data-tab="risk" id="navRisk" onclick="showTab('risk')" data-tip="Risk"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-risk"/></svg></span><span class="lbl">Risk</span><span class="shortlbl">Risk</span></button>
+    <button data-tab="projections" id="navProjections" onclick="showTab('projections')" data-tip="Projections"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-projections"/></svg></span><span class="lbl">Projections</span><span class="shortlbl">Future</span></button>
+    <button data-tab="alerts" id="navAlerts" onclick="showTab('alerts')" data-tip="Alerts"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-alerts"/></svg></span><span class="lbl">Alerts</span><span class="shortlbl">Alerts</span><span id="alertBadge" class="badge" style="display:none">0</span></button>
     <!-- SETTINGS IN THE NAV (2026-09-29). Sixty simulated people tried to reach it and NOT ONE did,
          at any knowledge level: it lived behind the avatar, and an avatar does not read as settings.
          The professional scrolled seven times and then opened More in desperation. -->
-    <button data-tab="settings" id="navSettings" onclick="showTab('settings')" data-tip="Settings"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-settings"/></svg></span><span class="lbl">Settings</span></button>
+    <button data-tab="settings" id="navSettings" onclick="showTab('settings')" data-tip="Settings"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-settings"/></svg></span><span class="lbl">Settings</span><span class="shortlbl">Setup</span></button>
   </nav>
   <div class="side-foot"><span class="lbl">Press <b>[</b> to collapse</span></div>
 </aside>
@@ -1591,6 +1608,14 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </select>
       <button class="btn" onclick="addHolding()">Add</button>
     </div>
+    <!-- SAID ON THE SCREEN, NOT IN A TOOLTIP (2026-10-05). "Price when I decided $" carried its
+         explanation in a title attribute, which never appears on a phone and is a hover away on a
+         desktop. A walkthrough read the field as unexplained, which it effectively was. -->
+    <div class="muted" style="font-size:12px;margin-top:8px;line-height:1.5">
+      <b>Price when I decided</b> is optional: the price when you made the decision, before the order
+      filled. The gap between it and what you paid is what waiting and the spread cost you. Leave it
+      blank and it counts for nothing rather than against you.
+    </div>
     <!-- OFF BY DEFAULT SINCE 2026-10-05. It was ticked, and the first thing anybody does here is
          enter something they ALREADY OWN, which is not a purchase out of cash they have not recorded
          yet. The walkthrough hit a red "more than your $0 cash" that never once said to untick the
@@ -1704,6 +1729,16 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
            twelve-row table. The toggle says how many are set, so a filtered view can never look
            like the whole book with rows quietly missing. -->
       <button type="button" class="btn btn-ghost btn-sm" id="pfFilterToggle" aria-expanded="false" aria-controls="pfFilterMore" onclick="togglePortfolioFilters()">Filters</button>
+      <!-- HOW MANY HOLDINGS ARE BEING HIDDEN, AND ONE PRESS TO STOP (2026-10-05).
+           The ticker search set from the command palette persisted across visits, so a walkthrough
+           on 2026-10-04 searched INTC, came back to Portfolio days later and found INTC the only
+           row there, with the rest of the book apparently gone. The toggle beside it counted the
+           four folded filters and not the search box, which was the one that was set. This says
+           the count for all of them and offers the way out. -->
+      <span id="pfHiddenNote" style="display:none;align-items:center;gap:8px">
+        <span class="pill pill-na" id="pfHiddenCount" style="font-size:10.5px"></span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="clearPortfolioFilters()">Show all</button>
+      </span>
       <div class="spacer"></div>
       <select id="pfGlMode" style="max-width:190px" onchange="renderAll()" title="What the Gain/Loss column shows">
         <option value="total">Gain/Loss: Total</option>
@@ -2777,6 +2812,19 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 </div>
 
 <!-- CALCULATOR — opened from the header button, available on every tab -->
+
+
+<!-- THE CALCULATOR LIVES OUTSIDE THE TABS (2026-10-05).
+
+     It used to sit inside the element with id tab-settings, which carries tabs-hidden, which is
+     display:none. A position:fixed element inside a display:none ancestor is not positioned
+     anywhere; it is not rendered at all. So the header's calculator button worked only while
+     Settings happened to be the open tab, and on every other screen it set calcOpen, toggled its
+     own highlight, and showed nothing. A walkthrough on 2026-10-04 reported it as the icon doing
+     nothing, which it was, everywhere a person would actually press it.
+
+     Nothing about the panel changed. It is a direct child of body now, which is what a fixed
+     overlay has to be. -->
 <div class="calc-panel" id="calcPanel">
   <div class="calc-head">
     <button class="calc-tabbtn active" id="calcTabNormal" onclick="setCalcMode('normal')">Normal</button>
@@ -3065,7 +3113,16 @@ function persistDB(opts){
       if(D)D.lastLocalEdit=Date.now();
       Promise.resolve()
         .then(()=>syncPush())
-        .then(()=>{ clearSaveFailure(); showSaveFailure(quota,err,'rescued'); })
+        /* A RESCUE THAT WORKED IS NOT A WARNING (2026-10-05).
+           This raised a full-width banner across the bottom of the screen, coloured green, headed
+           "Saved to your account on the server" and bodied "This browser has no room left". It
+           appeared after every save, it sat on top of the content, and Not now did not keep it
+           away because the next save raised it again. A walkthrough reported it as frightening,
+           which is the correct reaction to a banner: a banner is for something that needs doing,
+           and nothing needed doing. The save succeeded and the book is on the server, so it is a
+           toast now, once, and the standing fact that this browser is out of room is said in the
+           storage card in Settings where a standing fact belongs. */
+        .then(()=>{ clearSaveFailure(); toast('Saved to your account. This browser is out of room, so changes go straight to the server.'); })
         .catch(()=>{ clearSaveFailure(); showSaveFailure(quota,err); })
         .finally(()=>{ _rescuing=false; });
       _saveFailed=true;
@@ -3166,7 +3223,10 @@ function showSaveFailure(isQuota,err,kind){
      cleared a second ago. */
   const copyOn=(typeof recordCopyOn==='function'&&recordCopyOn());
   const rescuing=kind==='rescuing', rescued=kind==='rescued';
-  /* Rescued is not a failure, so it is not red and it does not ask for anything. */
+  /* Rescued is not a failure, so it is not red and it does not ask for anything. It is also no
+     longer raised by the rescue path, which toasts instead; the branch stays because the banner is
+     the only surface that can say this at all, and a future caller with something genuinely
+     standing to report should get the quiet colour rather than the red one. */
   el.style.background=rescued?'var(--green,#1f7a4d)':'var(--red,#e5534b)';
   const head=refused  ? 'Save stopped to protect your data.'
            : rescued  ? 'Saved to your account on the server.'
@@ -4539,7 +4599,11 @@ function paletteActions(sym){
   const c=symbolContext(sym);
   const A=[];
   if(c.held)A.push({icon:'i-portfolio',label:'Open in Portfolio',note:c.shares+' sh · '+fmt$(c.value),
-    run:()=>{showTab('portfolio');const f=document.getElementById('pfFilterQ');if(f){f.value=sym;renderAll();}}});
+    /* This narrows the table to one row. That is the useful thing to do and it is also how the
+       book came to look empty on a later visit, so the action now says out loud that a filter was
+       set; the count beside the search box is what keeps saying it afterwards. */
+    run:()=>{showTab('portfolio');const f=document.getElementById('pfFilterQ');if(f){f.value=sym;renderAll();}
+      toast('Portfolio filtered to '+sym+'. Press Show all to see the rest.');}});
   if(c.watched)A.push({icon:'i-watch',label:'Open in Watchlist',note:'on your list',
     run:()=>{showTab('watchlist');const f=document.getElementById('wlFilterQ');if(f){f.value=sym;renderAll();}}});
   A.push({icon:'i-analyzer',label:'Analyze '+sym,note:c.scored?'re-score':'22 checks',run:()=>analyzeStock(sym)});
@@ -7402,6 +7466,25 @@ function holidaysFor(y){
   ]);
   _holCache[y]=H;
   return H;
+}
+/* WHICH SESSION A DAY CHANGE ACTUALLY DESCRIBES.
+   A quote's day change is against the previous close, so it describes the last session the market
+   held, which is "today" only when the market is open today. On a weekend or a holiday it is the
+   Friday, or the day before the holiday, and saying "today" makes the terminal look like it does
+   not know what day it is. Walks back at most a week: five holidays in a row has never happened,
+   and an unbounded loop over a corrupt clock would not be worth the risk. */
+function lastSessionPhrase(){
+  const today=etDate(Date.now());
+  if(isTradingDay(today))return 'today';
+  let d=today;
+  for(let i=0;i<7;i++){
+    d=addDays(d,-1);
+    if(isTradingDay(d)){
+      const dow=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dowOf(d)];
+      return 'on '+dow+', the last day the market traded';
+    }
+  }
+  return 'in the last session';
 }
 function isTradingDay(ds){
   const w=dowOf(ds);
@@ -10832,8 +10915,10 @@ function renderCompare(sym1,sc1,sym2,sc2){
     el.innerHTML='<div class="card" style="margin-top:16px"><div class="empty">Could not load data for '+esc(bad)+'. Check the ticker and your API key.</div></div>';
     return;
   }
-  const v1=verdictOf(sc1,D.holdings.some(h=>h.sym===sym1&&h.type==='Stock'),sym1);
-  const v2=verdictOf(sc2,D.holdings.some(h=>h.sym===sym2&&h.type==='Stock'),sym2);
+  const held1=D.holdings.some(h=>h.sym===sym1&&h.type==='Stock');
+  const held2=D.holdings.some(h=>h.sym===sym2&&h.type==='Stock');
+  const v1=verdictOf(sc1,held1,sym1);
+  const v2=verdictOf(sc2,held2,sym2);
   const row=(label,dispA,dispB,numA,numB,higherIsBetter)=>{
     let aCls='',bCls='';
     if(higherIsBetter!=null&&numA!=null&&numB!=null&&numA!==numB){
@@ -10848,7 +10933,18 @@ function renderCompare(sym1,sc1,sym2,sc2){
       '<div class="big">'+esc(sym1)+'</div><div class="spacer"></div><span class="muted">vs</span><div class="spacer"></div><div class="big">'+esc(sym2)+'</div>'+
     '</div>'+
     '<table><thead><tr><th></th><th>'+esc(sym1)+'</th><th>'+esc(sym2)+'</th></tr></thead><tbody>'+
-    '<tr><td>AI</td><td><span class="pill '+v1.cls+'">'+v1.label+'</span></td><td><span class="pill '+v2.cls+'">'+v2.label+'</span></td></tr>'+
+    /* THIS ROW WAS LABELLED "AI" (2026-10-05). There is no model behind it: it is this person's own
+       checklist thresholds applied to counted criteria, which is the one claim the whole product is
+       built to be able to make. One word undid it on the screen where two companies are compared.
+
+       AND IT SAYS WHICH LINE EACH ONE WAS JUDGED AGAINST. The walkthrough compared a holding with a
+       non-holding and got "Consider SELLING" beside "Doesn't qualify yet": two vocabularies, one
+       for a name you own and one for a name you do not, with nothing saying that is what happened.
+       A held name is measured against the sell line, an unheld one against the buy line, so the
+       labels are not on the same scale and the row now admits it. */
+    '<tr><td>Verdict<div class="muted" style="font-size:11px;font-weight:400">your rules, not a model</div></td>'+
+      '<td><span class="pill '+v1.cls+'">'+v1.label+'</span><div class="muted" style="font-size:11px;margin-top:4px">'+(held1?'judged against your sell line, you own it':'judged against your buy line')+'</div></td>'+
+      '<td><span class="pill '+v2.cls+'">'+v2.label+'</span><div class="muted" style="font-size:11px;margin-top:4px">'+(held2?'judged against your sell line, you own it':'judged against your buy line')+'</div></td></tr>'+
     row('Price','$'+sc1.price.toFixed(2),'$'+sc2.price.toFixed(2),null,null,null)+
     row('Quality score',sc1.qScore+'/12',sc2.qScore+'/12',sc1.qScore,sc2.qScore,true)+
     row('Price score',sc1.pScore+'/6',sc2.pScore+'/6',sc1.pScore,sc2.pScore,true)+
@@ -11787,8 +11883,13 @@ function renderAll(){
     /* "Nice." is gone. A one-day move is noise and congratulating the operator on it trains them to
        read noise as skill — the precise habit this app exists to break. State the number, then say
        what it is worth, which is nothing on its own. */
-    else if(dayBase>0&&dayChange!==0)gs.textContent=(dayChange>=0?'Up ':'Down ')+pmask(fmt$(Math.abs(dayChange)))+' today. One day is noise, not evidence.';
-    else gs.textContent='No change recorded today.';
+    /* "TODAY" ON A SUNDAY (2026-10-05). A walkthrough on a Sunday was told it was down $33.30
+       today. The market had been shut for two days: a quote's day change is measured against the
+       previous close, so on a Sunday it is Friday's move, correctly computed and wrongly dated.
+       isTradingDay already exists for grading marks against a market that was open, and it answers
+       this too. The number is unchanged; it is now attributed to the session it belongs to. */
+    else if(dayBase>0&&dayChange!==0)gs.textContent=(dayChange>=0?'Up ':'Down ')+pmask(fmt$(Math.abs(dayChange)))+' '+lastSessionPhrase()+'. One day is noise, not evidence.';
+    else gs.textContent=isTradingDay(etDate(Date.now()))?'No change recorded today.':'The market is shut. Nothing has moved since '+lastSessionPhrase().replace(/^on /,'')+'.';
   }
 
   /* pie charts */
@@ -11827,8 +11928,17 @@ function renderAll(){
     }
     return true;
   });
+  /* Written from the same arrays the table is built from, rather than recomputed, so the number
+     cannot drift away from the rows on screen. */
+  const pfHidden=D.holdings.length-filteredHoldings.length;
+  const pfNoteEl=document.getElementById('pfHiddenNote'), pfHidEl=document.getElementById('pfHiddenCount');
+  if(pfNoteEl&&pfHidEl){
+    pfNoteEl.style.display=pfHidden>0?'inline-flex':'none';
+    pfHidEl.textContent=pfHidden>0?(filteredHoldings.length+' of '+D.holdings.length+' shown, '+pfHidden+' hidden by a filter'):'';
+  }
   if(D.holdings.length&&!filteredHoldings.length){
-    hb.innerHTML='<tr><td colspan="11" class="empty">No holdings match your filters.</td></tr>';
+    hb.innerHTML='<tr><td colspan="11" class="empty"><b>All '+D.holdings.length+' of your holdings are hidden by a filter.</b><br>'+
+      '<span style="font-size:12.5px">Nothing has been lost. Press <b>Show all</b> above.</span></td></tr>';
   }
   const pfGetters={
     sym:x=>x.h.sym,
@@ -12749,7 +12859,11 @@ function showFirstRunExport(){
       '</div></details>'+
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
         '<button class="btn" onclick="exportData();dismissFirstRunExport()">Export a backup</button>'+
-        '<button class="btn btn-ghost" onclick="dismissFirstRunExport()">I understand the risk</button>'+
+        /* This read "I understand the risk" directly under three sentences explaining that the book
+           is kept on the server and that nothing depends on exporting anything. A walkthrough
+           named the contradiction: either the copy is wrong or the button is, and since the book
+           really is on the server it was the button. */
+        '<button class="btn btn-ghost" onclick="dismissFirstRunExport()">Not now</button>'+
       '</div>'+
     '</div>';
   document.body.appendChild(box);
@@ -14114,6 +14228,54 @@ function sizingLimits(sym,fromCash){
   }
   return out;
 }
+/* WHAT EACH LIMIT IS, IN THE WORDS OF THE RULE RATHER THAN THE NAME OF THE VARIABLE. The keys are
+   the labels sizingLimits already sorts by, so adding a limit there and forgetting it here shows
+   the raw key rather than silently vanishing. */
+const LIMIT_WORDS={
+  'policy cap':['your limit on how much goes into one name','Raise the per-name limit in Settings.'],
+  'volatility budget':['how much this one swings','It moves enough that your risk budget fills up before the per-name limit does.'],
+  'stop distance':['where you said you would sell','Your thesis stop is close to the price, so a full position would lose more than your budget if it hit.'],
+  'momentum gate':['a strategy you have switched on','The Herizen momentum rule allows no position in this name right now. Retire the strategy in Settings and it stops touching sizing.'],
+  'liquidity':['how hard it would be to get out','Not enough shares trade in a day for you to exit this size without moving the price.'],
+  /* Not one of sizingLimits' own labels: this row is added by the panel, because the cash balance
+     was only ever applied after the fact and so could be smaller than everything in the table. */
+  'the cash you have':['the cash you have','Untick \u201cFunded from cash\u201d to size against new money instead.'],
+};
+/* THE HEADROOM, SAID WHETHER OR NOT THERE IS ANY. Zero is the interesting case and the one that
+   used to produce a blank panel and a vanishing toast. */
+function sizingHeadroomHtml(sym,fromCash){
+  const L=sizingLimits(sym,fromCash);
+  let room=isFinite(L.limit)?L.limit:null;
+  const cash=D.cash||0;
+  /* Cash is a limit like any other and was only applied inside tiUseMax, so the panel could show
+     headroom larger than the money available. */
+  let bind=L.binding, note='';
+  if(fromCash&&room!=null&&cash<room){ room=cash; bind='the cash you have'; note='You have '+pmask(fmt$(cash))+' in cash. Untick "Funded from cash" to size against new money instead.'; }
+  else if(bind&&LIMIT_WORDS[bind]){ note=LIMIT_WORDS[bind][1]; bind=LIMIT_WORDS[bind][0]; }
+  /* CASH GOES IN THE TABLE TOO. Without it the table listed only the rule limits and marked the
+     smallest of THOSE as "smallest", which on an account with less cash than the per-name limit
+     put the badge on a number that was not binding at all. A table that contradicts the sentence
+     above it is worse than no table. */
+  const others=[['policy cap',L.cap],['volatility budget',L.vol],['stop distance',L.stop],
+                ['momentum gate',L.gate],['liquidity',L.liq]]
+    .concat(fromCash?[['the cash you have',cash]]:[]).filter(x=>isFinite(x[1]));
+  /* The badge follows the number actually in force, not sizingLimits' own winner. */
+  const smallest=others.length?others.reduce((a,b)=>b[1]<a[1]?b:a)[0]:null;
+  return '<div class="card" style="border-left:3px solid '+(room>0?'var(--accent)':'var(--yellow)')+'">'+
+    (room==null
+      ?'<div style="font-size:14.5px">No limit applies to '+esc(sym)+' yet, because nothing has been scored for it. Analyze it first and this fills in.</div>'
+      :room>0
+        ?'<div style="font-size:14.5px">You could put up to <b>'+pmask(fmt$(room))+'</b> into '+esc(sym)+'.</div>'+
+         '<div class="muted" style="font-size:12.5px;margin-top:6px">What stops it going higher: '+esc(bind||'your rules')+'. '+esc(note)+'</div>'
+        :'<div style="font-size:14.5px"><b>Your rules allow nothing in '+esc(sym)+' right now.</b></div>'+
+         '<div class="muted" style="font-size:12.5px;margin-top:6px">What said no: '+esc(bind||'your rules')+'. '+esc(note)+'</div>')+
+    (others.length>1?'<table class="tbl" style="font-size:12.5px;margin-top:12px"><tbody>'+others
+      .sort((a,b)=>a[1]-b[1]).map(x=>'<tr><td>'+esc((LIMIT_WORDS[x[0]]||[x[0]])[0])+'</td>'+
+        '<td style="text-align:right;white-space:nowrap">'+pmask(fmt$(x[1]))+(x[0]===smallest?' <span class="pill pill-na" style="font-size:9.5px">smallest</span>':'')+'</td></tr>').join('')+
+      '</tbody></table>':'')+
+    '<div class="muted" style="font-size:11.5px;margin-top:10px">Type an amount above to see what that trade would do to the rest of your money. Nothing here is a recommendation to buy.</div>'+
+  '</div>';
+}
 function tiUseMax(){
   const sym=((document.getElementById('tiTicker')||{}).value||'').trim().toUpperCase();
   if(!sym)return toast('Enter a ticker first.');
@@ -14126,8 +14288,12 @@ function tiUseMax(){
   if(side)side.value='buy';
   if(el)el.value=x>0?Math.floor(x*100)/100:0;
   renderTradeImpact();
-  if(!(x>0))toast(sym+' has no room left under your limits.');
-  else toast('Sized to '+fmt$(x)+'. Bound by your '+L.binding+'.');
+  /* The reason used to be missing here and the panel went blank behind it, which is how a real
+     limit working correctly read as a broken screen. The panel now explains it; the toast names it
+     too, because the press deserves an answer in the place the eye already is. */
+  const words=LIMIT_WORDS[L.binding];
+  if(!(x>0))toast('Your rules allow nothing in '+sym+' right now. What said no: '+((words&&words[0])||L.binding||'your rules')+'.');
+  else toast('Sized to '+fmt$(x)+'. What stops it going higher: '+((words&&words[0])||L.binding||'your rules')+'.');
 }
 function tiPrefill(sym){
   showTab('portfolio');
@@ -14204,8 +14370,21 @@ function renderTradeImpact(){
   const side=((document.getElementById('tiSide')||{}).value)||'buy';
   const amt=parseFloat((document.getElementById('tiAmount')||{}).value);
   const fromCash=!!(document.getElementById('tiFromCash')||{}).checked;
-  if(!sym||!isFinite(amt)||amt<=0){
-    el.innerHTML='';
+  /* AN EMPTY PANEL WAS THE ANSWER TO TWO DIFFERENT QUESTIONS (2026-10-05).
+
+     A walkthrough on 2026-10-04 typed MSFT and an amount and reported that nothing appeared, and
+     separately that "Largest size your policy allows" said "MSFT has no room left under your
+     limits" and gave no reason. Those are one fault. The button sizes to the largest allowed
+     amount, which for MSFT was zero, writes that zero into the amount field, and this branch then
+     blanks the whole panel because the amount is not positive. So the screen emptied itself at
+     precisely the moment it had something to explain, and the explanation went into a toast that
+     disappears.
+
+     A ticker with no amount now gets the headroom instead of nothing: every limit that applies,
+     which one is smallest, and what would change it. */
+  if(!sym){ el.innerHTML=''; return; }
+  if(!isFinite(amt)||amt<=0){
+    el.innerHTML=sizingHeadroomHtml(sym,fromCash);
     return;
   }
   const pol=policy();
