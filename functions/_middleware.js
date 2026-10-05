@@ -42,7 +42,18 @@ const HEADERS = {
    the World view's globe (CesiumJS, vendored), whose geometry workers are same-origin module
    workers under /vendor/cesium/Workers; nothing else on the site makes a worker. The two arcgisonline hosts are Esri's World Imagery, the
    satellite layer the World view fades in as the camera descends; img-src for the tiles,
-   connect-src for the service description. 'wasm-unsafe-eval'
+   connect-src for the service description.
+
+   img-src ON THE GATED PATHS NOW ALLOWS ANY https IMAGE, which is a real widening and is here for
+   one reason: the News screen shows the publisher's own photograph with each headline, and those
+   are served from a different CDN for every outlet, so there is no host list to enumerate. What it
+   costs is that loading a photograph tells that CDN the reader's IP address, the same as opening
+   the article would. What it does not cost is a referrer, because Referrer-Policy is no-referrer
+   for every response this file writes, so no outlet learns which page the image was on, which
+   ticker was being read, or that PerceptFolio exists. script-src is untouched: an image host
+   cannot run anything. The narrower alternative, proxying every thumbnail through the Worker, was
+   not taken because it puts the Worker in the path of every image on a news page and buys only the
+   IP back. 'wasm-unsafe-eval'
    lets Cesium compile the mesh decoders it instantiates at load (unused here, noisy if refused);
    it permits WebAssembly compilation only, never string evaluation, which stays forbidden. The public site, built by Vite,
    gets the strict policy: no inline script, no inline style, nothing from anywhere but here and
@@ -58,7 +69,7 @@ function csp(path, env) {
   const worker = (env.WORKER_URL || '').replace(/\/+$/, '');
   const connect = ["'self'", worker, 'https://*.workers.dev', 'https://finnhub.io', 'https://formsubmit.co'].filter(Boolean).join(' ');
   if (GATED.some(re => re.test(path))) {
-    return `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://services.arcgisonline.com https://server.arcgisonline.com; font-src 'self' data:; connect-src ${connect} https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
+    return `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: ; font-src 'self' data:; connect-src ${connect} https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
   }
   if (FRAMEABLE.test(path)) {
     /* Pages injects the Web Analytics beacon into this document as well; admitted here so the

@@ -14,7 +14,7 @@
          this origin, the worker and Finnhub, so an injected script cannot exfiltrate a portfolio
          to an arbitrary host; object-src and frame-src are closed; base-uri cannot be rewritten
          to redirect every relative URL. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://services.arcgisonline.com https://server.arcgisonline.com; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover,interactive-widget=resizes-content">
 <title>PerceptFolio | Your Portfolio Quant</title>
@@ -660,6 +660,14 @@ small.src{color:var(--muted)}
 /* One thin row above the headlines, not a panel. It wraps rather than scrolling, for the same
    reason the front-door chips do: a control a person cannot see is not a control. */
 .news-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 0 12px;margin-bottom:4px;border-bottom:1px solid var(--border)}
+/* The news grid. auto-fill with a minimum rather than a fixed column count, so it is four across on
+   a desk, two on a tablet and one on a phone without a single media query, and the lead story spans
+   two of whatever that turns out to be. The span is dropped below 700px, where two columns do not
+   exist to span. */
+.news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
+.news-tile{min-width:0}
+.news-tile.lead{grid-column:span 2}
+@media (max-width:700px){ .news-grid{grid-template-columns:1fr} .news-tile.lead{grid-column:auto} }
 .news-sep{width:1px;height:18px;background:var(--border);flex:none}
 @media (max-width:600px){ .news-bar{gap:6px} .news-bar input{max-width:120px !important} }
 .fold-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -2246,6 +2254,11 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <span class="muted" id="screenerFilterCount"></span>
     </div>
   </div>
+  <!-- WHAT THE SCAN FOUND, SAID BEFORE THE TABLE OF WHAT IT DID NOT. A walkthrough on 2026-10-04
+       scanned twenty names, scored twelve, and every one came back "Doesn't qualify yet". The screen
+       showed twelve rows of the same words and no statement that the answer was none, and no hint
+       what to try instead. A scan that finds nothing is a result; this is where it is said. -->
+  <div id="screenerOutcome" style="display:none"></div>
   <div class="card" style="overflow-x:auto">
     <table>
       <thead><tr><th>Ticker</th><th>Share price</th><th class="th-quality">Quality <span class="th-den">/12</span></th><th class="th-value">Value <span class="th-den">/6</span></th><th class="th-momentum">Momentum <span class="th-den">/4</span></th><th class="th-ai">Verdict</th><th class="th-mine">My call</th><th></th></tr></thead>
@@ -2399,13 +2412,31 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <label>Amount to simulate (split evenly across the tickers above, used because you're simulating specific stocks, not your real position sizes)</label>
       <input id="mcHypoAmount" type="number" min="0" step="100" value="10000">
     </div>
+    <!-- TWO QUESTIONS, AND THE REST FOLDED AWAY (2026-10-05).
+
+         A walkthrough on 2026-10-04 reported this screen as asking a beginner for a "risk-free
+         rate" and an "expected market return" before it would answer anything. Both already had
+         sensible defaults filled in, which is the point: nobody had to touch them and the screen
+         never said so, so they read as required homework in a language the reader does not speak.
+
+         So the two things that are genuinely this person's to decide stay on the screen, in plain
+         words, and the four that are model settings go behind a fold with their defaults in place
+         and a sentence saying what happens if they are left alone. Nothing was removed. -->
     <div class="grid grid-2">
-      <div class="field"><label>Time horizon (years)</label><input id="mcYears" type="number" min="1" max="40" value="10"></div>
-      <div class="field"><label>Simulations</label><input id="mcSims" type="number" min="200" max="10000" step="200" value="10000"></div>
-      <div class="field"><label>Risk-free rate (%/yr). E.g. short-term Treasury yield</label><input id="mcRf" type="number" step="0.1" value="4.5"></div>
-      <div class="field"><label>Expected return of the whole market (%/yr)</label><input id="mcMkt" type="number" step="0.1" value="8"></div>
-      <div class="field"><label>Monthly contribution ($, optional)</label><input id="mcContrib" type="number" min="0" step="50" value="0"></div>
+      <div class="field"><label>How many years from now</label><input id="mcYears" type="number" min="1" max="40" value="10"></div>
+      <div class="field"><label>How much you add each month ($)</label><input id="mcContrib" type="number" min="0" step="50" value="0"></div>
     </div>
+    <details class="aside">
+      <summary>The model's own settings, already filled in</summary>
+      <div>
+        <div class="muted" style="font-size:12.5px;margin-bottom:10px">These are filled with the usual figures and you can run the whole thing without touching them. Change them only if you have a reason to disagree.</div>
+        <div class="grid grid-2">
+          <div class="field"><label>What cash earns with no risk (%/yr)<br><span class="muted" style="font-size:11.5px">A short-term Treasury yield. Called the risk-free rate.</span></label><input id="mcRf" type="number" step="0.1" value="4.5"></div>
+          <div class="field"><label>What the whole market returns in an average year (%/yr)<br><span class="muted" style="font-size:11.5px">The long-run figure for the US market as a whole.</span></label><input id="mcMkt" type="number" step="0.1" value="8"></div>
+          <div class="field"><label>How many futures to run<br><span class="muted" style="font-size:11.5px">More is slower and barely changes the answer.</span></label><input id="mcSims" type="number" min="200" max="10000" step="200" value="10000"></div>
+        </div>
+      </div>
+    </details>
     <button class="btn" id="mcRunBtn" onclick="runMonteCarlo()">Run simulation</button>
     <span class="muted" id="mcStatus"></span>
   </div>
@@ -4472,7 +4503,7 @@ function showTab(t){
   } else newsLiveOff();
   if(t==='map'){drawMap();renderRelList();}
   if(t==='dashboard')renderCommand();
-  if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();}
+  if(t==='portfolio'){fillThesisPicker();renderDrift();renderTradeImpact();scoreUnscoredHoldings();}
   if(t==='risk')renderAttribution();
   if(t==='projections')renderHerizen();
   if(t==='news')renderNews();
@@ -5024,23 +5055,65 @@ function scoreTotal(sc){
    checked BEFORE the global rule — a condition you set deliberately for one company should outrank
    the blanket setting, and it's the mechanism that makes a written thesis do work rather than sit
    in a text box. */
+/* HOW MANY CHECKS EACH SECTION HAS WHEN EVERYTHING ANSWERS. A score is a fraction of the checks
+   that HAD data, so 0/6 and 0/6-of-which-5-were-blank are the same number and mean nothing like
+   the same thing. A walkthrough on 2026-10-04 hit exactly that: INTC, up 165%, flagged "Consider
+   SELLING" off "Price 0/6 (1 had data)", with five rows reading "Not available on your Finnhub
+   plan". Missing data was quietly counted as a failure and no screen said so. These constants are
+   what makes it sayable. */
+const CHECK_COUNTS={quality:12,price:6,momentum:4};
+/* The sentence naming thin data, or '' when the score is complete. It is deliberately the first
+   thing appended to a reason, because if the evidence is thin that is the most important fact
+   about the verdict and not a footnote to it. */
+function thinNote(sc){
+  if(!sc||sc.error)return '';
+  const gaps=[];
+  const q=CHECK_COUNTS.quality-(sc.qTotal||0), pr=CHECK_COUNTS.price-(sc.pTotal||0);
+  if(q>0)gaps.push(q+' of '+CHECK_COUNTS.quality+' quality');
+  if(pr>0)gaps.push(pr+' of '+CHECK_COUNTS.price+' price');
+  if(!gaps.length)return '';
+  return 'Careful: '+gaps.join(' and ')+' checks had no data, so they could not pass. That alone can produce this answer.';
+}
+/* Whether missing data, on its own, could have decided a sell. If the checks that never answered
+   would have been enough to clear the sell line had they all passed, the verdict is not evidence
+   about the company; it is evidence about the data. */
+function sellIsDataDriven(sc,r){
+  if(!sc||sc.error)return false;
+  const missing=CHECK_COUNTS.quality-(sc.qTotal||0);
+  return missing>0 && (sc.qScore+missing)>(r.qSell||0);
+}
 function verdictOf(sc,isHolding,sym){
   /* "No data" for a rate limit told the reader the company had no data, which is false and reads
      as a broken terminal. Each failure says its own thing, in the words a person would use. */
   if(sc.error)return{label:sc.error==='RATE_LIMIT'?'Not scored yet, too many at once':sc.error==='NO_KEY'?'Needs market data':sc.error==='NO_DATA'?'No quote for this ticker':'Not scored',cls:'pill-na',key:'na'};
   const r=D.rules;
   const th=sym?thesisFor(sym):null;
+  const thin=thinNote(sc);
+  /* Every branch below carries a `why`. It used to carry one only on the thesis path, so every
+     other row on the keep/look/sell list read "Your rules say consider selling", which is the
+     verdict restated rather than a reason for it. A verdict without a reason is a tip. */
+  /* The warning goes BEFORE the arithmetic, not after it. Appended, it reads as a footnote to a
+     conclusion the reader has already accepted; first, it is the frame they read the number in. */
+  const plus=t=>thin?thin+' '+t:t;
   if(isHolding&&th&&isFinite(th.sellBelow)&&th.sellBelow>0&&sc.qScore<th.sellBelow){
-    return{label:'SELL. Your thesis condition',cls:'pill-sell',key:'sell',viaThesis:true,
-      why:'Quality '+sc.qScore+'/'+sc.qTotal+' is below the '+th.sellBelow+' you set for this position'};
+    return{label:'SELL. Your thesis condition',cls:'pill-sell',key:'sell',viaThesis:true,thin:!!thin,
+      why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' is below the '+th.sellBelow+' you set for this position.')};
   }
   const mOk=(r.mBuy||0)<=0||sc.mScore>=r.mBuy; // momentum only gates BUY if you've raised mBuy above 0 in Settings
-  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&mOk)return{label:'BUY candidate',cls:'pill-buy',key:'buy'};
-  if(isHolding&&sc.qTotal>=6&&sc.qScore<=r.qSell)return{label:'Consider SELLING',cls:'pill-sell',key:'sell'};
-  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&!mOk)return{label:'Good price, weak momentum. WATCH',cls:'pill-watch',key:'watch'};
-  if(sc.qScore>=r.qBuy)return{label:'Great biz, pricey. WATCH',cls:'pill-watch',key:'watch'};
-  if(isHolding)return{label:'HOLD',cls:'pill-hold',key:'hold'};
-  return{label:'Doesn\'t qualify yet',cls:'pill-na',key:'no'};
+  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&mOk)return{label:'BUY candidate',cls:'pill-buy',key:'buy',thin:!!thin,
+    why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' and price '+sc.pScore+'/'+sc.pTotal+' both clear the lines you set ('+r.qBuy+' and '+r.pBuy+').')};
+  if(isHolding&&sc.qTotal>=6&&sc.qScore<=r.qSell)return{label:'Consider SELLING',cls:'pill-sell',key:'sell',thin:!!thin,
+    dataDriven:sellIsDataDriven(sc,r),
+    why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' is at or below your sell line of '+r.qSell+'.'
+      +(sellIsDataDriven(sc,r)?' Had the missing checks passed it would not have fired, so this is about the data as much as the company.':''))};
+  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&!mOk)return{label:'Good price, weak momentum. WATCH',cls:'pill-watch',key:'watch',thin:!!thin,
+    why:plus('The business and the price pass, but momentum '+sc.mScore+'/'+sc.mTotal+' is under the '+r.mBuy+' you asked for.')};
+  if(sc.qScore>=r.qBuy)return{label:'Great biz, pricey. WATCH',cls:'pill-watch',key:'watch',thin:!!thin,
+    why:plus('The business passes on '+sc.qScore+'/'+sc.qTotal+', but price '+sc.pScore+'/'+sc.pTotal+' is under your '+r.pBuy+'. You are being asked to pay up.')};
+  if(isHolding)return{label:'HOLD',cls:'pill-hold',key:'hold',thin:!!thin,
+    why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' is above your sell line of '+r.qSell+' but under the '+r.qBuy+' you would buy at. Nothing to do.')};
+  return{label:'Doesn\'t qualify yet',cls:'pill-na',key:'no',thin:!!thin,
+    why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' needs '+r.qBuy+' and price '+sc.pScore+'/'+sc.pTotal+' needs '+r.pBuy+'.')};
 }
 
 /* ================= EDUCATIONAL BRIDGE — academic factor context, kept strictly separate from the checklist =================
@@ -6640,13 +6713,16 @@ async function startScreener(givenList){
   if(!Array.isArray(givenList)&&/^\(whole market/.test(typed.trim())){ return scanUniverse(); }
   const list=Array.isArray(givenList)?givenList:parseTickerList(typed);
   if(!list.length)return toast('Paste some tickers or pick a preset first.');
-  screenerRunning=true;screenerCancelFlag=false;screenerResults=[];
+  screenerRunning=true;screenerCancelFlag=false;screenerResults=[];renderScanOutcome();
   document.getElementById('screenerStartBtn').style.display='none';
   document.getElementById('screenerStopBtn').style.display='inline-block';
   renderScreenerTable();
   const delayMs=4000; // ~5 API calls per ticker scored; keeps well under Finnhub's 60/min free-tier limit
   const freshMs=12*3600*1000; // reuse a cached score if it's less than 12h old, so repeat/overlapping scans go faster
-  const etaMin=Math.max(1,Math.round(list.length*delayMs/60000));
+  /* Ceil, not round. Twenty names at four seconds is eighty seconds, which rounded to "up to ~1
+     min" and then took ninety: the walkthrough timed it. A stated ceiling that is exceeded is worse
+     than a larger honest one, because it is the number the reader decided to wait against. */
+  const etaMin=Math.max(1,Math.ceil(list.length*delayMs/60000));
   for(let idx=0;idx<list.length;idx++){
     if(screenerCancelFlag)break;
     const sym=list[idx];
@@ -6663,11 +6739,72 @@ async function startScreener(givenList){
   document.getElementById('screenerStartBtn').style.display='inline-block';
   document.getElementById('screenerStopBtn').style.display='none';
   document.getElementById('screenerStatus').textContent=screenerCancelFlag?'Stopped, '+screenerResults.length+' scanned.':'Done, scanned '+screenerResults.length+' tickers.';
+  renderScanOutcome();
+}
+
+/* HOW FAR SHORT A NAME FELL, in checks. Zero means it cleared both bars. This is what "closest"
+   means: not the highest score, but the smallest distance from the lines this person set, so
+   raising the price bar by one changes the answer to this question the way it should. */
+function shortfall(sc){
+  if(!sc||sc.error)return Infinity;
+  const r=D.rules;
+  return Math.max(0,(r.qBuy||0)-(sc.qScore||0))+Math.max(0,(r.pBuy||0)-(sc.pScore||0));
+}
+/* THE ANSWER WAS NONE, AND THAT IS AN ANSWER.
+
+   Three near-misses, not ten, and not a ranking of everything: the point is to end the session, not
+   to launder a long list of rejections into something that looks like a shortlist. Each one says
+   what it is short of, so nothing here reads as a suggestion to buy it anyway. */
+function renderScanOutcome(){
+  const el=document.getElementById('screenerOutcome');
+  if(!el)return;
+  if(!screenerResults.length){el.style.display='none';el.innerHTML='';return;}
+  const scored=screenerResults.filter(r=>r.sc&&!r.sc.error);
+  const buys=scored.filter(r=>verdictOf(r.sc,D.holdings.some(h=>h.sym===r.sym&&h.type==='Stock'),r.sym).key==='buy');
+  el.style.display='block';
+  if(buys.length){
+    el.innerHTML='<div class="card" style="margin-bottom:12px"><div class="section-title" style="margin-top:0">'+
+      buys.length+' of '+scored.length+' clear your bars</div>'+
+      '<div class="muted" style="font-size:12.5px">'+buys.map(b=>'<b>'+esc(b.sym)+'</b>').join(', ')+
+      '. They are at the top of the table. Nothing here is a recommendation to buy.</div></div>';
+    return;
+  }
+  const near=[...scored].sort((a,b)=>shortfall(a.sc)-shortfall(b.sc)).slice(0,3).filter(r=>isFinite(shortfall(r.sc)));
+  const unwatched=near.filter(r=>!D.watchlist.includes(r.sym)).map(r=>r.sym);
+  const r=D.rules;
+  el.innerHTML='<div class="card" style="margin-bottom:12px">'+
+    '<div class="section-title" style="margin-top:0">Nothing to buy, out of '+scored.length+' scanned</div>'+
+    '<div class="muted" style="font-size:12.5px;margin:-6px 0 12px">That is a result, not a failure. Your bars are quality '+r.qBuy+'/12 and value '+r.pBuy+'/6. Lower either in Settings and more will qualify; leaving them alone is also an answer.</div>'+
+    (near.length?'<table class="tbl" style="font-size:13px"><tbody>'+near.map(n=>{
+      const d=shortfall(n.sc);
+      return '<tr><td style="white-space:nowrap"><b>'+esc(n.sym)+'</b></td>'+
+        '<td class="muted" style="white-space:nowrap">'+d+' check'+(d===1?'':'s')+' short</td>'+
+        '<td class="muted">quality '+n.sc.qScore+'/'+n.sc.qTotal+', value '+n.sc.pScore+'/'+n.sc.pTotal+'</td>'+
+        '<td style="text-align:right">'+(D.watchlist.includes(n.sym)
+          ?'<span class="pill pill-na" style="font-size:9.5px">watched</span>'
+          :'<button class="btn btn-ghost btn-sm" onclick="addWatchSym(\''+esc(n.sym)+'\')">Watch</button>')+'</td></tr>';
+    }).join('')+'</tbody></table>':'')+
+    (unwatched.length>1?'<button class="btn btn-sm" style="margin-top:10px" onclick="watchNearMisses()">Watch all '+unwatched.length+'</button>':'')+
+    '<div class="muted" style="font-size:11.5px;margin-top:10px">Watched names are re-scored on every refresh, so if one crosses your bars you will see it without scanning again.</div>'+
+    '</div>';
+}
+/* One press rather than three, because the walkthrough's near-misses were never saved and the
+   Watchlist stayed at zero through a whole session. */
+function watchNearMisses(){
+  const scored=screenerResults.filter(r=>r.sc&&!r.sc.error);
+  const near=[...scored].sort((a,b)=>shortfall(a.sc)-shortfall(b.sc)).slice(0,3)
+    .map(r=>r.sym).filter(sym=>!D.watchlist.includes(sym));
+  if(!near.length)return toast('They are all already on your watchlist.');
+  near.forEach(sym=>D.watchlist.push(sym));
+  saveDB();renderAll();renderScreenerTable();renderScanOutcome();
+  toast(near.join(', ')+' added to your watchlist, scored on every refresh.');
 }
 function stopScreener(){screenerCancelFlag=true;}
 function addWatchSym(sym){
   if(D.watchlist.includes(sym))return toast(sym+' is already on your watchlist.');
-  D.watchlist.push(sym);saveDB();renderAll();renderScreenerTable();toast(sym+' added to watchlist.');
+  D.watchlist.push(sym);saveDB();renderAll();renderScreenerTable();
+  if(typeof renderScanOutcome==='function')renderScanOutcome();
+  toast(sym+' added to watchlist.');
 }
 function clearScreenerFilters(){
   const q=document.getElementById('scFilterQ');if(q)q.value='';
@@ -6705,7 +6842,10 @@ function renderScreenerTable(){
     return (b.sc.qScore-a.sc.qScore)||(b.sc.pScore-a.sc.pScore);
   });
   tb.innerHTML=sorted.map(({sym,sc})=>{
-    if(sc.error)return '<tr><td><b>'+esc(sym)+'</b></td><td colspan="4" class="muted">no data ('+esc(sc.error)+')</td><td></td><td></td><td></td></tr>';
+    /* This row used to print the raw code: "no data (NO_DATA)". verdictOf already turns every one
+       of these into a sentence, and there was no reason for the screener to have its own, worse
+       vocabulary for the same four failures. */
+    if(sc.error)return '<tr><td><b>'+esc(sym)+'</b></td><td colspan="4" class="muted">'+esc(verdictOf(sc,false,sym).label)+'</td><td></td><td></td><td></td></tr>';
     const v=verdictOf(sc,D.holdings.some(h=>h.sym===sym&&h.type==='Stock'),sym);
     const inWatch=D.watchlist.includes(sym);
     return '<tr><td><b>'+esc(sym)+'</b></td><td>'+fmt$(sc.price)+'</td><td>'+sc.qScore+'/12</td><td>'+sc.pScore+'/6</td><td>'+sc.mScore+'/4</td>'+
@@ -8172,6 +8312,22 @@ function newsBrief(sym,items,days){
     '<p class="muted" style="font-size:11px;margin-top:9px;line-height:1.5">Themes are matched from headline text; the day shown is the largest move in your price log. Same-day publication is coincidence in time, <b>not</b> proof of cause.</p>'+
   '</div>';
 }
+/* THE PUBLISHER'S OWN PHOTOGRAPH, or nothing at all.
+
+   Only https, because the page is https and an http image would be blocked anyway, and the check
+   is cheaper than the console noise. onerror hides the element rather than leaving a broken-image
+   glyph: a dead CDN link is common and must not make a real headline look damaged. loading=lazy so
+   a page of forty stories fetches the handful on screen; decoding=async so a slow decode does not
+   block the headline beside it. referrerpolicy=no-referrer belongs here as well as in the response
+   header, because the header is set by our middleware and this file is also opened from a cached
+   copy by the service worker, where no middleware ran. */
+function newsImg(n,h){
+  const u=(n&&n.image||'').trim();
+  if(!/^https:\/\//.test(u))return '';
+  return '<img src="'+esc(u)+'" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" '+
+    'onerror="this.style.display=\'none\'" '+
+    'style="width:100%;height:'+h+'px;object-fit:cover;border-radius:8px;background:var(--panel);display:block">';
+}
 function newsItemHtml(n){
   const t=n.datetime?new Date(n.datetime*1000):null;
   const when=t?t.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
@@ -8183,6 +8339,19 @@ function newsItemHtml(n){
     (sum?'<p class="muted" style="font-size:13px;line-height:1.6;margin-top:5px">'+esc(sum.slice(0,300))+(sum.length>300?'…':'')+'</p>':'')+
     '<div class="muted" style="font-size:11.5px;margin-top:6px">'+esc(n.source||'')+(when?' · '+esc(when):'')+'</div>'+
   '</div>';
+}
+/* THE FRONT PAGE TILE. Photograph, headline, outlet, time. No summary: a wall of three-hundred
+   character abstracts is the thing the old screen had instead of news. */
+function newsTileHtml(n,big){
+  const t=n.datetime?new Date(n.datetime*1000):null;
+  const when=t?t.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+  const head=esc(n.headline||'');
+  const inner=newsImg(n,big?210:132)+
+    '<div style="font-size:'+(big?'17px':'14px')+';line-height:1.35;font-weight:650;margin-top:10px">'+head+'</div>'+
+    '<div class="muted" style="font-size:11.5px;margin-top:6px">'+esc(n.source||'')+(when?' · '+esc(when):'')+'</div>';
+  return '<div class="news-tile">'+(n.url
+    ?'<a href="'+esc(n.url)+'" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;display:block">'+inner+'</a>'
+    :inner)+'</div>';
 }
 /* ---- Written summaries ----
    The keyword brief above is honest but mechanical. A sentence like "BofA and UBS named it a top
@@ -8656,23 +8825,37 @@ function renderNews(){
         : '<div class="card" style="margin-bottom:14px"><div class="empty">Nothing published about '+esc(newsFocus)+' in this window. Try <b>Week</b> or <b>Month</b>.</div></div>');
   }
 
+  /* THE NEWS IS THE FIRST THING ON THE SCREEN (2026-10-05).
+
+     It used to open with four counting tiles: how many market stories, how many of your names were
+     in the news, which was busiest, the window. Then cards of summaries. The owner's objection is
+     the whole of it: somebody who opens News expects to see the news. A count of stories is a fact
+     about the feed, not a story, and it was occupying the only part of the screen nobody has to
+     scroll to.
+
+     So the order is inverted. Photographs and headlines across the page, the lead story double
+     width, then the stories about what this person actually owns, then the counts as one source
+     line at the bottom where a source line belongs. Nothing was deleted; the summaries and the
+     per-position cards are all still here, below the news rather than instead of it. */
+  const lead=market.slice(0,1), rest=market.slice(1,24);
   el.innerHTML=
-    '<div class="stat-row" style="margin-bottom:16px">'+
-      '<div class="stat s-in"><span class="stat-label">Market stories '+label+'</span><span class="stat-value">'+market.length+'</span></div>'+
-      '<div class="stat s-count"><span class="stat-label">Your names in the news</span><span class="stat-value">'+perSym.length+' / '+syms.length+'</span></div>'+
-      '<div class="stat s-profit"><span class="stat-label">Busiest</span><span class="stat-value" style="font-size:16px">'+(perSym.length?esc(perSym[0].sym):'-')+'</span></div>'+
-      '<div class="stat"><span class="stat-label">Window</span><span class="stat-value" style="font-size:15px">'+newsWindow+'d</span></div>'+
-    '</div>'+
+    (market.length
+      ?'<div class="news-grid" style="margin-bottom:22px">'+
+         lead.map(n=>newsTileHtml(n,true).replace('news-tile','news-tile lead')).join('')+
+         rest.map(n=>newsTileHtml(n,false)).join('')+
+       '</div>'
+      :'<div class="card" style="margin-bottom:18px"><div class="empty">No general market stories in this window. Try <b>Week</b> or <b>Month</b>.</div></div>')+
 
     (focusHtml)+
-    (perSym.length?'<div class="section-title" style="margin-top:0">Your positions</div>'+
+    (perSym.length?'<div class="section-title">What your own names are in the news for</div>'+
       perSym.map(x=>symbolNewsCard(x.sym,x.items,x.held?'held':'watching',x.move)).join('')
       :'<div class="card"><div class="empty">Nothing published about your holdings or watchlist in this window. Try a longer one.</div></div>')+
 
-    '<div class="section-title">Market-wide</div>'+
-    '<div class="card">'+
-      (market.length?market.slice(0,25).map(newsItemHtml).join('')
-        :'<div class="empty">No general market stories in this window.</div>')+
+    '<div class="muted" style="font-size:11.5px;margin:18px 0 0;border-top:1px solid var(--border);padding-top:12px">'+
+      market.length+' market '+(market.length===1?'story':'stories')+' '+label+' · '+
+      perSym.length+' of your '+syms.length+' names in the news'+
+      (perSym.length?' · busiest '+esc(perSym[0].sym):'')+
+      ' · '+newsWindow+'-day window · photographs and headlines are the publishers\u2019 own, fetched from their sites and nothing else'+
     '</div>'+
 
     '<div class="card" style="margin-top:16px;border-left:3px solid var(--red)">'+
@@ -10438,11 +10621,17 @@ async function analyzeBook(){
     const v=sc?verdictOf(sc,true,h.sym):null;
     const tooBig=pct>p.maxPosition;
     let bucket, why;
-    if(!sc){ bucket='unreviewed'; why='Not scored yet.'; }
-    else if(v&&v.key==='sell'){ bucket='sell'; why=v.why||('Your rules say '+v.label.toLowerCase()+'.'); }
-    else if(tooBig){ bucket='look'; why='This is '+pct.toFixed(1)+'% of your money and your limit is '+p.maxPosition+'%.'; }
-    else if(v&&v.key==='watch'){ bucket='look'; why=v.label+'.'; }
-    else { bucket='keep'; why=v?(v.label+'.'):'Passes your rules.'; }
+    /* SIZE IS SAID ALONGSIDE THE VERDICT, NOT INSTEAD OF IT. This used to be an else-if chain, so a
+       holding that was both a sell and far over its limit showed only the checklist reason and the
+       78%-of-the-book fact disappeared. Size is the first clause when it applies, because it is the
+       one the owner's rulebook exists to catch and the one the reader can act on without agreeing
+       with any score. */
+    const sizeWhy='This is '+pct.toFixed(1)+'% of your money and your limit is '+p.maxPosition+'%.';
+    if(!sc){ bucket='unreviewed'; why=tooBig?sizeWhy+' Not scored yet.':'Not scored yet.'; }
+    else if(v&&v.key==='sell'){ bucket='sell'; why=(tooBig?sizeWhy+' ':'')+(v.why||('Your rules say '+v.label.toLowerCase()+'.')); }
+    else if(tooBig){ bucket='look'; why=sizeWhy+(v&&v.why?' '+v.why:''); }
+    else if(v&&v.key==='watch'){ bucket='look'; why=v.why||(v.label+'.'); }
+    else { bucket='keep'; why=v?(v.why||v.label+'.'):'Passes your rules.'; }
     return {sym:h.sym, pct, bucket, why, val};
   });
   const group=(k)=>rows.filter(r=>r.bucket===k).sort((a,b)=>b.pct-a.pct);
@@ -10466,6 +10655,37 @@ async function analyzeBook(){
     block('Not reviewed','muted','No score yet, which is not the same as a pass.',un)+
     '<div class="muted" style="font-size:11.5px;margin-top:14px">This is your rulebook applied to your holdings. Change the rules in Settings and these answers change. Nothing here is advice and nothing is a recommendation to buy or sell.</div>';
   if(btn){btn.disabled=false;btn.textContent='Check again';}
+}
+
+/* VERDICTS WITHOUT BEING ASKED (2026-10-05).
+
+   The My call column was blank for every holding until somebody found Refresh data, and a
+   walkthrough on 2026-10-04 reported it as the column being broken. It was not broken; it was
+   empty, which on a first visit is indistinguishable.
+
+   WHY THIS IS NOT JUST refreshAll(). That fetches prices for everything and is the expensive,
+   rate-limited call the user presses deliberately. This scores only holdings that have no score at
+   all, one at a time so a 429 on the fifth does not lose the first four, and it is capped: a
+   hundred-name book imported from a broker must not quietly spend the minute's whole Finnhub
+   allowance because somebody opened a tab. Already-scored holdings are left alone, however stale,
+   because refreshing a score is Refresh data's job and doing it here would make opening Portfolio
+   cost an API call forever.
+
+   It is silent on failure. There is nothing for the reader to do about a rate limit they did not
+   cause, and the row still carries its own Score it button. */
+let autoScoring=false;
+async function scoreUnscoredHoldings(){
+  if(autoScoring||!hasMarketData())return;
+  const todo=(D.holdings||[]).filter(h=>h.sym&&h.type==='Stock'&&!D.analyses[h.sym]).slice(0,20);
+  if(!todo.length)return;
+  autoScoring=true;
+  try{
+    for(const h of todo){
+      try{ const sc=await scoreStock(h.sym); D.analyses[h.sym]=sc; }
+      catch(e){ break; /* a rate limit will hit every one that follows; stop rather than hammer */ }
+    }
+    saveDB();renderHoldings();
+  }finally{ autoScoring=false; }
 }
 
 async function analyzeStock(symArg){
@@ -11304,14 +11524,39 @@ let mcChart=null,mcHistChart=null,lastMcResult=null;
 function renderMonteCarloResults(r){
   lastMcResult=r;
   const el=document.getElementById('mcResults');
+  /* THE ANSWER IS IN DOLLARS AND IT GOES FIRST (2026-10-05).
+
+     This screen used to open on a one-year RETURN RANGE in percent, under a line explaining that it
+     was "not tied to how much money you put in". The dollar figures, which are the answer to the
+     question anybody opened this screen to ask, were four blocks down the page. A walkthrough on
+     2026-10-04 found the dollars genuinely good and genuinely buried.
+
+     Nothing is deleted and no number changed. The dollar block and its chart move to the top, with
+     one sentence above them that says the whole result out loud, and the percent range follows for
+     whoever wants it. The ordering is the entire change. */
+  const yrs=r.years+(r.years===1?' year':' years');
+  const putIn=r.totalVal+(r.contrib||0)*12*r.years;
+  const lead='In '+yrs+(r.contrib>0?', adding '+pmask(fmt$(r.contrib))+' a month':'')+
+    ', the middle outcome is <b>'+pmask(fmt$(r.finalP50))+'</b>. '+
+    'The bad end is '+pmask(fmt$(r.finalP5))+' and the good end is '+pmask(fmt$(r.finalP95))+'. '+
+    r.probLoss.toFixed(1)+'% of the futures ended below the '+pmask(fmt$(putIn))+' put in.';
   el.innerHTML=
-    '<p class="muted" style="margin-top:16px">Simulating: <b>'+esc(r.simLabel)+'</b></p>'+
-    '<div class="section-title" style="margin-top:8px">1-year return range</div>'+
-    '<p class="muted" style="margin-bottom:10px">Pure percent performance over the next year, not tied to how much money you put in, just how the investment itself could do.</p>'+
+    '<div class="card" style="margin-top:16px;border-left:3px solid var(--accent)">'+
+      '<div style="font-size:15px;line-height:1.6">'+lead+'</div>'+
+      '<div class="muted" style="font-size:11.5px;margin-top:8px">'+esc(r.simLabel)+' · '+r.sims.toLocaleString()+' simulated futures · a range of plausible outcomes, not a forecast</div>'+
+    '</div>'+
+    '<div class="grid grid-3" style="margin-top:16px">'+
+    '<div class="card"><h3>Bad end</h3><div class="big neg">'+pmask(fmt$(r.finalP5))+'</div><div class="muted">5% of futures ended below this</div></div>'+
+    '<div class="card"><h3>Middle</h3><div class="big">'+pmask(fmt$(r.finalP50))+'</div><div class="muted">Half landed above, half below</div></div>'+
+    '<div class="card"><h3>Good end</h3><div class="big pos">'+pmask(fmt$(r.finalP95))+'</div><div class="muted">5% of futures ended above this</div></div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:16px"><h3>The range, year by year</h3><div class="chart-box" style="height:320px"><canvas id="mcChartCanvas"></canvas></div></div>'+
+    '<div class="section-title">And the same thing as a percentage, over one year</div>'+
+    '<div class="muted" style="font-size:12.5px;margin:-6px 0 10px">How the investment itself could do, with no money added. Useful for comparing one holding against another; it is not the answer above.</div>'+
     '<div class="grid grid-3">'+
-    '<div class="card"><h3>Worst case (5th pct)</h3><div class="big neg">'+(r.yearP5>=0?'+':'')+r.yearP5.toFixed(1)+'%</div></div>'+
-    '<div class="card"><h3>Median</h3><div class="big">'+(r.yearP50>=0?'+':'')+r.yearP50.toFixed(1)+'%</div></div>'+
-    '<div class="card"><h3>Best case (95th pct)</h3><div class="big pos">'+(r.yearP95>=0?'+':'')+r.yearP95.toFixed(1)+'%</div></div>'+
+    '<div class="card"><h3>Bad end (5th pct)</h3><div class="big neg">'+(r.yearP5>=0?'+':'')+r.yearP5.toFixed(1)+'%</div></div>'+
+    '<div class="card"><h3>Middle</h3><div class="big">'+(r.yearP50>=0?'+':'')+r.yearP50.toFixed(1)+'%</div></div>'+
+    '<div class="card"><h3>Good end (95th pct)</h3><div class="big pos">'+(r.yearP95>=0?'+':'')+r.yearP95.toFixed(1)+'%</div></div>'+
     '</div>'+
     '<div class="card" style="margin-top:16px">'+
     '<div class="row"><h3 style="margin:0">Distribution of possible 1-year returns</h3><div class="spacer"></div>'+
@@ -11320,13 +11565,6 @@ function renderMonteCarloResults(r){
     '<div class="chart-box" id="mcHistWrap" style="height:260px;margin-top:10px"><canvas id="mcHistCanvas"></canvas></div>'+
     '<div id="mcBoxWrap" style="display:none;height:170px;position:relative;margin-top:10px"><canvas id="mcBoxCanvas"></canvas></div>'+
     '<details class="aside"><summary>The middle half of outcomes</summary><div>25th–75th percentile: '+(r.yearP25>=0?'+':'')+r.yearP25.toFixed(1)+'% to '+(r.yearP75>=0?'+':'')+r.yearP75.toFixed(1)+'%, that middle band is where the simulation thinks a typical year lands. The box &amp; whisker view shows the same 5th/25th/median/75th/95th spread as a single chart instead of a full bar-by-bar histogram.</div></details></div>'+
-    '<div class="section-title">Dollar projection over '+r.years+' years</div>'+
-    '<div class="grid grid-3">'+
-    '<div class="card"><h3>Worst case (5th pct)</h3><div class="big neg">'+pmask(fmt$(r.finalP5))+'</div><div class="muted">5% of simulations ended below this</div></div>'+
-    '<div class="card"><h3>Median outcome</h3><div class="big">'+pmask(fmt$(r.finalP50))+'</div><div class="muted">Half of simulations landed above, half below</div></div>'+
-    '<div class="card"><h3>Best case (95th pct)</h3><div class="big pos">'+pmask(fmt$(r.finalP95))+'</div><div class="muted">5% of simulations ended above this</div></div>'+
-    '</div>'+
-    '<div class="card" style="margin-top:16px"><h3>Range over time</h3><div class="chart-box" style="height:320px"><canvas id="mcChartCanvas"></canvas></div></div>'+
     '<div class="card" style="margin-top:16px"><h3>Assumptions used</h3>'+
     '<table><tbody>'+
     '<tr><td>Starting value</td><td>'+pmask(fmt$(r.totalVal))+'</td></tr>'+
@@ -11627,7 +11865,13 @@ function renderAll(){
       '<td class="'+(gl==null?'':gl>=0?'pos':'neg')+'">'+(gl==null
           ?'<span class="muted" title="'+(glMode()==='today'?'No live quote today. Manually priced, a mutual fund, or not refreshed yet.':'Set a price to see this.')+'">-</span>'
           :pmask(fmt$(gl))+(glPct!=null?'<div style="font-size:11px;opacity:.8">'+(glPct>=0?'+':'')+glPct.toFixed(2)+'%</div>':''))+'</td>'+
-      '<td>'+(v?'<span class="pill '+v.cls+'">'+v.label+'</span>':(h.type!=='Stock'?'<span class="pill pill-na">'+h.type+'</span>':'<span class="muted">refresh</span>'))+'</td>'+
+      /* This cell used to read a grey "refresh" for anything unscored. It looked like a control, it
+         was a word, and pressing it did nothing: found by a walkthrough on 2026-10-04. It is now
+         the button it was pretending to be, and scores this one holding rather than making somebody
+         find Refresh data and wait for the whole book. */
+      '<td>'+(v?'<span class="pill '+v.cls+'" title="'+esc(v.why||'')+'">'+v.label+'</span>'+(v.thin?' <span class="pill pill-na" style="font-size:9.5px;padding:1px 6px" title="Some checks had no data and so could not pass. Open the stock to see which.">thin data</span>':'')
+        :(h.type!=='Stock'?'<span class="pill pill-na">'+h.type+'</span>'
+        :'<button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(h.sym)+'\')">Score it</button>'))+'</td>'+
       '<td class="mycall-cell">'+myTagSelect(h.sym)+'</td>'+
       '<td style="text-align:right">'+ovfButton("holdingMenu(this,'"+esc(h.sym)+"',"+i+")",h.sym+' options')+'</td>';
     hb.appendChild(tr);
