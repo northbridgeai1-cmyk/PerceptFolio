@@ -132,6 +132,93 @@ for (const [err, word] of [['RATE_LIMIT', 'too many at once'], ['NO_KEY', 'Needs
   t(err + ' is not dressed up as a verdict', v.key === 'na', v.key);
 }
 
+/* =============================================================================================
+   THREE WORDS, AND OWNING IT IS NOT ONE OF THEM (2026-10-06).
+
+   The owner's instruction: put buy, hold or sell on everything, whether I own it or not. Two of the
+   six old labels depended on ownership rather than on the company, so the same score produced
+   different words for different readers, and Compare put both vocabularies side by side.
+
+   The property being asserted here is the one that is easy to lose in a later edit and impossible
+   to see by reading: for any score at all, the WORD is identical held and unheld. Only the sentence
+   under it differs. It is checked by sweeping every reachable score rather than by picking cases. */
+console.log('\nTHE WORD NEVER DEPENDS ON WHETHER YOU OWN IT');
+{
+  const mismatches = [];
+  for (let q = 0; q <= 12; q++) for (let pr = 0; pr <= 6; pr++) {
+    const sc = full(q, pr);
+    const held = verdictOf(sc, true, 'AAA'), free = verdictOf(sc, false, 'AAA');
+    if (held.label !== free.label || held.key !== free.key) mismatches.push({ q, p: pr, held: held.label, free: free.label });
+  }
+  t('91 scores, held and unheld, give the same word every time', mismatches.length === 0, mismatches.slice(0, 4));
+}
+{
+  const words = new Set();
+  for (let q = 0; q <= 12; q++) for (let pr = 0; pr <= 6; pr++) words.add(verdictOf(full(q, pr), false, 'AAA').label);
+  t('and there are only ever three of them', words.size === 3, [...words]);
+  t('and they are BUY, HOLD and SELL', ['BUY', 'HOLD', 'SELL'].every(w => words.has(w)), [...words]);
+  t('WATCH is not one of them any more', !words.has('WATCH') && ![...words].some(w => /watch/i.test(w)), [...words]);
+  t('and neither is "doesn\'t qualify"', ![...words].some(w => /qualif/i.test(w)), [...words]);
+}
+
+console.log('\nTHE THREE THRESHOLDS IN SETTINGS ARE THE WHOLE DEFINITION');
+{
+  /* Nothing else may decide the word. If these three numbers do not predict it, the setting the
+     owner asked for is not actually the thing in control. */
+  const wrong = [];
+  for (let q = 0; q <= 12; q++) for (let pr = 0; pr <= 6; pr++) {
+    const got = verdictOf(full(q, pr), false, 'AAA').label;
+    const want = (q >= RULES.qBuy && pr >= RULES.pBuy) ? 'BUY' : (q <= RULES.qSell) ? 'SELL' : 'HOLD';
+    if (got !== want) wrong.push({ q, p: pr, got, want });
+  }
+  t('the buy line, the sell line and nothing else predict every verdict', wrong.length === 0, wrong.slice(0, 4));
+}
+{
+  /* Move the lines; the answers must move with them. A score that was a HOLD under one rulebook is
+     a BUY under a looser one, with no code change. */
+  const loose = build({ qBuy: 5, pBuy: 2, qSell: 1, mBuy: 0 });
+  const strict = build({ qBuy: 11, pBuy: 6, qSell: 9, mBuy: 0 });
+  t('a middling name is a BUY under loose lines', loose.verdictOf(full(6, 3), false, 'A').label === 'BUY', loose.verdictOf(full(6, 3), false, 'A').label);
+  t('the same name is a SELL under strict ones', strict.verdictOf(full(6, 3), false, 'A').label === 'SELL', strict.verdictOf(full(6, 3), false, 'A').label);
+  t('and a HOLD exists in between', build({ qBuy: 9, pBuy: 4, qSell: 2, mBuy: 0 }).verdictOf(full(6, 5), false, 'A').label === 'HOLD');
+}
+
+console.log('\nWHAT OWNERSHIP DOES CHANGE IS THE INSTRUCTION, NOT THE JUDGEMENT');
+{
+  const held = verdictOf(full(2, 1), true, 'INTC'), free = verdictOf(full(2, 1), false, 'INTC');
+  t('a bad company you own says SELL', held.label === 'SELL', held.label);
+  t('a bad company you do not own also says SELL', free.label === 'SELL', free.label);
+  t('but the owner is told it is a position to close', /position to think about closing/.test(held.why), held.why);
+  t('and the non-owner is told to leave it alone', /to leave alone/.test(free.why), free.why);
+  t('the two reasons are not the same sentence', held.why !== free.why);
+}
+{
+  const held = verdictOf(full(10, 5), true, 'AAPL');
+  t('a BUY you already hold says so', /already own it/.test(held.why), held.why);
+  t('a BUY you do not hold does not', !/own it/.test(verdictOf(full(10, 5), false, 'AAPL').why));
+}
+
+console.log('\nA HOLD STILL SAYS WHICH KIND OF HOLD IT IS');
+{
+  t('pricey', verdictOf(full(10, 1), false, 'A').detail === 'good business, pricey', verdictOf(full(10, 1), false, 'A').detail);
+  t('weak momentum', build({ qBuy: 8, pBuy: 4, qSell: 4, mBuy: 3 }).verdictOf(full(10, 5, 1), false, 'A').detail === 'good price, weak momentum');
+  t('simply in between', verdictOf(full(6, 2), false, 'A').detail === 'in between your lines', verdictOf(full(6, 2), false, 'A').detail);
+  t('and those details are not shown as the verdict', verdictOf(full(10, 1), false, 'A').label === 'HOLD');
+}
+
+console.log('\nTOO LITTLE DATA IS A HOLD, AND SAYS SO RATHER THAN PRETENDING');
+{
+  /* The guard used to apply only to names you held, so an unknown company with two answered checks
+     was quietly given the benefit of the doubt while a held one was called a sell. */
+  const sc = thin(0, 3, 0, 1);
+  const held = verdictOf(sc, true, 'CYBR'), free = verdictOf(sc, false, 'CYBR');
+  t('three answered checks is not enough to call a sell, held', held.key === 'hold', held.label);
+  t('nor unheld', free.key === 'hold', free.label);
+  t('and it says that is why', /not enough to judge this either way/.test(free.why), free.why);
+  t('and marks itself as such', free.detail === 'not enough data', free.detail);
+  t('six answered checks is enough', verdictOf(thin(0, 6, 0, 1), false, 'X').key === 'sell');
+}
+
 /* ---------------------------------------------------------------------------------------------
    HOW CLOSE IS CLOSE. The screener's near-miss list sorts by this, and the whole point of the
    list is that the three names it offers are genuinely the nearest to THIS person's bars. Sorted

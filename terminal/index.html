@@ -1791,7 +1791,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       </select>
       <select id="pfFilterBroker" style="max-width:150px" onchange="renderAll()"><option value="All">All brokers</option></select>
       <select id="pfFilterSignal" style="max-width:150px" onchange="renderAll()">
-        <option value="All">All verdicts</option><option value="buy">System: BUY</option><option value="sell">System: SELL</option><option value="watch">System: Watch</option><option value="hold">System: Hold</option>
+        <option value="All">All verdicts</option><option value="buy">BUY</option><option value="hold">HOLD</option><option value="sell">SELL</option>
       </select>
       <select id="pfFilterMine" style="max-width:150px" onchange="renderAll()">
         <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
@@ -1937,7 +1937,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
         <option value="All">All my calls</option><option value="buy">Mine: Buy</option><option value="hold">Mine: Hold</option><option value="sell">Mine: Sell</option><option value="watching">Mine: Watching</option><option value="none">Mine: Untagged</option>
       </select>
       <select id="wlFilterVerdict" style="max-width:170px" onchange="renderAll()">
-        <option value="All">All verdicts</option><option value="buy">BUY candidate</option><option value="watch">Watch</option><option value="no">Doesn't qualify</option><option value="na">No data yet</option>
+        <option value="All">All verdicts</option><option value="buy">BUY</option><option value="hold">HOLD</option><option value="sell">SELL</option><option value="na">No data yet</option>
       </select>
       <!-- The list picker and the group-by-list toggle are gone: inside a single list, one filters
            to the list you are already in and the other groups a single group. -->
@@ -2315,11 +2315,9 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <input id="scFilterQ" placeholder="Search ticker…" style="max-width:180px" oninput="renderScreenerTable()">
       <select id="scFilterVerdict" style="max-width:190px" onchange="renderScreenerTable()">
         <option value="All">All verdicts</option>
-        <option value="buy">BUY candidate</option>
-        <option value="watch">Watch</option>
-        <option value="hold">Hold</option>
-        <option value="sell">Consider selling</option>
-        <option value="no">Doesn't qualify</option>
+        <option value="buy">BUY</option>
+        <option value="hold">HOLD</option>
+        <option value="sell">SELL</option>
         <option value="na">No data</option>
       </select>
       <select id="scFilterMine" style="max-width:150px" onchange="renderScreenerTable()">
@@ -2641,6 +2639,17 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Investment policy</h3>
+    <!-- HOW MUCH TERMINAL, said before the rules themselves, because it decides what the rest of
+         this screen is even about. -->
+    <div class="field" style="margin-bottom:14px">
+      <label>How much of it do you want to see?</label>
+      <select id="setLevel" onchange="setUserLevel(this.value)">
+        <option value="beginner">Starting out, six screens</option>
+        <option value="intermediate">I know the basics, ten screens</option>
+        <option value="advanced">Show me everything, all fourteen</option>
+      </select>
+      <div class="muted" id="setLevelNote" style="font-size:12px;margin-top:6px"></div>
+    </div>
     <div class="grid grid-2">
       <div class="field"><label>Risk profile</label><select id="polRisk">
         <option value="conservative">Conservative. Capital preservation</option>
@@ -2657,11 +2666,21 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Buy / Sell Rules</h3>
+    <!-- WHAT COUNTS AS A BUY, A HOLD AND A SELL (2026-10-06). These four numbers were already here
+         and were already the whole definition; what was missing was anyone saying so. The verdict
+         is now three words and nothing but these decides which one a company gets, so they are
+         introduced as the thing they are rather than as four unrelated minimums. -->
+    <div class="muted" style="font-size:13px;line-height:1.6;margin-bottom:12px">
+      These four numbers <b>are</b> the verdict. A company clearing the buy lines says BUY, one at or
+      under the sell line says SELL, everything else says HOLD. Nothing else decides it, and the same
+      answer is given whether or not you own the company.
+    </div>
     <div class="grid grid-2">
       <div class="field"><label>Min quality checks passed to be a BUY candidate (of 12)</label><input id="setQBuy" type="number" min="1" max="12"></div>
       <div class="field"><label>Min price checks passed to be a BUY candidate (of 6)</label><input id="setPBuy" type="number" min="1" max="6"></div>
       <div class="field"><label>Min momentum checks passed to be a BUY candidate (of 4, 0 = don't require it)</label><input id="setMBuy" type="number" min="0" max="4"></div>
-      <div class="field"><label>Quality score at/below which a holding flags SELL</label><input id="setQSell" type="number" min="0" max="12"></div>
+      <div class="field"><label>Min context checks passed to be a BUY (of 6, 0 = don't require it)<br><span class="muted" style="font-size:11.5px">News and who they trade with. Counted, never interpreted.</span></label><input id="setCBuy" type="number" min="0" max="6" value="0"></div>
+      <div class="field"><label>Quality score at/below which anything flags SELL</label><input id="setQSell" type="number" min="0" max="12"></div>
       <div class="field"><label>Auto-refresh on page load</label><select id="setAutoRefresh"><option value="yes">Yes</option><option value="no">No</option></select></div>
     </div>
     <button class="btn" onclick="saveRules()">Save Rules</button>
@@ -3331,7 +3350,7 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   theses:{},                                    // ticker -> {why,mustBeTrue,invalidIf,reviewDate,created,scoreAtEntry}
   policy:{maxPosition:10,cashTarget:3,risk:'moderate',exclusions:'',riskPerTrade:2},
   ruleChanges:[],                               // every change to the buy/sell rules, pre-registered
-  rules:{qBuy:9,pBuy:4,qSell:6,mBuy:0,autoRefresh:'yes'},lastRefresh:0};}
+  rules:{qBuy:9,pBuy:4,qSell:6,mBuy:0,cBuy:0,autoRefresh:'yes'},lastRefresh:0};}
 /* Your own manual call per ticker (Buy/Hold/Sell/Watching) — independent of the app's computed verdict above.
    Defensive lazy-init so profiles saved before this feature still work. */
 const MY_TAG_OPTS=[['','-'],['buy','Buy'],['hold','Hold'],['sell','Sell'],['watching','Watching']];
@@ -3994,6 +4013,9 @@ async function finishLogin(email){
   /* No sync on this device: nothing is coming, so release the tour rather than suppress it. */
   if(!syncActive()&&_firstPull){ _firstPull=false; try{ maybeStartTour(); }catch(e){} }
   if(hasMarketData()&&D.rules.autoRefresh==='yes')refreshAll();
+  /* The sidebar belongs to the account, so it is rebuilt on every sign-in rather than left as the
+     previous account's shape. */
+  try{ if(typeof applyNavLevel==='function')applyNavLevel(); fillLevelInput(); }catch(e){}
   /* Deliberately not awaited. See autoBrokerSync: entry must never wait on a broker. */
   try{ autoBrokerSync(); }catch(e){}
 }
@@ -4258,6 +4280,7 @@ function enterSession(){
   document.getElementById('setQBuy').value=D.rules.qBuy;
   document.getElementById('setPBuy').value=D.rules.pBuy;
   document.getElementById('setMBuy').value=D.rules.mBuy||0;
+  document.getElementById('setCBuy').value=D.rules.cBuy||0;
   document.getElementById('setQSell').value=D.rules.qSell;
   document.getElementById('setAutoRefresh').value=D.rules.autoRefresh;
   applyTheme();
@@ -4891,9 +4914,76 @@ function dcfFairValue(fcfShare,g,disc,tg){
   v+=(f*(1+tg))/((disc-tg)*Math.pow(1+disc,5));
   return v;
 }
+/* THE CONTEXT CHECKS, LIFTED OUT OF scoreStock SO THEY CAN BE RUN (2026-10-06).
+
+   They were written inline, which meant the only way to exercise six new scored checks was to make
+   six network calls and own a supply-chain map. Extracted, they are a pure function of two
+   arguments: the headlines, and the relation record. test/context.mjs runs it.
+
+   newsItems may be null (not fetched, which happens during a bulk scan) or empty (fetched, nothing
+   published). Those are different and must stay different: null means every news check is null,
+   and empty means the coverage check legitimately fails while the two "no bad news" checks pass,
+   because no stories really does mean no lawsuits were reported. */
+function contextChecks(newsItems,rel){
+  const checks=[];
+  const add=(name,target,value,pass,note)=>{checks.push({name,target,value,pass,note:note||''});};
+  const haveNews=Array.isArray(newsItems);
+  const newsCount=haveNews?newsItems.length:null;
+  const themeCount=k=>{
+    const th=NEWS_THEMES.find(x=>x.k===k);
+    if(!th||!haveNews)return null;
+    return newsItems.filter(n=>th.re.test(((n.headline||'')+' '+(n.summary||'')))).length;
+  };
+
+  const legal=themeCount('Legal'), reg=themeCount('Regulation');
+  /* A story can be both a lawsuit and a regulator, and counting it twice would make one piece of
+     news look like two. Union, not sum. */
+  const legalTotal=!haveNews?null:newsItems.filter(n=>{
+    const t=(n.headline||'')+' '+(n.summary||'');
+    return NEWS_THEMES.find(x=>x.k==='Legal').re.test(t)||NEWS_THEMES.find(x=>x.k==='Regulation').re.test(t);
+  }).length;
+  add('Legal and regulatory news','None in 30 days',
+    legalTotal==null?null:legalTotal+' stor'+(legalTotal===1?'y':'ies'),
+    legalTotal==null?null:legalTotal===0,
+    legalTotal==null?'No headlines loaded for this ticker yet':'Counted by keyword against the last 30 days of headlines. Open News to read them.');
+
+  const work=themeCount('Workforce');
+  add('Layoffs or restructuring','None in 30 days',
+    work==null?null:work+' stor'+(work===1?'y':'ies'),
+    work==null?null:work===0,
+    work==null?'No headlines loaded for this ticker yet':'Keyword count, not a reading of the articles.');
+
+  add('Press coverage','3 or more stories in 30 days',
+    newsCount==null?null:newsCount+' stories',
+    newsCount==null?null:newsCount>=3,
+    'A company almost nobody writes about is harder to be wrong about slowly. Not a judgement on the coverage.');
+
+  const sup=(rel&&Array.isArray(rel.suppliers))?rel.suppliers:[];
+  const cus=(rel&&Array.isArray(rel.customers))?rel.customers:[];
+  const mapped=sup.length+cus.length;
+  const maxW=list=>list.length?Math.max(...list.map(x=>isFinite(x.weight)?x.weight:0)):null;
+
+  add('Who they sell to is mapped','At least one customer recorded',
+    mapped===0?null:cus.length+' recorded',
+    mapped===0?null:cus.length>0,
+    mapped===0?'Nothing mapped for this company yet. Supply chain screen.':'From your own map, not from a vendor feed.');
+
+  const cmax=maxW(cus);
+  add('Customer concentration','No single customer over a third',
+    cmax==null?null:'largest '+cmax+'%',
+    cmax==null?null:cmax<=33,
+    cmax==null?'No customers mapped yet':'Weights are the ones you entered. One customer who can leave is the risk this measures.');
+
+  add('More than one supplier','2 or more recorded',
+    mapped===0?null:sup.length+' recorded',
+    mapped===0?null:sup.length>=2,
+    mapped===0?'Nothing mapped for this company yet':'A single source of supply is a single point of failure.');
+
+  return {checks,newsCount};
+}
 async function scoreStock(sym){
   sym=sym.toUpperCase();
-  const out={sym,when:Date.now(),price:null,quality:[],priceChecks:[],momentum:[],wallStreet:[],qScore:0,qTotal:0,pScore:0,pTotal:0,mScore:0,mTotal:0,wsScore:0,wsTotal:0,error:null,riskRating:null,riskRange:null,sharpe:null};
+  const out={sym,when:Date.now(),price:null,quality:[],priceChecks:[],momentum:[],wallStreet:[],context:[],qScore:0,qTotal:0,pScore:0,pTotal:0,mScore:0,mTotal:0,wsScore:0,wsTotal:0,cScore:0,cTotal:0,newsCount:null,error:null,riskRating:null,riskRange:null,sharpe:null};
   const man=manualFor(sym);
   let q=null,mAll=null,earn=null,ins=null;
   try{q=await getQuote(sym);out.price=q.c;}catch(e){out.error=e.message;return out;}
@@ -5108,6 +5198,44 @@ async function scoreStock(sym){
   }
   add(out.momentum,'Beating the Market','Outperforming S&P 500 (12mo)',rsVal,rsPass,rsPass==null?'Benchmark comparison unavailable':'');
 
+  /* ================= CONTEXT (6) — THE NEWS, AND WHO THEY TRADE WITH (2026-10-06) =================
+
+     The owner's instruction: make sure it analyses everything, news, who they buy to, everything we
+     do, that is how it analyses.
+
+     THIS CUTS ACROSS A PROMISE THIS PRODUCT MAKES EVERYWHERE, so here is how both are kept. The
+     News screen says, at length, that it never turns a headline into a buy or sell, and the reason
+     is sound: a model asked to justify BUY from press coverage will always find a way, because
+     finding reasons is what the words in headlines are for. That promise is about INTERPRETATION.
+     None of it is broken by COUNTING.
+
+     So nothing here reads an article. Every check below is a count against a published rule, using
+     the same NEWS_THEMES patterns the News tab already tags with, and every one states its own
+     threshold on screen the way the other twenty-two do. "Two stories mentioning a lawsuit or a
+     probe in thirty days" is a fact about the press that anybody can verify by opening the tab.
+     "This coverage is bearish" would be an opinion, and there is none of that here.
+
+     WHO THEY TRADE WITH IS LOCAL DATA AND COSTS NOTHING. The supply-chain map is entered by hand,
+     so these three read D.relations and make no request. Unmapped is null, not a fail: a company
+     nobody has mapped has not failed a check about its customers, and counting it as a failure is
+     precisely the bug that made INTC look like a sell on the walkthrough.
+
+     WHETHER THIS GATES A BUY IS THE OWNER'S CHOICE, NOT MINE. It is counted and shown always, and
+     it only constrains the verdict if cBuy is raised above 0 in Settings, which is exactly how the
+     momentum gate has always worked. Switching it on by default would move every existing user's
+     verdicts overnight on the strength of news counts, without them asking. */
+  let newsItems=null;
+  /* One extra request per ticker, and the screener already runs close to Finnhub's minute limit, so
+     a bulk scan reads the cache and never fetches. During a scan these three come back null, which
+     is the honest answer: not fetched is not the same as nothing found. */
+  try{
+    const cacheKey=sym+':30';
+    if(typeof newsCache!=='undefined'&&newsCache[cacheKey])newsItems=newsCache[cacheKey].items;
+    else if(typeof screenerRunning==='undefined'||!screenerRunning)newsItems=await fhNews(sym,30);
+  }catch(e){ newsItems=null; }
+  const ctx=contextChecks(newsItems,(D.relations&&D.relations[sym])||null);
+  out.context=ctx.checks; out.newsCount=ctx.newsCount;
+
   /* ---- RISK-ADJUSTED OUTLOOK — Sharpe-ratio rating + 1-yr range (same math as the Monte Carlo tool) ---- */
   let outlook=null;
   try{
@@ -5155,6 +5283,8 @@ async function scoreStock(sym){
   out.pTotal=out.priceChecks.filter(c=>c.pass!==null).length;
   out.mScore=out.momentum.filter(c=>c.pass===true).length;
   out.mTotal=out.momentum.filter(c=>c.pass!==null).length;
+  out.cScore=out.context.filter(c=>c.pass===true).length;
+  out.cTotal=out.context.filter(c=>c.pass!==null).length;
   return out;
 }
 
@@ -5205,31 +5335,87 @@ function verdictOf(sc,isHolding,sym){
   const r=D.rules;
   const th=sym?thesisFor(sym):null;
   const thin=thinNote(sc);
-  /* Every branch below carries a `why`. It used to carry one only on the thesis path, so every
-     other row on the keep/look/sell list read "Your rules say consider selling", which is the
-     verdict restated rather than a reason for it. A verdict without a reason is a tip. */
   /* The warning goes BEFORE the arithmetic, not after it. Appended, it reads as a footnote to a
      conclusion the reader has already accepted; first, it is the frame they read the number in. */
   const plus=t=>thin?thin+' '+t:t;
+  const owned=isHolding?' You own it.':'';
+
+  /* ================= THREE WORDS, AND OWNING IT IS NOT ONE OF THEM (2026-10-06) =================
+
+     The owner's instruction: put buy, hold or sell on everything, whether I own it or not.
+
+     WHAT WAS WRONG. This function used to answer in six labels, and TWO OF THEM DEPENDED ON
+     OWNERSHIP RATHER THAN ON THE COMPANY. A name scoring badly said "Consider SELLING" if it was in
+     your book and "Doesn't qualify yet" if it was not; a name in the middle said "HOLD" if owned
+     and "Doesn't qualify yet" if not. So the same company, scored identically on the same day, got
+     different words depending on who was looking, and the Compare screen put those two vocabularies
+     side by side and expected somebody to work it out. A walkthrough on 2026-10-04 reported exactly
+     that and could not tell whether it was a disagreement about the company or about the reader.
+
+     WHAT IT IS NOW. One of three words, every time, decided only by this person's own thresholds:
+
+         BUY     quality and price both clear the buy lines (and momentum, if they gated on it)
+         SELL    quality is at or below the sell line
+         HOLD    everything in between
+
+     Those three numbers live in Settings and nowhere else, which is what makes the answer auditable
+     and what the owner meant by choosing what a buy, a hold and a sell is. Ownership no longer
+     changes the word; it changes the sentence under it, because "sell it" and "do not buy it" are
+     the same judgement about the company and different instructions to the reader.
+
+     WATCH IS GONE as a verdict. It was two labels that both meant "not yet", and a fourth word in
+     a three-word system is how the Compare screen ended up unreadable. What it carried, which was
+     WHY not yet, is in the reason, where it was always the useful part. */
+  const mOk=(r.mBuy||0)<=0||sc.mScore>=r.mBuy; // momentum only gates BUY if you raised mBuy above 0
+  /* The context section (news and who they trade with) gates a BUY on exactly the same terms, and
+     is 0 by default for exactly the same reason: a gate nobody asked for is a rule change applied
+     to somebody else's rulebook. Raise it in Settings and news counts start constraining buys. */
+  const cOk=(r.cBuy||0)<=0||(sc.cScore||0)>=r.cBuy;
+  const BUY =t=>({label:'BUY', cls:'pill-buy', key:'buy', thin:!!thin, why:plus(t)});
+  const HOLD=(t,d)=>({label:'HOLD',cls:'pill-hold',key:'hold',thin:!!thin, detail:d||'', why:plus(t)});
+  const SELL=(t,extra)=>Object.assign({label:'SELL',cls:'pill-sell',key:'sell',thin:!!thin,why:plus(t)},extra||{});
+
+  /* A condition written for one position outranks the blanket setting: it is the mechanism that
+     makes a written thesis do work rather than sit in a text box. Only for a name you hold, because
+     a thesis is a record of why you bought something. */
   if(isHolding&&th&&isFinite(th.sellBelow)&&th.sellBelow>0&&sc.qScore<th.sellBelow){
-    return{label:'SELL. Your thesis condition',cls:'pill-sell',key:'sell',viaThesis:true,thin:!!thin,
-      why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' is below the '+th.sellBelow+' you set for this position.')};
+    return SELL('Quality '+sc.qScore+'/'+sc.qTotal+' is below the '+th.sellBelow+' you set for this position.',
+      {viaThesis:true});
   }
-  const mOk=(r.mBuy||0)<=0||sc.mScore>=r.mBuy; // momentum only gates BUY if you've raised mBuy above 0 in Settings
-  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&mOk)return{label:'BUY candidate',cls:'pill-buy',key:'buy',thin:!!thin,
-    why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' and price '+sc.pScore+'/'+sc.pTotal+' both clear the lines you set ('+r.qBuy+' and '+r.pBuy+').')};
-  if(isHolding&&sc.qTotal>=6&&sc.qScore<=r.qSell)return{label:'Consider SELLING',cls:'pill-sell',key:'sell',thin:!!thin,
-    dataDriven:sellIsDataDriven(sc,r),
-    why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' is at or below your sell line of '+r.qSell+'.'
-      +(sellIsDataDriven(sc,r)?' Had the missing checks passed it would not have fired, so this is about the data as much as the company.':''))};
-  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&!mOk)return{label:'Good price, weak momentum. WATCH',cls:'pill-watch',key:'watch',thin:!!thin,
-    why:plus('The business and the price pass, but momentum '+sc.mScore+'/'+sc.mTotal+' is under the '+r.mBuy+' you asked for.')};
-  if(sc.qScore>=r.qBuy)return{label:'Great biz, pricey. WATCH',cls:'pill-watch',key:'watch',thin:!!thin,
-    why:plus('The business passes on '+sc.qScore+'/'+sc.qTotal+', but price '+sc.pScore+'/'+sc.pTotal+' is under your '+r.pBuy+'. You are being asked to pay up.')};
-  if(isHolding)return{label:'HOLD',cls:'pill-hold',key:'hold',thin:!!thin,
-    why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' is above your sell line of '+r.qSell+' but under the '+r.qBuy+' you would buy at. Nothing to do.')};
-  return{label:'Doesn\'t qualify yet',cls:'pill-na',key:'no',thin:!!thin,
-    why:plus('Quality '+sc.qScore+'/'+sc.qTotal+' needs '+r.qBuy+' and price '+sc.pScore+'/'+sc.pTotal+' needs '+r.pBuy+'.')};
+  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&mOk&&cOk){
+    return BUY('Quality '+sc.qScore+'/'+sc.qTotal+' and price '+sc.pScore+'/'+sc.pTotal+' both clear your buy lines ('+r.qBuy+' and '+r.pBuy+').'
+      +((r.cBuy||0)>0?' Context '+(sc.cScore||0)+'/'+(sc.cTotal||0)+' clears your '+r.cBuy+' as well.':'')
+      +(isHolding?' You already own it.':''));
+  }
+  /* qTotal>=6 guards against calling a sell off two checks that happened to answer. It applies
+     whether or not the name is held, which it did not before: an unheld company with almost no data
+     was silently given the benefit of the doubt while a held one was not. */
+  if(sc.qTotal>=6&&sc.qScore<=r.qSell){
+    return SELL('Quality '+sc.qScore+'/'+sc.qTotal+' is at or below your sell line of '+r.qSell+'.'
+      +(isHolding?' You own it, so this is a position to think about closing.':' You do not own it, so this is one to leave alone.')
+      +(sellIsDataDriven(sc,r)?' Had the missing checks passed it would not have fired, so this is about the data as much as the company.':''),
+      {dataDriven:sellIsDataDriven(sc,r)});
+  }
+  /* Everything else is a hold, and the reason says which kind. These were three separate labels. */
+  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&!cOk){
+    return HOLD('The business and the price pass, but the context checks are '+(sc.cScore||0)+'/'+(sc.cTotal||0)+', under the '+r.cBuy+' you asked for. That is the news and the supply chain, not the numbers.'+owned,
+      'context is short');
+  }
+  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&!mOk){
+    return HOLD('The business and the price pass, but momentum '+sc.mScore+'/'+sc.mTotal+' is under the '+r.mBuy+' you asked for.'+owned,
+      'good price, weak momentum');
+  }
+  if(sc.qScore>=r.qBuy){
+    return HOLD('The business passes on '+sc.qScore+'/'+sc.qTotal+', but price '+sc.pScore+'/'+sc.pTotal+' is under your '+r.pBuy+'. You are being asked to pay up.'+owned,
+      'good business, pricey');
+  }
+  if(sc.qTotal<6){
+    /* Too little answered to say anything. Not a hold on the merits, and it must not read as one. */
+    return HOLD('Only '+sc.qTotal+' of the quality checks had any data, which is not enough to judge this either way.'+owned,
+      'not enough data');
+  }
+  return HOLD('Quality '+sc.qScore+'/'+sc.qTotal+' is above your sell line of '+r.qSell+' but under the '+r.qBuy+' you would buy at.'
+    +(isHolding?' Nothing to do.':' Not one to buy yet.'),'in between your lines');
 }
 
 /* ================= EDUCATIONAL BRIDGE — academic factor context, kept strictly separate from the checklist =================
@@ -7258,7 +7444,7 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
    checks without a new version here would turn every call before it into the track record of a
    scorecard nobody can use any more. The test suite hashes scoreStock() and CHECK_ORDER against
    this version: change either, bump the version, and say why in PRD §26. */
-const SCORECARD_VERSION='1.0 (2026-09-21)';
+const SCORECARD_VERSION='1.1 (2026-10-06)';
 const CHECK_ORDER=[
   'Revenue Growth (YoY)','Gross Margin','Operating Margin','Free Cash Flow','Cash vs Debt',
   'Current Ratio','ROE','EPS Beats','Revenue Guidance','Insider Buying','Clear Growth Runway',
@@ -10765,7 +10951,10 @@ async function analyzeBook(){
     if(!sc){ bucket='unreviewed'; why=tooBig?sizeWhy+' Not scored yet.':'Not scored yet.'; }
     else if(v&&v.key==='sell'){ bucket='sell'; why=(tooBig?sizeWhy+' ':'')+(v.why||('Your rules say '+v.label.toLowerCase()+'.')); }
     else if(tooBig){ bucket='look'; why=sizeWhy+(v&&v.why?' '+v.why:''); }
-    else if(v&&v.key==='watch'){ bucket='look'; why=v.why||(v.label+'.'); }
+    /* WATCH is gone as a verdict, so "worth a look" is now decided by WHY it is a hold rather than
+       by a fourth label. A hold whose reason is the price or the momentum is a look; a hold that is
+       simply sitting between the lines is a keep. detail carries which. */
+    else if(v&&v.key==='hold'&&/pricey|momentum|not enough data/.test(v.detail||'')){ bucket='look'; why=v.why||(v.label+'.'); }
     else { bucket='keep'; why=v?(v.why||v.label+'.'):'Passes your rules.'; }
     return {sym:h.sym, pct, bucket, why, val};
   });
@@ -10861,7 +11050,9 @@ function renderAnalysis(sym,sc){
   };
   const manSel=(field,label)=>'<div class="field"><label>'+label+'</label><select onchange="setManual(\''+sym+'\',\''+field+'\',this.value)">'+
     ['unknown','yes','no'].map(o=>'<option value="'+o+'"'+(man[field]===o?' selected':'')+'>'+(o==='unknown'?'Not sure yet':o==='yes'?'Yes':'No')+'</option>').join('')+'</select></div>';
-  const vCls=v.key==='buy'?'v-buy':v.key==='sell'?'v-avoid':v.key==='watch'?'v-watch':'v-hold';
+  /* Three keys now; v-watch has no verdict that produces it any more and is left in the stylesheet
+     for the stored history below, which still holds rows written when watch was a verdict. */
+  const vCls=v.key==='buy'?'v-buy':v.key==='sell'?'v-avoid':'v-hold';
   el.innerHTML=
   '<div class="card" style="margin-top:16px">'+
     '<div class="row"><div class="big">'+esc(sym)+', $'+sc.price.toFixed(2)+'</div><div class="spacer"></div>'+
@@ -10872,8 +11063,35 @@ function renderAnalysis(sym,sc){
     '<span class="muted" style="font-size:12px">Your call:</span> '+myTagSelect(sym)+'</div>'+
     '<div class="chart-box" style="height:200px;margin-top:14px"><canvas id="anChart"></canvas></div>'+
     (isEtf?'<p class="muted" style="margin-top:10px">This is an ETF in your Portfolio; it has a live price, but the 12-point quality checklist below is built for individual companies (revenue growth, margins, moat, etc.), so most of those rows will show no data. That\'s expected, not a bug.</p>':'')+
-    '<div class="verdict-box '+vCls+'" style="margin-top:14px"><b>Quality: '+sc.qScore+'/12 ('+sc.qTotal+' had data) &nbsp;|&nbsp; Price: '+sc.pScore+'/6 ('+sc.pTotal+' had data) &nbsp;|&nbsp; Momentum: '+sc.mScore+'/4 ('+sc.mTotal+' had data)'+(sc.wsTotal?' &nbsp;|&nbsp; Wall Street: '+sc.wsScore+'/'+sc.wsTotal+' positive':'')+'</b><br>'+
-    '<span class="muted">Buy rule: quality ≥ '+D.rules.qBuy+' AND price ≥ '+D.rules.pBuy+(D.rules.mBuy>0?' AND momentum ≥ '+D.rules.mBuy:'')+'. Checks with no data don\'t count as passes. Fill in the manual ones below to complete the picture.</span></div>'+
+    /* ================= A BEGINNER GETS THE ANSWER (2026-10-06) =================
+
+       The owner's instruction: for beginners they just get the verdict.
+
+       Under this line sits about seventy rows of checklist across four tables, every one of them
+       useful and none of them an answer. Somebody on their first morning asked "should I buy this"
+       and was handed a spreadsheet with a verdict somewhere near the top of it.
+
+       So at beginner level the word and the reason are the whole screen, in type large enough to be
+       the answer rather than a label, and everything below folds away behind one press. NOTHING IS
+       REMOVED and nothing is recomputed: the same tables, in the same order, one click further. The
+       fold is open by default at the other two levels, because somebody who asked for ten or
+       fifteen screens did not ask to be protected from a table.
+
+       The verdict is the same verdict at every level. A beginner is not given a simpler judgement,
+       only a shorter page: a product whose answers depend on who is asking is not keeping score on
+       itself, it is telling people what they want to hear. */
+    '<div class="verdict-box '+vCls+'" style="margin-top:14px">'+
+      '<div style="font-size:26px;font-weight:700;letter-spacing:-.02em">'+v.label+'</div>'+
+      '<div style="font-size:14.5px;line-height:1.6;margin-top:6px">'+esc(v.why||'')+'</div>'+
+      (v.detail?'<div class="muted" style="font-size:12.5px;margin-top:4px">'+esc(v.detail)+'</div>':'')+
+      '<div class="muted" style="font-size:12px;margin-top:10px">Quality '+sc.qScore+'/12 · Price '+sc.pScore+'/6 · Momentum '+sc.mScore+'/4'+(sc.wsTotal?' · Wall Street '+sc.wsScore+'/'+sc.wsTotal:'')+
+        ' · your lines: buy at quality '+D.rules.qBuy+' and price '+D.rules.pBuy+(D.rules.mBuy>0?' and momentum '+D.rules.mBuy:'')+', sell at quality '+D.rules.qSell+'. Change them in Settings.</div>'+
+    '</div>'+
+    '<details class="an-work"'+(userLevel()>0?' open':'')+' style="margin-top:16px">'+
+      '<summary style="cursor:pointer;font-weight:600;font-size:14px;padding:6px 0">'+
+        (userLevel()>0?'The working':'Show me how it got there')+
+        '<span class="muted" style="font-weight:400"> · every check, and what it found</span></summary>'+
+      '<div style="padding-top:8px">'+
     '<h3>1 · Quality Check: Is the business good?</h3>'+
     '<div class="score-bar"><div style="width:'+(sc.qScore/12*100)+'%;background:var(--green)"></div></div>'+
     '<table style="margin-top:10px"><thead><tr><th>Check</th><th>Target</th><th>Actual</th><th>Result</th><th>Note</th></tr></thead><tbody>'+
@@ -10904,13 +11122,27 @@ function renderAnalysis(sym,sc){
         '</div><div class="chart-box" style="height:150px"><canvas id="anBoxCanvas"></canvas></div>'
         :'<p class="empty">Not enough data to simulate a range for this ticker.</p>')
       :'<p class="empty">Risk-adjusted rating unavailable for this ticker (needs a beta and either price history or a fallback default. Try re-analyzing).</p>')+
-    '<h3 style="margin-top:22px">5 · Wall Street Signals: What else hedge funds watch</h3>'+
+    /* THE CONTEXT SECTION (2026-10-06). Counted, never interpreted: see scoreStock for why that
+       distinction is the whole of how this coexists with the News screen's promise. It says on the
+       page whether it is gating anything, because a scored section that quietly does not count is
+       the kind of thing people discover by accident and then stop trusting. */
+    '<h3 style="margin-top:22px">5 · The news, and who they trade with</h3>'+
+    '<p class="muted" style="margin-bottom:6px">Headlines counted by keyword over 30 days, plus the supply chain you mapped yourself. Nothing here reads an article or forms an opinion about one. '+
+      ((D.rules.cBuy||0)>0
+        ? 'You have set this to gate a BUY at '+D.rules.cBuy+'/6.'
+        : 'Informational: it does not affect the verdict until you set a minimum in Settings.')+'</p>'+
+    '<div class="score-bar"><div style="width:'+((sc.cScore||0)/6*100)+'%;background:var(--brand2)"></div></div>'+
+    (sc.context&&sc.context.length?
+      '<table style="margin-top:10px"><thead><tr><th>Check</th><th>Target</th><th>Actual</th><th>Result</th><th>Note</th></tr></thead><tbody>'+
+      sc.context.map(checkRow).join('')+'</tbody></table>'
+      :'<p class="empty">Not scored yet. Re-analyze this ticker to fetch its headlines.</p>')+
+    '<h3 style="margin-top:22px">6 · Wall Street Signals: What else hedge funds watch</h3>'+
     '<p class="muted" style="margin-bottom:6px">Informational only. Doesn\'t affect the BUY call. Sell-side analyst opinion and volume can be noisy or lag the real story; treat these as one more data point, not a signal on their own.</p>'+
     (sc.wallStreet&&sc.wallStreet.length?
       '<table style="margin-top:10px"><thead><tr><th>Check</th><th>Target</th><th>Actual</th><th>Result</th><th>Note</th></tr></thead><tbody>'+
       sc.wallStreet.map(checkRow).join('')+'</tbody></table>'
       :'<p class="empty">Not available. Try re-analyzing to fetch it.</p>')+
-    '<h3 style="margin-top:22px">6 · Dividend Income</h3>'+
+    '<h3 style="margin-top:22px">7 · Dividend Income</h3>'+
     (sc.dividend?
       '<p class="muted" style="margin-bottom:6px">Informational only. Doesn\'t affect the BUY call.</p>'+
       '<div class="grid grid-3" style="margin-bottom:10px">'+
@@ -10928,6 +11160,11 @@ function renderAnalysis(sym,sc){
       manSel('comps','Cheaper than comparable companies?')+
       '<div class="field"><label>Forward P/E'+(sc.autoFwdPe!=null?' <span class="muted">(auto: '+sc.autoFwdPe.toFixed(1)+'. Leave blank to use it, or override)</span>':' <span class="muted">(auto-fetch unavailable. Enter from your broker)</span>')+'</label><input type="number" step="any" value="'+(man.fwdpe??'')+'" placeholder="'+(sc.autoFwdPe!=null?sc.autoFwdPe.toFixed(1):'e.g. 24.5')+'" onchange="setManualNum(\''+sym+'\',\'fwdpe\',this.value)"></div>'+
     '</div>'+
+      '</div>'+
+    '</details>'+
+    /* The actions sit OUTSIDE the fold. Folding the working away must not fold away the ability to
+       act on it: a beginner reading BUY needs the button that adds it to the portfolio without
+       first opening a table they were deliberately spared. */
     '<div class="row" style="margin-top:8px">'+
       '<button class="btn btn-sm" onclick="analyzeStock(\''+sym+'\')">Re-score with my answers</button>'+
       (D.watchlist.includes(sym)?'':'<button class="btn btn-ghost btn-sm" onclick="D.watchlist.push(\''+sym+'\');saveDB();renderAll();toast(\'Added to watchlist.\')">+ Add to Watchlist</button>')+
@@ -12765,7 +13002,10 @@ function refreshMarketDataCard(){
    So: state the expected effect and the failure test, or the change doesn't save. */
 function ruleSnapshot(){
   const r=D.rules||{};
-  return{qBuy:r.qBuy,pBuy:r.pBuy,mBuy:r.mBuy,qSell:r.qSell};
+  /* cBuy belongs here with the other three: the rule log exists so a change in the record can be
+     attributed to a change in the rulebook, and a context gate that moved without being logged
+     would make a run of verdicts unexplainable. */
+  return{qBuy:r.qBuy,pBuy:r.pBuy,mBuy:r.mBuy,cBuy:r.cBuy,qSell:r.qSell};
 }
 function rulesDiffer(a,b){
   return a.qBuy!==b.qBuy||a.pBuy!==b.pBuy||a.mBuy!==b.mBuy||a.qSell!==b.qSell;
@@ -12794,6 +13034,7 @@ function saveRules(){
     qBuy:Math.min(12,Math.max(1,parseInt(document.getElementById('setQBuy').value)||9)),
     pBuy:Math.min(6,Math.max(1,parseInt(document.getElementById('setPBuy').value)||4)),
     mBuy:Math.min(4,Math.max(0,parseInt(document.getElementById('setMBuy').value)||0)),
+    cBuy:Math.min(6,Math.max(0,parseInt(document.getElementById('setCBuy').value)||0)),
     qSell:Math.min(12,Math.max(0,parseInt(document.getElementById('setQSell').value)||6))
   };
   const autoRefresh=document.getElementById('setAutoRefresh').value;
@@ -13904,6 +14145,17 @@ const SURVEY = [
       { t: 'Fossil fuels', set: { _ex: 'fossil fuels' } },
       { t: 'Nothing in particular', set: { _exClear: true } },
     ] },
+  /* ASKED, NOT ASSUMED (2026-10-06). The walkthrough's second request was a question about
+     experience, and the level is what it was for: this is the one answer that changes how much of
+     the terminal somebody is handed on their first morning. Last, because it is about them rather
+     than about their money, and the four before it have already earned the right to ask. */
+  { q: 'Have you done this before?',
+    sub: 'It decides how many screens you start with. You can change it in Settings whenever you like, and nothing is ever locked away.',
+    opts: [
+      { t: 'This is new to me', d: 'Six screens. The ones you need and no more.', set: { level: 'beginner' } },
+      { t: 'I know the basics', d: 'Ten. Your record, finding stocks, and what could go wrong.', set: { level: 'intermediate' } },
+      { t: 'I have done this for years', d: 'All of it, including supply chains and projections.', set: { level: 'advanced' } },
+    ] },
   { q: 'How often will you actually look at this?',
     sub: 'It changes what the terminal puts in front of you, and nothing else.',
     opts: [
@@ -13974,8 +14226,11 @@ function finishSurvey(){
     exclusions: _sv.ex.join(', '),
   });
   D.cadence=a.cadence||'weekly';
+  if(!D.rules)D.rules={};
+  D.rules.level=LEVELS.indexOf(a.level)<0?'beginner':a.level;
   D.surveyDone=Date.now();
   saveDB();
+  try{ applyNavLevel(); fillLevelInput(); }catch(e){}
   const w=document.getElementById('surveyWrap'); if(w)w.style.display='none';
   try{ fillPolicyInputs(); }catch(e){}
   renderAll();
@@ -13984,11 +14239,69 @@ function finishSurvey(){
   setTimeout(()=>{ try{ if(typeof replayTour==='function') replayTour(); }catch(e){} }, 400);
   toast('Your rules are set. You can change any of them in Settings.');
 }
+/* ================= HOW MUCH TERMINAL YOU GET (2026-10-06) =================
+
+   The owner's instruction: beginners see six screens, advanced see all of them, the middle sees
+   half, and it is changeable in Settings.
+
+   WHY A LEVEL AND NOT A TOGGLE. There was already a More button that hid six screens behind it,
+   remembered per device in localStorage. That is a different thing: it is a view preference about
+   one browser. This is a statement about the person, it belongs to the account, and it follows them
+   to their phone. So the level decides which tabs are IN the list, and More still reveals the rest
+   when somebody wants to look. Nothing is ever locked: every screen is one press away at every
+   level, and a tab opened by a chip, the search box or a link reveals itself whatever the level.
+
+   WHAT SITS WHERE, AND WHY. Beginner is the owner's own six. Intermediate adds the four that need
+   one idea each and nothing more: your own record, finding stocks, the market's mood, and what
+   could go wrong. Advanced adds the four that need a vocabulary before they mean anything: supply
+   chains, world exposure, Monte Carlo projections, and the alert machinery.
+
+   Risk is at intermediate rather than advanced on purpose: "what could go wrong" is a chip on the
+   front door, and a front door that opens onto a screen the person is not allowed to have is worse
+   than no chip. */
+const LEVELS=['beginner','intermediate','advanced'];
+const TAB_LEVEL={
+  dashboard:0, portfolio:0, watchlist:0, analyzer:0, news:0, settings:0,
+  history:1, screener:1, market:1, risk:1,
+  map:2, world:2, projections:2, alerts:2,
+  /* `clients` was listed here and there is no such tab: it went with the business terminal on
+     2026-09-27. A phantom key costs nothing functionally and told the reader "6 of 15 screens"
+     when the sidebar has fourteen, which is the kind of small lie that makes somebody stop
+     believing the other numbers. */
+};
+function userLevel(){
+  const v=(D&&D.rules&&D.rules.level)||'';
+  const i=LEVELS.indexOf(v);
+  /* Unset means beginner. Somebody who has never answered the question is not an expert, and the
+     cost of guessing low is one press of More; the cost of guessing high is fourteen tabs. */
+  return i<0?0:i;
+}
+function setUserLevel(name){
+  if(!D)return;
+  if(!D.rules)D.rules={};
+  D.rules.level=LEVELS.indexOf(name)<0?'beginner':name;
+  saveDB();
+  applyNavLevel();
+  renderAll();
+  try{ fillLevelInput(); }catch(e){}
+  const n=Object.values(TAB_LEVEL).filter(l=>l<=userLevel()).length;
+  toast('Showing '+n+' screens. More, at the foot of the sidebar, still opens the rest.');
+}
+function fillLevelInput(){
+  const el=document.getElementById('setLevel');
+  if(el)el.value=LEVELS[userLevel()];
+  const note=document.getElementById('setLevelNote');
+  if(note){
+    const shown=Object.keys(TAB_LEVEL).filter(t=>TAB_LEVEL[t]<=userLevel());
+    note.textContent=shown.length+' of '+Object.keys(TAB_LEVEL).length+' screens in the sidebar. Nothing is locked: More opens the rest.';
+  }
+}
 function fillPolicyInputs(){
   const p=policy();
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
   set('polRisk',p.risk);set('polMaxPos',p.maxPosition);set('polCash',p.cashTarget);set('polExclusions',p.exclusions);
   set('polRiskPerTrade',p.riskPerTrade);
+  try{ fillLevelInput(); }catch(e){}
 }
 function savePolicy(){
   const num=(id,d)=>{const v=parseFloat((document.getElementById(id)||{}).value);return isFinite(v)?v:d;};
@@ -18969,7 +19282,27 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
      here: the walker showed people opening More as a last resort, not as navigation, and those three
      were the screens they were hunting for. What is left is the deep end, which is where a beginner
      does not need to go on day one. */
-  var ADV=['market','map','world','risk','projections','alerts','clients'];
+  /* WHICH TABS ARE "ADVANCED" IS NOW A PROPERTY OF THE PERSON (2026-10-06), not a list written
+     here. It used to be a fixed six; it is whatever sits above the account's level. Recomputed
+     rather than fixed, because the level changes in Settings and the sidebar has to follow without
+     a reload. The pf-adv class and every rule that reads it are untouched: only who wears it
+     changed. */
+  function advTabs(){
+    var lvl=(typeof userLevel==='function')?userLevel():0;
+    var map=(typeof TAB_LEVEL!=='undefined')?TAB_LEVEL:{};
+    return Object.keys(map).filter(function(t){ return map[t]>lvl; });
+  }
+  var ADV=advTabs();
+  window.applyNavLevel=function(){
+    ADV=advTabs();
+    nav.querySelectorAll('button[data-tab]').forEach(function(b){
+      b.classList.toggle('pf-adv', ADV.indexOf(b.dataset.tab)>-1);
+    });
+    /* A level change can strand somebody on a tab that just left their list. The tab keeps working
+       and the sidebar expands to show where they are, rather than the screen going blank. */
+    var open=document.querySelector('nav button.active');
+    if(open&&ADV.indexOf(open.dataset.tab)>-1)set(false);
+  };
   ADV.forEach(function(t){ var b=nav.querySelector('button[data-tab="'+t+'"]'); if(b) b.classList.add('pf-adv'); });
   var more=document.createElement('button'); more.type='button'; more.className='pf-more'; more.setAttribute('data-tip','More');
   more.innerHTML='<span class="ico"><svg viewBox="0 0 24 24"><use href="#i-chev"/></svg></span><span class="lbl">More</span>';

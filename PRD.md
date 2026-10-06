@@ -499,6 +499,25 @@ record arrive. Done and decided:
   carries it; the scorecard view names it; the suite hashes `scoreStock()` and `CHECK_ORDER`
   against it. To change a check: bump the version, re-pin the hash, and write the reason here.
   The record is attributable to the scorecard that made it, and nothing can backdate one.
+- **Scorecard v1.1, 2026-10-06. Why it changed.** Two changes, on the owner's instruction, and the
+  second is the one that matters for the record.
+  1. `scoreStock()` gained a sixth section, **context**: three counts over 30 days of headlines
+     (legal and regulatory stories, layoffs, whether the company is covered at all) and three read
+     from the hand-entered supply-chain map (customers recorded, largest customer's share,
+     number of suppliers). Nothing in it reads or interprets an article; every check is a count
+     against a published threshold, which is what lets it sit beside the News screen's standing
+     promise that no headline ever produces a verdict. It is scored and displayed always and
+     gates a BUY only if `cBuy` is raised above 0 in Settings, defaulting to 0 — the same
+     convention the momentum gate has used since v1.0.
+  2. `verdictOf()` now answers in **three words for everything**: BUY, HOLD, SELL, decided only by
+     `qBuy`, `pBuy`, `qSell` (plus the two optional gates). Previously two of six labels depended
+     on whether the reader held the stock, so the same score produced different words for
+     different people and Compare showed both vocabularies at once. WATCH is gone as a verdict;
+     what it carried moved into the reason line, which every verdict now has.
+  **The 22 graded checks themselves are unchanged**, so a v1.0 call and a v1.1 call remain
+  comparable on quality, price and momentum. What is not comparable across the boundary is the
+  *label*: a pre-v1.1 call stamped WATCH has no v1.1 equivalent, and the scorecard must keep
+  reading those as their own thing rather than folding them into HOLD.
 - **The data licence.** Finnhub's terms make every plan personal and forbid redistribution or
   business use without written approval. The worker's Finnhub key therefore serves only the
   operator's own devices (the `/finnhub` proxy behind the sync key, the operator's calendar). What

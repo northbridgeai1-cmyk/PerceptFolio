@@ -1819,7 +1819,35 @@ G('History is there on the first visit');
 G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
 {
   const mw = read('functions/_middleware.js'), asm = read('scripts/assemble.mjs'), sw = read('sw.js');
-  t('the World tab exists, is reachable from the sidebar, and hides behind More with the other advanced tabs', /id="tab-world"/.test(term) && /data-tab="world"/.test(term) && /var ADV=\[[^\]]*'world'/.test(term));
+  /* Which tabs hide behind More stopped being a literal array on 2026-10-06 and became whatever
+     sits above the account's experience level, so this now checks the level map rather than the
+     list that used to be written out. World is level 2, which is the same claim the old assertion
+     made: it is in the sidebar, and a beginner does not meet it until they open More. */
+  t('the World tab exists, is reachable from the sidebar, and hides behind More with the other advanced tabs', /id="tab-world"/.test(term) && /data-tab="world"/.test(term) && /world:2/.test(term) && /function advTabs\(\)/.test(term) && /return Object\.keys\(map\)\.filter\(function\(t\)\{ return map\[t\]>lvl; \}\);/.test(term));
+  /* The levels themselves, since the sidebar is now the main thing a new subscriber sees. */
+  t('three levels, and the beginner gets the owner\'s six screens', /const LEVELS=\['beginner','intermediate','advanced'\];/.test(term)
+    && /dashboard:0, portfolio:0, watchlist:0, analyzer:0, news:0, settings:0,/.test(term)
+    && /history:1, screener:1, market:1, risk:1,/.test(term)
+    && /map:2, world:2, projections:2, alerts:2,/.test(term)
+    /* There is no clients tab; it went with the business terminal. A phantom key made the Settings
+       note say "6 of 15" over a sidebar of fourteen. */
+    && !/clients:2/.test(term));
+  t('every tab the level map names is a tab that exists',
+    Object.keys({dashboard:0,portfolio:0,watchlist:0,analyzer:0,news:0,settings:0,history:1,screener:1,market:1,risk:1,map:2,world:2,projections:2,alerts:2})
+      .every(k => term.includes('data-tab="' + k + '"')));
+  t('an unanswered level is beginner, not advanced', /return i<0\?0:i;/.test(term));
+  t('the level is an account setting, changeable in Settings, and the survey asks for it',
+    /<select id="setLevel" onchange="setUserLevel\(this\.value\)">/.test(term)
+    && /{ t: 'This is new to me', d: 'Six screens\./.test(term)
+    && /D\.rules\.level=LEVELS\.indexOf\(a\.level\)<0\?'beginner':a\.level;/.test(term));
+  t('nothing is locked at any level: More still reveals everything, and an off-level tab opened by a chip or the search expands the list',
+    /ADV\.indexOf\(t\)>-1&&nav\.classList\.contains\('pf-compact'\)/.test(term)
+    && /window\.applyNavLevel=function\(\)/.test(term));
+  /* A beginner is given a shorter page, never a different answer. */
+  t('a beginner gets the verdict with the working folded, not a simpler verdict',
+    /<details class="an-work"'\+\(userLevel\(\)>0\?' open':''\)/.test(term)
+    && /Show me how it got there/.test(term)
+    && !/userLevel\(\)[^\n]*verdictOf/.test(term));
   t('Cesium is vendored, not loaded from a CDN, and only when the tab opens', /BASE='\/vendor\/cesium\/'/.test(term) && /s\.src=BASE\+'Cesium\.js'/.test(term) && !/cdnjs\.cloudflare\.com\/ajax\/libs\/cesium/.test(term) && exists('vendor/cesium/Cesium.js') && exists('vendor/cesium/Workers/createGeometry.js') && exists('vendor/cesium/LICENSE.md'));
   const cz = read('vendor/cesium/Cesium.js');
   t('the vendored Cesium carries the two CSP patches: Knockout finds the global without eval, and workers come from Workers/ as same-origin modules', /var t=this\|\|globalThis,n=t\.document/.test(cz) && !/\(0,eval\)\("this"\)/.test(cz) && /if\(!1&&!n&&typeof CESIUM_WORKERS<"u"\)/.test(cz) && /new C\.CesiumWidget\('wdGlobe'/.test(term) && !/new C\.Viewer\(/.test(term));
@@ -1879,7 +1907,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v166/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v167/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2202,15 +2230,22 @@ G('Scorecard v1.0, frozen 2026-09-21: the record is attributable to it');
    of the 22 checks orphans every call made before it, so the two are hashed here against the
    version constant. To change the checks: bump SCORECARD_VERSION, replace this hash, and say why
    in PRD §26. A change that skips that fails the build. */
-t('the scorecard carries a version', /const SCORECARD_VERSION='1\.0 \(2026-09-21\)';/.test(term));
+t('the scorecard carries a version', /const SCORECARD_VERSION='1\.1 \(2026-10-06\)';/.test(term));
 t('every recorded call is stamped with it', /scorecard:SCORECARD_VERSION/.test(term));
 t('the scorecard view names it', /id="scorecardVersion"/.test(term) && /'scorecard v'\+SCORECARD_VERSION/.test(term));
-t('scoreStock() and CHECK_ORDER match the frozen v1.0 hash', (() => {
+/* Re-pinned for v1.1 on 2026-10-06: scoreStock gained the context section (news counts and the
+   supply-chain map) and verdictOf collapsed to three ownership-independent words. The 22 graded
+   checks are untouched, so calls either side of the boundary stay comparable on quality, price and
+   momentum; the reason is written out in PRD §26, as this guard demands. */
+t('scoreStock() and CHECK_ORDER match the frozen v1.1 hash', (() => {
   const s0 = term.indexOf('async function scoreStock(sym){'), e0 = term.indexOf('\n}\n', s0) + 2;
   const c0 = term.indexOf('const CHECK_ORDER=['), ce = term.indexOf('];', c0) + 2;
   const src = (term.slice(s0, e0) + term.slice(c0, ce)).replace(/\s+/g, ' ');
-  return crypto.createHash('sha256').update(src).digest('hex').slice(0, 16) === '52c4bc7ebcd23963';
+  return crypto.createHash('sha256').update(src).digest('hex').slice(0, 16) === '89a187d6a58a4554';
 })(), 'the checks changed; bump SCORECARD_VERSION, re-pin the hash, and record why in PRD §26');
+t('and the reason for the v1.1 change is written down where the guard says to write it',
+  /\*\*Scorecard v1\.1, 2026-10-06\. Why it changed\.\*\*/.test(read('PRD.md'))
+  && /The 22 graded checks themselves are unchanged/.test(read('PRD.md')));
 
 /* ==================== QUIET NOTES ==================== */
 G('State the number, do not lecture');
