@@ -781,7 +781,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/staffcode', '/forget', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/kronos', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/staffcode', '/forget', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -3781,34 +3781,12 @@ async function handleBilling(request, env, url) {
   }
 
 
-  /* ---- POST /kronos {code, symbol, horizon} -> a model forecast, cached a day ----
-     Gated by a live access code. Daily OHLCV comes from Yahoo's chart endpoint (Finnhub's candle
-     route is paid-tier), goes to the Kronos service on Modal with the service token, and the
-     answer is cached per symbol, horizon and day. Never public, never a recommendation. */
-  if (url.pathname === '/kronos' && request.method === 'POST') {
-    if (!env.KRONOS_URL || !env.KRONOS_TOKEN) return json({ error: 'The model is not configured yet.', configured: false }, 503, env);
-    if (await tooMany(env, request, '/kronos', 10)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
-    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    const code = clean(body.code, 12).toUpperCase();
-    if (!(await grantIsLive(env, code))) return json({ error: 'A live access code is required.' }, 401, env);
-    const sym = clean(body.symbol, 12).toUpperCase();
-    const horizon = Math.max(5, Math.min(180, Math.floor(Number(body.horizon) || 30)));
-    if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
-    const day = new Date().toISOString().slice(0, 10), ck = 'kronos:' + sym + ':' + horizon + ':' + day;
-    const cached = await env.PF_SYNC.get(ck); if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
-    let candles = [], feedUsed = priceFeed(env);
-    try { const { bars } = await dailyBars(env, sym, 740); candles = bars.map(b => ({ t: b.t || Math.floor(Date.parse(b.d) / 1000), open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v })); } catch (e) { /* fall through */ }
-    if (candles.length < 60) return json({ error: 'Not enough price history for ' + sym + '.' }, 502, env);
-    let out;
-    try {
-      const r = await fetch(env.KRONOS_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + env.KRONOS_TOKEN }, body: JSON.stringify({ candles, horizon }) });
-      out = await r.json(); if (!r.ok || !out || !Array.isArray(out.path)) return json({ error: 'The model did not answer.', detail: out && out.detail }, 502, env);
-    } catch (e) { return json({ error: 'The model is not reachable.' }, 502, env); }
-    const last = candles[candles.length - 1];
-    const result = { symbol: sym, horizon, asOf: day, last: last.close, path: out.path, lo: out.lo, hi: out.hi, dates: out.dates, model: out.model, prices: feedLabel(feedUsed), cached: false };
-    await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 86400 });
-    return json(result, 200, env);
-  }
+  /* /kronos WAS REMOVED ON 2026-10-06 with the terminal's Model view, on the owner's instruction.
+     It gated a live access code, pulled two years of daily bars, posted them to the Kronos service
+     on Modal and cached the forecast for a day. Nothing calls it now, and an endpoint nothing calls
+     is an endpoint nobody is watching, so it goes rather than lingering as a reachable surface that
+     still spends a Modal invocation for anyone who finds it. KRONOS_URL and KRONOS_TOKEN can be
+     unset; the service under kronos/ is no longer wired to anything. */
 
   /* ---- GET /history?symbol=SPY : two years of daily closes, cached a day ----
      The terminal's charts, averages, volatility and growth views read the app's own price log,

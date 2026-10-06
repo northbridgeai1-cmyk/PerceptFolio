@@ -52,7 +52,6 @@ export function Security() {
         ['Finnhub', 'The ticker you ask about.', 'Quotes, fundamentals, news, insider filings. Through our service for signed-in accounts, or through a key of your own.'],
         ['Price feed vendor (EODHD or Tiingo, when set)', 'The ticker and a date range.', 'Daily closes for the record’s marks and the history. Until one is set, history comes from Yahoo’s public endpoint and is labelled as interim.'],
         ['SEC EDGAR, FRED, UN Comtrade, OpenStreetMap, Esri', 'A ticker, a series id, a country, a map tile. Nothing about you.', 'Statements, macro, trade, plants, imagery. Public data.'],
-        ['Modal', 'A ticker and its closes.', 'Runs the Kronos forecasting model.'],
         ['Anthropic, or Cloudflare Workers AI', 'Headlines and public company facts. Never your holdings, notes or record.', 'News summaries where every claim must cite a headline; the six investor lenses.'],
         ['Resend', 'Your email address and the message.', 'Sends your code, quotes and replies.'],
         ['FormSubmit', 'The access request you typed.', 'Delivers it to our inbox; keeps no copy.'],

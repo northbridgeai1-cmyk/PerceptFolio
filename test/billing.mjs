@@ -135,32 +135,9 @@ t('door: a day later it goes through on its own', r.status === 200 && j.ok === t
   t('with no configured origin the header is absent rather than the string null', r2.headers.get('access-control-allow-origin') === null);
 }
 
-/* --- M6: /kronos is gated, cached, and honest when unconfigured --- */
-{
-  let rr = await post('/kronos', { code: 'AAAAA-AAAAA', symbol: 'SPY', horizon: 30 }); const k0 = await rr.json().catch(() => ({}));
-  t('kronos: 503 and configured:false until the model exists', rr.status === 503 && k0.configured === false, rr.status + ' ' + JSON.stringify(k0).slice(0, 80));
-  const e2 = { ...env, KRONOS_URL: 'https://kronos.example/forecast', KRONOS_TOKEN: 'svc-token' };
-  const seen = [];
-  const prevFetch = globalThis.fetch;
-  globalThis.fetch = async (url, opts = {}) => {
-    const u = String(url); seen.push({ u, auth: opts.headers && opts.headers.Authorization });
-    /* Bars dated up to today: dailyBars() keeps only bars inside the window it asked for, so a
-       fixed 2023 start would be filtered to nothing and read as "not enough history". */
-    if (u.includes('query1.finance.yahoo.com')) { const n = 120; const t0 = Math.floor(Date.now() / 1000) - n * 86400; const ts = [...Array(n)].map((_, i) => t0 + i * 86400); const px = [...Array(n)].map((_, i) => 100 + i * 0.3); return new Response(JSON.stringify({ chart: { result: [{ timestamp: ts, indicators: { quote: [{ open: px, high: px.map(x => x + 1), low: px.map(x => x - 1), close: px, volume: px.map(() => 1000) }] } }] } }), { status: 200 }); }
-    if (u.includes('kronos.example')) return new Response(JSON.stringify({ path: [136, 137, 138], lo: [130, 131, 132], hi: [140, 141, 142], dates: ['2026-09-15', '2026-09-16', '2026-09-17'], model: 'NeoQuasar/Kronos-small' }), { status: 200 });
-    return prevFetch(url, opts);
-  };
-  const kpost = (body) => worker.fetch(new Request(W + '/kronos', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://perceptfolio.com' }, body: JSON.stringify(body) }), e2);
-  rr = await kpost({ code: 'ZZZZZ-ZZZZZ', symbol: 'SPY', horizon: 30 }); const k1 = await rr.json().catch(() => ({}));
-  t('kronos: a code without a live grant is refused (401)', rr.status === 401, rr.status + ' ' + JSON.stringify(k1).slice(0, 90));
-  const live = { code: liveCode };
-  rr = await kpost({ code: live.code, symbol: 'SPY', horizon: 30 }); let kj = await rr.json();
-  t('kronos: a live code gets the path, band and last close', rr.status === 200 && Array.isArray(kj.path) && kj.path.length === 3 && kj.last > 0 && kj.cached === false);
-  t('kronos: the model is called with the service token, never the user code', seen.some(x => x.u.includes('kronos.example') && x.auth === 'Bearer svc-token'));
-  const calls = seen.length; rr = await kpost({ code: live.code, symbol: 'SPY', horizon: 30 }); kj = await rr.json();
-  t('kronos: the second ask the same day is served from cache without calling the model', kj.cached === true && seen.length === calls);
-  globalThis.fetch = prevFetch;
-}
+/* M6's /kronos route and the Kronos service were removed on 2026-10-06 with the terminal's Model
+   view, on the owner's instruction. The checks that lived here proved it was gated by a live code,
+   cached per symbol and day, and honest about being unconfigured; there is nothing left to gate. */
 
 /* --- history on day one, and the council --- */
 {

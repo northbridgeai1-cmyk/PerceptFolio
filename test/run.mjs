@@ -201,9 +201,19 @@ t('feature gates count the worker as a source of market data',
 G('Test account — public credentials, so containment is the whole safety argument');
 
 t('the demo credentials exist', /const DEMO_ID='test1212', DEMO_PW='testishard'/.test(term));
-t('login accepts them before the normal profile lookup',
-  term.indexOf("if(email===DEMO_ID&&pw===DEMO_PW)return enterDemo()") <
-  term.indexOf("if(!email||!DB.profiles[email])return toast"));
+/* THIS ASSERTION WAS NEVER TESTING LOGIN (found 2026-10-06). It compared the demo check's position
+   against "if(!email||!DB.profiles[email])return toast", a string that existed in exactly one place
+   in this file: copyToAccount, an unrelated Settings feature. Deleting that feature turned the
+   indexOf into -1 and the comparison into false, which is the only reason anybody noticed. The
+   login path's own guard is "if(!email)return toast('Enter your email.')". Rewritten to assert the
+   real property, which is that the demo account is answered before any profile is looked up, and
+   anchored inside the login function rather than against the whole file. */
+t('login accepts them before the normal profile lookup', (() => {
+  const fn = term.slice(term.indexOf("if(email===DEMO_ID&&pw===DEMO_PW)return enterDemo()") - 600);
+  const demo = fn.indexOf("if(email===DEMO_ID&&pw===DEMO_PW)return enterDemo()");
+  const lookup = fn.indexOf("const p=DB.profiles[email];");
+  return demo > -1 && lookup > demo;
+})());
 
 /* The containment claim, checked per function. If any sync entry point loses its guard, a login
    whose password is printed in a public file could overwrite the real portfolio — and
@@ -1797,9 +1807,22 @@ G('Closed with evidence, not assurance');
 G('A model is one more input, graded like everything else');
 {
   t('the kronos service is a Modal app that checks a service token and loads the open model once', /modal\.App\("perceptfolio-kronos"/.test(read('kronos/app.py')) && /KRONOS_TOKEN/.test(read('kronos/app.py')) && /NeoQuasar\/Kronos-small/.test(read('kronos/app.py')));
-  t('the worker bridge is code-gated, cached a day, and fails closed when unconfigured', /url\.pathname === '\/kronos'/.test(worker) && /grantIsLive\(env, code\)/.test(worker) && /expirationTtl: 86400/.test(worker) && /configured: false \}, 503/.test(worker));
-  t('the terminal has a kronos track and the Model view records onto it', /'ewma','kronos'\]/.test(term) && /id="pfModelGo"/.test(term) && /,'kronos'\);/.test(term));
-  t('the model view says what a forecast is and is not', /not a recommendation/.test(term.slice(term.indexOf('Model view (M6)'))));
+  /* The bridge went with the panel on 2026-10-06: an endpoint nothing calls is an endpoint nobody
+     is watching, and this one still spent a Modal invocation for anyone who found it. */
+  /* Checked against CODE, not against prose: the note explaining the removal necessarily names
+     KRONOS_URL, and an assertion that bans the string bans its own explanation. */
+  t('the worker bridge is gone, not merely unused',
+    !/url\.pathname === '\/kronos'/.test(worker)
+    && !/env\.KRONOS_URL/.test(worker) && !/env\.KRONOS_TOKEN/.test(worker)
+    && !/'\/kronos'[,\)]/.test(worker));
+  /* THE KRONOS MODEL VIEW WAS REMOVED on 2026-10-06 on the owner's instruction. What these two
+     assertions protected has inverted: nothing may make a kronos call any more, because the panel
+     that made them is gone. What must NOT have gone is the record: calls already stamped kronos
+     keep their name, because a terminal that claims to keep score on itself cannot quietly delete
+     a track, and the one it deleted would always be the one somebody suspected it of. */
+  t('nothing can record a kronos call any more', !/id="pfModelGo"/.test(term) && !/,'kronos'\);/.test(term) && !/'ewma','kronos'\]/.test(term) && !/\/kronos'/.test(term));
+  t('but calls already recorded on that track keep their name', /kronos:'Kronos, the model'/.test(term));
+  t('and the removal says why, and why the name stayed', /THE KRONOS MODEL VIEW WAS REMOVED ON 2026-10-06/.test(term) && /cannot\n     quietly drop the track/.test(term));
   t('the model is never exposed on the public site', !/kronos/i.test(idx) && !/kronos/i.test(read('site/src/pages/Landing.tsx')));
 }
 
@@ -1907,7 +1930,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v167/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v168/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2158,7 +2181,8 @@ t('the sign-in toggle is an underline, not a box', /\.auth-switch button\.on\{ba
 t('no rounded frame is drawn around a table', !/border:1px solid var\(--border\);border-radius:(9|10)px;overflow:hidden/.test(term));
 /* The door keeps the code it was opened with, for a profile that has none of its own. */
 t('the door keeps the code for the terminal', /localStorage\.setItem\('pf_door_code', payload\.code\)/.test(read('enter/enter.js')));
-t('every model helper, the settings status, the macro helpers and the door read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 10);   /* the tenth: finishLogin, deciding whether a pull is coming */
+/* Was ten; the Model view's own code() helper went with the panel on 2026-10-06. */
+t('every model helper, the settings status, the macro helpers and the door read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 9);
 /* The greeting was chatbot furniture; a statement is headed by its date. */
 t('the dashboard and command screens are headed by the date', /function dateLine\(\)/.test(term) && !/'Good '\+period/.test(term));
 t('no headings are typed in Title Case',
@@ -2174,7 +2198,7 @@ G('Nothing the worker serves to everyone comes off the personal Finnhub key');
    The worker's key may therefore serve only the operator's own devices, behind the sync key. */
 t('the /finnhub proxy is behind the sync key', (() => { const gate = worker.indexOf("Everything past this point is yours alone"); const route = worker.indexOf("url.pathname === '/finnhub'"); return gate > 0 && route > gate && /if \(!safeEqual\(token, env\.SYNC_SECRET\)\) \{/.test(worker.slice(gate, gate + 400)); })());
 t('marks run only on a licensed price feed', /if \(!priceFeed\(env\)\.licensed\) throw new Error\('no licensed price feed/.test(worker) && !/finnhub\.io\/api\/v1\/quote\?symbol=' \+ encodeURIComponent\(sym\)\n            \+ '&token='/.test(worker));
-t('history and the model\'s candles come from the price feed, labelled when it is the interim', /function dailyBars\(env, sym, days\)/.test(worker) && /source: feedLabel\(feedUsed\)/.test(worker) && /prices: feedLabel\(feedUsed\)/.test(worker) && /yahoo \(interim, unlicensed; set PRICE_FEED and PRICE_FEED_KEY\)/.test(worker));
+t('history and the model\'s candles come from the price feed, labelled when it is the interim', /function dailyBars\(env, sym, days\)/.test(worker) && /source: feedLabel\(feedUsed\)/.test(worker) && /yahoo \(interim, unlicensed; set PRICE_FEED and PRICE_FEED_KEY\)/.test(worker));   /* `prices: feedLabel(...)` was the /kronos answer's own label; that route went on 2026-10-06, and /history still carries `source: feedLabel(...)` above */
 t('a licensed feed is two secrets away: EODHD or Tiingo', /eodhd\.com\/api\/eod\//.test(worker) && /api\.tiingo\.com\/tiingo\/daily\//.test(worker));
 t('the council takes its facts from the caller\'s own key; the worker\'s key only for the operator', /const given = \(body\.facts && typeof body\.facts === 'object'\) \? body\.facts : null;/.test(worker) && /if \(!operator \|\| !env\.FINNHUB_API_KEY\) return null;/.test(worker) && /facts:facts\|\|undefined/.test(term));
 t('nothing on the worker reads Yahoo\'s quote summary any more', !/quoteSummary/.test(worker));
@@ -3211,7 +3235,7 @@ G('The review: what changed since you last looked, then the assumptions marked b
   t('a closed review with marks is sealed into the chain and pushed with the record copy', /if\(marks\.length\)D\.reviews\.push\(rec\)/.test(term) && /const n=await sealNewMarks\(\); if\(n\)\{ pushChainHead\(\); \} pushRecordCopy\(\);/.test(grab(term, 'submitReview')));
   t('a review closes with a snapshot, so the next digest has something to diff against', /D\.reviewSnap\[sym\]=await reviewSnapshot\(sym\)/.test(term));
   t('nothing changed is a line with the date and what was checked', /digestRow\('Nothing changed','since '\+\(d\.sinceDay\|\|'the thesis was written'\)\+'\. Checked: '/.test(term));
-  t('every digest line cites a source and a date; none says what it means', /No line above says what it means; that is yours/.test(term) && /digestRow\('Filing'/.test(term) && /digestRow\('Insiders'/.test(term) && /digestRow\('Analysts'/.test(term) && /digestRow\(touched\.length\?'Headline, touches '/.test(term) && /digestRow\('Model'/.test(term) && /digestRow\('Verdict'/.test(term) && /digestRow\('Check'/.test(term));
+  t('every digest line cites a source and a date; none says what it means', /No line above says what it means; that is yours/.test(term) && /digestRow\('Filing'/.test(term) && /digestRow\('Insiders'/.test(term) && /digestRow\('Analysts'/.test(term) && /digestRow\(touched\.length\?'Headline, touches '/.test(term) && !/digestRow\('Model'/.test(term)   /* the Model line went with Kronos on 2026-10-06 */ && /digestRow\('Verdict'/.test(term) && /digestRow\('Check'/.test(term));
   t('Command: REVIEW fires on the date or the cadence, opens the review, and carries the digest in its row', /if\(th&&reviewDue\(th,today\)\)/.test(term) && /action:'openReview\(/.test(term) && /digest:h\.sym/.test(term) && /fillDigestInto\(q\[cmdOpen\]\.digest/.test(term));
   t('the thesis form carries assumptions and a cadence; the holding menu carries Review with the last date', /id="thesisAssumptions"/.test(term) && /id="thesisEvery"/.test(term) && /label:'Review'\+\(thesisFor\(sym\)&&thesisFor\(sym\)\.reviewedAt/.test(term));
   t('the worker\'s filings route reads EDGAR submissions, keeps the forms a holder needs, names 8-K items, and caches six hours', /url\.pathname === '\/filings' && request\.method === 'GET'/.test(worker) && /data\.sec\.gov\/submissions\/CIK/.test(worker) && /'2\.02': 'results'/.test(worker) && /'5\.02': 'officer or director change'/.test(worker) && /expirationTtl: 6 \* 3600/.test(worker));

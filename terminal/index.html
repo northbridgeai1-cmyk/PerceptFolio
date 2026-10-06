@@ -1093,23 +1093,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 #sidebar nav button.pf-more{color:var(--muted)}
 /* Model view (Projections). One row of controls that never wraps its button; an empty state that
    looks designed rather than logged. */
-#pfModel .mv-head{display:block}
-#pfModel .mv-form{margin-top:14px}
-#pfModel .mv-title{font-size:15px;font-weight:600;margin-top:6px}
-#pfModel .mv-kicker{font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-#pfModel .mv-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
-#pfModel .mv-form input,#pfModel .mv-form select{height:40px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 12px;color:var(--text);font:inherit}
-#pfModel .mv-form input{width:120px;text-transform:uppercase;font-family:var(--mono);letter-spacing:.06em}
-#pfModel .mv-form select{width:auto;min-width:130px;flex:0 0 auto;padding-right:32px}
-#pfModel .mv-form input{flex:0 0 auto}
-#pfModel .mv-form .btn{white-space:nowrap;height:40px;padding:0 16px}
-#pfModel .mv-empty{margin-top:14px;padding:14px 0 0;border-top:1px solid var(--border)}
-#pfModel .mv-empty .dot{display:none}
-#pfModel .mv-empty b{display:block;font-size:14px;margin-bottom:4px}
-#pfModel .mv-empty p{margin:0;font-size:13px;line-height:1.55;color:var(--muted);max-width:60ch}
-#pfModel .mv-empty code{font-family:var(--mono);font-size:12px;background:var(--panel2);padding:2px 6px;border-radius:5px}
-#pfModel .mv-stats{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:10px;font-family:var(--mono);font-size:13px}
-#pfModel .mv-note{margin-top:12px;font-size:13px;line-height:1.55;color:var(--muted);max-width:64ch}
 @media (max-width:600px){#pfModel .mv-form{width:100%}#pfModel .mv-form input{flex:1;min-width:0}#pfModel .mv-form .btn{width:100%}}
 </style>
 </head>
@@ -1810,7 +1793,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
         <th class="sortable" id="pfTh_price" onclick="sortPortfolio('price')">Price now</th>
         <th class="sortable" id="pfTh_value" onclick="sortPortfolio('value')">Market value</th>
         <th class="sortable th-profit" id="pfTh_gl" onclick="sortPortfolio('gl')">Gain/Loss</th>
-        <th class="sortable th-ai" id="pfTh_signal" onclick="sortPortfolio('signal')">Verdict</th>
+        <th class="sortable th-ai" id="pfTh_signal" onclick="sortPortfolio('signal')"><span id="pfThVerdict">Verdict</span></th>
         <th class="th-mine">My call</th>
         <th></th>
       </tr></thead>
@@ -2691,22 +2674,13 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <h3>Rule change log</h3>
     <div id="ruleLog"></div>
   </div>
-  <div class="card" style="margin-top:16px">
-    <h3>Copy holdings / watchlist to another account</h3>
-    <div class="row" style="margin-bottom:10px">
-      <select id="copyTarget" style="max-width:280px"></select>
-      <select id="copyWhat" style="max-width:190px">
-        <option value="both">Holdings + Watchlist</option>
-        <option value="holdings">Holdings only</option>
-        <option value="watchlist">Watchlist only</option>
-      </select>
-      <select id="copyMode" style="max-width:210px">
-        <option value="merge">Merge into theirs</option>
-        <option value="replace">Replace theirs</option>
-      </select>
-      <button class="btn" onclick="copyToAccount()">Copy</button>
-    </div>
-    <p class="muted" style="font-size:12px"><b>Merge</b> adds anything they don't already have and leaves their existing positions untouched. <b>Replace</b> wipes the selected lists on the target account first; that can't be undone, so it asks first.</p>
+  <!-- ONE PLACE TO LOOK A WORD UP (2026-10-06). The swap below reaches the labels a beginner meets
+       most, and it cannot reach every sentence in an eighteen-thousand-line file. This table can:
+       it is the whole vocabulary, printed, so a word met anywhere has somewhere to be looked up. -->
+  <div class="card" style="margin-top:16px" id="glossaryCard">
+    <h3>What the words mean</h3>
+    <div class="muted" style="font-size:12.5px;margin-bottom:10px">Every term this terminal uses, in plain English. Nothing here changes a number; it is the same answer in different words.</div>
+    <div id="glossaryBody"></div>
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Where your book is kept</h3>
@@ -4285,7 +4259,6 @@ function enterSession(){
   document.getElementById('setAutoRefresh').value=D.rules.autoRefresh;
   applyTheme();
   fillPolicyInputs();
-  populateCopyTargets();
   // Display only. Must never kick off a pull, because syncPull() calls enterSession() on success
   // and the two would recurse into each other.
   renderSyncSettings();
@@ -4913,6 +4886,154 @@ function dcfFairValue(fcfShare,g,disc,tg){
   for(let y=1;y<=5;y++){f*=(1+g);v+=f/Math.pow(1+disc,y);}
   v+=(f*(1+tg))/((disc-tg)*Math.pow(1+disc,5));
   return v;
+}
+/* ================= THE WORDS, IN PLAIN ENGLISH (2026-10-06) =================
+
+   The owner's instruction: as a beginner it will be hard to understand everything, so keep it
+   simple. The jargon audit in test/personas.mjs counts what a level-0 reader meets before anybody
+   has explained anything; on 2026-10-06 that was 69 uses of 17 terms.
+
+   TWO THINGS, AND THE SECOND IS THE ONE THAT SCALES.
+
+   1. At beginner level the plain phrase is shown INSTEAD of the term, with the term kept in the
+      tooltip. That direction matters: a beginner reads "how much it moves" and can discover that
+      professionals call it volatility, rather than reading "volatility" and having to hover to find
+      out what it means. Above beginner the term is shown, with the plain phrase in the tooltip,
+      because somebody who asked for ten or fifteen screens did not ask to be talked down to.
+
+   2. Every term is in one table, and Settings prints the whole table. A beginner meeting a word
+      anywhere in the terminal has one place to look it up, including the words this swap does not
+      reach. A glossary nobody can find is a glossary nobody has.
+
+   WHAT THIS IS NOT. It does not change a single number, threshold or verdict. Simpler words for the
+   same answer; never a simpler answer, which would make the terminal tell different people
+   different things about the same company. */
+const PLAIN_WORDS={
+  'verdict':'the answer',
+  'position':'a holding',
+  'positions':'holdings',
+  'momentum':'going up lately',
+  'volatility':'how much it moves',
+  'beta':'how much it swings against the market',
+  'horizon':'how long',
+  'watchlist':'stocks you follow',
+  'concentration':'too much in one thing',
+  'cost basis':'what you paid',
+  'expectancy':'what you make on average per call',
+  'marked':'scored against the market',
+  'screener':'finding stocks',
+  'counterfactual':'what would have happened instead',
+  'sharpe ratio':'return for the amount it swings',
+  'monte carlo':'thousands of made-up futures, to see the spread',
+  'drawdown':'the worst drop along the way',
+  'liquidity':'how easily you could sell it',
+  'dividend':'cash the company pays you for holding it',
+  'etf':'a basket of many companies in one',
+};
+/* The word to put on screen, and the one to put in its tooltip. */
+function word(term){
+  const plain=PLAIN_WORDS[String(term).toLowerCase()];
+  if(!plain)return {show:term,tip:''};
+  return (typeof userLevel==='function'&&userLevel()===0)
+    ? {show:plain,tip:'Professionals call this "'+term+'".'}
+    : {show:term,tip:plain};
+}
+/* Inline, for use inside the HTML strings this file is built from. */
+function w(term){
+  const x=word(term);
+  return x.tip?'<span title="'+esc(x.tip)+'" style="border-bottom:1px dotted currentColor">'+esc(x.show)+'</span>':esc(x.show);
+}
+/* The whole table, for Settings. Sorted, so looking a word up is scanning rather than hunting. */
+function glossaryHtml(){
+  const rows=Object.keys(PLAIN_WORDS).sort().map(k=>
+    '<tr><td style="white-space:nowrap"><b>'+esc(k)+'</b></td><td>'+esc(PLAIN_WORDS[k])+'</td></tr>').join('');
+  return '<table class="tbl" style="font-size:13px"><tbody>'+rows+'</tbody></table>';
+}
+
+/* ================= ONE STOCK, PROJECTED (2026-10-06) =================
+
+   The owner's instruction: when analysing, check all the risks, go through all the projections,
+   everything.
+
+   The Analyze screen already computed a stock's expected return, its volatility, its beta and a
+   one-year range, and showed the range as three percentages and nothing else. The Projections
+   screen could answer the same question in dollars over ten years, and would not do it for a single
+   company unless you went to another tab and typed the ticker again.
+
+   This closes that. Same geometric Brownian motion the Monte Carlo tool uses, done in closed form
+   rather than by sampling: for a lognormal price, the percentile at T years is
+
+       multiple = exp( (mu - sigma^2/2) * T  +  z * sigma * sqrt(T) )
+
+   with z = -1.645, 0 and +1.645 for the 5th, the median and the 95th. Closed form because ten
+   thousand sampled paths would say the same thing more slowly and less exactly, and because a
+   number that is reproducible can be argued with.
+
+   THE DRIFT IS NOT A FORECAST and the screen says so. mu comes from CAPM, which is a statement
+   about what a stock with this beta ought to return on average, not a claim about this company.
+   Over ten years sigma dominates it so completely that the band is wider than the middle is high,
+   which is the actual lesson and the reason the bad end is shown first. */
+function projectStock(mu,sigma,years){
+  /* Number.isFinite, not the global isFinite, and the difference is not pedantic: isFinite(null) is
+     TRUE, because the global one coerces its argument and null becomes 0. A stock whose expected
+     return could not be computed would therefore have been projected at zero drift and shown as a
+     confident set of dollar figures with nothing to say it was built on a missing number. Caught by
+     test/projection.mjs, which asked what a missing mu does. */
+  if(!Number.isFinite(mu)||!Number.isFinite(sigma)||sigma<=0||!Number.isFinite(years)||years<=0)return null;
+  const drift=(mu-sigma*sigma/2)*years, sd=sigma*Math.sqrt(years);
+  const at=z=>Math.exp(drift+z*sd);
+  return {years, lo:at(-1.645), mid:at(0), hi:at(1.645)};
+}
+/* How many days of the stock's own trading it would take to get out of a position. The fifth
+   sizing limit already measured this for the trade calculator and nothing on the Analyze screen
+   ever said it, which is the risk that only appears on the day it matters. */
+function exitDays(dollars,price,advShares){
+  /* Number.isFinite here too, for the same reason: see projectStock. */
+  if(!Number.isFinite(dollars)||dollars<=0||!Number.isFinite(price)||price<=0||!Number.isFinite(advShares)||advShares<=0)return null;
+  return (dollars/price)/advShares;
+}
+/* The risks and the projections for one company, in the order somebody actually asks them: how
+   much does it swing, could I get out, and what might it be worth. Separated from renderAnalysis so
+   it can be read, and so the arithmetic can be tested without a DOM. */
+function riskAndProjectionHtml(sc,sym,isHolding){
+  const mu=sc.riskMu, sigma=sc.riskSigma;
+  const held=(D.holdings||[]).filter(h=>h.sym===sym).reduce((a,h)=>a+((h.price??h.cost)*h.shares),0);
+  /* An unheld company is projected on a round 10,000 so the figures mean something; it is labelled,
+     not smuggled in as if it were their money. */
+  const base=held>0?held:10000;
+  const rows=[1,5,10].map(y=>({y,p:projectStock(mu,sigma,y)})).filter(x=>x.p);
+  const days=exitDays(base,sc.price,sc.advShares);
+  const total=(D.holdings||[]).reduce((a,h)=>a+((h.price??h.cost)*h.shares),0)+(D.cash||0);
+  const pct=(total>0&&held>0)?(held/total*100):null;
+  const p=(typeof policy==='function')?policy():{maxPosition:10};
+
+  return '<h3 style="margin-top:22px">5 · How much it swings, and what it could be worth</h3>'+
+    '<p class="muted" style="margin-bottom:10px">From this company\u2019s own volatility and beta. '+
+      (held>0?'Projected on the '+pmask(fmt$(held))+' you hold.':'Projected on a round $10,000, because you do not own it.')+
+      ' A projection is arithmetic on an assumed average return, not a forecast of this company.</p>'+
+    '<div class="grid grid-3" style="margin-bottom:12px">'+
+      '<div class="card"><h3>How much it moves</h3><div class="big">'+(sigma!=null?(sigma*100).toFixed(0)+'%':'-')+'</div>'+
+        '<div class="muted">a year, up or down. The S&P is around 15%.</div></div>'+
+      '<div class="card"><h3>Versus the market</h3><div class="big">'+(sc.riskBeta!=null?sc.riskBeta.toFixed(2)+'\u00d7':'-')+'</div>'+
+        '<div class="muted">'+(sc.riskBeta==null?'not measured yet':sc.riskBeta>1.15?'swings harder than the market':sc.riskBeta<0.85?'steadier than the market':'moves about with the market')+'</div></div>'+
+      '<div class="card"><h3>Getting out</h3><div class="big">'+(days==null?'-':days<0.1?'<1 day':days.toFixed(1)+' days')+'</div>'+
+        '<div class="muted">'+(days==null?'average volume unknown':'of this stock\u2019s own trading to sell that position')+'</div></div>'+
+    '</div>'+
+    (rows.length
+      ? '<table style="margin-top:4px"><thead><tr><th>In</th><th>Bad end</th><th>Middle</th><th>Good end</th></tr></thead><tbody>'+
+        rows.map(x=>'<tr><td>'+x.y+(x.y===1?' year':' years')+'</td>'+
+          '<td class="neg">'+pmask(fmt$(base*x.p.lo))+'</td>'+
+          '<td><b>'+pmask(fmt$(base*x.p.mid))+'</b></td>'+
+          '<td class="pos">'+pmask(fmt$(base*x.p.hi))+'</td></tr>').join('')+
+        '</tbody></table>'+
+        '<p class="muted" style="font-size:12px;margin-top:8px">Bad and good are the 5th and 95th of a lognormal spread: one year in twenty falls outside each. The band widens faster than the middle rises, which is what volatility costs.</p>'
+      : '<p class="empty">Not enough price history to project this one yet.</p>')+
+    (pct!=null
+      ? '<p class="muted" style="font-size:12.5px;margin-top:10px">It is <b>'+pct.toFixed(1)+'%</b> of your money. Your limit is '+p.maxPosition+'%.'+
+        (pct>p.maxPosition?' <span class="neg">Over your own limit.</span>':'')+'</p>'
+      : '')+
+    '<details class="aside"><summary>What this assumes</summary><div>4.5% risk-free, 8% expected market return, this stock\u2019s beta and volatility'+
+      (sc.riskSigmaSource?' ('+esc(sc.riskSigmaSource)+')':'')+'. Returns are assumed lognormal around one average, which real markets are not: crashes cluster and tails are fatter. Same method as the Monte Carlo tool on Projections, in closed form rather than sampled.</div></details>';
 }
 /* THE CONTEXT CHECKS, LIFTED OUT OF scoreStock SO THEY CAN BE RUN (2026-10-06).
 
@@ -10323,7 +10444,10 @@ function renderCounterfactual(){
    worth stating plainly rather than enforcing: every track added divides the same thin stream of
    tickers further, and with enough tracks sliced enough ways one of them looks like a winner by
    luck. Four is fine. Twelve would not be. */
-const ACTIVE_TRACKS=['checklist','herizen','gated','ewma','kronos'];   // kronos: model forecasts, recorded and marked like every other track
+/* kronos came out on 2026-10-06 with the Model view that fed it. The NAME stays in TRACK_NAMES
+   below so calls already recorded against it still render as themselves rather than as a blank;
+   it is simply no longer a track anything can add to. */
+const ACTIVE_TRACKS=['checklist','herizen','gated','ewma'];
 function trackIsLive(id){return ACTIVE_TRACKS.includes(id);}
 
 /* ================= EWMA 50/200 =================
@@ -11084,7 +11208,7 @@ function renderAnalysis(sym,sc){
       '<div style="font-size:26px;font-weight:700;letter-spacing:-.02em">'+v.label+'</div>'+
       '<div style="font-size:14.5px;line-height:1.6;margin-top:6px">'+esc(v.why||'')+'</div>'+
       (v.detail?'<div class="muted" style="font-size:12.5px;margin-top:4px">'+esc(v.detail)+'</div>':'')+
-      '<div class="muted" style="font-size:12px;margin-top:10px">Quality '+sc.qScore+'/12 · Price '+sc.pScore+'/6 · Momentum '+sc.mScore+'/4'+(sc.wsTotal?' · Wall Street '+sc.wsScore+'/'+sc.wsTotal:'')+
+      '<div class="muted" style="font-size:12px;margin-top:10px">Quality '+sc.qScore+'/12 · Price '+sc.pScore+'/6 · '+w('momentum')+' '+sc.mScore+'/4'+(sc.wsTotal?' · Wall Street '+sc.wsScore+'/'+sc.wsTotal:'')+
         ' · your lines: buy at quality '+D.rules.qBuy+' and price '+D.rules.pBuy+(D.rules.mBuy>0?' and momentum '+D.rules.mBuy:'')+', sell at quality '+D.rules.qSell+'. Change them in Settings.</div>'+
     '</div>'+
     '<details class="an-work"'+(userLevel()>0?' open':'')+' style="margin-top:16px">'+
@@ -11100,7 +11224,7 @@ function renderAnalysis(sym,sc){
     '<div class="score-bar"><div style="width:'+(sc.pScore/6*100)+'%;background:var(--accent)"></div></div>'+
     '<table style="margin-top:10px"><thead><tr><th>Check</th><th>Target</th><th>Actual</th><th>Result</th><th>Note</th></tr></thead><tbody>'+
     sc.priceChecks.map(checkRow).join('')+'</tbody></table>'+
-    '<h3 style="margin-top:22px">3 · Momentum Check: Is the market agreeing?</h3>'+
+    '<h3 style="margin-top:22px">3 · '+(userLevel()===0?'Is the market agreeing? (professionals call this momentum)':'Momentum Check: Is the market agreeing?')+'</h3>'+
     '<p class="muted" style="margin-bottom:6px">Doesn\'t affect the BUY call unless you raise the momentum minimum above 0 in Settings.</p>'+
     '<div class="score-bar"><div style="width:'+(sc.mScore/4*100)+'%;background:var(--yellow)"></div></div>'+
     '<table style="margin-top:10px"><thead><tr><th>Check</th><th>Target</th><th>Actual</th><th>Result</th><th>Note</th></tr></thead><tbody>'+
@@ -11122,11 +11246,17 @@ function renderAnalysis(sym,sc){
         '</div><div class="chart-box" style="height:150px"><canvas id="anBoxCanvas"></canvas></div>'
         :'<p class="empty">Not enough data to simulate a range for this ticker.</p>')
       :'<p class="empty">Risk-adjusted rating unavailable for this ticker (needs a beta and either price history or a fallback default. Try re-analyzing).</p>')+
+    /* ===== EVERYTHING ELSE THIS STOCK'S OWN NUMBERS CAN SAY (2026-10-06) =====
+       The owner asked for the analysis to go through all the risks and all the projections rather
+       than stopping at a one-year percentage. Everything below is computed from mu, sigma, beta and
+       average volume, all of which scoreStock already had and none of which it showed; there is no
+       extra request. Dollars, because a percentage is not an amount, and the bad end first. */
+    riskAndProjectionHtml(sc,sym,isHolding)+
     /* THE CONTEXT SECTION (2026-10-06). Counted, never interpreted: see scoreStock for why that
        distinction is the whole of how this coexists with the News screen's promise. It says on the
        page whether it is gating anything, because a scored section that quietly does not count is
        the kind of thing people discover by accident and then stop trusting. */
-    '<h3 style="margin-top:22px">5 · The news, and who they trade with</h3>'+
+    '<h3 style="margin-top:22px">6 · The news, and who they trade with</h3>'+
     '<p class="muted" style="margin-bottom:6px">Headlines counted by keyword over 30 days, plus the supply chain you mapped yourself. Nothing here reads an article or forms an opinion about one. '+
       ((D.rules.cBuy||0)>0
         ? 'You have set this to gate a BUY at '+D.rules.cBuy+'/6.'
@@ -11136,13 +11266,13 @@ function renderAnalysis(sym,sc){
       '<table style="margin-top:10px"><thead><tr><th>Check</th><th>Target</th><th>Actual</th><th>Result</th><th>Note</th></tr></thead><tbody>'+
       sc.context.map(checkRow).join('')+'</tbody></table>'
       :'<p class="empty">Not scored yet. Re-analyze this ticker to fetch its headlines.</p>')+
-    '<h3 style="margin-top:22px">6 · Wall Street Signals: What else hedge funds watch</h3>'+
+    '<h3 style="margin-top:22px">7 · Wall Street Signals: What else hedge funds watch</h3>'+
     '<p class="muted" style="margin-bottom:6px">Informational only. Doesn\'t affect the BUY call. Sell-side analyst opinion and volume can be noisy or lag the real story; treat these as one more data point, not a signal on their own.</p>'+
     (sc.wallStreet&&sc.wallStreet.length?
       '<table style="margin-top:10px"><thead><tr><th>Check</th><th>Target</th><th>Actual</th><th>Result</th><th>Note</th></tr></thead><tbody>'+
       sc.wallStreet.map(checkRow).join('')+'</tbody></table>'
       :'<p class="empty">Not available. Try re-analyzing to fetch it.</p>')+
-    '<h3 style="margin-top:22px">7 · Dividend Income</h3>'+
+    '<h3 style="margin-top:22px">8 · Dividend Income</h3>'+
     (sc.dividend?
       '<p class="muted" style="margin-bottom:6px">Informational only. Doesn\'t affect the BUY call.</p>'+
       '<div class="grid grid-3" style="margin-bottom:10px">'+
@@ -12224,6 +12354,9 @@ function renderAll(){
   });
   /* Written from the same arrays the table is built from, rather than recomputed, so the number
      cannot drift away from the rows on screen. */
+  /* The two column headers a beginner meets first. Set here rather than written into the markup,
+     because the level can change without a reload. */
+  try{ const vh=document.getElementById('pfThVerdict'); if(vh){ const x=word('verdict'); vh.textContent=x.show.charAt(0).toUpperCase()+x.show.slice(1); vh.title=x.tip; } }catch(e){}
   const pfHidden=D.holdings.length-filteredHoldings.length;
   const pfNoteEl=document.getElementById('pfHiddenNote'), pfHidEl=document.getElementById('pfHiddenCount');
   if(pfNoteEl&&pfHidEl){
@@ -12859,76 +12992,15 @@ function fcGainLoss(){
     '<span class="muted">Now worth '+fmt$(s*n)+' · cost basis '+fmt$(s*c)+'</span>');
 }
 
-/* ================= COPY BETWEEN ACCOUNTS =================
-   Writes straight into the target profile's stored data rather than swapping USER/D, so the account
-   you're sitting in is never disturbed. If the target happens to be the account currently loaded in
-   memory, D is refreshed too — otherwise the in-memory copy would overwrite the change on next save. */
-function populateCopyTargets(){
-  const sel=document.getElementById('copyTarget');
-  if(!sel)return;
-  const prev=sel.value;
-  const targets=Object.keys(DB.profiles).filter(e=>e!==USER);
-  if(!targets.length){
-    sel.innerHTML='<option value="">No other accounts on this browser</option>';
-    return;
-  }
-  sel.innerHTML=targets.map(e=>{
-    const p=DB.profiles[e];
-    return '<option value="'+esc(e)+'">'+esc(e)+'</option>';
-  }).join('');
-  if(targets.includes(prev))sel.value=prev;
-}
-function copyToAccount(){
-  const sel=document.getElementById('copyTarget');
-  const email=sel?sel.value:'';
-  if(!email||!DB.profiles[email])return toast('Pick an account to copy into first.');
-  const what=document.getElementById('copyWhat').value;
-  const mode=document.getElementById('copyMode').value;
-  const target=DB.profiles[email];
-  const label=email;
-  if(!target.data)target.data=defaultData();
-  const td=target.data;
-  if(!Array.isArray(td.holdings))td.holdings=[];
-  if(!Array.isArray(td.watchlist))td.watchlist=[];
+/* COPY BETWEEN ACCOUNTS WAS REMOVED ON 2026-10-06, on the owner's instruction: not needed.
 
-  const doHoldings=what==='both'||what==='holdings';
-  const doWatch=what==='both'||what==='watchlist';
-  if(doHoldings&&!D.holdings.length&&!doWatch)return toast('You have no holdings to copy.');
-  if(doWatch&&!D.watchlist.length&&!doHoldings)return toast('Your watchlist is empty.');
+   It copied one profile's holdings and watchlist into another profile on the same browser, with a
+   Replace mode that erased the target's positions. It was built for the multi-account world that
+   went away when the business terminal was deleted on 2026-09-27, and what it mainly was by the
+   end was a button that could wipe somebody's book with two dropdowns and one confirm.
 
-  if(mode==='replace'){
-    const parts=[];
-    if(doHoldings)parts.push(td.holdings.length+' holding'+(td.holdings.length===1?'':'s'));
-    if(doWatch)parts.push(td.watchlist.length+' watchlist ticker'+(td.watchlist.length===1?'':'s'));
-    if(!confirm('Replace '+label+'\'s '+parts.join(' and ')+' with yours? This erases what they currently have and cannot be undone.'))return;
-  }
-
-  let addedH=0,skippedH=0,addedW=0;
-  if(doHoldings){
-    if(mode==='replace')td.holdings=[];
-    D.holdings.forEach(h=>{
-      const existing=td.holdings.find(x=>x.sym===h.sym&&x.type===h.type);
-      if(existing){skippedH++;return;} // merge never silently rewrites someone's cost basis
-      // Structured clone so the two accounts never share an object reference.
-      td.holdings.push({sym:h.sym,type:h.type,shares:h.shares,cost:h.cost,broker:h.broker,
-        price:h.price??null,manualPrice:!!h.manualPrice,priceDate:h.priceDate??null,autoFailed:false});
-      addedH++;
-    });
-  }
-  if(doWatch){
-    if(mode==='replace')td.watchlist=[];
-    D.watchlist.forEach(s=>{if(!td.watchlist.includes(s)){td.watchlist.push(s);addedW++;}});
-  }
-
-  persistDB();
-  if(email===USER)D=Object.assign(defaultData(),td);
-  renderAll();
-  const bits=[];
-  if(doHoldings)bits.push(addedH+' holding'+(addedH===1?'':'s')+(skippedH?' ('+skippedH+' already there, left alone)':''));
-  if(doWatch)bits.push(addedW+' watchlist ticker'+(addedW===1?'':'s'));
-  toast('Copied to '+label+': '+bits.join(', ')+'. Their prices refresh next time that account runs Refresh data.');
-}
-
+   Nothing replaces it. Moving a book between devices is what the access code already does, and it
+   does it without a destructive mode. */
 /* ================= SETTINGS ================= */
 /* adv picks which of the two inputs was used — the always-visible one, or the override that only
    appears when the worker is already supplying data. */
@@ -13976,7 +14048,7 @@ function reviewSinceTs(sym){
 }
 /* The state of everything the digest compares against, taken when a review closes. */
 async function reviewSnapshot(sym){
-  const snap={at:Date.now(),price:null,verdict:null,checks:null,rec:null,insiders:null,filings:null,kronos:null};
+  const snap={at:Date.now(),price:null,verdict:null,checks:null,rec:null,insiders:null,filings:null};
   try{ const sc=D.analyses&&D.analyses[sym]; if(sc&&!sc.error){ snap.price=sc.price; snap.checks=checkBitmap(sc); } }catch(e){}
   try{ const last=(D.calls||[]).filter(c=>c.sym===sym&&(c.track||'checklist')==='checklist'&&c.conviction!=='flickering').pop(); if(last)snap.verdict=last.verdict; }catch(e){}
   if(hasMarketData()){
@@ -13985,7 +14057,6 @@ async function reviewSnapshot(sym){
   }
   try{ const r=await fetch(INVITE_WORKER+'/filings?symbol='+encodeURIComponent(sym)); if(r.ok){ const j=await r.json(); snap.filings=(j.filings||[]).slice(0,1).map(f=>f.accession)[0]||null; } }catch(e){}
   try{ const r=await fetch(INVITE_WORKER+'/holders?symbol='+encodeURIComponent(sym)); if(r.ok){ const j=await r.json(); if(j.latest)snap.holders={period:j.latest.period,filers:j.latest.filers}; } }catch(e){}
-  try{ const code=accessCodeFor(USER); if(code){ const r=await fetch(INVITE_WORKER+'/kronos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,symbol:sym,horizon:30})}); if(r.ok){ const j=await r.json(); snap.kronos={last:j.last,end:j.path[j.path.length-1],asOf:j.asOf}; } } }catch(e){}
   return snap;
 }
 function insiderSummary(ins,sinceTs){
@@ -14039,7 +14110,6 @@ async function reviewDigest(sym){
   /* institutional filers against the count at the last review (A6.2) */
   try{ const r=await fetch(INVITE_WORKER+'/holders?symbol='+encodeURIComponent(sym)); if(r.ok){ const j=await r.json(); if(j.latest){ checked.push('13F filers'); if(snap.holders&&snap.holders.period!==j.latest.period)rows.push(digestRow('13F filers',j.latest.filers.toLocaleString()+' filers for the quarter ended '+j.latest.period+' ('+(j.change>=0?'+':'')+j.change+' on the quarter before)',j.latest.period)); } } }catch(e){}
   /* the model against the path recorded at the last review */
-  try{ const code=accessCodeFor(USER); if(code&&snap.kronos){ const r=await fetch(INVITE_WORKER+'/kronos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,symbol:sym,horizon:30})}); if(r.ok){ const j=await r.json(); checked.push('the model'); const end=j.path[j.path.length-1]; const was=(snap.kronos.end-snap.kronos.last)/snap.kronos.last*100, now=(end-j.last)/j.last*100; if(Math.sign(was)!==Math.sign(now)||Math.abs(now-was)>=5)rows.push(digestRow('Model','30-day median now '+(now>=0?'+':'')+now.toFixed(1)+'% (was '+(was>=0?'+':'')+was.toFixed(1)+'% on '+snap.kronos.asOf+')',j.asOf)); } } }catch(e){}
   return{rows,checked,sinceDay};
 }
 async function fillDigestInto(sym,tbody){
@@ -14302,6 +14372,7 @@ function fillPolicyInputs(){
   set('polRisk',p.risk);set('polMaxPos',p.maxPosition);set('polCash',p.cashTarget);set('polExclusions',p.exclusions);
   set('polRiskPerTrade',p.riskPerTrade);
   try{ fillLevelInput(); }catch(e){}
+  try{ const g=document.getElementById('glossaryBody'); if(g)g.innerHTML=glossaryHtml(); }catch(e){}
 }
 function savePolicy(){
   const num=(id,d)=>{const v=parseFloat((document.getElementById(id)||{}).value);return isFinite(v)?v:d;};
@@ -18035,7 +18106,7 @@ function horizonEvidenceHTML(){
 function trackComparison(winRaw){
   /* A8.3. The model rides in the same table as the rulebook: same tickers, same marks, same
      interval. Grading it beside the checklist is the whole reason it was let in. */
-  const rows=['checklist','herizen','gated','kronos'].map(t=>({t,s:trackStats(t,winRaw)}));
+  const rows=['checklist','herizen','gated'].map(t=>({t,s:trackStats(t,winRaw)}));
   const any=rows.filter(r=>r.s);
   if(any.length<2)return '';   // nothing to compare against yet
   const best=any.slice().sort((a,b)=>b.s.expectancy-a.s.expectancy)[0];
@@ -18851,7 +18922,6 @@ async function companySheetHTML(sym,sc){
   }
   jobs.push(fetch(INVITE_WORKER+'/edgar?symbol='+encodeURIComponent(sym)).then(r=>r.ok?r.json():null).then(x=>edgar=x).catch(()=>{}));
   const code=accessCodeFor(USER);
-  if(code)jobs.push(fetch(INVITE_WORKER+'/kronos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,symbol:sym,horizon:30})}).then(r=>r.ok?r.json():null).then(x=>kro=x).catch(()=>{}));
   await Promise.all(jobs);
   const isHolding=(D.holdings||[]).some(h=>h.sym===sym&&h.type==='Stock');
   const v=verdictOf(sc,isHolding,sym);
@@ -18893,7 +18963,7 @@ async function companySheetHTML(sym,sc){
   if(th){ h+='<h2>The thesis · written '+esc2(th.created)+(th.reviewedAt?', last reviewed '+dt(th.reviewedAt):', never reviewed')+'</h2><table><tbody>'+(th.why?'<tr><th>Why</th><td>'+esc2(th.why)+'</td></tr>':'')+(th.assumptions&&th.assumptions.length?'<tr><th>Assumptions</th><td>'+th.assumptions.map(a=>a.n+'. '+esc2(a.text)).join('<br>')+'</td></tr>':'')+(th.invalidIf?'<tr><th>Sell if</th><td>'+esc2(th.invalidIf)+'</td></tr>':'')+'<tr><th>Stop · target · deadline</th><td>'+(th.stop?fmt$(th.stop):'-')+' · '+(th.target?fmt$(th.target):'-')+' · '+esc2(th.deadline||'-')+'</td></tr></tbody></table>'; }
   const calls=(D.calls||[]).filter(c=>c.sym===sym&&c.conviction!=='flickering');
   if(calls.length){ h+='<h2>This account\'s record on '+esc2(sym)+'</h2><table><thead><tr><th>Date</th><th>Call</th><th>Price</th>'+CALL_HORIZONS.map(hz=>'<th>'+hz+' d</th>').join('')+'</tr></thead><tbody>'+calls.slice(-20).map(c=>'<tr><td>'+esc2(c.date)+'</td><td>'+esc2(c.label||c.verdict)+'</td><td>'+(c.price?fmt$(c.price):'-')+'</td>'+CALL_HORIZONS.map(hz=>{ const m=(c.marks||{})[hz]; if(!m)return '<td class="na">awaiting</td>'; if(m.missed)return '<td class="na">missed</td>'; const sr=(m.price-c.price)/c.price*100, pr=(m.spy-c.spy)/c.spy*100; return '<td>'+((sr-pr)>=0?'+':'')+(sr-pr).toFixed(1)+' vs index</td>'; }).join('')+'</tr>').join('')+'</tbody></table>'; }
-  h+='<p class="m">Source line: checks from Finnhub metrics under your bars; statements SEC EDGAR; insiders and analyst counts Finnhub; headlines Finnhub company news; the model Kronos through the worker. These are checks against bars you set, not a recommendation. Research software, not advice.</p>';
+  h+='<p class="m">Source line: checks from Finnhub metrics under your bars; statements SEC EDGAR; insiders and analyst counts Finnhub; headlines Finnhub company news. These are checks against bars you set, not a recommendation. Research software, not advice.</p>';
   return h;
 }
 function exportHoldingsCsv(){
@@ -19352,71 +19422,18 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   if(typeof window.updateGreeting==='function'){ var _ug=window.updateGreeting; window.updateGreeting=function(){ var r=_ug.apply(this,arguments); try{ keyNudge(); }catch(e){} return r; }; }
 })();
 </script>
-<script>
-/* Model view (M6). Kronos runs on Modal behind the worker's /kronos; this panel asks for a forecast
-   of the ticker in the Projections search, draws the median path and the 10-90% band, and can
-   record the direction as a call on the kronos track, where it is marked against the index on
-   the same horizon as everything else. A forecast is a model's continuation of a series, and the
-   panel says so; it is never a recommendation. */
-(function(){
-  var HZ=[30,90,180];
-  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||localStorage.getItem('pf_door_code')||''; }catch(e){ return ''; } }
-  function panel(){
-    var host=document.getElementById('tab-projections'); if(!host||document.getElementById('pfModel'))return;
-    var d=document.createElement('div'); d.id='pfModel'; d.className='card'; d.style.marginTop='16px';
-    d.innerHTML='<div class="mv-head">'+
-      '<div><div class="mv-kicker">Model view</div><div class="mv-title">Kronos, a K-line foundation model</div></div>'+
-      '<div class="mv-form"><input id="pfModelSym" placeholder="TICKER" aria-label="Ticker" maxlength="10" autocapitalize="characters" spellcheck="false">'+
-      '<select id="pfModelHz" aria-label="Horizon">'+HZ.map(function(h){return '<option value="'+h+'"'+(h===90?' selected':'')+'>'+h+' days</option>';}).join('')+'</select>'+
-      '<button class="btn" id="pfModelGo">Ask the model</button></div></div>'+
-      '<div id="pfModelOut"><p class="mv-note">A forecast is the model\'s continuation of the price series, drawn as a median path with a 10 to 90 percent band. It is recorded and marked like any other call, and it is not a recommendation.</p></div>';
-    host.insertBefore(d, host.firstChild);
-    document.getElementById('pfModelGo').addEventListener('click', ask);
-    document.getElementById('pfModelSym').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); ask(); } });
-  }
-  function draw(cv,last,path,lo,hi){
-    var dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight; if(!(w>0&&h>0))return;
-    cv.width=w*dpr; cv.height=h*dpr; var g=cv.getContext('2d'); g.scale(dpr,dpr);
-    var all=[last].concat(path,lo,hi), mn=Math.min.apply(null,all), mx=Math.max.apply(null,all), pad=(mx-mn)*.1||1; mn-=pad; mx+=pad;
-    var n=path.length, X=function(i){return 8+(i/n)*(w-16);}, Y=function(v){return h-10-((v-mn)/(mx-mn))*(h-20);};
-    g.fillStyle='rgba(59,130,246,.12)'; g.beginPath(); g.moveTo(X(0),Y(last)); hi.forEach(function(v,i){g.lineTo(X(i+1),Y(v));}); for(var i=lo.length-1;i>=0;i--)g.lineTo(X(i+1),Y(lo[i])); g.closePath(); g.fill();
-    g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=1; g.beginPath(); g.moveTo(0,Y(last)); g.lineTo(w,Y(last)); g.stroke();
-    g.strokeStyle='#3b82f6'; g.lineWidth=1.6; g.beginPath(); g.moveTo(X(0),Y(last)); path.forEach(function(v,i){g.lineTo(X(i+1),Y(v));}); g.stroke();
-  }
-  function ask(){
-    var sym=(document.getElementById('pfModelSym').value||'').trim().toUpperCase(), hz=parseInt(document.getElementById('pfModelHz').value,10), out=document.getElementById('pfModelOut');
-    if(!/^[A-Z.\-]{1,10}$/.test(sym)){ out.innerHTML='<div class="mv-empty"><span class="dot"></span><div><b>Enter a ticker</b><p>A US listing, for example NVDA. The model needs about two years of daily closes, which the worker fetches for you.</p></div></div>'; document.getElementById('pfModelSym').focus(); return; }
-    out.innerHTML='<div class="mv-empty"><span class="dot" style="background:var(--accent);box-shadow:0 0 0 4px rgba(59,130,246,.18)"></span><div><b>Asking the model</b><p>A first answer takes a few seconds while the service wakes.</p></div></div>';
-    var base=(typeof INVITE_WORKER==='string'&&INVITE_WORKER)||'';
-    fetch(base.replace(/\/+$/,'')+'/kronos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),symbol:sym,horizon:hz})})
-      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
-      .then(function(x){
-        var j=x.j;
-        if(!x.ok){
-          out.innerHTML=(j&&j.configured===false)
-            ? '<div class="mv-empty"><span class="dot"></span><div><b>Not connected yet</b></div></div>'
-            : '<div class="mv-empty"><span class="dot"></span><div><b>No answer</b><p>'+esc((j&&j.error&&/access code/.test(j.error))?'This profile has no access code: Settings \u2192 Access code.':((j&&j.error)||'The model did not answer.'))+'</p></div></div>';
-          return;
-        }
-        var end=j.path[j.path.length-1], pct=(end-j.last)/j.last*100, dir=pct>=0?'up':'down';
-        out.innerHTML='<canvas id="pfModelCv" style="width:100%;height:180px;display:block;border-bottom:1px solid var(--border);background:var(--bg)"></canvas>'+
-          '<div class="mv-stats"><span>last <b>'+j.last.toFixed(2)+'</b></span><span>median at '+hz+'d <b class="'+(pct>=0?'pos':'neg')+'">'+end.toFixed(2)+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</b></span><span class="muted">band '+j.lo[j.lo.length-1].toFixed(2)+' to '+j.hi[j.hi.length-1].toFixed(2)+'</span><span class="muted">'+(j.cached?'cached today':'fresh')+'</span></div>'+
-          '<div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-sm" id="pfModelRec" style="white-space:nowrap">Record as a '+hz+'-day '+(dir==='up'?'BUY':'SELL')+' call</button><span class="muted" style="font-size:12px">On the model track, marked against the index on its anniversary like every other call.</span></div>';
-        draw(document.getElementById('pfModelCv'),j.last,j.path,j.lo,j.hi);
-        document.getElementById('pfModelRec').addEventListener('click',function(){
-          try{
-            recordCall(sym,{price:j.last,qScore:null,pScore:null,mScore:null},dir==='up'?'buy':'sell','Kronos '+hz+'d '+(dir==='up'?'up':'down'),'kronos');
-            var c=D.calls&&D.calls[D.calls.length-1]; if(c&&c.sym===sym){ c.source='kronos'; c.horizonDays=hz; c.modelEnd=end; if(typeof saveDB==='function')saveDB(); }
-            this.textContent='Recorded'; this.disabled=true;
-          }catch(e){ this.textContent='Could not record: '+e.message; }
-        });
-      })
-      .catch(function(){ out.innerHTML='<div class="mv-empty"><span class="dot"></span><div><b>No connection</b><p>The worker is not reachable right now. Check your network and try again.</p></div></div>'; });
-  }
-  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='projections')setTimeout(panel,50); return r; }; }
-  document.addEventListener('DOMContentLoaded',function(){ if(document.getElementById('tab-projections')&&!document.getElementById('tab-projections').classList.contains('tabs-hidden'))panel(); });
-})();
-</script>
+<!-- THE KRONOS MODEL VIEW WAS REMOVED ON 2026-10-06, on the owner's instruction.
+
+     It asked a K-line foundation model, running on Modal behind the worker's /kronos, for a
+     continuation of a price series over 30, 90 or 180 days, drew the median path and a 10-90 band,
+     and could record the direction as a call on its own scorecard track.
+
+     What is left behind on purpose: the `kronos` entry in TRACK_NAMES, and the scorecard's ability
+     to read calls already stamped with that track. Removing those would silently delete part of
+     somebody's record, and a terminal whose whole claim is that it keeps score on itself cannot
+     quietly drop the track that did worst or best. No NEW kronos calls can be made, because this
+     was the only thing that made them. -->
+
 <script>
 /* Company, analysts and six lenses, under an analysis. Data via the worker:
    Finnhub's free profile, metrics and recommendation counts, a consensus target, and six short
@@ -20403,7 +20420,6 @@ select{padding-right:20px}
 .mycall{border-bottom-style:dashed;padding:5px 0;max-width:96px}
 #globalSearch{padding-left:24px;font-size:13.5px}
 .hd-search-ico{left:2px}
-#pfModel .mv-form .btn{height:auto}
 
 /* Quiet actions are words. The primary button on a screen stays a solid block of ink. */
 .btn{border-radius:2px;padding:10px 18px}
@@ -20558,7 +20574,7 @@ header{border-bottom-color:var(--line)}
      goes in by heading like every other group, which is the whole point of this design: the two
      cards were written months apart and neither needed touching for this. It sits before Advanced
      because Advanced is the catch-all and matches everything. */
-  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|Rule change log)/i],['Accounts',/^(Copy holdings)/i],['Broker and keys',/^(API keys|Your broker)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
+  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|Rule change log)/i],['Broker and keys',/^(API keys|Your broker)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
   function groupOf(card){ var h=card.querySelector('h3'); var txt=h?h.textContent.trim():''; for(var i=0;i<GROUPS.length;i++)if(GROUPS[i][1].test(txt))return GROUPS[i][0]; return 'Advanced'; }
   function cards(){ var tab=document.getElementById('tab-settings'); return tab?Array.prototype.slice.call(tab.children).filter(function(el){ return el.classList&&(el.classList.contains('card')||el.classList.contains('addwrap')); }):[]; }
   window.showSettings=function(name){

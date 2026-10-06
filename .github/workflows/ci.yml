@@ -1,4 +1,4 @@
-# Every push and pull request: the whole suite, the billing and Kronos contracts, the site build,
+# Every push and pull request: the whole suite, the billing contracts, the site build,
 # an audit, and a secret scan. On main, when a Cloudflare token exists in the repo's secrets, the
 # assembled dist/ deploys to Pages. The Worker deploys separately, by hand, from worker.wrangler.toml.
 name: ci
@@ -16,7 +16,7 @@ jobs:
         with: { node-version: '22', cache: 'npm', cache-dependency-path: site/package-lock.json }
       - name: Static suite
         run: node test/run.mjs
-      - name: Worker contracts (billing, org, kronos) against an in-memory KV
+      - name: Worker contracts (billing, org) against an in-memory KV
         run: node test/billing.mjs
       - name: Site build and audit
         run: |
