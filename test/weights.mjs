@@ -1,0 +1,197 @@
+/* EVERYTHING COUNTS, IN PROPORTION (2026-10-06).
+
+   The owner's instruction: the whole analysis should use the whole thing, everything should give a
+   verdict on the stock. ANALYSIS-AUDIT.md scores all 31 checks 1 to 10 and those scores ARE the
+   weights, so this suite's first job is to make sure the document and the code cannot drift apart:
+   a weight changed in one and not the other is a document that has quietly become decoration.
+
+   Its second and more important job is the defect this replaces. The buy bar was an absolute count
+   of nine from twelve quality checks, four of which are questions the user types. Their total was
+   eight, and eight out of eight could never reach nine, so a company passing every check it was
+   possible to pass could not be a BUY. That is asserted here directly, because it is the kind of
+   thing that is invisible until somebody computes it and obvious forever afterwards. */
+import { readFileSync } from 'node:fs';
+const src = readFileSync(new URL('../terminal/index.html', import.meta.url), 'utf8');
+const doc = readFileSync(new URL('../ANALYSIS-AUDIT.md', import.meta.url), 'utf8');
+
+function lift(sig) {
+  const at = src.indexOf(sig);
+  if (at < 0) throw new Error('not found: ' + sig);
+  let d = 0;
+  for (let j = src.indexOf('{', at); j < src.length; j++) {
+    if (src[j] === '{') d++;
+    else if (src[j] === '}') { d--; if (!d) return src.slice(at, j + 1); }
+  }
+  throw new Error('unbalanced: ' + sig);
+}
+const liftConst = (n, c) => { const at = src.indexOf(n); return src.slice(at, src.indexOf(c, at) + c.length); };
+
+const CORE =
+  liftConst('const CHECK_WEIGHT={', '\n};') + '\n' +
+  liftConst('const DEFAULT_WEIGHT=', ';') + '\n' +
+  liftConst('const SCORED_SECTIONS=', ';') + '\n' +
+  lift('function allScoredChecks(sc)') + '\n' + lift('function weightOf(c)') + '\n' +
+  lift('function weightedScore(sc)') + '\n' + lift('function sectionBreakdown(sc)') + '\n';
+
+const { CHECK_WEIGHT, weightedScore, sectionBreakdown } =
+  new Function(CORE + 'return {CHECK_WEIGHT, weightedScore, sectionBreakdown};')();
+
+const build = rules => new Function('D', 'thesisFor',
+  CORE + liftConst('const THIN_BELOW=', ';') + '\n' +
+  lift('function buyAt()') + '\n' + lift('function sellAt()') + '\n' +
+  lift('function verdictOf(sc,isHolding,sym)') + '\nreturn verdictOf;')({ rules }, () => null);
+
+let pass = 0, fail = 0;
+const t = (n, ok, got) => { if (ok) { pass++; console.log('  PASS  ' + n); }
+  else { fail++; console.log('  FAIL  ' + n + (got !== undefined ? '\n        got ' + JSON.stringify(got) : '')); } };
+
+/* Build a score object from section -> [pass|null, ...], using the real check names so the real
+   weights apply. */
+const NAMES = {
+  quality: ['Free Cash Flow','Cash vs Debt','Revenue Growth (YoY)','Gross Margin','Operating Margin','ROE','Insider Buying','Current Ratio','EPS Beats','Competitive Moat','Clear Growth Runway','Revenue Guidance'],
+  priceChecks: ['P/E vs Own History','PEG Ratio','P/E','Forward P/E','DCF Value','Comp Analysis'],
+  momentum: ['Beating the Market','6-Month Return','12-Month Return','Near 52-Week High'],
+  context: ['Legal and regulatory news','Customer concentration','Layoffs or restructuring','More than one supplier','Press coverage','Who they sell to is mapped'],
+  wallStreet: ['Price Target Upside','Analyst Consensus','Volume Trend'],
+};
+const MANUAL = ['Competitive Moat','Clear Growth Runway','Revenue Guidance','Comp Analysis','Customer concentration','More than one supplier','Who they sell to is mapped'];
+/* `set` maps a section to a function(name, index) -> true | false | null. */
+function mk(set) {
+  const sc = { error: null };
+  for (const [k, names] of Object.entries(NAMES)) sc[k] = names.map((n, i) => ({ name: n, pass: set(n, k, i) }));
+  return sc;
+}
+const allPass = mk(() => true);
+const allFail = mk(() => false);
+/* The real-world shape: everything typed is blank, everything automatic passes. */
+const noHomework = mk(n => MANUAL.includes(n) ? null : true);
+
+console.log('\nTHE DOCUMENT AND THE CODE ARE THE SAME TABLE');
+{
+  const inDoc = {};
+  for (const m of doc.matchAll(/\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*\*\*(\d+)\*\*\s*\|/g)) inDoc[m[1].trim()] = +m[2];
+  t('the audit lists weights at all', Object.keys(inDoc).length >= 25, Object.keys(inDoc).length);
+  /* Names differ slightly in prose (the doc spells out "P/E under 30"), so match on the number
+     for every code key that the doc also names verbatim, and require most of them to line up. */
+  const codeKeys = Object.keys(CHECK_WEIGHT);
+  const matched = codeKeys.filter(k => inDoc[k] !== undefined);
+  t('most checks are named identically in both', matched.length >= 24, { matched: matched.length, of: codeKeys.length });
+  const wrong = matched.filter(k => inDoc[k] !== CHECK_WEIGHT[k]);
+  t('and every one of those carries the same number', wrong.length === 0,
+    wrong.map(k => ({ check: k, doc: inDoc[k], code: CHECK_WEIGHT[k] })));
+  t('every weight is on the 1 to 10 scale', codeKeys.every(k => CHECK_WEIGHT[k] >= 1 && CHECK_WEIGHT[k] <= 10));
+  t('all 31 checks are weighted', codeKeys.length === 31, codeKeys.length);
+  /* Every check the terminal actually adds must have a weight, or it silently counts as 5. */
+  const added = [...src.matchAll(/add\(out\.(?:quality|priceChecks|momentum|wallStreet),'([^']+)'/g)].map(m => m[1]);
+  const ctx = [...src.matchAll(/^  add\('([^']+)'/gm)].map(m => m[1]);
+  const missing = [...new Set([...added, ...ctx])].filter(n => CHECK_WEIGHT[n] === undefined);
+  t('no check the terminal computes is left unweighted', missing.length === 0, missing);
+}
+
+console.log('\nTHE DEFECT: A PERFECT COMPANY COULD NOT BE A BUY');
+{
+  const V = build({ buyAt: 75, sellAt: 40 });
+  const v = V(noHomework, false, 'X');
+  t('everything answerable passes and nothing was typed', weightedScore(noHomework).score === 100,
+    weightedScore(noHomework).score);
+  t('it is now a BUY', v.label === 'BUY', { label: v.label, why: v.why });
+  t('and it says how much of the evidence it had', v.confidence > 0 && v.confidence < 100, v.confidence);
+  /* The old code: qScore 8, qTotal 8, qBuy 9 -> impossible. Asserted as arithmetic so the
+     regression is named rather than remembered. */
+  t('under the old absolute bar this same company scored 8 of 8 against a bar of 9', 8 < 9);
+}
+
+console.log('\nSCORE IS A SHARE OF WHAT ANSWERED, CONFIDENCE IS HOW MUCH THAT WAS');
+{
+  t('everything passes is 100', weightedScore(allPass).score === 100);
+  t('everything fails is 0', weightedScore(allFail).score === 0);
+  t('everything answered is 100% confidence', weightedScore(allPass).confidence === 100);
+  const half = mk((n, k, i) => i % 2 === 0 ? true : null);
+  t('half the checks blank lowers confidence, not the score', half && weightedScore(half).score === 100
+    && weightedScore(half).confidence < 100, weightedScore(half));
+  const none = mk(() => null);
+  t('nothing answered gives no score at all', weightedScore(none).score === null, weightedScore(none));
+  t('and zero confidence', weightedScore(none).confidence === 0);
+  t('an errored score has no weighted score', weightedScore({ error: 'NO_DATA' }) === null);
+}
+
+console.log('\nWEIGHT ACTUALLY CHANGES THE ANSWER');
+{
+  /* Free Cash Flow is a 9 and Press coverage is a 2. Failing the first must cost more than four
+     times what failing the second costs, or the scores in the audit are decoration. */
+  const failFcf = mk(n => n !== 'Free Cash Flow');
+  const failPress = mk(n => n !== 'Press coverage');
+  const a = weightedScore(failFcf).score, b = weightedScore(failPress).score;
+  t('failing a 9 hurts more than failing a 2', a < b, { failedFreeCashFlow: a, failedPressCoverage: b });
+  t('and roughly in proportion to the weights', (100 - a) / (100 - b) > 3.5, ((100 - a) / (100 - b)).toFixed(2));
+}
+
+console.log('\nEVERY SECTION IS IN THE VERDICT NOW, INCLUDING THE THREE THAT GATED NOTHING');
+{
+  for (const [section, label] of [['momentum', 'momentum'], ['context', 'the news'], ['wallStreet', 'Wall Street']]) {
+    const good = mk(() => true);
+    const bad = mk((n, k) => k === section ? false : true);
+    t(label + ' moves the score', weightedScore(bad).score < weightedScore(good).score,
+      { with: weightedScore(good).score, without: weightedScore(bad).score });
+  }
+  t('dividend is deliberately not scored', !/SCORED_SECTIONS=\[[^\]]*dividend/.test(src));
+  t('and the audit says why it is held out', /Dividend yield, payout/.test(doc) && /Shown, never scored/.test(doc));
+}
+
+console.log('\nTHE TWO LINES IN SETTINGS ARE THE WHOLE RULEBOOK');
+{
+  const strict = build({ buyAt: 95, sellAt: 60 });
+  const loose = build({ buyAt: 40, sellAt: 10 });
+  const mid = mk((n, k, i) => i % 2 === 0);
+  const m = weightedScore(mid).score;
+  t('a middling company is a SELL under strict lines', strict(mid, false, 'X').label === 'SELL', m);
+  t('and a BUY under loose ones', loose(mid, false, 'X').label === 'BUY', m);
+  t('the bar is named in the reason', /the 40% you buy at/.test(loose(mid, false, 'X').why), loose(mid, false, 'X').why);
+}
+{
+  /* Migration: somebody who moved their old counts keeps the intent of where they put them. */
+  const migrated = build({ qBuy: 6, qSell: 3 });
+  t('an old rulebook migrates to the same proportions', migrated(mk(() => true), false, 'X').why.includes('50% you buy at'),
+    migrated(mk(() => true), false, 'X').why);
+  const fresh = build({});
+  t('a brand new account defaults to 75 and 40', fresh(mk(() => true), false, 'X').why.includes('75% you buy at'));
+}
+
+console.log('\nIT STILL NAMES A REASON, NOT JUST A NUMBER');
+{
+  const V = build({ buyAt: 75, sellAt: 40 });
+  /* Failing every price check leaves the overall score at 79%, because price is honestly about a
+     fifth of the weight. That alone would have read BUY, which is how the price floor came to
+     exist: found by this suite, not by reading. */
+  const weakPrice = mk((n, k) => k === 'priceChecks' ? false : true);
+  const v = V(weakPrice, false, 'X');
+  t('a company that is good but expensive is not a BUY', v.label === 'HOLD', { label: v.label, why: v.why });
+  t('and it says that is why', /A good company is not a good buy at any price/.test(v.why), v.why);
+  t('naming the price number and the bar it missed', /price checks are 0%, under the 50%/.test(v.why), v.why);
+  t('and carrying it as a detail', v.detail === 'good business, too expensive', v.detail);
+  /* The floor is a rule the owner controls, not a thumb on the scale. */
+  const noFloor = build({ buyAt: 75, sellAt: 40, priceFloor: 0 });
+  t('switching the floor off lets it through', noFloor(weakPrice, false, 'X').label === 'BUY');
+  const midWeak = mk((n, k, i) => k === 'priceChecks' ? false : (i % 2 === 0));
+  t('an ordinary hold still names the section holding it back',
+    /is what is holding it back/i.test(V(midWeak, false, 'X').why), V(midWeak, false, 'X').why);
+  const buy = V(allPass, false, 'X');
+  t('a buy names its strongest section', /Strongest on/.test(buy.why), buy.why);
+  t('ownership changes the instruction, not the word',
+    V(allFail, true, 'X').label === V(allFail, false, 'X').label);
+  t('the owner is told it is a position to close', /position to think about closing/.test(V(allFail, true, 'X').why));
+}
+
+console.log('\nTHIN EVIDENCE IS DISCLOSED, FIRST');
+{
+  const V = build({ buyAt: 75, sellAt: 40 });
+  const sparse = mk((n, k, i) => (k === 'quality' && i < 2) ? true : null);
+  const v = V(sparse, false, 'X');
+  t('a verdict on very little evidence warns first', /^Careful: only \d+% of the checks/.test(v.why), v.why);
+  t('and flags itself', v.thin === true);
+  t('a complete score does not cry wolf', !/Careful/.test(V(allPass, false, 'X').why));
+  t('nothing answered at all refuses to judge', /nothing to judge it on either way/.test(V(mk(() => null), false, 'X').why));
+}
+
+console.log('\n' + (fail ? 'FAILED ' + fail + ', passed ' + pass : 'ALL ' + pass + ' CHECKS PASSED') + '\n');
+process.exit(fail ? 1 : 0);

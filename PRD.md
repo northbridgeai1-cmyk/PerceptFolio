@@ -518,6 +518,36 @@ record arrive. Done and decided:
   comparable on quality, price and momentum. What is not comparable across the boundary is the
   *label*: a pre-v1.1 call stamped WATCH has no v1.1 equivalent, and the scorecard must keep
   reading those as their own thing rather than folding them into HOLD.
+- **Scorecard v2.0, 2026-10-06. A major number, because the verdict changed kind.** v1.1 added
+  checks. This changes how any of them count, so calls either side of it are not comparable at all
+  and the version is bumped accordingly.
+  - **The defect.** The buy bar was an absolute count, nine of twelve quality checks. Four of the
+    twelve are questions the user types an answer to, so a user who does not answer them has a
+    total of eight, and **eight out of eight could never reach nine**. A company passing every check
+    it was possible to pass could not be a BUY. On a free Finnhub plan, where most price checks also
+    return nothing, no company could ever be a BUY. Verified by running verdictOf, not by reading.
+  - **The fix.** Score is now the share of check WEIGHT that passed, out of the weight that
+    answered; confidence is how much of the total weight answered. A check that could not answer
+    lowers confidence instead of counting as a failure, which was also the fault behind the INTC
+    sell on the 2026-10-04 walkthrough. Both are percentages, so adding or reweighting a check never
+    silently moves anybody's rulebook.
+  - **Everything counts now.** Momentum, the news-and-supply-chain section and the three Wall Street
+    rows gated nothing before: three sections of real work decided nothing. All 31 checks carry a
+    1-to-10 weight, published with its reasoning in **ANALYSIS-AUDIT.md**, and `test/weights.mjs`
+    fails if that document and `CHECK_WEIGHT` disagree.
+  - **One rule that is not a weight.** Price is honestly about a fifth of the total weight, so a
+    company could fail every price check and still score 79% and read BUY. A good business at any
+    price is the oldest mistake there is, so a BUY also requires the price section at or above 50%,
+    settable in Settings and 0 to switch off. Found by the suite, not by reading.
+  - **Not in the verdict, deliberately:** dividend, VaR/ES/GARCH, Monte Carlo and the stock
+    projection, beta/volatility/liquidity, concentration, the supply-chain map's own screens, World,
+    Seasonal, Cycle, Hindsight, Counterfactual and fear-and-greed. ANALYSIS-AUDIT.md gives the
+    reason for each; the short version is that none of them is evidence about whether this company
+    is worth owning today, and several would be circular if fed back in.
+  - **The policy fingerprint changed shape** from four counts to three percentages, so every call
+    recorded after this carries a different policy hash and cannot pool with the old ones. That is
+    intended: they were made by a different system.
+
 - **The data licence.** Finnhub's terms make every plan personal and forbid redistribution or
   business use without written approval. The worker's Finnhub key therefore serves only the
   operator's own devices (the `/finnhub` proxy behind the sync key, the operator's calendar). What

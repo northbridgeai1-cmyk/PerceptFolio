@@ -2649,21 +2649,20 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   </div>
   <div class="card" style="margin-top:16px">
     <h3>Buy / Sell Rules</h3>
-    <!-- WHAT COUNTS AS A BUY, A HOLD AND A SELL (2026-10-06). These four numbers were already here
-         and were already the whole definition; what was missing was anyone saying so. The verdict
-         is now three words and nothing but these decides which one a company gets, so they are
-         introduced as the thing they are rather than as four unrelated minimums. -->
+    <!-- WHAT COUNTS AS A BUY, A HOLD AND A SELL. Four absolute counts until 2026-10-06, when they
+         became three percentages: the counts made a BUY unreachable for anyone who did not type
+         the four manual answers, because eight out of eight could never clear a bar of nine. See
+         ANALYSIS-AUDIT.md. -->
     <div class="muted" style="font-size:13px;line-height:1.6;margin-bottom:12px">
-      These four numbers <b>are</b> the verdict. A company clearing the buy lines says BUY, one at or
-      under the sell line says SELL, everything else says HOLD. Nothing else decides it, and the same
-      answer is given whether or not you own the company.
+      These numbers <b>are</b> the verdict. Every check the terminal runs counts toward one score,
+      each in proportion to how much it is worth; the full table is in ANALYSIS-AUDIT.md. A company
+      at or above the buy line says BUY, at or under the sell line says SELL, anything between says
+      HOLD. The same answer whether or not you own it.
     </div>
     <div class="grid grid-2">
-      <div class="field"><label>Min quality checks passed to be a BUY candidate (of 12)</label><input id="setQBuy" type="number" min="1" max="12"></div>
-      <div class="field"><label>Min price checks passed to be a BUY candidate (of 6)</label><input id="setPBuy" type="number" min="1" max="6"></div>
-      <div class="field"><label>Min momentum checks passed to be a BUY candidate (of 4, 0 = don't require it)</label><input id="setMBuy" type="number" min="0" max="4"></div>
-      <div class="field"><label>Min context checks passed to be a BUY (of 6, 0 = don't require it)<br><span class="muted" style="font-size:11.5px">News and who they trade with. Counted, never interpreted.</span></label><input id="setCBuy" type="number" min="0" max="6" value="0"></div>
-      <div class="field"><label>Quality score at/below which anything flags SELL</label><input id="setQSell" type="number" min="0" max="12"></div>
+      <div class="field"><label>Buy at or above (%)<br><span class="muted" style="font-size:11.5px">Share of everything that could be checked.</span></label><input id="setBuyAt" type="number" min="1" max="100"></div>
+      <div class="field"><label>Sell at or below (%)</label><input id="setSellAt" type="number" min="0" max="99"></div>
+      <div class="field"><label>A buy also needs the price checks at least (%)<br><span class="muted" style="font-size:11.5px">0 switches it off. A good company is not a good buy at any price.</span></label><input id="setPriceFloor" type="number" min="0" max="100"></div>
       <div class="field"><label>Auto-refresh on page load</label><select id="setAutoRefresh"><option value="yes">Yes</option><option value="no">No</option></select></div>
     </div>
     <button class="btn" onclick="saveRules()">Save Rules</button>
@@ -3324,7 +3323,7 @@ function defaultData(){return{apiKey:'',cash:0,holdings:[],watchlist:[],favorite
   theses:{},                                    // ticker -> {why,mustBeTrue,invalidIf,reviewDate,created,scoreAtEntry}
   policy:{maxPosition:10,cashTarget:3,risk:'moderate',exclusions:'',riskPerTrade:2},
   ruleChanges:[],                               // every change to the buy/sell rules, pre-registered
-  rules:{qBuy:9,pBuy:4,qSell:6,mBuy:0,cBuy:0,autoRefresh:'yes'},lastRefresh:0};}
+  rules:{buyAt:75,sellAt:40,priceFloor:50,autoRefresh:'yes'},lastRefresh:0};}
 /* Your own manual call per ticker (Buy/Hold/Sell/Watching) — independent of the app's computed verdict above.
    Defensive lazy-init so profiles saved before this feature still work. */
 const MY_TAG_OPTS=[['','-'],['buy','Buy'],['hold','Hold'],['sell','Sell'],['watching','Watching']];
@@ -4251,11 +4250,9 @@ function enterSession(){
   loadEarnings().then(j=>{ if(j&&typeof renderAll==='function')renderAll(); });
   refreshMarketDataCard();
   document.getElementById('cashInput').value=D.cash||'';
-  document.getElementById('setQBuy').value=D.rules.qBuy;
-  document.getElementById('setPBuy').value=D.rules.pBuy;
-  document.getElementById('setMBuy').value=D.rules.mBuy||0;
-  document.getElementById('setCBuy').value=D.rules.cBuy||0;
-  document.getElementById('setQSell').value=D.rules.qSell;
+  document.getElementById('setBuyAt').value=buyAt();
+  document.getElementById('setSellAt').value=sellAt();
+  document.getElementById('setPriceFloor').value=Number.isFinite(D.rules.priceFloor)?D.rules.priceFloor:50;
   document.getElementById('setAutoRefresh').value=D.rules.autoRefresh;
   applyTheme();
   fillPolicyInputs();
@@ -5342,9 +5339,11 @@ async function scoreStock(sym){
      precisely the bug that made INTC look like a sell on the walkthrough.
 
      WHETHER THIS GATES A BUY IS THE OWNER'S CHOICE, NOT MINE. It is counted and shown always, and
-     it only constrains the verdict if cBuy is raised above 0 in Settings, which is exactly how the
-     momentum gate has always worked. Switching it on by default would move every existing user's
-     verdicts overnight on the strength of news counts, without them asking. */
+     it counted toward the verdict only if a separate threshold was raised above 0 in Settings,
+     which meant it was computed, displayed and ignored. That threshold is gone: since 2026-10-06
+     these six count like every other check, weighted by what each is worth, because the owner's
+     instruction was that the whole analysis uses the whole thing. The weights and the reasoning
+     for them are in ANALYSIS-AUDIT.md. */
   let newsItems=null;
   /* One extra request per ticker, and the screener already runs close to Finnhub's minute limit, so
      a bulk scan reads the cache and never fetches. During a scan these three come back null, which
@@ -5409,6 +5408,103 @@ async function scoreStock(sym){
   return out;
 }
 
+/* ================= EVERY CHECK COUNTS, IN PROPORTION (2026-10-06) =================
+
+   The owner's instruction: the whole analysis should use the whole thing, everything should give a
+   verdict on the stock.
+
+   THE DEFECT THIS REPLACES, measured rather than suspected. The buy bar was an absolute count:
+   nine of twelve quality checks. Four of those twelve are questions the user types an answer to,
+   and most people never will, so their quality total is eight. Eight out of eight, a company
+   passing every check it is possible to pass, could never reach nine. A free-plan user could not
+   see a BUY at all, on any company, ever.
+
+   The bar was not the problem. Counting was. A check that could not answer was being treated as a
+   check the company failed, which is also what made INTC look like a sell on the 2026-10-04 walk.
+
+   SO: score is a share of the weight that ANSWERED, and confidence is how much of the total weight
+   that was.
+
+       score      = weight that passed   / weight that answered
+       confidence = weight that answered / weight of everything
+
+   Two consequences worth stating. A missing check now lowers confidence instead of faking a
+   failure, which is the honest treatment. And because both numbers are percentages, a check can be
+   added or reweighted without silently moving anybody's rulebook, which is what made it possible to
+   bring momentum, the news and the Wall Street rows into the verdict at all: they used to gate
+   nothing, so three sections of real work sat on the page deciding nothing.
+
+   THE WEIGHTS ARE THE AUDIT. Each number is the 1-to-10 score in ANALYSIS-AUDIT.md, with the
+   reasoning for it written out there rather than here. test/weights.mjs fails if the two disagree,
+   so the document cannot rot into decoration. */
+const CHECK_WEIGHT={
+  /* Quality: is the business any good */
+  'Free Cash Flow':9, 'Cash vs Debt':8, 'Revenue Growth (YoY)':8, 'Gross Margin':7,
+  'Operating Margin':7, 'ROE':7, 'Insider Buying':6, 'Current Ratio':5, 'EPS Beats':4,
+  'Competitive Moat':4, 'Clear Growth Runway':3, 'Revenue Guidance':3,
+  /* Price: are you paying too much */
+  'P/E vs Own History':8, 'PEG Ratio':7, 'P/E':6, 'Forward P/E':6, 'DCF Value':5, 'Comp Analysis':3,
+  /* Momentum: is the market agreeing yet */
+  'Beating the Market':7, '6-Month Return':6, '12-Month Return':6, 'Near 52-Week High':5,
+  /* The news and who they trade with */
+  'Legal and regulatory news':7, 'Customer concentration':6, 'Layoffs or restructuring':5,
+  'More than one supplier':4, 'Press coverage':2, 'Who they sell to is mapped':2,
+  /* Wall Street: what everyone else thinks. They used to gate nothing at all; now they count, at
+     the bottom of the scale, which is present in the verdict and unable to decide it. */
+  'Price Target Upside':4, 'Analyst Consensus':3, 'Volume Trend':3,
+};
+/* An unlisted check counts as a 5 rather than as a zero or a crash: a new check somebody adds and
+   forgets to weight is averagely important, not invisible. test/weights.mjs catches the omission. */
+const DEFAULT_WEIGHT=5;
+/* The five sections that judge the COMPANY. Dividend is deliberately not here: how a company
+   returns cash is a fact about it, not evidence that it is good. ANALYSIS-AUDIT.md lists
+   everything else held out of the verdict and why. */
+const SCORED_SECTIONS=['quality','priceChecks','momentum','context','wallStreet'];
+function allScoredChecks(sc){
+  const out=[];
+  for(const k of SCORED_SECTIONS){ const arr=sc&&sc[k]; if(Array.isArray(arr))out.push(...arr); }
+  return out;
+}
+function weightOf(c){
+  return Object.prototype.hasOwnProperty.call(CHECK_WEIGHT,c.name)?CHECK_WEIGHT[c.name]:DEFAULT_WEIGHT;
+}
+/* The whole verdict, from everything that answered. */
+function weightedScore(sc){
+  if(!sc||sc.error)return null;
+  let passed=0, answered=0, missing=0;
+  for(const c of allScoredChecks(sc)){
+    const w=weightOf(c);
+    if(c.pass===null||c.pass===undefined){ missing+=w; continue; }
+    answered+=w;
+    if(c.pass===true)passed+=w;
+  }
+  const total=answered+missing;
+  if(!answered)return {score:null,confidence:0,passed:0,answered:0,missing,total};
+  return {
+    score:Math.round(passed/answered*100),
+    confidence:total?Math.round(answered/total*100):0,
+    passed,answered,missing,total,
+  };
+}
+/* Which sections drove it. The reason line names the weakest one, because "62%" is a number and
+   "the price is what is holding it back" is a reason. */
+function sectionBreakdown(sc){
+  const names={quality:'the business',priceChecks:'the price',momentum:'momentum',
+               context:'the news and supply chain',wallStreet:'Wall Street'};
+  const out=[];
+  for(const k of SCORED_SECTIONS){
+    const arr=(sc&&sc[k])||[]; if(!Array.isArray(arr)||!arr.length)continue;
+    let passed=0,answered=0,missing=0;
+    for(const c of arr){
+      const w=weightOf(c);
+      if(c.pass===null||c.pass===undefined){missing+=w;continue;}
+      answered+=w; if(c.pass===true)passed+=w;
+    }
+    out.push({key:k,name:names[k],score:answered?Math.round(passed/answered*100):null,weight:answered,missing});
+  }
+  return out;
+}
+
 /* Total criteria passed across all three checks. Shown beside the verdict so the call always carries
    its evidence — "BUY 19/22" is auditable in a way "AI says buy" never is, and if this system ever
    has to justify a decision after the fact, the number is the justification. */
@@ -5422,121 +5518,111 @@ function scoreTotal(sc){
    checked BEFORE the global rule — a condition you set deliberately for one company should outrank
    the blanket setting, and it's the mechanism that makes a written thesis do work rather than sit
    in a text box. */
-/* HOW MANY CHECKS EACH SECTION HAS WHEN EVERYTHING ANSWERS. A score is a fraction of the checks
+/* SUPERSEDED ON 2026-10-06 by weightedScore's `confidence`, which answers the same question across
+   every section at once and in the units the verdict is actually decided in. Removed rather than
+   left: a second, narrower measure of the same thing is how two numbers end up disagreeing on one
+   screen. The original note explaining the problem it solved:
+
+   HOW MANY CHECKS EACH SECTION HAS WHEN EVERYTHING ANSWERS. A score is a fraction of the checks
    that HAD data, so 0/6 and 0/6-of-which-5-were-blank are the same number and mean nothing like
    the same thing. A walkthrough on 2026-10-04 hit exactly that: INTC, up 165%, flagged "Consider
    SELLING" off "Price 0/6 (1 had data)", with five rows reading "Not available on your Finnhub
    plan". Missing data was quietly counted as a failure and no screen said so. These constants are
    what makes it sayable. */
-const CHECK_COUNTS={quality:12,price:6,momentum:4};
+
 /* The sentence naming thin data, or '' when the score is complete. It is deliberately the first
    thing appended to a reason, because if the evidence is thin that is the most important fact
    about the verdict and not a footnote to it. */
-function thinNote(sc){
-  if(!sc||sc.error)return '';
-  const gaps=[];
-  const q=CHECK_COUNTS.quality-(sc.qTotal||0), pr=CHECK_COUNTS.price-(sc.pTotal||0);
-  if(q>0)gaps.push(q+' of '+CHECK_COUNTS.quality+' quality');
-  if(pr>0)gaps.push(pr+' of '+CHECK_COUNTS.price+' price');
-  if(!gaps.length)return '';
-  return 'Careful: '+gaps.join(' and ')+' checks had no data, so they could not pass. That alone can produce this answer.';
-}
 /* Whether missing data, on its own, could have decided a sell. If the checks that never answered
    would have been enough to clear the sell line had they all passed, the verdict is not evidence
    about the company; it is evidence about the data. */
-function sellIsDataDriven(sc,r){
-  if(!sc||sc.error)return false;
-  const missing=CHECK_COUNTS.quality-(sc.qTotal||0);
-  return missing>0 && (sc.qScore+missing)>(r.qSell||0);
+/* The two numbers that are the rulebook, as percentages of the weight that answered. Percentages
+   rather than counts is the whole fix: see weightedScore. Migrated once from the old counts, so
+   somebody who moved their bars keeps the intent of where they put them. */
+function buyAt(){
+  const r=D.rules||{};
+  if(Number.isFinite(r.buyAt))return r.buyAt;
+  return Number.isFinite(r.qBuy)?Math.round(r.qBuy/12*100):75;
 }
+function sellAt(){
+  const r=D.rules||{};
+  if(Number.isFinite(r.sellAt))return r.sellAt;
+  return Number.isFinite(r.qSell)?Math.round(r.qSell/12*100):40;
+}
+/* Low confidence is not a different verdict, it is the same verdict with a warning attached. The
+   line is 55%: below that, more than two fifths of the weight never answered and the reader is
+   being shown an opinion formed on a minority of the evidence. */
+const THIN_BELOW=55;
 function verdictOf(sc,isHolding,sym){
   /* "No data" for a rate limit told the reader the company had no data, which is false and reads
      as a broken terminal. Each failure says its own thing, in the words a person would use. */
   if(sc.error)return{label:sc.error==='RATE_LIMIT'?'Not scored yet, too many at once':sc.error==='NO_KEY'?'Needs market data':sc.error==='NO_DATA'?'No quote for this ticker':'Not scored',cls:'pill-na',key:'na'};
-  const r=D.rules;
   const th=sym?thesisFor(sym):null;
-  const thin=thinNote(sc);
-  /* The warning goes BEFORE the arithmetic, not after it. Appended, it reads as a footnote to a
-     conclusion the reader has already accepted; first, it is the frame they read the number in. */
-  const plus=t=>thin?thin+' '+t:t;
+  const ws=weightedScore(sc);
   const owned=isHolding?' You own it.':'';
 
-  /* ================= THREE WORDS, AND OWNING IT IS NOT ONE OF THEM (2026-10-06) =================
+  /* Nothing answered at all. Not a hold on the merits, and it must not read as one. */
+  if(!ws||ws.score===null){
+    return {label:'HOLD',cls:'pill-hold',key:'hold',thin:true,score:null,confidence:0,
+      detail:'nothing could be checked',
+      why:'Not one of the checks could be answered for this company, so there is nothing to judge it on either way.'+owned};
+  }
 
-     The owner's instruction: put buy, hold or sell on everything, whether I own it or not.
+  const thin=ws.confidence<THIN_BELOW;
+  /* The warning goes BEFORE the arithmetic, not after it. Appended, it reads as a footnote to a
+     conclusion the reader has already accepted; first, it is the frame they read the number in. */
+  const warn=thin?'Careful: only '+ws.confidence+'% of the checks could be answered for this company, so this rests on a minority of the evidence. ':'';
+  const bars=sectionBreakdown(sc).filter(b=>b.score!==null);
+  /* The section that is holding it back, named. A reason beats a number. */
+  const weakest=bars.length?bars.reduce((a,b)=>b.score<a.score?b:a):null;
+  const strongest=bars.length?bars.reduce((a,b)=>b.score>a.score?b:a):null;
+  const base='Scored '+ws.score+'% on everything that could be checked, at '+ws.confidence+'% confidence.';
 
-     WHAT WAS WRONG. This function used to answer in six labels, and TWO OF THEM DEPENDED ON
-     OWNERSHIP RATHER THAN ON THE COMPANY. A name scoring badly said "Consider SELLING" if it was in
-     your book and "Doesn't qualify yet" if it was not; a name in the middle said "HOLD" if owned
-     and "Doesn't qualify yet" if not. So the same company, scored identically on the same day, got
-     different words depending on who was looking, and the Compare screen put those two vocabularies
-     side by side and expected somebody to work it out. A walkthrough on 2026-10-04 reported exactly
-     that and could not tell whether it was a disagreement about the company or about the reader.
-
-     WHAT IT IS NOW. One of three words, every time, decided only by this person's own thresholds:
-
-         BUY     quality and price both clear the buy lines (and momentum, if they gated on it)
-         SELL    quality is at or below the sell line
-         HOLD    everything in between
-
-     Those three numbers live in Settings and nowhere else, which is what makes the answer auditable
-     and what the owner meant by choosing what a buy, a hold and a sell is. Ownership no longer
-     changes the word; it changes the sentence under it, because "sell it" and "do not buy it" are
-     the same judgement about the company and different instructions to the reader.
-
-     WATCH IS GONE as a verdict. It was two labels that both meant "not yet", and a fourth word in
-     a three-word system is how the Compare screen ended up unreadable. What it carried, which was
-     WHY not yet, is in the reason, where it was always the useful part. */
-  const mOk=(r.mBuy||0)<=0||sc.mScore>=r.mBuy; // momentum only gates BUY if you raised mBuy above 0
-  /* The context section (news and who they trade with) gates a BUY on exactly the same terms, and
-     is 0 by default for exactly the same reason: a gate nobody asked for is a rule change applied
-     to somebody else's rulebook. Raise it in Settings and news counts start constraining buys. */
-  const cOk=(r.cBuy||0)<=0||(sc.cScore||0)>=r.cBuy;
-  const BUY =t=>({label:'BUY', cls:'pill-buy', key:'buy', thin:!!thin, why:plus(t)});
-  const HOLD=(t,d)=>({label:'HOLD',cls:'pill-hold',key:'hold',thin:!!thin, detail:d||'', why:plus(t)});
-  const SELL=(t,extra)=>Object.assign({label:'SELL',cls:'pill-sell',key:'sell',thin:!!thin,why:plus(t)},extra||{});
+  const mk=(label,cls,key,why,detail)=>({label,cls,key,thin,score:ws.score,confidence:ws.confidence,
+    detail:detail||'',why:warn+why});
 
   /* A condition written for one position outranks the blanket setting: it is the mechanism that
-     makes a written thesis do work rather than sit in a text box. Only for a name you hold, because
-     a thesis is a record of why you bought something. */
+     makes a written thesis do work rather than sit in a text box. Only for a name you hold. */
   if(isHolding&&th&&isFinite(th.sellBelow)&&th.sellBelow>0&&sc.qScore<th.sellBelow){
-    return SELL('Quality '+sc.qScore+'/'+sc.qTotal+' is below the '+th.sellBelow+' you set for this position.',
+    return Object.assign(mk('SELL','pill-sell','sell',
+      'Quality '+sc.qScore+'/'+sc.qTotal+' is below the '+th.sellBelow+' you set for this position.'),
       {viaThesis:true});
   }
-  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&mOk&&cOk){
-    return BUY('Quality '+sc.qScore+'/'+sc.qTotal+' and price '+sc.pScore+'/'+sc.pTotal+' both clear your buy lines ('+r.qBuy+' and '+r.pBuy+').'
-      +((r.cBuy||0)>0?' Context '+(sc.cScore||0)+'/'+(sc.cTotal||0)+' clears your '+r.cBuy+' as well.':'')
+  /* THE PRICE FLOOR (2026-10-06, added the same day the weighting was, because the suite found it).
+
+     Price is 35 of the 166 weight, about a fifth. So a company could fail EVERY price check, be
+     expensive on every measure the terminal has, and still score 79% and read BUY on the strength
+     of the business alone. Buying a good business at any price is the oldest mistake there is, and
+     this product's first line is "know what to buy".
+
+     Weighting cannot fix it, because the honest weight for price IS about a fifth. So it is a
+     separate, stated rule rather than a thumb on the scale: a BUY also needs the price section to
+     be at least this good, counted only across the price checks that answered. It is visible in
+     Settings, it names itself when it blocks a buy, and it can be set to 0 to switch it off. A
+     hidden third rule would have broken the promise that the lines in Settings are the rulebook. */
+  const priceBar=Number.isFinite((D.rules||{}).priceFloor)?D.rules.priceFloor:50;
+  const priceSec=bars.find(b=>b.key==='priceChecks');
+  const priceBlocks=priceBar>0&&priceSec&&priceSec.score<priceBar;
+  if(ws.score>=buyAt()&&!priceBlocks){
+    return mk('BUY','pill-buy','buy', base+' That clears the '+buyAt()+'% you buy at.'
+      +(strongest?' Strongest on '+strongest.name+', at '+strongest.score+'%.':'')
       +(isHolding?' You already own it.':''));
   }
-  /* qTotal>=6 guards against calling a sell off two checks that happened to answer. It applies
-     whether or not the name is held, which it did not before: an unheld company with almost no data
-     was silently given the benefit of the doubt while a held one was not. */
-  if(sc.qTotal>=6&&sc.qScore<=r.qSell){
-    return SELL('Quality '+sc.qScore+'/'+sc.qTotal+' is at or below your sell line of '+r.qSell+'.'
-      +(isHolding?' You own it, so this is a position to think about closing.':' You do not own it, so this is one to leave alone.')
-      +(sellIsDataDriven(sc,r)?' Had the missing checks passed it would not have fired, so this is about the data as much as the company.':''),
-      {dataDriven:sellIsDataDriven(sc,r)});
+  if(ws.score>=buyAt()&&priceBlocks){
+    return mk('HOLD','pill-hold','hold', base+' It clears the '+buyAt()+'% you buy at on the business, '
+      +'but the price checks are '+priceSec.score+'%, under the '+priceBar+'% a buy needs. A good company is not a good buy at any price.'
+      +owned, 'good business, too expensive');
   }
-  /* Everything else is a hold, and the reason says which kind. These were three separate labels. */
-  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&!cOk){
-    return HOLD('The business and the price pass, but the context checks are '+(sc.cScore||0)+'/'+(sc.cTotal||0)+', under the '+r.cBuy+' you asked for. That is the news and the supply chain, not the numbers.'+owned,
-      'context is short');
+  if(ws.score<=sellAt()){
+    return Object.assign(mk('SELL','pill-sell','sell', base+' That is at or under the '+sellAt()+'% you sell at.'
+      +(weakest?' Weakest on '+weakest.name+', at '+weakest.score+'%.':'')
+      +(isHolding?' You own it, so this is a position to think about closing.':' You do not own it, so this is one to leave alone.')),
+      {dataDriven:thin});
   }
-  if(sc.qScore>=r.qBuy&&sc.pScore>=r.pBuy&&!mOk){
-    return HOLD('The business and the price pass, but momentum '+sc.mScore+'/'+sc.mTotal+' is under the '+r.mBuy+' you asked for.'+owned,
-      'good price, weak momentum');
-  }
-  if(sc.qScore>=r.qBuy){
-    return HOLD('The business passes on '+sc.qScore+'/'+sc.qTotal+', but price '+sc.pScore+'/'+sc.pTotal+' is under your '+r.pBuy+'. You are being asked to pay up.'+owned,
-      'good business, pricey');
-  }
-  if(sc.qTotal<6){
-    /* Too little answered to say anything. Not a hold on the merits, and it must not read as one. */
-    return HOLD('Only '+sc.qTotal+' of the quality checks had any data, which is not enough to judge this either way.'+owned,
-      'not enough data');
-  }
-  return HOLD('Quality '+sc.qScore+'/'+sc.qTotal+' is above your sell line of '+r.qSell+' but under the '+r.qBuy+' you would buy at.'
-    +(isHolding?' Nothing to do.':' Not one to buy yet.'),'in between your lines');
+  return mk('HOLD','pill-hold','hold', base+' Between the '+sellAt()+'% you sell at and the '+buyAt()+'% you buy at.'
+    +(weakest?' '+weakest.name.charAt(0).toUpperCase()+weakest.name.slice(1)+' is what is holding it back, at '+weakest.score+'%.':'')
+    +(isHolding?' Nothing to do.':' Not one to buy yet.'),
+    weakest?('held back by '+weakest.name):'in between your lines');
 }
 
 /* ================= EDUCATIONAL BRIDGE — academic factor context, kept strictly separate from the checklist =================
@@ -7170,8 +7256,13 @@ async function startScreener(givenList){
    raising the price bar by one changes the answer to this question the way it should. */
 function shortfall(sc){
   if(!sc||sc.error)return Infinity;
-  const r=D.rules;
-  return Math.max(0,(r.qBuy||0)-(sc.qScore||0))+Math.max(0,(r.pBuy||0)-(sc.pScore||0));
+  const ws=weightedScore(sc);
+  if(!ws||ws.score===null)return Infinity;
+  /* Distance from the buy line in score points. It used to add up how many quality and price
+     CHECKS a name was short, which stopped meaning anything the moment the bars became
+     percentages: qBuy was gone, so every shortfall computed to zero and the screener's three
+     near-misses would have been whichever three it scored first. */
+  return Math.max(0,buyAt()-ws.score);
 }
 /* THE ANSWER WAS NONE, AND THAT IS AN ANSWER.
 
@@ -7197,12 +7288,12 @@ function renderScanOutcome(){
   const r=D.rules;
   el.innerHTML='<div class="card" style="margin-bottom:12px">'+
     '<div class="section-title" style="margin-top:0">Nothing to buy, out of '+scored.length+' scanned</div>'+
-    '<div class="muted" style="font-size:12.5px;margin:-6px 0 12px">That is a result, not a failure. Your bars are quality '+r.qBuy+'/12 and value '+r.pBuy+'/6. Lower either in Settings and more will qualify; leaving them alone is also an answer.</div>'+
+    '<div class="muted" style="font-size:12.5px;margin:-6px 0 12px">That is a result, not a failure. Your buy line is '+buyAt()+'%. Lower it in Settings and more will qualify; leaving it alone is also an answer.</div>'+
     (near.length?'<table class="tbl" style="font-size:13px"><tbody>'+near.map(n=>{
       const d=shortfall(n.sc);
       return '<tr><td style="white-space:nowrap"><b>'+esc(n.sym)+'</b></td>'+
-        '<td class="muted" style="white-space:nowrap">'+d+' check'+(d===1?'':'s')+' short</td>'+
-        '<td class="muted">quality '+n.sc.qScore+'/'+n.sc.qTotal+', value '+n.sc.pScore+'/'+n.sc.pTotal+'</td>'+
+        '<td class="muted" style="white-space:nowrap">'+d+' point'+(d===1?'':'s')+' short</td>'+
+        '<td class="muted">scored '+(weightedScore(n.sc)||{}).score+'%</td>'+
         '<td style="text-align:right">'+(D.watchlist.includes(n.sym)
           ?'<span class="pill pill-na" style="font-size:9.5px">watched</span>'
           :'<button class="btn btn-ghost btn-sm" onclick="addWatchSym(\''+esc(n.sym)+'\')">Watch</button>')+'</td></tr>';
@@ -7433,7 +7524,10 @@ function fnv1a(str){ let h=0x811c9dc5; for(let i=0;i<str.length;i++){ h^=str.cha
 function rulebookVersion(){
   try{
     const r=D.rules||{};
-    return 'p:'+fnv1a(canonicalJson({qBuy:r.qBuy==null?null:+r.qBuy,pBuy:r.pBuy==null?null:+r.pBuy,qSell:r.qSell==null?null:+r.qSell,mBuy:r.mBuy==null?null:+r.mBuy}));
+    /* The fingerprint follows the rulebook's shape. It changed on 2026-10-06 from four counts to
+       three percentages, which deliberately gives every call made after that a different policy
+       hash: they were made by a different system and must not be pooled with the old ones. */
+    return 'p:'+fnv1a(canonicalJson({buyAt:buyAt(),sellAt:sellAt(),priceFloor:r.priceFloor==null?50:+r.priceFloor}));
   }catch(e){ return null; }
 }
 function recordCall(sym,sc,verdictKey,verdictLabel,track){
@@ -7463,7 +7557,12 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
       price:(sc&&isFinite(sc.price))?sc.price:null,
       spy:(_spyPriceCache&&isFinite(_spyPriceCache.price))?_spyPriceCache.price:null,
       q:sc?sc.qScore:null,p:sc?sc.pScore:null,m:sc?sc.mScore:null,
-      mOk:!!(sc&&D.rules&&sc.mScore>=(D.rules.mBuy||0)),
+      /* The weighted score and how much of the evidence it rested on, stamped at the moment the
+         system spoke. mOk went with the momentum gate on 2026-10-06: it recorded whether momentum
+         cleared a bar that no longer exists, and with mBuy gone it would have stamped `true` on
+         every call forever, which is worse than not recording it. */
+      score:(weightedScore(sc)||{}).score??null,
+      confidence:(weightedScore(sc)||{}).confidence??null,
       conviction,refreshes,
       /* M1. The operator's standing position at the moment the system spoke, captured here because
          myTags is a current map with no history and I11 forbids reconstructing one later. Without
@@ -7513,8 +7612,10 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
      have touched the wrong side of it. Without this the entry gate alone would still let a stock
      sitting on the bar leave BUY every other refresh. */
   if(last&&last.verdict==='buy'&&verdictKey!=='buy'&&!bypassesHysteresis(sc,verdictKey,sym)){
-    const bar=(D.rules&&D.rules.qBuy)||0;
-    if(!(sc&&isFinite(sc.qScore)&&sc.qScore<=bar-EXIT_MARGIN)){
+    /* In score points now, matching the units the bar is in. */
+    const bar=buyAt();
+    const nowScore=(weightedScore(sc)||{}).score;
+    if(!(Number.isFinite(nowScore)&&nowScore<=bar-EXIT_MARGIN)){
       delete pend[key];
       return;                                     // inside the band: the opinion has not changed
     }
@@ -7565,7 +7666,7 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
    checks without a new version here would turn every call before it into the track record of a
    scorecard nobody can use any more. The test suite hashes scoreStock() and CHECK_ORDER against
    this version: change either, bump the version, and say why in PRD §26. */
-const SCORECARD_VERSION='1.1 (2026-10-06)';
+const SCORECARD_VERSION='2.0 (2026-10-06)';
 const CHECK_ORDER=[
   'Revenue Growth (YoY)','Gross Margin','Operating Margin','Free Cash Flow','Cash vs Debt',
   'Current Ratio','ROE','EPS Beats','Revenue Guidance','Insider Buying','Clear Growth Runway',
@@ -11208,8 +11309,16 @@ function renderAnalysis(sym,sc){
       '<div style="font-size:26px;font-weight:700;letter-spacing:-.02em">'+v.label+'</div>'+
       '<div style="font-size:14.5px;line-height:1.6;margin-top:6px">'+esc(v.why||'')+'</div>'+
       (v.detail?'<div class="muted" style="font-size:12.5px;margin-top:4px">'+esc(v.detail)+'</div>':'')+
-      '<div class="muted" style="font-size:12px;margin-top:10px">Quality '+sc.qScore+'/12 · Price '+sc.pScore+'/6 · '+w('momentum')+' '+sc.mScore+'/4'+(sc.wsTotal?' · Wall Street '+sc.wsScore+'/'+sc.wsTotal:'')+
-        ' · your lines: buy at quality '+D.rules.qBuy+' and price '+D.rules.pBuy+(D.rules.mBuy>0?' and momentum '+D.rules.mBuy:'')+', sell at quality '+D.rules.qSell+'. Change them in Settings.</div>'+
+      /* THE SCORE AND HOW MUCH OF IT IS KNOWN, then every section it came from. This used to print
+         four fractions with different denominators and leave the reader to combine them, which is
+         the job the terminal exists to do. */
+      (v.score!=null?'<div style="font-size:13px;margin-top:12px;display:flex;gap:18px;flex-wrap:wrap">'+
+        '<span><b style="font-size:17px">'+v.score+'%</b> <span class="muted">score</span></span>'+
+        '<span><b style="font-size:17px">'+v.confidence+'%</b> <span class="muted">of the checks could be answered</span></span>'+
+      '</div>':'')+
+      '<div class="muted" style="font-size:12px;margin-top:8px">'+
+        sectionBreakdown(sc).map(b=>esc(b.name)+' '+(b.score==null?'not checked':b.score+'%')).join(' · ')+
+        ' · your lines: buy at '+buyAt()+'%, sell at '+sellAt()+'%. Change them in Settings.</div>'+
     '</div>'+
     '<details class="an-work"'+(userLevel()>0?' open':'')+' style="margin-top:16px">'+
       '<summary style="cursor:pointer;font-weight:600;font-size:14px;padding:6px 0">'+
@@ -11258,9 +11367,7 @@ function renderAnalysis(sym,sc){
        the kind of thing people discover by accident and then stop trusting. */
     '<h3 style="margin-top:22px">6 · The news, and who they trade with</h3>'+
     '<p class="muted" style="margin-bottom:6px">Headlines counted by keyword over 30 days, plus the supply chain you mapped yourself. Nothing here reads an article or forms an opinion about one. '+
-      ((D.rules.cBuy||0)>0
-        ? 'You have set this to gate a BUY at '+D.rules.cBuy+'/6.'
-        : 'Informational: it does not affect the verdict until you set a minimum in Settings.')+'</p>'+
+      'These count toward the verdict like every other check, weighted by what each is worth; the table is in ANALYSIS-AUDIT.md.'+'</p>'+
     '<div class="score-bar"><div style="width:'+((sc.cScore||0)/6*100)+'%;background:var(--brand2)"></div></div>'+
     (sc.context&&sc.context.length?
       '<table style="margin-top:10px"><thead><tr><th>Check</th><th>Target</th><th>Actual</th><th>Result</th><th>Note</th></tr></thead><tbody>'+
@@ -13074,16 +13181,15 @@ function refreshMarketDataCard(){
    So: state the expected effect and the failure test, or the change doesn't save. */
 function ruleSnapshot(){
   const r=D.rules||{};
-  /* cBuy belongs here with the other three: the rule log exists so a change in the record can be
-     attributed to a change in the rulebook, and a context gate that moved without being logged
-     would make a run of verdicts unexplainable. */
-  return{qBuy:r.qBuy,pBuy:r.pBuy,mBuy:r.mBuy,cBuy:r.cBuy,qSell:r.qSell};
+  /* The rule log exists so a change in the record can be attributed to a change in the rulebook,
+     so every number that can move a verdict belongs in this snapshot. */
+  return{buyAt:r.buyAt,sellAt:r.sellAt,priceFloor:r.priceFloor};
 }
 function rulesDiffer(a,b){
   return a.qBuy!==b.qBuy||a.pBuy!==b.pBuy||a.mBuy!==b.mBuy||a.qSell!==b.qSell;
 }
 function describeRules(r){
-  return 'quality≥'+r.qBuy+', value≥'+r.pBuy+', momentum≥'+r.mBuy+', sell at≤'+r.qSell;
+  return 'buy at ≥'+buyAt()+'%, sell at ≤'+sellAt()+'%, price floor '+(r.priceFloor==null?50:r.priceFloor)+'%';
 }
 /* How many distinct rule-sets does the current graded record actually span? If the answer is more
    than one, the headline expectancy is an average across different systems and should not be read
@@ -13102,13 +13208,13 @@ function ruleChangeWarning(){
 }
 function saveRules(){
   const before=ruleSnapshot();
-  const after={
-    qBuy:Math.min(12,Math.max(1,parseInt(document.getElementById('setQBuy').value)||9)),
-    pBuy:Math.min(6,Math.max(1,parseInt(document.getElementById('setPBuy').value)||4)),
-    mBuy:Math.min(4,Math.max(0,parseInt(document.getElementById('setMBuy').value)||0)),
-    cBuy:Math.min(6,Math.max(0,parseInt(document.getElementById('setCBuy').value)||0)),
-    qSell:Math.min(12,Math.max(0,parseInt(document.getElementById('setQSell').value)||6))
-  };
+  const n=(id,d)=>{const v=parseInt((document.getElementById(id)||{}).value);return Number.isFinite(v)?v:d;};
+  let b=Math.min(100,Math.max(1,n('setBuyAt',75)));
+  let sl=Math.min(99,Math.max(0,n('setSellAt',40)));
+  /* A sell line at or above the buy line makes every company both at once, and the verdict would
+     be decided by which branch ran first. Clamped rather than refused, and said out loud. */
+  if(sl>=b){ sl=Math.max(0,b-1); toast('The sell line has to sit below the buy line. Set to '+sl+'%.'); }
+  const after={ buyAt:b, sellAt:sl, priceFloor:Math.min(100,Math.max(0,n('setPriceFloor',50))) };
   const autoRefresh=document.getElementById('setAutoRefresh').value;
 
   if(rulesDiffer(before,after)){
@@ -13134,7 +13240,10 @@ function saveRules(){
     if(D.ruleChanges.length>200)D.ruleChanges=D.ruleChanges.slice(D.ruleChanges.length-200);
   }
 
-  D.rules.qBuy=after.qBuy;D.rules.pBuy=after.pBuy;D.rules.mBuy=after.mBuy;D.rules.qSell=after.qSell;
+  D.rules.buyAt=after.buyAt;D.rules.sellAt=after.sellAt;D.rules.priceFloor=after.priceFloor;
+  /* The old count-based keys are dropped on the first save, so nothing can read a stale bar that
+     no longer means anything. The migration in buyAt()/sellAt() has already run by this point. */
+  delete D.rules.qBuy;delete D.rules.pBuy;delete D.rules.mBuy;delete D.rules.cBuy;delete D.rules.qSell;
   D.rules.autoRefresh=autoRefresh;
   saveDB();renderAll();renderRuleLog();
   toast(rulesDiffer(before,after)?'Rules changed and logged. The scorecard now spans more than one system.':'Rules saved.');
@@ -15086,7 +15195,7 @@ function buildActionQueue(){
         detail:(byThesis
           ? 'When you wrote the thesis for '+h.sym+' you said to sell if quality dropped below '+thesisFor(h.sym).sellBelow+'. It is now '+sc.qScore+'/'+sc.qTotal+'. This is your own condition firing, not the global rule.'
             +(thesisFor(h.sym).why?' You bought it because: "'+thesisFor(h.sym).why.slice(0,180)+(thesisFor(h.sym).why.length>180?'…':'')+'"':'')
-          : 'Your global sell rule fires when quality drops to '+D.rules.qSell+' or below. It is now '+sc.qScore+'/'+sc.qTotal+'.')
+          : 'Your global sell rule fires at '+sellAt()+'% or below. It is now '+((weightedScore(sc)||{}).score)+'%.')
           +' The position is worth '+fmt$(val)+', which is '+pct.toFixed(1)+'% of the portfolio.',
         evidence:byThesis?'thesis':(tot?tot.got+'/'+tot.max:''),
         action:'analyzeStock(\''+esc(h.sym)+'\')',actionLabel:'Review '+h.sym});
@@ -17118,7 +17227,7 @@ function renderMarketScan(){
   const s=scanState(), hits=scanHits(), total=(typeof universeSize==='function'&&universeSize())||0;
   const r=D.rules||{};
   note.innerHTML=(s.scanned?'<b>'+s.scanned.toLocaleString()+'</b> of '+(total?total.toLocaleString():'the whole listing')+' scanned'+(s.started?', since '+new Date(s.started).toISOString().slice(0,10):'')+'. ':'Not started. ')+
-    'It walks the listing in the background while you work, at the pace the data allows, and keeps its place between visits. Your bars: quality '+(r.qBuy==null?'?':r.qBuy)+'+ and value '+(r.pBuy==null?'?':r.pBuy)+'+ to buy, quality '+(r.qSell==null?'?':r.qSell)+' or less to sell.';
+    'It walks the listing in the background while you work, at the pace the data allows, and keeps its place between visits. Your lines: '+buyAt()+'% or more to buy, '+sellAt()+'% or less to sell.';
   if(!hits.length){ body.innerHTML='<div class="muted" style="font-size:13px">'+(s.scanned?'Nothing in what it has scanned so far clears your buy bar or breaks your sell bar. That is the usual answer.':'Press Scan the market. Only the names that clear your buy bar or break your sell bar appear here.')+'</div>'; return; }
   const buys=hits.filter(h=>h.verdict==='buy'), sells=hits.filter(h=>h.verdict==='sell');
   const rows=hits.slice().sort((a,b)=>(a.verdict===b.verdict?(b.q-a.q):(a.verdict==='buy'?-1:1))).map(h=>

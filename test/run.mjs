@@ -1332,8 +1332,9 @@ G('One opinion is one call');
 
 t('a verdict must hold before it is recorded', /const CONFIRM_REFRESHES=3/.test(term));
 t('leaving BUY needs a clear margin, not a touch', /const EXIT_MARGIN=2/.test(term));
+/* In score points since 2026-10-06, matching the units the bar is now in. */
 t('the exit gate reads the score, not just the flipped verdict',
-  /sc\.qScore<=bar-EXIT_MARGIN/.test(term));
+  /nowScore<=bar-EXIT_MARGIN/.test(term) && /const bar=buyAt\(\);/.test(term));
 t('unconfirmed verdicts survive a reload', /pendingCalls:\{\}/.test(term));
 /* Discarding flickers would answer by assumption whether conviction is worth anything. */
 t('flickers are recorded, not discarded', /write\('flickering'/.test(term));
@@ -1782,7 +1783,9 @@ G('One grant, one code, two devices');
     && /function removeFromList\(sym,id\)\{[\s\S]{0,180}?l\.syms=l\.syms\.filter/.test(term)
     && !/function removeFromList[\s\S]{0,180}?D\.watchlist=/.test(term));
   t('the terminal has no firm rulebook to apply and no seat to lock inputs for', !/D\.rules\.qBuy=rb\.qBuy/.test(term) && !/Publish to all/.test(term) && !/PF_ORG/.test(term));
-  t('the four bars are the account\'s own, versioned by their digest', /return 'p:'\+fnv1a\(canonicalJson\(\{qBuy:/.test(term));
+  /* Three percentages since 2026-10-06, not four counts. The fingerprint changing is the point:
+     calls made under the old rulebook must not pool with calls made under this one. */
+  t('the bars are the account\'s own, versioned by their digest', /return 'p:'\+fnv1a\(canonicalJson\(\{buyAt:buyAt\(\),sellAt:sellAt\(\)/.test(term));
   t('first-run data key card: shown without a key, saves to the profile, removed once set', /pfKeyCard/.test(term) && /D\.apiKey=v; if\(typeof saveDB==='function'\) saveDB\(\); card\.remove\(\)/.test(term));
   t('admin can pause or resume a single code', /async function pauseSeat/.test(read('admin.html')) && /\/pause\/code/.test(read('admin.html')));
   t('the worker deploys from its own config with the KV binding and kept vars', /keep_vars = true/.test(read('worker.wrangler.toml')) && /binding = "PF_SYNC"/.test(read('worker.wrangler.toml')));
@@ -1919,7 +1922,7 @@ G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
    says how far it has walked, and it shows only the two verdicts that mean something. */
 t('the market scan walks the listing, keeps its place, and shows only buys and sells', /function startMarketScan\(\)/.test(term) && /rows=await loadUniverse\(\)/.test(term) && /s\.cursor\+\+;/.test(term) && /if\(v\.key==='buy'\|\|v\.key==='sell'\)/.test(term) && /of '\+rows\.length\.toLocaleString\(\)/.test(term));
 t('a scan find older than a week is dropped', /const SCAN_STALE_MS=7\*864e5;/.test(term) && /\(s\.hits\|\|\[\]\)\.filter\(h=>h\.at>cut\)/.test(term));
-t('the scan states the bars it is using and can be stopped or started over', /Your bars: quality '\+\(r\.qBuy==null\?'\?':r\.qBuy\)/.test(term) && /function stopMarketScan\(\)/.test(term) && /function clearMarketScan\(\)/.test(term));
+t('the scan states the bars it is using and can be stopped or started over', /Your lines: '\+buyAt\(\)\+'% or more to buy/.test(term) && /function stopMarketScan\(\)/.test(term) && /function clearMarketScan\(\)/.test(term));
 t('the calendar effects panel sits directly under the move it is context for', term.indexOf('The move, in context') < term.indexOf('Calendar effects</h3>') && term.indexOf('Calendar effects</h3>') < term.indexOf('Rates and the economy</h3>'));
   /* The globe is created when the World tab opens, before its map tiles arrive; with render-on-demand
      nothing repainted and the first look was white borders on a black ball. */
@@ -1930,7 +1933,7 @@ t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProg
   t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
   t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
   t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v169/.test(sw));
+  t('sw.js was bumped for the new terminal', /perceptfolio-v170/.test(sw));
   t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
   t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
 }
@@ -2254,22 +2257,23 @@ G('Scorecard v1.0, frozen 2026-09-21: the record is attributable to it');
    of the 22 checks orphans every call made before it, so the two are hashed here against the
    version constant. To change the checks: bump SCORECARD_VERSION, replace this hash, and say why
    in PRD §26. A change that skips that fails the build. */
-t('the scorecard carries a version', /const SCORECARD_VERSION='1\.1 \(2026-10-06\)';/.test(term));
+t('the scorecard carries a version', /const SCORECARD_VERSION='2\.0 \(2026-10-06\)';/.test(term));
 t('every recorded call is stamped with it', /scorecard:SCORECARD_VERSION/.test(term));
 t('the scorecard view names it', /id="scorecardVersion"/.test(term) && /'scorecard v'\+SCORECARD_VERSION/.test(term));
 /* Re-pinned for v1.1 on 2026-10-06: scoreStock gained the context section (news counts and the
    supply-chain map) and verdictOf collapsed to three ownership-independent words. The 22 graded
    checks are untouched, so calls either side of the boundary stay comparable on quality, price and
    momentum; the reason is written out in PRD §26, as this guard demands. */
-t('scoreStock() and CHECK_ORDER match the frozen v1.1 hash', (() => {
+t('scoreStock() and CHECK_ORDER match the frozen v2.0 hash', (() => {
   const s0 = term.indexOf('async function scoreStock(sym){'), e0 = term.indexOf('\n}\n', s0) + 2;
   const c0 = term.indexOf('const CHECK_ORDER=['), ce = term.indexOf('];', c0) + 2;
   const src = (term.slice(s0, e0) + term.slice(c0, ce)).replace(/\s+/g, ' ');
-  return crypto.createHash('sha256').update(src).digest('hex').slice(0, 16) === '89a187d6a58a4554';
+  return crypto.createHash('sha256').update(src).digest('hex').slice(0, 16) === '3ad5643c5d698fd1';
 })(), 'the checks changed; bump SCORECARD_VERSION, re-pin the hash, and record why in PRD §26');
-t('and the reason for the v1.1 change is written down where the guard says to write it',
-  /\*\*Scorecard v1\.1, 2026-10-06\. Why it changed\.\*\*/.test(read('PRD.md'))
-  && /The 22 graded checks themselves are unchanged/.test(read('PRD.md')));
+t('and the reason for the v2.0 change is written down where the guard says to write it',
+  /\*\*Scorecard v2\.0, 2026-10-06\. A major number, because the verdict changed kind\.\*\*/.test(read('PRD.md'))
+  && /eight out of eight could never reach nine/.test(read("PRD.md"))
+  && /ANALYSIS-AUDIT\.md/.test(read('PRD.md')));
 
 /* ==================== QUIET NOTES ==================== */
 G('State the number, do not lecture');

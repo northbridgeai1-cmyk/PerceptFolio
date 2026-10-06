@@ -170,13 +170,21 @@ console.log('\nTHE SHAPE scoreStock DEPENDS ON');
     /out\.cScore=out\.context\.filter\(c=>c\.pass===true\)\.length;/.test(src)
     && /out\.cTotal=out\.context\.filter\(c=>c\.pass!==null\)\.length;/.test(src));
   t('a bulk scan reads the cache and never fetches', /else if\(typeof screenerRunning==='undefined'\|\|!screenerRunning\)newsItems=await fhNews\(sym,30\);/.test(src));
-  t('it gates a BUY only when asked to', /const cOk=\(r\.cBuy\|\|0\)<=0\|\|\(sc\.cScore\|\|0\)>=r\.cBuy;/.test(src));
-  t('and it defaults to not gating', /cBuy:0,/.test(src));
-  t('the setting exists, is bounded, and is logged when it changes',
-    /id="setCBuy"/.test(src) && /cBuy:Math\.min\(6,Math\.max\(0,parseInt\(document\.getElementById\('setCBuy'\)\.value\)\|\|0\)\)/.test(src)
-    && /return\{qBuy:r\.qBuy,pBuy:r\.pBuy,mBuy:r\.mBuy,cBuy:r\.cBuy,qSell:r\.qSell\};/.test(src));
-  t('the screen says whether it is affecting the verdict',
-    /does not affect the verdict until you set a minimum in Settings/.test(src));
+  /* IT NO LONGER NEEDS A GATE OF ITS OWN (2026-10-06). These six used to sit behind an opt-in
+     threshold, cBuy, defaulting to 0, which meant they were computed, displayed and ignored. The
+     owner's instruction was that the whole analysis uses the whole thing, so they now count like
+     every other check, weighted by what each is worth. The weights are in ANALYSIS-AUDIT.md and
+     checked by test/weights.mjs. */
+  /* Checked against code, not prose: the delete that clears the old key necessarily names it. */
+  t('the separate context gate is gone',
+    !/const cOk=/.test(src) && !/r\.cBuy/.test(src) && !/id="setCBuy"/.test(src));
+  t('context is one of the scored sections', /const SCORED_SECTIONS=\['quality','priceChecks','momentum','context','wallStreet'\];/.test(src));
+  t('every one of the six is weighted', ['Legal and regulatory news','Customer concentration',
+    'Layoffs or restructuring','More than one supplier','Press coverage','Who they sell to is mapped']
+    .every(n => new RegExp("'" + n + "':\\d").test(src)));
+  t('and the screen says it counts, rather than that it does not',
+    /These count toward the verdict like every other check/.test(src)
+    && !/does not affect the verdict until you set a minimum/.test(src));
 }
 
 console.log('\n' + (fail ? 'FAILED ' + fail + ', passed ' + pass : 'ALL ' + pass + ' CHECKS PASSED') + '\n');
