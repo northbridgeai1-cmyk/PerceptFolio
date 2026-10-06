@@ -125,7 +125,19 @@ input::placeholder{color:var(--muted)}
 .btn-ghost:hover{border-color:var(--text)}
 .btn-danger{background:transparent;color:var(--red);border:1px solid var(--border);font-family:var(--mono);font-size:13px}
 .btn-danger:hover{border-color:var(--red)}
+/* Button SIZING is not settled here. The "Soft" block at the end of this file re-declares .btn and
+   .btn-sm and wins, so these two numbers have had no effect on the page for weeks: measured in a
+   browser on 2026-10-06, .btn-sm resolves to 7px 14px from down there, not the 7px 6px written
+   here. Left in place as the fallback the cascade starts from, and labelled, because reading this
+   line and believing it is how an afternoon gets spent changing a number that does nothing. */
 .btn-sm{padding:7px 6px;font-size:12px}
+/* ONE WEIGHT PER JOB.
+     .btn            the one action a screen exists for. At most one per card.
+     .btn-ghost      everything else: going somewhere, changing a view, a second choice.
+     .btn-danger     destroys something.
+   There is no fourth. btn-p was a fourth, used twice, and had no rule anywhere in this file, so
+   both buttons wearing it rendered as plain .btn while reading in the source like a deliberate
+   variant. A class that does nothing is worse than no class: it hides the fact that nobody chose. */
 /* Installed on iOS the status bar is translucent and content runs under the notch, so the header
    pads itself by whatever the device reports as its safe area. On desktop these insets are 0. */
 header{display:flex;align-items:center;gap:10px;padding:0 16px 0 12px;height:56px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:50;
@@ -653,6 +665,11 @@ small.src{color:var(--muted)}
 .doorChip{flex:none;background:var(--panel);border:1px solid var(--border);border-radius:999px;
   padding:7px 14px;font:inherit;font-size:13.5px;color:var(--text);cursor:pointer;white-space:nowrap}
 .doorChip:hover{border-color:var(--brand2);color:var(--brand2)}
+/* The three the product is for. Filled, so the row has a front and a back rather than eight equal
+   options; everything else on the row keeps the outline it had. Colour is not carrying this on its
+   own, the fill is, so it survives a colourblind reader and a grey-scale print. */
+.doorChip-key{background:var(--btn-bg);color:var(--btn-fg);border-color:var(--btn-bg);font-weight:600}
+.doorChip-key:hover{background:var(--btn-bg);color:var(--btn-fg);border-color:var(--btn-bg);opacity:.85}
 .doorChip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* On a phone eight chips at desktop size stack to seven rows and push the portfolio value most of a
    screen down. Tighter type and padding pack them two to a row without hiding any, which is the
@@ -1054,12 +1071,23 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
    Hiding is done by a class on <nav>, so removing it restores the original rules untouched. */
 #sidebar nav.pf-compact button.pf-adv{display:none}
 #sidebar nav.pf-compact .nav-sep{display:none}
+/* MORE GOES LAST, AND IT IS A CSS PROBLEM (2026-10-06).
+   The owner asked once already why More sits in the middle of the sidebar, and it kept sitting
+   there, because the markup was never the cause: More is the last button in the document and this
+   rule gave it order:5, between History at 4 and everything else at 10. Reordering the HTML could
+   not have fixed it and nobody would have found it by reading the HTML.
+
+   The intent was a short list of work tabs, then More to reveal the rest. That only reads as
+   "more" if nothing follows it, and four tabs did: Lists, News, Find stocks and Settings are not
+   marked pf-adv, so compact mode leaves them visible and they sorted after the expander. So More
+   now sits after every visible tab, with Settings pinned below it, where a utility belongs. */
 #sidebar nav.pf-compact button{order:10}
 #sidebar nav.pf-compact button[data-tab="dashboard"]{order:1}
 #sidebar nav.pf-compact button[data-tab="portfolio"]{order:2}
 #sidebar nav.pf-compact button[data-tab="analyzer"]{order:3}
 #sidebar nav.pf-compact button[data-tab="history"]{order:4}
-#sidebar nav.pf-compact button.pf-more{order:5}
+#sidebar nav.pf-compact button.pf-more{order:50}
+#sidebar nav button[data-tab="settings"]{order:60}
 #sidebar nav button.pf-more .ico svg{transform:rotate(-90deg);transition:transform .2s var(--ease)}
 #sidebar nav:not(.pf-compact) button.pf-more .ico svg{transform:rotate(90deg)}
 #sidebar nav button.pf-more{color:var(--muted)}
@@ -1391,8 +1419,8 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
          They landed here, found nothing that matched what they came to do, and left without ever
          reaching the screen that would have helped.
 
-         So this is one row, in their words, at the top: the six things people actually arrive
-         wanting. It is a row of chips rather than a card on purpose. The portfolio value was dragged
+         So this is one row, in their words, at the top: the things people actually arrive wanting,
+         the three that matter most of all filled and first. It is a row of chips rather than a card on purpose. The portfolio value was dragged
          below the fold once already by things that sat above it, and the fix for that is not to put
          something else there; this costs about one line of height and goes no further. -->
     <div class="doorRow" id="doorRow">
@@ -1401,14 +1429,23 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
            because both contained the word the person was searching on and Today came first; it now
            says news, which nothing else on the screen does. Same reason for the last two: without a
            chip carrying "how much" and "wrong", those two goals ended in a blind press of More. -->
-      <button type="button" class="doorChip" onclick="showTab('screener')">find something to buy</button>
-      <button type="button" class="doorChip" onclick="showTab('analyzer')">analyze a stock</button>
+      <!-- THREE OF THESE ARE THE PRODUCT, AND THEY ALL LOOKED THE SAME (2026-10-06).
+           The row started as six chips and grew to eight, every one an identical grey outline in
+           the order they happened to be added, so the first thing anybody sees on opening the
+           terminal is eight equal-weight options and no idea which is the point. The owner read
+           the screen as messed, and this row is what the eye lands on first.
+           Buy, sell and bring my account in are the three the owner named as the best part of the
+           product; they are filled and they come first. The other five still look like what they
+           are, which is the rest of the menu. Nothing was removed: every chip that was reachable
+           before is reachable now, in the same row, one press away. -->
+      <button type="button" class="doorChip doorChip-key" onclick="showTab('screener')">find something to buy</button>
+      <button type="button" class="doorChip doorChip-key" onclick="showWhatToSell()">know what to sell</button>
+      <button type="button" class="doorChip doorChip-key" onclick="goBrokerSetup()">bring in my account</button>
       <button type="button" class="doorChip" onclick="showTab('portfolio')">see what I own</button>
+      <button type="button" class="doorChip" onclick="showTab('analyzer')">analyze a stock</button>
       <button type="button" class="doorChip" onclick="showTab('news')">see today's news</button>
-      <button type="button" class="doorChip" onclick="showWhatToSell()">know what to sell</button>
       <button type="button" class="doorChip" onclick="goHowMuch()">how much to put in</button>
       <button type="button" class="doorChip" onclick="showTab('risk')">what could go wrong</button>
-      <button type="button" class="doorChip" onclick="goBrokerSetup()">bring in my account</button>
     </div>
 
     <!-- E1. The monthly close. Appears on the 1st and stays until it is read. It keeps its place at
@@ -1441,10 +1478,13 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
          routine is one line. The market-data step appears only where a key is actually needed. -->
     <div id="welcomeCard" class="welcome-card" style="display:none">
       <h2>Start here</h2>
-      <p class="muted" style="margin-bottom:16px">Three steps. Then every morning is one button.</p>
-      <div id="wcKeyStep" class="wc-step" style="margin-bottom:10px"><span class="step-num">0</span><div><b>Turn on prices.</b> Paste a free Finnhub key in Settings. Two minutes, no card. <button class="btn btn-sm btn-ghost" onclick="showTab('settings')">Open Settings</button></div></div>
-      <div class="wc-step" id="wcStep1" style="margin-bottom:10px"><span class="step-num wc-n">1</span><div><b>Add what you own.</b> Stocks, funds, and the cash you have to invest. <button class="btn btn-sm" onclick="showTab('portfolio')">Open Portfolio</button></div></div>
-      <div class="wc-step" id="wcStep2" style="margin-bottom:10px"><span class="step-num wc-n">2</span><div><b>Add a few tickers you are watching.</b> Optional. The terminal scores them for you. <button class="btn btn-sm btn-ghost" onclick="showTab('watchlist')">Open Lists</button></div></div>
+      <!-- COUNTED, NOT TYPED. It said "Three steps" above a list that renders three or four
+           depending on whether market data is already on, and the fourth step was numbered 4 under
+           a heading promising three. -->
+      <p class="muted" style="margin-bottom:16px"><span id="wcCount">Three</span> steps. Then every morning is one button.</p>
+      <div id="wcKeyStep" class="wc-step" style="margin-bottom:10px"><span class="step-num">0</span><div><b>Turn on prices.</b> Paste a free Finnhub key in Settings. Two minutes, no card. <button class="btn btn-ghost btn-sm" onclick="showTab('settings')">Open Settings</button></div></div>
+      <div class="wc-step" id="wcStep1" style="margin-bottom:10px"><span class="step-num wc-n">1</span><div><b>Add what you own.</b> Stocks, funds, and the cash you have to invest. <button class="btn btn-ghost btn-sm" onclick="showTab('portfolio')">Open Portfolio</button></div></div>
+      <div class="wc-step" id="wcStep2" style="margin-bottom:10px"><span class="step-num wc-n">2</span><div><b>Add a few tickers you are watching.</b> Optional. The terminal scores them for you. <button class="btn btn-ghost btn-sm" onclick="showTab('watchlist')">Open Lists</button></div></div>
       <div class="wc-step" id="wcStep3" style="margin-bottom:6px"><span class="step-num wc-n">3</span><div><b>Press Run review.</b> It pulls prices, checks everything, and lists what needs you. It is under <b>What needs you</b>, at the foot of this screen.</div></div>
       <p class="muted" style="font-size:12.5px;margin-top:12px">Lost? <a href="#" onclick="replayTour();return false">Show me around</a>, five screens, one minute.</p>
     </div>
@@ -2775,6 +2815,16 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     </div>
     <div class="muted" id="broStatus" style="font-size:12.5px;margin-top:10px">Not connected.</div>
     <div id="broAccounts" style="margin-top:8px"></div>
+    <!-- REFUSABLE, AND REFUSABLE WHERE IT IS EXPLAINED (2026-10-06). Signing in now pulls from a
+         connected broker on its own and reprices the book. That is a request made to somebody's
+         bank without them asking for it that time, so the switch is on this card rather than
+         buried in Advanced, and it says what it does rather than naming a feature. -->
+    <label class="row" id="broAutoRow" style="gap:8px;align-items:flex-start;margin-top:12px;display:none">
+      <input type="checkbox" id="setBrokerAuto" style="width:auto;margin-top:3px" onchange="setBrokerAuto(this.checked)">
+      <span style="font-size:13px;line-height:1.5">Read my broker every time I sign in, and reprice the book
+        <span class="muted" style="display:block;font-size:12px">At most once every ten minutes. Sync now above is never held back.</span>
+      </span>
+    </label>
     <div class="muted" style="font-size:12px;margin-top:10px;opacity:.8">
       Trades read from a broker are stored as history, the same as a CSV import. The record does not
       grade them, because they are not calls this terminal made.
@@ -3247,7 +3297,7 @@ function showSaveFailure(isQuota,err,kind){
     /* Not now. The bar used to be undismissable, which made a full disk a wall across the screen
        for the rest of the session even after the person had decided what to do about it. It comes
        back on the next failed save, so dismissing it hides the notice, never the problem. */
-    '<button class="btn btn-sm btn-ghost" style="color:#fff;border-color:rgba(255,255,255,.5)" onclick="dismissSaveFailure()">Not now</button>';
+    '<button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5)" onclick="dismissSaveFailure()">Not now</button>';
 }
 /* Hidden, not resolved: _saveFailed stays true, so the next failed write raises it again. */
 function dismissSaveFailure(){ clearSaveFailure(); }
@@ -3944,6 +3994,8 @@ async function finishLogin(email){
   /* No sync on this device: nothing is coming, so release the tour rather than suppress it. */
   if(!syncActive()&&_firstPull){ _firstPull=false; try{ maybeStartTour(); }catch(e){} }
   if(hasMarketData()&&D.rules.autoRefresh==='yes')refreshAll();
+  /* Deliberately not awaited. See autoBrokerSync: entry must never wait on a broker. */
+  try{ autoBrokerSync(); }catch(e){}
 }
 /* Screener/Risk/Monte Carlo results (and their Chart.js instances) live in module-level globals
    outside of D, so a plain in-memory account switch (switchAccount, which does not reload the
@@ -11829,7 +11881,12 @@ function renderAll(){
   const wc=document.getElementById('welcomeCard');
   if(wc)wc.style.display=isNew?'block':'none';
   /* Market data is built in for a signed-in account; the key step only appears where it is true. */
-  if(wc){ const ks=document.getElementById('wcKeyStep'), built=hasMarketData(); if(ks)ks.style.display=built?'none':''; wc.querySelectorAll('.wc-n').forEach((n,i)=>{ n.textContent=String(built?i+1:i+2); });
+  if(wc){ const ks=document.getElementById('wcKeyStep'), built=hasMarketData(); if(ks)ks.style.display=built?'none':'';
+    wc.querySelectorAll('.wc-n').forEach((n,i)=>{ n.textContent=String(built?i+1:i+2); });
+    /* The key step is numbered 1 when it is showing, rather than 0. A zeroth step is a programmer's
+       way of counting and it was on screen. */
+    if(ks){ const z=ks.querySelector('.step-num'); if(z)z.textContent='1'; }
+    const cnt=document.getElementById('wcCount'); if(cnt)cnt.textContent=built?'Three':'Four';
     [['wcStep1',done1],['wcStep2',done2],['wcStep3',done3]].forEach(([id,ok])=>{ const el=document.getElementById(id); if(!el)return; el.classList.toggle('wc-done',!!ok); const n=el.querySelector('.step-num'); if(n&&ok)n.textContent='✓'; }); }
 
   /* The filter selects call renderAll, so the count on the Filters button is refreshed here rather
@@ -13065,6 +13122,7 @@ function showBrokerState(j){
   if(un)un.style.display=connected?'':'none';
   if(link)link.textContent=connected?'Connect another':'Connect a broker';
   renderBrokerAccounts(j&&j.accounts);
+  renderBrokerAutoRow(connected);
   if(!st)return;
   if(j&&j.error){ st.innerHTML='<span class="neg">'+esc(j.error)+'</span>'; return; }
   if(!connected){ st.textContent='Not connected.'; return; }
@@ -13123,10 +13181,98 @@ async function brokerSync(){
     const res=mergeBrokerData(j);
     broBusy(false,'');
     showBrokerState({connected:true,accounts:j.accounts,lastSyncAt:j.syncedAt});
-    toast(res);
+    /* Pressed by a person, so it answers whatever it found, including nothing. */
+    toast(res.text);
   }catch(e){ broBusy(false,''); toast(e.message); }
 }
-/* Returns the sentence the toast shows, so the counting and the reporting cannot drift apart. */
+/* ================= SYNC THE BROKER ON THE WAY IN (2026-10-06) =================
+
+   The owner's instruction: whenever I enter, it syncs to the broker and reloads everything. Before
+   this, a connected broker only moved when somebody opened Settings, found the broker card and
+   pressed Sync now, which means the book on screen was as old as the last time they remembered to.
+
+   WHAT IT DOES, IN ORDER. Ask the worker whether a broker is actually linked; if one is, pull the
+   positions and transactions, merge them, then reprice everything. The repricing is the "reloads
+   everything" half and it matters as much as the sync: new holdings arriving from a broker have no
+   quote, so without it they would sit at cost and the day's gain would be wrong.
+
+   WHAT IT WILL NOT DO:
+
+   - BLOCK ENTRY. Nothing here is awaited by the caller. A broker API having a slow morning must
+     never stand between somebody and their own terminal, so this runs behind the screen and the
+     screen is already usable.
+   - SHOUT. A failure is silent. There is nothing the reader can do about SnapTrade being down,
+     they did not ask for this sync, and an error bar on the way in over something nobody requested
+     is how software teaches people to ignore error bars. The broker card still has its own button,
+     which still says what went wrong when pressed. Success is a toast only when something actually
+     arrived; a sync that found nothing new says nothing, because most of them will find nothing.
+   - RUN ON EVERY RELOAD. finishLogin runs on a reload as well as a sign-in, and a broker that is
+     polled every time somebody refreshes a tab is a broker that starts rate-limiting. Ten minutes
+     between automatic syncs; pressing Sync now in Settings is never throttled, because that is a
+     person asking.
+   - TOUCH THE DEMO ACCOUNT, which has no access code and no broker, and whose whole promise is
+     that nothing in it is real or reaches the network.
+
+   It is a setting, defaulting on. Something that reaches out to a bank on your behalf without
+   being asked has to be refusable in the place it is explained. */
+const BROKER_AUTO_GAP_MS=10*60*1000;
+function brokerAutoOn(){ return !D||!D.rules||D.rules.brokerAutoSync!=='no'; }
+function setBrokerAuto(on){
+  if(!D)return;
+  if(!D.rules)D.rules={};
+  D.rules.brokerAutoSync=on?'yes':'no';
+  saveDB();
+  toast(on?'Your broker will be read each time you sign in.':'Automatic broker reads are off. Sync now still works.');
+}
+/* The row is shown only once a broker is actually connected: a switch governing something that
+   cannot happen is a question about nothing. showBrokerState is the one place that knows. */
+function renderBrokerAutoRow(connected){
+  const row=document.getElementById('broAutoRow'), box=document.getElementById('setBrokerAuto');
+  if(!row||!box)return;
+  row.style.display=connected?'flex':'none';
+  box.checked=brokerAutoOn();
+}
+async function autoBrokerSync(){
+  if(!D||isDemoUser()||!brokerAutoOn())return;
+  const code=brokerCode();
+  if(!code)return;
+  if(D.brokerAutoAt&&Date.now()-D.brokerAutoAt<BROKER_AUTO_GAP_MS)return;
+  try{
+    /* Status first. It is the cheap call, and syncing a broker that is not connected would spend a
+       request to be told so. */
+    const sr=await fetch(INVITE_WORKER+'/broker/status?code='+encodeURIComponent(code));
+    if(!sr.ok)return;                       // 503 is the operator not having switched it on
+    const st=await sr.json();
+    if(!st||!st.connected)return;
+    if(!sessionAlive())return;              // signed out while the status was on the wire
+    D.brokerAutoAt=Date.now();
+    const r=await fetch(INVITE_WORKER+'/broker/sync?code='+encodeURIComponent(code),{method:'POST'});
+    const j=await r.json();
+    if(!r.ok||!sessionAlive())return;
+    const said=mergeBrokerData(j);
+    saveDB();renderAll();
+    try{ showBrokerState({connected:true,accounts:j.accounts,lastSyncAt:j.syncedAt}); }catch(e){}
+    /* Nobody asked for this sync, so it speaks only when it has something to say. */
+    if(said&&said.changed)toast('From your broker: '+said.text);
+    await refreshAllSoon();
+  }catch(e){ /* silent on purpose: see above */ }
+}
+/* refreshAll drops itself if one is already running, and on the way in one usually is: finishLogin
+   starts a refresh of its own. Dropping the post-sync refresh would leave holdings that arrived
+   from the broker priced at cost, which is the exact thing this is for. So it waits for the
+   in-flight one to finish rather than firing into it. Bounded, because waiting forever on a flag
+   that never clears is a leak nobody would ever see. */
+async function refreshAllSoon(){
+  for(let i=0;i<60&&refreshing;i++)await new Promise(r=>setTimeout(r,500));
+  if(!sessionAlive()||!hasMarketData())return;
+  if(D.rules&&D.rules.autoRefresh==='no')return;   // they turned repricing off; honour it
+  await refreshAll();
+}
+/* Returns the sentence the toast shows, so the counting and the reporting cannot drift apart, and
+   alongside it `changed`, which is false when nothing actually moved. The sentence is written
+   unconditionally and reads "0 holdings added, 0 trades imported" on a sync that found nothing,
+   which is the right thing to show somebody who pressed Sync now and the wrong thing to interrupt
+   somebody with on the way in. Most automatic syncs find nothing. */
 function mergeBrokerData(j){
   let addedTx=0,dupeTx=0,addedH=0,keptH=0,differs=0;
   if(!D.transactions)D.transactions=[];
@@ -13159,7 +13305,8 @@ function mergeBrokerData(j){
   if(differs)bits.push(differs+' with a different share count, which you may want to check');
   bits.push(addedTx+' trade'+(addedTx===1?'':'s')+' imported');
   if(dupeTx)bits.push(dupeTx+' already there');
-  return bits.join(', ')+'. Trades are marked imported: history, not calls this terminal made.';
+  return {text:bits.join(', ')+'. Trades are marked imported: history, not calls this terminal made.',
+          changed:!!(addedH||addedTx||differs)};
 }
 async function brokerUnlink(){
   const code=brokerCode();
@@ -18864,7 +19011,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       card=document.createElement('div'); card.id='pfKeyCard'; card.className='card'; card.style.cssText='margin:14px 0 18px';
       card.innerHTML='<div style="font-weight:700;font-size:15px;margin-bottom:6px">Connect your free data key to see prices</div>'+
         '<div class="muted" style="font-size:13px"><a href="https://finnhub.io/register" target="_blank" rel="noopener">finnhub.io/register</a></div>'+
-        '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="pfKeyInput" placeholder="Finnhub API key" style="flex:1;min-width:220px;font-family:var(--mono)" autocomplete="off"><button type="button" class="btn btn-p btn-sm" id="pfKeySave">Save and refresh</button></div>';
+        '<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="pfKeyInput" placeholder="Finnhub API key" style="flex:1;min-width:220px;font-family:var(--mono)" autocomplete="off"><button type="button" class="btn btn-sm" id="pfKeySave">Save and refresh</button></div>';
       host.insertBefore(card,before||null);
       document.getElementById('pfKeySave').onclick=function(){ var v=(document.getElementById('pfKeyInput').value||'').trim(); if(!v) return; D.apiKey=v; if(typeof saveDB==='function') saveDB(); card.remove(); if(typeof refreshAll==='function') refreshAll(); else if(typeof loadMarketData==='function') loadMarketData(true); };
     }catch(e){}
@@ -18888,7 +19035,7 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
       '<div><div class="mv-kicker">Model view</div><div class="mv-title">Kronos, a K-line foundation model</div></div>'+
       '<div class="mv-form"><input id="pfModelSym" placeholder="TICKER" aria-label="Ticker" maxlength="10" autocapitalize="characters" spellcheck="false">'+
       '<select id="pfModelHz" aria-label="Horizon">'+HZ.map(function(h){return '<option value="'+h+'"'+(h===90?' selected':'')+'>'+h+' days</option>';}).join('')+'</select>'+
-      '<button class="btn btn-p" id="pfModelGo">Ask the model</button></div></div>'+
+      '<button class="btn" id="pfModelGo">Ask the model</button></div></div>'+
       '<div id="pfModelOut"><p class="mv-note">A forecast is the model\'s continuation of the price series, drawn as a median path with a 10 to 90 percent band. It is recorded and marked like any other call, and it is not a recommendation.</p></div>';
     host.insertBefore(d, host.firstChild);
     document.getElementById('pfModelGo').addEventListener('click', ask);
@@ -20002,6 +20149,8 @@ main .card .card,main .card .alert-item,main .card .prob-box,.alert-item,.list-c
 th{border-bottom-color:var(--border)}
 table thead th{background:transparent}
 .btn{border-radius:10px;padding:10px 20px}   /* rounded, not a pill: DESIGN.md keeps pills off buttons */
+/* This is the .btn-sm the page actually uses; the one near the top of the file is overridden by
+   it. Change button sizing here. */
 .btn-sm{padding:7px 14px}
 input,select,textarea,#globalSearch,.prob-own input,#pfModel .mv-form input,#pfModel .mv-form select,#tab-world .wd-form input,.list-pick,.mycall
   {border:0;border-radius:10px;background:var(--panel2);padding:9px 12px;box-shadow:none}
