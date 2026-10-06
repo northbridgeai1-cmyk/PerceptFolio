@@ -149,6 +149,41 @@ rules that cut the page into bands are gone; space (30px) does the grouping and 
 keeps its one rule. Row hairlines use --line, a shade lighter than --border. A keyless heat map
 is one line, not fifty grey tiles.
 
+## Friendly (2026-10-06)
+
+"Make it feel more friendly and usable for everyone." The fourth pass, and it reverses part of the
+second and third on purpose.
+
+The paper pass decided nothing on the page is framed or filled: a panel became a hairline above its
+content and space did the grouping. That is right for somebody who reads statements and wrong for
+everybody else, and it is the real reason the terminal twice read as "messed": space only groups
+things for a reader who already knows what the groups are. A beginner cannot see where one idea
+ends without a boundary.
+
+So gentle containment returns. A card is a warm white surface (`--pf-card` #fffdf8 on the bone
+ground; #16181d on dark), one hairline `--pf-cardline`, 14px radius, 18/20px padding. A card inside
+a card stays flat, as a hairline row, because nesting surfaces is how a page becomes a form. The
+stat row is one object rather than four floating figures.
+
+What did not change, because it was right: the bone ground, ink text, one blue, green and red only
+for numbers that moved and for a verdict word, mono only for data, Archivo for headings, no
+paragraph saying what a thing is for, one-line empty states.
+
+Legibility, which was the other half: body 15px, nothing quiet below 12.5px (the old 11 and 12px
+greys were a third of the screen), `--pf-muted` darkened to clear 4.5:1 on the card as well as on
+the ground. Controls take a 40px minimum height, 44px on a coarse pointer, fields included.
+
+The verdict is the loudest thing on its screen: still a word rather than a chip, still carrying its
+colour, now on its own surface with a 4px coloured left edge, so colour is not the only thing
+distinguishing it.
+
+Contrast is measured by `test/contrast.mjs` rather than eyeballed, both themes, including the
+meaning colours at 3:1 — they are held lower on the explicit grounds that none of them ever carries
+meaning alone here: the verdict is a word, the gain is a signed number, the colour only agrees.
+
+One block, `<style id="v4-friendly">`, last in the file. Delete it and the terminal is the
+paper-and-soft terminal again, which is how all four passes have been built.
+
 ## Browser surfaces
 
 Selection is --accent at .35. Scrollbars are --line2 thumbs on the page ground. Caret is --accent.

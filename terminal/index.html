@@ -20530,6 +20530,145 @@ header{border-bottom-color:var(--line)}
   .btn{padding:10px 18px}
 }
 </style>
+
+<style id="v4-friendly">
+/* ===== Friendly, 2026-10-06. "Make it feel more friendly and usable for everyone." =====
+
+   THE FOURTH PASS, AND IT REVERSES PART OF THE SECOND AND THIRD ON PURPOSE.
+
+   The paper pass (2026-09-21) decided that nothing on the page is framed or filled: a panel became
+   a hairline above its content, space did the grouping, and only things that float kept an edge.
+   Set like a statement, which is exactly right for somebody who reads statements.
+
+   It is wrong for everybody else, and the owner has now said so twice. "It all looks messed" was
+   not about the buttons; it was about a screen with no visible structure, where a beginner cannot
+   see where one idea ends and the next begins because nothing marks the boundary. Space only
+   groups things for a reader who already knows what the groups are.
+
+   So: gentle containment comes back. Not the boxes-everywhere of a dashboard template, and not the
+   heavy borders of the pre-ledger terminal. A card is a warm white surface, one hairline, a soft
+   radius and real padding, sitting on the bone ground. That is enough to say "these things belong
+   together" and little enough to keep the page calm.
+
+   WHAT IS NOT CHANGED, because it was right: the warm bone ground, ink text, one blue, green and
+   red only for numbers that moved and for a verdict word, mono only for data, Archivo for
+   headings, no paragraph on screen saying what a thing is for, one-line empty states. The
+   information design stands; this is about legibility and grouping.
+
+   EVERYTHING HERE IS LAST IN THE CASCADE AND SELF-CONTAINED. Delete this block and the terminal
+   is exactly the paper-and-soft terminal again, which is how the previous three passes were built
+   and the reason this one could be written at all. */
+
+/* ---- 1. GROUPING. A card is a surface again. ---------------------------------------------- */
+main .card{
+  background:var(--pf-card);
+  border:1px solid var(--pf-cardline);
+  border-radius:14px;
+  padding:18px 20px;
+}
+main .card+.card,.grid+.card,.card+.grid{margin-top:18px}
+/* A card inside a card stays flat: nesting surfaces is how a page starts to look like a form from
+   1998. The inner one is a hairline row, as the soft pass had it. */
+main .card .card,main .card .list-card,main .card .prob-box{
+  background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:12px 0;
+}
+main .card .card:first-child,main .card .list-card:first-child{border-top:0;padding-top:0}
+/* The stat row reads as one object rather than four floating figures. */
+.stat-row{
+  background:var(--pf-card);border:1px solid var(--pf-cardline);border-radius:14px;
+  padding:16px 20px;margin-bottom:22px;
+}
+
+/* ---- 2. LEGIBILITY. The quiet text was too quiet and too small. --------------------------- */
+/* 11.5 and 12px grey carried a third of this screen. Nothing below 12.5px, and the grey is
+   darkened to clear 4.5:1 on the card as well as on the ground. */
+body{font-size:15px}
+.muted{color:var(--pf-muted)}
+.muted[style*="font-size:11"],.muted[style*="font-size:12px"],
+[style*="font-size:11.5px"],[style*="font-size:12px"],[style*="font-size:11px"]{font-size:12.5px !important}
+small,.src{font-size:12.5px}
+/* Section titles earn a little more presence, since they are now the label on a real surface. */
+.section-title{font-size:16px;letter-spacing:-.01em}
+
+/* ---- 3. REACHABILITY. Controls big enough to hit, on any device. -------------------------- */
+.btn{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-sm{min-height:34px}
+.icon-btn{width:36px;height:36px}
+@media (pointer:coarse){
+  .btn{min-height:44px}
+  .btn-sm{min-height:40px}
+  .icon-btn{width:44px;height:44px}
+  select,input,textarea{min-height:44px}
+}
+/* Rows in a table are a touch taller, which is most of what makes a long table readable. */
+td,th{padding-top:9px;padding-bottom:9px}
+tbody tr:hover{background:var(--pf-rowhover)}
+
+/* ---- 4. THE TOKENS THIS PASS ADDS ---------------------------------------------------------- */
+/* Named rather than inlined so the dark theme can restate them and nothing else has to change. */
+/* THE ROOT HOLDS THE DARK VALUES AND LIGHT OVERRIDES ON body, not the other way round. The first
+   version put the white card at :root and corrected it with body:not(.theme-light), which works
+   only because custom properties inherit and body happens to sit between :root and everything
+   else. Anything rendered outside body, or any future rule that reads these off the documentElement,
+   got a white card on a near-black ground. Measured on 2026-10-06; the default belongs at the root.
+
+   Both pairs are checked by test/contrast.mjs rather than eyeballed. --pf-muted on its card is
+   6.81:1 light and 7.4:1 dark, against the 4.5 that AA asks for body text. */
+:root{
+  --pf-card:#16181d;
+  --pf-cardline:#2b2f38;
+  --pf-muted:#aeb4bf;
+  --pf-rowhover:rgba(255,255,255,.035);
+}
+body.theme-light{
+  --pf-card:#fffdf8;
+  --pf-cardline:#e7e2d6;
+  --pf-muted:#5b5a54;
+  --pf-rowhover:rgba(0,0,0,.025);
+}
+
+/* ---- 5. THE VERDICT IS THE LOUDEST THING ON ITS SCREEN ------------------------------------- */
+/* It is the answer. It was a coloured word the same size as the labels around it. Still a word,
+   not a chip, and still carrying its colour, but now with a tinted ground so it is findable at a
+   glance and so the colour is not the only thing distinguishing it. */
+.verdict-box{
+  border-radius:14px;padding:18px 20px;border:1px solid var(--pf-cardline);
+  background:var(--pf-card);border-left-width:4px;
+}
+.verdict-box.v-buy{border-left-color:var(--green)}
+.verdict-box.v-avoid{border-left-color:var(--red)}
+.verdict-box.v-hold{border-left-color:var(--yellow)}
+
+/* ---- 6. THE FRONT DOOR ---------------------------------------------------------------------- */
+/* The three filled chips are the product; the rest are the menu. On a card ground the outline ones
+   needed a surface of their own to stop looking like disabled buttons. */
+.doorChip:not(.doorChip-key){background:var(--pf-card);border-color:var(--pf-cardline)}
+.doorChip{min-height:38px}
+/* The filled three are restated here because this block is last in the cascade, and the first
+   version of this rule set a card background on every chip including them: their white label went
+   onto a white ground and the three most important controls on the screen disappeared. Caught by
+   looking at it, which is the only thing that catches a cascade bug. */
+.doorChip-key{background:var(--btn-bg);color:var(--btn-fg);border-color:var(--btn-bg)}
+@media (pointer:coarse){ .doorChip{min-height:44px} }
+
+/* ---- 7. THE TEST BANNER WAS SHOUTING -------------------------------------------------------- */
+/* Full-width saturated amber, uppercase, tracked, above everything. It is a true statement about a
+   sandbox account and it does not need to be the first thing anybody sees. Still unmissable, no
+   longer alarming. */
+body.is-demo #app::before{
+  letter-spacing:.01em;font-weight:600;text-transform:none;font-size:12.5px;line-height:1.4;
+  font-family:inherit;padding:8px 14px;
+}
+/* On a phone this was three lines of tracked uppercase mono across the top of an 812px screen,
+   which is a lot of a sandbox warning before anybody has seen the product. It still cannot be
+   missed; it is simply no longer the headline. */
+@media (max-width:600px){ body.is-demo #app::before{font-size:11.5px;padding:6px 10px} }
+
+/* ---- 8. SPACE, SLIGHTLY MORE GENEROUS ------------------------------------------------------- */
+main{padding-top:22px}
+.section-title{margin-top:28px}
+h3{margin-bottom:10px}
+</style>
 <script>
 /* The statements behind the 22 checks: ten fiscal years from SEC EDGAR (public domain, no key),
    as a table under an analysis. Display only; nothing here is a check, and every figure is the
