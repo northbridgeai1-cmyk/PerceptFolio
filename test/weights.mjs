@@ -37,7 +37,7 @@ const { CHECK_WEIGHT, weightedScore, sectionBreakdown } =
   new Function(CORE + 'return {CHECK_WEIGHT, weightedScore, sectionBreakdown};')();
 
 const build = rules => new Function('D', 'thesisFor',
-  CORE + liftConst('const THIN_BELOW=', ';') + '\n' +
+  CORE + liftConst('const THIN_BELOW=', ';') + '\n' + liftConst('const JUDGE_ABOVE=', ';') + '\n' +
   lift('function buyAt()') + '\n' + lift('function sellAt()') + '\n' +
   lift('function verdictOf(sc,isHolding,sym)') + '\nreturn verdictOf;')({ rules }, () => null);
 
@@ -189,10 +189,48 @@ console.log('\nIT STILL NAMES A REASON, NOT JUST A NUMBER');
   t('the owner is told it is a position to close', /position to think about closing/.test(V(allFail, true, 'X').why));
 }
 
+console.log('\nBELOW THE FLOOR THERE IS NO VERDICT AT ALL');
+{
+  /* Found by a council review and verified by running it: one answered check that passed scored
+     100% and printed BUY at 13% confidence. The warning fired; the word still said BUY. A warning
+     is not a gate, and nobody reads past a verdict they like. */
+  const V = build({ buyAt: 75, sellAt: 40, priceFloor: 50 });
+  const oneCheck = mk((n, k, i) => (k === 'quality' && i === 0) ? true : null);
+  const v = V(oneCheck, false, 'X');
+  t('one answered check does not print BUY', v.label !== 'BUY', { label: v.label, confidence: v.confidence });
+  t('it refuses to judge instead', v.label === 'NOT ENOUGH TO JUDGE', v.label);
+  t('and it is not dressed up as a HOLD', v.key === 'na', v.key);
+  t('it says how little it had', /Only \d+% of the checks could be answered/.test(v.why), v.why);
+  t('and names the sections that came back with nothing', /Nothing came back for/.test(v.why), v.why);
+  t('and refuses all three words explicitly', /not a buy, a hold or a sell/i.test(v.why), v.why);
+  t('the score is still reported, so nothing is hidden', v.score === 100 && v.confidence < 40, { s: v.score, c: v.confidence });
+}
+{
+  /* The two thresholds are deliberately different and must not collapse into one. */
+  const V = build({ buyAt: 75, sellAt: 40, priceFloor: 50 });
+  /* Between the floor and the warning line: a real verdict, disclaimed. */
+  const some = mk((n, k, i) => (k === 'quality') ? true : (k === 'priceChecks' && i < 3 ? true : null));
+  const v = V(some, false, 'X');
+  t('between the floor and the warning a verdict is still given', ['BUY', 'HOLD', 'SELL'].includes(v.label),
+    { label: v.label, confidence: v.confidence });
+  t('and it is above the floor', v.confidence >= 40, v.confidence);
+  const floor = liftConst('const JUDGE_ABOVE=', ';'), warn = liftConst('const THIN_BELOW=', ';');
+  t('the floor is lower than the warning line', /40/.test(floor) && /55/.test(warn), { floor, warn });
+}
+{
+  const V = build({ buyAt: 75, sellAt: 40, priceFloor: 50 });
+  t('a fully answered company is judged normally', ['BUY', 'HOLD', 'SELL'].includes(V(allPass, false, 'X').label));
+}
+
 console.log('\nTHIN EVIDENCE IS DISCLOSED, FIRST');
 {
   const V = build({ buyAt: 75, sellAt: 40 });
-  const sparse = mk((n, k, i) => (k === 'quality' && i < 2) ? true : null);
+  /* Between the floor (40) and the warning line (55): enough to form an opinion, little enough
+     that the opinion needs disclaiming. Below 40 it refuses outright, which is tested above. */
+  /* Quality (71 of 188) plus two price checks (15) is 46%: above the floor of 40, below the warning
+     line of 55. Quality alone is 38% and would be refused outright; quality plus all of price is
+     56% and would not warn at all. The window is narrow on purpose and this sits inside it. */
+  const sparse = mk((n, k, i) => k === 'quality' ? true : (k === 'priceChecks' && i < 2) ? true : null);
   const v = V(sparse, false, 'X');
   t('a verdict on very little evidence warns first', /^Careful: only \d+% of the checks/.test(v.why), v.why);
   t('and flags itself', v.thin === true);

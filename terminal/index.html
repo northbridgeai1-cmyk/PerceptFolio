@@ -5638,6 +5638,24 @@ function sellAt(){
    line is 55%: below that, more than two fifths of the weight never answered and the reader is
    being shown an opinion formed on a minority of the evidence. */
 const THIN_BELOW=55;
+/* ================= AND BELOW THIS, NO VERDICT AT ALL (2026-10-07) =================
+
+   Found by a council review, then verified by running it: a company with ONE answered check that
+   passed scored 100% and printed BUY, at 13% confidence. The warning fired and said so, and the
+   word still said BUY.
+
+   A warning is not a gate. "Careful, this rests on a minority of the evidence" above the word BUY
+   is the shape of a product that wants credit for the disclaimer and the conversion from the word.
+   Nobody reads past a verdict they like.
+
+   So below this line the verdict is withheld rather than softened: not a BUY, not a SELL, and not a
+   HOLD pretending to be a judgement either. It says it cannot judge, and it says what is missing.
+
+   WHY 40 AND NOT 55. 55 is where the warning starts, and between 40 and 55 there is genuinely
+   enough to form an opinion worth disclaiming. Below 40, three fifths of the weight never answered,
+   and any number computed on the rest is arithmetic rather than evidence. The two thresholds are
+   deliberately different: one frames a real answer, the other refuses to give one. */
+const JUDGE_ABOVE=40;
 function verdictOf(sc,isHolding,sym){
   /* "No data" for a rate limit told the reader the company had no data, which is false and reads
      as a broken terminal. Each failure says its own thing, in the words a person would use. */
@@ -5653,6 +5671,16 @@ function verdictOf(sc,isHolding,sym){
       why:'Not one of the checks could be answered for this company, so there is nothing to judge it on either way.'+owned};
   }
 
+  /* The floor, before anything else is decided. */
+  if(ws.confidence<JUDGE_ABOVE){
+    const bars0=sectionBreakdown(sc);
+    const missing=bars0.filter(b=>b.score===null).map(b=>b.name);
+    return {label:'NOT ENOUGH TO JUDGE',cls:'pill-na',key:'na',thin:true,
+      score:ws.score,confidence:ws.confidence,detail:'too little answered',
+      why:'Only '+ws.confidence+'% of the checks could be answered for this company, which is under the '+JUDGE_ABOVE+'% this terminal needs before it will call anything. '
+        +(missing.length?'Nothing came back for '+missing.join(', ')+'. ':'')
+        +'It is not a buy, a hold or a sell; there is not enough here to say.'};
+  }
   const thin=ws.confidence<THIN_BELOW;
   /* The warning goes BEFORE the arithmetic, not after it. Appended, it reads as a footnote to a
      conclusion the reader has already accepted; first, it is the frame they read the number in. */

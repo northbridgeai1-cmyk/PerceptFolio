@@ -106,6 +106,21 @@ third number visible, which is the one that has been doing damage invisibly.
 probabilities, and no such mapping is measured here. It would look more precise than it is, and
 precision this product has not earned is the one thing it has never shipped.
 
+## 4a. Fixed the same day: a verdict on almost no evidence
+
+A council review asked whether a score of passed-over-answered had a floor. It did not, and running
+it confirmed the worst case: **one answered check that passed scored 100% and printed BUY, at 13%
+confidence.** The warning fired and said so, and the word still said BUY.
+
+A warning is not a gate. "Careful, this rests on a minority of the evidence" printed above the word
+BUY is the shape of a product that wants credit for the disclaimer and the conversion from the word.
+
+Below 40% answered the verdict is now withheld rather than softened: **NOT ENOUGH TO JUDGE**, with
+the sections that came back empty named. It is not a buy, a hold or a sell.
+
+Two thresholds, deliberately different: 40% is where it refuses to judge, 55% is where it judges but
+disclaims. Between them there is genuinely enough to form an opinion worth qualifying.
+
 ## 5. What to add, in order
 
 | # | Thing | Why it is in this position | Size |
