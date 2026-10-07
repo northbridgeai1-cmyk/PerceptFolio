@@ -2193,21 +2193,21 @@ G('Scorecard v1.0, frozen 2026-09-21: the record is attributable to it');
    of the 22 checks orphans every call made before it, so the two are hashed here against the
    version constant. To change the checks: bump SCORECARD_VERSION, replace this hash, and say why
    in PRD §26. A change that skips that fails the build. */
-t('the scorecard carries a version', /const SCORECARD_VERSION='2\.2 \(2026-10-07\)';/.test(term));
+t('the scorecard carries a version', /const SCORECARD_VERSION='2\.3 \(2026-10-07\)';/.test(term));
 t('every recorded call is stamped with it', /scorecard:SCORECARD_VERSION/.test(term));
 t('the scorecard view names it', /id="scorecardVersion"/.test(term) && /'scorecard v'\+SCORECARD_VERSION/.test(term));
 /* Re-pinned for v1.1 on 2026-10-06: scoreStock gained the context section (news counts and the
    supply-chain map) and verdictOf collapsed to three ownership-independent words. The 22 graded
    checks are untouched, so calls either side of the boundary stay comparable on quality, price and
    momentum; the reason is written out in PRD §26, as this guard demands. */
-t('scoreStock() and CHECK_ORDER match the frozen v2.2 hash', (() => {
+t('scoreStock() and CHECK_ORDER match the frozen v2.3 hash', (() => {
   const s0 = term.indexOf('async function scoreStock(sym){'), e0 = term.indexOf('\n}\n', s0) + 2;
   const c0 = term.indexOf('const CHECK_ORDER=['), ce = term.indexOf('];', c0) + 2;
   const src = (term.slice(s0, e0) + term.slice(c0, ce)).replace(/\s+/g, ' ');
-  return crypto.createHash('sha256').update(src).digest('hex').slice(0, 16) === '5def18813ca95cbf';
+  return crypto.createHash('sha256').update(src).digest('hex').slice(0, 16) === '8182618933154018';
 })(), 'the checks changed; bump SCORECARD_VERSION, re-pin the hash, and record why in PRD §26');
-t('and the reason for the v2.2 change is written down where the guard says to write it',
-  /\*\*Scorecard v2\.2, 2026-10-07\. Two refusals, no new checks\.\*\*/.test(read('PRD.md'))
+t('and the reason for the v2.3 change is written down where the guard says to write it',
+  /\*\*Scorecard v2\.3, 2026-10-07\. Who answers the four judgement checks\.\*\*/.test(read('PRD.md'))
   && /eight out of eight could never reach nine/.test(read("PRD.md"))
   && /ANALYSIS-AUDIT\.md/.test(read('PRD.md')));
 

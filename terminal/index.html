@@ -4892,7 +4892,55 @@ async function getSpy52wReturn(){
 
 /* ================= SCORING ENGINE ================= */
 // Manual (qualitative) answers per symbol: D.manual[sym] = {guidance:'yes'|'no'|'unknown', runway, moat, comps, fwdpe:number|null}
+/* ================= WHO ANSWERS THE JUDGEMENT CHECKS (2026-10-07) =================
+
+   Four of the thirty-six checks are not facts to look up. Is the moat durable, is there a growth
+   runway, did management raise guidance, is it cheaper than its peers. They are questions somebody
+   has to form a view on, and they sit blank for almost everybody, which is 15% of the weight
+   permanently at "unknown".
+
+   THE OWNER'S DECISION: at beginner level the model answers them; above it, the user does.
+
+   That is a deliberate split and worth stating plainly rather than burying. A beginner cannot judge
+   a moat, so a blank check helps nobody and a model's view is better than nothing as long as it is
+   labelled. Somebody who asked for ten or fifteen screens is telling you they want to judge for
+   themselves, and handing them a model's opinion dressed as their own rulebook would be the
+   opposite of what this product is.
+
+   WHAT IS TRUE AT EVERY LEVEL. A model answer is stored in its own field, never written into the
+   human one, so the two can never be confused and a later change of level does not inherit the
+   model's view. It is marked on screen wherever it is shown. The user can overrule it with one tap
+   and their answer wins permanently. And the verdict says when a model judgement contributed,
+   before the arithmetic, the same way it discloses a model-suggested supply chain.
+
+   THE RULE ELSEWHERE IS UNCHANGED: a model never produces the verdict. It answers a check, the
+   thresholds do the judging, and at every level above beginner it does not even do that. */
 function manualFor(sym){if(!D.manual[sym])D.manual[sym]={guidance:'unknown',runway:'unknown',moat:'unknown',comps:'unknown',fwdpe:null};return D.manual[sym];}
+/* The model's answers, kept apart from the human's. */
+function modelJudgedFor(sym){ return ((D.modelJudged||{})[sym])||null; }
+const JUDGE_FIELDS=['moat','runway','guidance','comps'];
+/* The note a judgement check carries. It always says who answered, because a check answered by a
+   model and a check answered by the person reading it are not the same evidence and must never
+   look the same on the page. */
+function judgeNote(j,fallback){
+  if(j.by==='you')return 'Your answer.';
+  if(j.by==='model')return 'Answered by the model because you are set to Starting out. '+(j.why||'')+' Change it and your answer wins.';
+  return fallback;
+}
+/* Whether the model is allowed to answer these at all, which is purely the account's level. */
+function modelMayJudge(){ return typeof userLevel==='function' && userLevel()===0; }
+/* The answer a check should use: the human's if they gave one, the model's only at beginner level,
+   'unknown' otherwise. Returns the source too, so every surface can say which it is showing. */
+function judgementFor(sym,field){
+  const human=manualFor(sym)[field];
+  if(human&&human!=='unknown')return {value:human,by:'you'};
+  if(modelMayJudge()){
+    const m=modelJudgedFor(sym);
+    if(m&&m[field]&&m[field].value&&m[field].value!=='unknown')
+      return {value:m[field].value,by:'model',why:m[field].why||''};
+  }
+  return {value:'unknown',by:null};
+}
 
 function dcfFairValue(fcfShare,g,disc,tg){
   let v=0,f=fcfShare;
@@ -5323,7 +5371,8 @@ async function scoreStock(sym){
   }
   add(out.quality,'EPS Beats','4/4 last Qtrs',epsVal,epsPass,epsPass==null?'Earnings history unavailable':'');
 
-  add(out.quality,'Revenue Guidance','Raised',man.guidance==='unknown'?null:man.guidance,man.guidance==='unknown'?null:man.guidance==='yes','Manual, check latest earnings call');
+  const jGuid=judgementFor(sym,'guidance');
+  add(out.quality,'Revenue Guidance','Raised',jGuid.value==='unknown'?null:jGuid.value,jGuid.value==='unknown'?null:jGuid.value==='yes',judgeNote(jGuid,'Check the latest earnings call.'));
 
   /* ---- Insider buying, read as clusters rather than a raw count ----
      One executive buying is noise — it can be a scheduled plan, a tax move, or one person's view.
@@ -5361,8 +5410,10 @@ async function scoreStock(sym){
   }
   add(out.quality,'Insider Buying','Cluster',insVal,insPass,insPass==null?'Insider data unavailable':insNote);
 
-  add(out.quality,'Clear Growth Runway','Yes',man.runway==='unknown'?null:man.runway,man.runway==='unknown'?null:man.runway==='yes','Manual. Your judgment');
-  add(out.quality,'Competitive Moat','Durable',man.moat==='unknown'?null:man.moat,man.moat==='unknown'?null:man.moat==='yes','Manual, your judgment');
+  const jRun=judgementFor(sym,'runway');
+  add(out.quality,'Clear Growth Runway','Yes',jRun.value==='unknown'?null:jRun.value,jRun.value==='unknown'?null:jRun.value==='yes',judgeNote(jRun,'Your judgement.'));
+  const jMoat=judgementFor(sym,'moat');
+  add(out.quality,'Competitive Moat','Durable',jMoat.value==='unknown'?null:jMoat.value,jMoat.value==='unknown'?null:jMoat.value==='yes',judgeNote(jMoat,'Your judgement.'));
 
   /* ---- PRICE (6) ---- */
   const pe=pick(m,['peTTM','peBasicExclExtraTTM','peExclExtraTTM','peAnnual']);
@@ -5375,7 +5426,8 @@ async function scoreStock(sym){
   }
   add(out.priceChecks,'P/E vs Own History','Below average',peHistVal,peHistPass,peHistPass==null?'Historical P/E unavailable':'');
 
-  add(out.priceChecks,'Comp Analysis','Below comparable companies',man.comps==='unknown'?null:man.comps,man.comps==='unknown'?null:man.comps==='yes','Manual. Compare P/E vs peers');
+  const jComp=judgementFor(sym,'comps');
+  add(out.priceChecks,'Comp Analysis','Below comparable companies',jComp.value==='unknown'?null:jComp.value,jComp.value==='unknown'?null:jComp.value==='yes',judgeNote(jComp,'Compare its P/E against its peers.'));
 
   let dcfPass=null,dcfVal=null;
   if(pfcf!=null&&pfcf>0&&out.price&&revG!=null){
@@ -5473,6 +5525,8 @@ async function scoreStock(sym){
     if(typeof newsCache!=='undefined'&&newsCache[cacheKey])newsItems=newsCache[cacheKey].items;
     else if(typeof screenerRunning==='undefined'||!screenerRunning)newsItems=await fhNews(sym,30);
   }catch(e){ newsItems=null; }
+  /* How many of the four judgement checks the model answered, for the verdict to disclose. */
+  out.modelJudgedCount=JUDGE_FIELDS.filter(f=>judgementFor(sym,f).by==='model').length;
   const ctx=contextChecks(newsItems,(D.relations&&D.relations[sym])||null,D.analyses||{});
   out.context=ctx.checks; out.newsCount=ctx.newsCount;
   out.chainRows=ctx.chainRows; out.chainGuessed=ctx.chainGuessed;
@@ -5788,7 +5842,13 @@ function verdictOf(sc,isHolding,sym){
   const guessWarn=(sc.chainGuessed>0&&sc.chainRows>0)
     ? 'Some of this rests on a supply chain a model suggested, not one you confirmed ('+sc.chainGuessed+' of '+sc.chainRows+' entries). Correct it on Supply chain and the answer follows. '
     : '';
-  const warn=(thin?'Careful: only '+ws.confidence+'% of the checks could be answered for this company, so this rests on a minority of the evidence. ':'')+guessWarn;
+  /* The same disclosure for the judgement checks a model answered. Said, not buried: this is the
+     one place in the terminal where a model's opinion reaches a verdict, and it only happens at
+     beginner level, and the reader has to know which it is looking at. */
+  const judgedWarn=(sc.modelJudgedCount>0)
+    ? sc.modelJudgedCount+' of the four judgement checks were answered by the model, not by you, because you are set to Starting out. Answer them yourself under the stock and your answers win. '
+    : '';
+  const warn=(thin?'Careful: only '+ws.confidence+'% of the checks could be answered for this company, so this rests on a minority of the evidence. ':'')+guessWarn+judgedWarn;
   const bars=sectionBreakdown(sc).filter(b=>b.score!==null);
   /* The section that is holding it back, named. A reason beats a number. */
   const weakest=bars.length?bars.reduce((a,b)=>b.score<a.score?b:a):null;
@@ -7883,7 +7943,7 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
    checks without a new version here would turn every call before it into the track record of a
    scorecard nobody can use any more. The test suite hashes scoreStock() and CHECK_ORDER against
    this version: change either, bump the version, and say why in PRD §26. */
-const SCORECARD_VERSION='2.2 (2026-10-07)';
+const SCORECARD_VERSION='2.3 (2026-10-07)';
 const CHECK_ORDER=[
   'Revenue Growth (YoY)','Gross Margin','Operating Margin','Free Cash Flow','Cash vs Debt',
   'Current Ratio','ROE','EPS Beats','Revenue Guidance','Insider Buying','Clear Growth Runway',
@@ -11490,8 +11550,18 @@ function renderAnalysis(sym,sc){
     else{s='- N/A';cls='check-na';}
     return '<tr><td>'+esc(c.name)+'</td><td class="muted">'+esc(c.target)+'</td><td>'+(c.value==null?'<span class="muted">no data</span>':esc(c.value))+'</td><td class="'+cls+'">'+s+'</td><td><small class="src">'+esc(c.note)+'</small></td></tr>';
   };
-  const manSel=(field,label)=>'<div class="field"><label>'+label+'</label><select onchange="setManual(\''+sym+'\',\''+field+'\',this.value)">'+
-    ['unknown','yes','no'].map(o=>'<option value="'+o+'"'+(man[field]===o?' selected':'')+'>'+(o==='unknown'?'Not sure yet':o==='yes'?'Yes':'No')+'</option>').join('')+'</select></div>';
+  /* The dropdown shows the HUMAN answer only, never the model's, so changing it is always an act
+     of answering rather than of editing something that looks like it was already yours. What the
+     model said sits under it, labelled, with the reason it gave. */
+  const manSel=(field,label)=>{
+    const j=judgementFor(sym,field);
+    const modelSaid=(j.by==='model')
+      ? '<div class="muted" style="font-size:11.5px;margin-top:4px">The model answered <b>'+esc(j.value)+'</b>'+(j.why?': '+esc(j.why):'')+'. Counting until you answer.</div>'
+      : (modelMayJudge()&&man[field]!=='unknown'
+          ? '<div class="muted" style="font-size:11.5px;margin-top:4px">Your answer, which beats the model\'s.</div>' : '');
+    return '<div class="field"><label>'+label+'</label><select onchange="setManual(\''+sym+'\',\''+field+'\',this.value)">'+
+      ['unknown','yes','no'].map(o=>'<option value="'+o+'"'+(man[field]===o?' selected':'')+'>'+(o==='unknown'?'Not sure yet':o==='yes'?'Yes':'No')+'</option>').join('')+'</select>'+modelSaid+'</div>';
+  };
   /* Three keys now; v-watch has no verdict that produces it any more and is left in the stylesheet
      for the stored history below, which still holds rows written when watch was a verdict. */
   const vCls=v.key==='buy'?'v-buy':v.key==='sell'?'v-avoid':'v-hold';
@@ -11712,7 +11782,12 @@ function renderCompare(sym1,sc1,sym2,sc2){
     '</div>'+
   '</div>';
 }
-function setManual(sym,f,v){manualFor(sym)[f]=v;saveDB();}
+function setManual(sym,f,v){
+  manualFor(sym)[f]=v;saveDB();
+  /* The human answer beats the model's from this moment, and the score should say so now rather
+     than after the next refresh. */
+  if(D.analyses&&D.analyses[sym])try{ analyzeStock(sym); }catch(e){}
+}
 function setManualNum(sym,f,v){manualFor(sym)[f]=v===''?null:parseFloat(v);saveDB();}
 /* ================= PORTFOLIO RISK ================= */
 let lastRiskCorrPairs=null;
@@ -13848,6 +13923,37 @@ async function brokerSync(){
     toast(res.text);
   }catch(e){ broBusy(false,''); toast(e.message); }
 }
+/* Ask the model the four judgement questions, for holdings, at beginner level only.
+
+   Guarded by modelMayJudge() rather than by the caller, so there is exactly one place that decides
+   whether a model is allowed to answer these and every path has to go through it. Same shape as the
+   chain pre-fill: holdings only, once each, capped, silent on failure, and recorded as tried so a
+   company the model answered "unknown" for is not asked again every morning. */
+async function judgeDrafts(){
+  if(!D||isDemoUser()||!modelMayJudge())return;
+  const code=brokerCode();
+  if(!code)return;
+  if(!D.modelJudged)D.modelJudged={};
+  if(!D.judgeTried)D.judgeTried={};
+  const todo=(D.holdings||[]).filter(h=>h.sym&&h.type==='Stock').map(h=>h.sym)
+    .filter(sym=>!D.modelJudged[sym]&&!D.judgeTried[sym])
+    .slice(0,6);
+  if(!todo.length)return;
+  for(const sym of todo){
+    if(!sessionAlive())return;
+    D.judgeTried[sym]=Date.now();
+    try{
+      const r=await fetch(INVITE_WORKER+'/judge',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({code,symbol:sym})});
+      if(!r.ok)continue;
+      const j=await r.json();
+      if(!sessionAlive())return;
+      if(j&&j.fields)D.modelJudged[sym]=j.fields;
+    }catch(e){ /* silent: nobody asked, and a blank check is already handled as unknown */ }
+  }
+  saveDB();
+}
+
 /* ================= THE MAP FILLS ITSELF FOR WHAT YOU OWN (2026-10-07) =================
 
    Eight of the context checks read the supply-chain map, and the map is filled by hand. Nobody
@@ -13958,6 +14064,7 @@ async function catchUpEverything(){
     /* After the scores, because the two counterparty-health checks read them. */
     catchUpStatus('Checking who they buy from and sell to\u2026');
     try{ await prefillChains(); }catch(e){}
+    try{ await judgeDrafts(); }catch(e){}
     if(!sessionAlive())return;
     catchUpStatus('Reading the news\u2026');
     try{ if(typeof loadNews==='function'){ _newsAutoLoaded=true; await loadNews(false); } }catch(e){}

@@ -241,7 +241,9 @@ console.log('\nTHE SHAPE scoreStock DEPENDS ON');
   t('the verdict discloses a model-suggested chain', /rests on a supply chain a model suggested/.test(src));
   t('it counts how many entries were suggested', /sc\.chainGuessed\+' of '\+sc\.chainRows\+' entries\)/.test(src));
   t('it points at the screen to correct them', /Correct it on Supply chain and the answer follows/.test(src));
-  t('and it is said before the score, not appended', /const warn=\(thin\?[\s\S]{0,200}\)\+guessWarn;/.test(src));
+  /* Three disclosures now share this line: thin evidence, a model-suggested chain, and model-
+     answered judgement checks. All of them go BEFORE the arithmetic. */
+  t('and it is said before the score, not appended', /const warn=\(thin\?[\s\S]{0,200}\)\+guessWarn\+judgedWarn;/.test(src));
   t('the rule itself is written down', /An AI adds information\. It never tells the user what to buy/.test(read('ANALYSIS-AUDIT.md')));
 }
 

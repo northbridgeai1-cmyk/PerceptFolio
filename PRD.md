@@ -585,6 +585,25 @@ record arrive. Done and decided:
     scored exactly like a confirmed one, which is what keeps the judgement in the thresholds.
   - The full rule, with the table of what a model may and may not do, is in ANALYSIS-AUDIT.md.
 
+- **Scorecard v2.3, 2026-10-07. Who answers the four judgement checks.** The checks and the scoring
+  method are unchanged; what changed is where one kind of answer may come from.
+  - Moat, growth runway, revenue guidance and comp analysis are not facts to look up. They sat blank
+    for almost everybody, which is 15% of the weight permanently at unknown.
+  - **The owner's rule, with its one deliberate exception: a model never judges, except at beginner
+    level, where it answers these four.** A beginner cannot judge a moat, so a blank check helps
+    nobody; somebody who asked for ten or fifteen screens is saying they want to judge for
+    themselves, and putting a model's opinion inside their own rulebook would be the opposite of
+    this product. `modelMayJudge()` is the single gate and reads nothing but the level.
+  - A model answer is stored in `D.modelJudged`, never written into `D.manual`, so the two cannot be
+    confused and raising the level never inherits an opinion the person did not form. A human answer
+    wins at every level and re-scores immediately. Every surface that shows a model answer says it
+    is the model's and gives its reason, and the verdict discloses how many of the four it answered.
+  - The worker route `/judge` is code-gated, cached a week, and its prompt requires "unknown" to be
+    available: a model that must choose will choose, and a forced opinion on a company it knows
+    nothing about is worse than silence.
+  - `aiText` gained **Groq** as a provider, tried first when `GROQ_API_KEY` is set. Same contract as
+    the others; unset, nothing changes.
+
 - **The data licence.** Finnhub's terms make every plan personal and forbid redistribution or
   business use without written approval. The worker's Finnhub key therefore serves only the
   operator's own devices (the `/finnhub` proxy behind the sync key, the operator's calendar). What

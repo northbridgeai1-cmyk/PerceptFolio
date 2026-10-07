@@ -781,7 +781,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/staffcode', '/forget', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/history', '/council', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/staffcode', '/forget', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/history', '/council', '/judge', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -3542,6 +3542,25 @@ function worldFeatures(results) {
 const CF_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 async function aiText(env, system, user, maxTokens) {
   let lastErr = null;
+  /* GROQ FIRST WHEN ITS KEY IS SET (2026-10-07), on the owner's instruction. It is an
+     OpenAI-shaped endpoint, so this is one more branch rather than a new abstraction, and the
+     contract is unchanged: a system prompt, a user message, plain text back. It is tried before the
+     others because setting the key is the act of choosing it; unset, nothing about this changes. */
+  if (env.GROQ_API_KEY) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + env.GROQ_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: env.GROQ_MODEL || 'llama-3.3-70b-versatile', max_tokens: maxTokens, temperature: 0,
+          messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error('groq ' + res.status + (j && j.error && j.error.message ? ': ' + String(j.error.message).slice(0, 120) : ''));
+      const text = (j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+      if (!text.trim()) throw new Error('groq answered nothing');
+      return { text, model: 'groq' };
+    } catch (e) { lastErr = e; }
+  }
   if (env.AI_API_KEY) {
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': env.AI_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
@@ -3787,6 +3806,61 @@ async function handleBilling(request, env, url) {
      is an endpoint nobody is watching, so it goes rather than lingering as a reachable surface that
      still spends a Modal invocation for anyone who finds it. KRONOS_URL and KRONOS_TOKEN can be
      unset; the service under kronos/ is no longer wired to anything. */
+
+  /* ---- POST /judge {code, symbol, name, industry} -> the four judgement checks ----
+
+     Four of the terminal's checks are not facts to look up: is the moat durable, is there a growth
+     runway, did management raise guidance, is it cheaper than its peers. The owner's rule is that a
+     model never judges, with one exception they set deliberately: at BEGINNER level it answers
+     these, because somebody who has never invested cannot, and a permanently blank check helps
+     nobody. Above that level the terminal does not call this route at all.
+
+     The answer is yes, no or unknown, with one short reason each. Unknown is required to be
+     available and the prompt says so: a model that must choose will choose, and a forced opinion on
+     a company it knows nothing about is worse than silence. Cached per symbol for a week, because
+     these change on the timescale of a business, not a quote. */
+  if (url.pathname === '/judge' && request.method === 'POST') {
+    if (await tooMany(env, request, '/judge', 10)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
+    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
+    const code = clean(body.code, 12).toUpperCase();
+    if (!(await grantIsLive(env, code))) return json({ error: 'A live access code is required.' }, 401, env);
+    const sym = clean(body.symbol, 12).toUpperCase();
+    if (!/^[A-Z.\-]{1,10}$/.test(sym)) return json({ error: 'Symbol.' }, 400, env);
+    if (!(env.GROQ_API_KEY || env.AI_API_KEY || env.AI)) return json({ error: 'No model is configured on the worker.', configured: false }, 503, env);
+    const ck = 'judge:' + sym;
+    const cached = await env.PF_SYNC.get(ck);
+    if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
+    const name = clean(body.name, 80) || sym, industry = clean(body.industry, 60);
+    const system = 'You answer four specific questions about a public company for a stock research tool. '
+      + 'Answer ONLY with JSON: {"moat":{"v":"yes|no|unknown","why":"..."},"runway":{...},"guidance":{...},"comps":{...}}. '
+      + 'Each "why" is one short sentence, at most 18 words, naming the concrete reason. '
+      + 'Use "unknown" whenever you are not confident from well-established public knowledge. '
+      + 'Guessing is worse than unknown here: a wrong answer silently changes somebody\'s investment score. '
+      + 'Never give investment advice and never say whether to buy or sell.';
+    const user = 'Company: ' + name + ' (' + sym + ')' + (industry ? ', industry: ' + industry : '') + '\n\n'
+      + 'moat: does it have a durable competitive moat?\n'
+      + 'runway: does it have a clear runway for growth ahead?\n'
+      + 'guidance: did management RAISE revenue guidance at the most recent earnings call?\n'
+      + 'comps: is it cheaper than comparable companies on earnings multiples?';
+    let out = null, modelUsed = null;
+    try {
+      const r = await aiText(env, system, user, 500);
+      modelUsed = r.model;
+      const m = r.text.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error('the model did not answer with JSON');
+      out = JSON.parse(m[0]);
+    } catch (e) { return json({ error: 'The model did not answer.', detail: String(e.message || e).slice(0, 140) }, 502, env); }
+    const ok = v => (v === 'yes' || v === 'no') ? v : 'unknown';
+    const fields = {};
+    for (const f of ['moat', 'runway', 'guidance', 'comps']) {
+      const o = out && out[f] || {};
+      fields[f] = { value: ok(clean(o.v, 10)), why: clean(o.why, 140) };
+    }
+    const result = { symbol: sym, fields, model: modelUsed, asOf: new Date().toISOString().slice(0, 10),
+      disclaimer: 'Answered by a model from general public knowledge, not from filings. Shown only to accounts set to Starting out, marked as the model\'s, and overridden by your own answer.', cached: false };
+    await env.PF_SYNC.put(ck, JSON.stringify(result), { expirationTtl: 604800 });
+    return json(result, 200, env);
+  }
 
   /* ---- GET /history?symbol=SPY : two years of daily closes, cached a day ----
      The terminal's charts, averages, volatility and growth views read the app's own price log,
