@@ -5177,7 +5177,24 @@ function contextChecks(newsItems,rel,scores){
     cu==null?null:cu.bad===0,
     cu==null?'No mapped customer has a ticker this terminal has scored':'A customer you would sell is revenue that may not arrive.'+(cu.bad?' '+cu.names.join(', '):''));
 
-  return {checks,newsCount};
+  /* ================= WHERE A MODEL SUPPLIED THE INFORMATION (2026-10-07) =================
+
+     The owner's rule, set out in one sentence: an AI adds INFORMATION, it never tells the user what
+     to buy; the verdict is the user's own rules, or the defaults shipped for them.
+
+     The supply-chain checks sit exactly on that line and are the only thing in the terminal that
+     does. The map can be pre-filled by a model, and five checks read it, so a model's idea of who
+     supplies whom moves a verdict. Under the rule that is allowed, because what the model supplied
+     is a FACT CLAIM about the world and the judgement is still the thresholds in Settings applied
+     to it.
+
+     What the rule does not permit is for that to be invisible. A verdict resting on a supply chain
+     nobody has checked is a verdict resting on a guess, and the reader has to be able to see which.
+     So it is counted and reported, and the verdict discloses it the same way it discloses thin
+     evidence: before the arithmetic, not as a footnote. */
+  const chainRows=sup.concat(cus);
+  const guessed=chainRows.filter(x=>x&&x.prefilled).length;
+  return {checks,newsCount,chainRows:chainRows.length,chainGuessed:guessed};
 }
 async function scoreStock(sym){
   sym=sym.toUpperCase();
@@ -5435,6 +5452,7 @@ async function scoreStock(sym){
   }catch(e){ newsItems=null; }
   const ctx=contextChecks(newsItems,(D.relations&&D.relations[sym])||null,D.analyses||{});
   out.context=ctx.checks; out.newsCount=ctx.newsCount;
+  out.chainRows=ctx.chainRows; out.chainGuessed=ctx.chainGuessed;
 
   /* ---- RISK-ADJUSTED OUTLOOK — Sharpe-ratio rating + 1-yr range (same math as the Monte Carlo tool) ---- */
   let outlook=null;
@@ -5684,7 +5702,14 @@ function verdictOf(sc,isHolding,sym){
   const thin=ws.confidence<THIN_BELOW;
   /* The warning goes BEFORE the arithmetic, not after it. Appended, it reads as a footnote to a
      conclusion the reader has already accepted; first, it is the frame they read the number in. */
-  const warn=thin?'Careful: only '+ws.confidence+'% of the checks could be answered for this company, so this rests on a minority of the evidence. ':'';
+  /* A model supplied some of what this rests on. Said before the arithmetic, for the same reason
+     thin evidence is: appended, it reads as a footnote to a conclusion already accepted. It names
+     the screen to correct it on, because the rule is that the user's judgement wins and that is
+     only true if correcting it is one press away. */
+  const guessWarn=(sc.chainGuessed>0&&sc.chainRows>0)
+    ? 'Some of this rests on a supply chain a model suggested, not one you confirmed ('+sc.chainGuessed+' of '+sc.chainRows+' entries). Correct it on Supply chain and the answer follows. '
+    : '';
+  const warn=(thin?'Careful: only '+ws.confidence+'% of the checks could be answered for this company, so this rests on a minority of the evidence. ':'')+guessWarn;
   const bars=sectionBreakdown(sc).filter(b=>b.score!==null);
   /* The section that is holding it back, named. A reason beats a number. */
   const weakest=bars.length?bars.reduce((a,b)=>b.score<a.score?b:a):null;
@@ -7779,7 +7804,7 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
    checks without a new version here would turn every call before it into the track record of a
    scorecard nobody can use any more. The test suite hashes scoreStock() and CHECK_ORDER against
    this version: change either, bump the version, and say why in PRD §26. */
-const SCORECARD_VERSION='2.1 (2026-10-07)';
+const SCORECARD_VERSION='2.2 (2026-10-07)';
 const CHECK_ORDER=[
   'Revenue Growth (YoY)','Gross Margin','Operating Margin','Free Cash Flow','Cash vs Debt',
   'Current Ratio','ROE','EPS Beats','Revenue Guidance','Insider Buying','Clear Growth Runway',

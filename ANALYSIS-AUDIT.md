@@ -31,6 +31,31 @@ The fix is in the scoring, not the bar: a check that could not answer no longer 
 company, it reduces how much is known about it. Score is a share of the weight that **answered**;
 confidence is how much of the total weight that was.
 
+## Where an AI is allowed to touch this
+
+Set by the owner, 2026-10-07, and it is the line everything else here hangs off:
+
+> **An AI adds information. It never tells the user what to buy. The verdict is the rules the user
+> set, or the defaults shipped for them.**
+
+| A model may | A model may not |
+|---|---|
+| Suggest who a company's suppliers and customers are | Say whether a company is good |
+| Classify what a headline is about | Decide what a headline means for the price |
+| Pull a figure out of a filing and cite the page | State a figure from memory |
+| Restate a check in plainer words | Choose a threshold, or move one |
+| Draft something for the user to confirm | Confirm it on their behalf |
+
+**The one place this is live, and the care it needs.** The supply-chain map can be pre-filled by a
+model, and five checks read it, so a model's claim about who supplies whom moves a verdict. That is
+permitted: the model supplied a *fact claim*, and the judgement is still the user's thresholds
+applied to it. What is not permitted is for that to be invisible. Every pre-filled entry is marked
+on screen, and any verdict resting on one says so before the arithmetic, names how many of the
+entries were suggested rather than confirmed, and points at the screen to correct them.
+
+A verdict that rests on a guess nobody has checked is still a guess. The product's claim is not that
+it is never wrong; it is that you can always see what it is wrong about.
+
 ## Scoring
 
 ```

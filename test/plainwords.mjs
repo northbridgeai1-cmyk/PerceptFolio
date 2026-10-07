@@ -120,7 +120,7 @@ console.log('\nWORDS ONLY: NO NUMBER, THRESHOLD OR VERDICT DEPENDS ON THE LEVEL'
   t('verdictOf never asks what level the reader is', !/userLevel/.test(v));
   const score = lift('async function scoreStock(sym)');
   t('scoreStock never asks either', !/userLevel/.test(score));
-  const ctx = lift('function contextChecks(newsItems,rel)');
+  const ctx = lift('function contextChecks(newsItems,rel,scores)');
   t('nor do the context checks', !/userLevel/.test(ctx));
   const proj = lift('function projectStock(mu,sigma,years)');
   t('nor the projection arithmetic', !/userLevel/.test(proj));

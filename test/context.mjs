@@ -20,6 +20,7 @@
      - one story that is both a lawsuit and a regulator counts once, not twice. */
 import { readFileSync } from 'node:fs';
 const src = readFileSync(new URL('../terminal/index.html', import.meta.url), 'utf8');
+const read = f => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 
 function lift(sig) {
   const at = src.indexOf(sig);
@@ -217,7 +218,34 @@ console.log('\nTHE SHAPE scoreStock DEPENDS ON');
     t('a ticker that errored is not counted', by(run([], rel, { X: { error: 'NO_DATA' } }), 'Suppliers you would not own').pass === null);
   }
 
-  console.log('\nAND THE MAP FILLS ITSELF FOR WHAT YOU OWN');
+  console.log('\nAN AI ADDS INFORMATION, IT NEVER GIVES THE VERDICT');
+{
+  /* The owner's rule, 2026-10-07: a model may supply a fact claim; the judgement stays the user's
+     thresholds applied to it. The supply-chain map is the only place in the terminal that sits on
+     this line, because a model can fill it and five checks read it. Permitted, but never invisible. */
+  const confirmed = { suppliers: [{ name: 'A', ticker: 'A', weight: 20 }], customers: [{ name: 'B', weight: 20 }] };
+  const guessed = { suppliers: [{ name: 'A', ticker: 'A', weight: 20, prefilled: true }], customers: [{ name: 'B', weight: 20, prefilled: true }] };
+  const mixed = { suppliers: [{ name: 'A', weight: 20, prefilled: true }], customers: [{ name: 'B', weight: 20 }] };
+  t('a map the user confirmed is reported as nothing guessed', run([], confirmed).chainGuessed === 0, run([], confirmed).chainGuessed);
+  t('a map a model filled is counted', run([], guessed).chainGuessed === 2, run([], guessed).chainGuessed);
+  t('and a mixed map counts only the suggested rows', run([], mixed).chainGuessed === 1 && run([], mixed).chainRows === 2,
+    { guessed: run([], mixed).chainGuessed, rows: run([], mixed).chainRows });
+  t('an empty map guesses nothing', run([], null).chainGuessed === 0 && run([], null).chainRows === 0);
+  /* The checks themselves must not care: a suggested supplier is scored exactly like a confirmed
+     one, because the model supplied the fact and the threshold still does the judging. */
+  t('a suggested entry is scored the same as a confirmed one',
+    by(run([], guessed), 'Supplier concentration').pass === by(run([], confirmed), 'Supplier concentration').pass);
+}
+{
+  /* And the verdict has to say so, before the arithmetic rather than after it. */
+  t('the verdict discloses a model-suggested chain', /rests on a supply chain a model suggested/.test(src));
+  t('it counts how many entries were suggested', /sc\.chainGuessed\+' of '\+sc\.chainRows\+' entries\)/.test(src));
+  t('it points at the screen to correct them', /Correct it on Supply chain and the answer follows/.test(src));
+  t('and it is said before the score, not appended', /const warn=\(thin\?[\s\S]{0,200}\)\+guessWarn;/.test(src));
+  t('the rule itself is written down', /An AI adds information\. It never tells the user what to buy/.test(read('ANALYSIS-AUDIT.md')));
+}
+
+console.log('\nAND THE MAP FILLS ITSELF FOR WHAT YOU OWN');
   {
     t('the pre-fill runs on the way in', /try\{ await prefillChains\(\); \}catch/.test(src));
     t('holdings only, not the watchlist', /\(D\.holdings\|\|\[\]\)\.filter\(h=>h\.sym&&h\.type==='Stock'\)/.test(src)

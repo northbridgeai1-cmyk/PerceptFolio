@@ -564,6 +564,27 @@ record arrive. Done and decided:
     existed, because eight of these read a hand-entered map that nobody enters. Marked as the
     model's guess, never overwriting a human edit, capped at six companies a sign-in.
 
+- **Scorecard v2.2, 2026-10-07. Two refusals, no new checks.** The check list is untouched; what
+  changed is when the scorer declines to speak.
+  - **A confidence floor.** Score is the share of check WEIGHT that passed out of the weight that
+    answered, which has no lower bound on how much answered. Verified by running it: a company with
+    ONE answered check that passed scored 100% and printed **BUY at 13% confidence**. The thin-data
+    warning fired and said so, and the word still said BUY. A warning is not a gate. Below **40%
+    answered** the verdict is now withheld rather than softened: `NOT ENOUGH TO JUDGE`, naming the
+    sections that came back empty, explicitly not a buy, a hold or a sell. The score and confidence
+    are still shown; what is removed is the claim. Two thresholds, deliberately apart: 40 refuses to
+    judge, 55 judges and discloses.
+  - **Model-supplied information is disclosed in the verdict.** The owner's standing rule, set this
+    day: *an AI adds information, it never tells the user what to buy; the verdict is the rules the
+    user set, or the defaults shipped for them.* The supply-chain map is the only place in the
+    terminal that sits on that line, because a model can pre-fill it and five checks read it. That
+    is permitted — the model supplied a fact claim, the judgement is still the user's thresholds
+    applied to it — but it may not be invisible. A verdict resting on pre-filled entries now says
+    so before the arithmetic, counts how many of them were suggested rather than confirmed, and
+    names the screen to correct them on. The checks themselves do not care: a suggested supplier is
+    scored exactly like a confirmed one, which is what keeps the judgement in the thresholds.
+  - The full rule, with the table of what a model may and may not do, is in ANALYSIS-AUDIT.md.
+
 - **The data licence.** Finnhub's terms make every plan personal and forbid redistribution or
   business use without written approval. The worker's Finnhub key therefore serves only the
   operator's own devices (the `/finnhub` proxy behind the sync key, the operator's calendar). What
