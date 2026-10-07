@@ -5067,7 +5067,7 @@ function riskAndProjectionHtml(sc,sym,isHolding){
    published). Those are different and must stay different: null means every news check is null,
    and empty means the coverage check legitimately fails while the two "no bad news" checks pass,
    because no stories really does mean no lawsuits were reported. */
-function contextChecks(newsItems,rel){
+function contextChecks(newsItems,rel,scores){
   const checks=[];
   const add=(name,target,value,pass,note)=>{checks.push({name,target,value,pass,note:note||''});};
   const haveNews=Array.isArray(newsItems);
@@ -5101,26 +5101,81 @@ function contextChecks(newsItems,rel){
     newsCount==null?null:newsCount>=3,
     'A company almost nobody writes about is harder to be wrong about slowly. Not a judgement on the coverage.');
 
+  /* ================= WHO THEY BUY FROM, NOT JUST WHO THEY SELL TO (2026-10-07) =================
+
+     The owner: it should also be analysing who they buy from, if there is a big supplier.
+
+     Correct, and the omission was lopsided in an obvious way once pointed at. There were three
+     chain checks and they were all about CUSTOMERS, plus a bare count of suppliers. A company with
+     one supplier for the part it cannot make itself is the company that stops shipping when that
+     supplier has a fire, and nothing here measured it. Suppliers now mirror customers exactly:
+     mapped, concentrated, and more than one.
+
+     AND BOTH SIDES ARE CHECKED FOR HEALTH, which is the part no vendor feed does. A counterparty
+     that carries a ticker gets its own weighted score read from D.analyses, the same score this
+     terminal computes for anything else. A supplier you would sell is a supplier that may not
+     deliver; a customer you would sell is revenue that may not arrive. It costs nothing: the score
+     is already there if that name has ever been looked at.
+
+     EVERY ONE OF THESE IS NULL WHEN THE MAP IS EMPTY, which matters more here than anywhere else,
+     because the map is filled by hand or by the pre-fill rather than by a data feed. Unmapped is
+     not a failing company. */
   const sup=(rel&&Array.isArray(rel.suppliers))?rel.suppliers:[];
   const cus=(rel&&Array.isArray(rel.customers))?rel.customers:[];
   const mapped=sup.length+cus.length;
   const maxW=list=>list.length?Math.max(...list.map(x=>isFinite(x.weight)?x.weight:0)):null;
+  /* A counterparty is "one you would not own" when this terminal's own score for it is at or under
+     the sell line. Names with no ticker, or never scored, are not counted either way. */
+  const unhealthy=list=>{
+    const seen=list.filter(x=>x.ticker&&scores&&scores[x.ticker]&&!scores[x.ticker].error);
+    if(!seen.length)return null;
+    const bad=seen.filter(x=>{
+      const ws=weightedScore(scores[x.ticker]);
+      return ws&&ws.score!==null&&ws.score<=sellAt();
+    });
+    return {seen:seen.length,bad:bad.length,names:bad.map(x=>x.ticker)};
+  };
 
+  /* ---- who they sell to ---- */
   add('Who they sell to is mapped','At least one customer recorded',
     mapped===0?null:cus.length+' recorded',
     mapped===0?null:cus.length>0,
     mapped===0?'Nothing mapped for this company yet. Supply chain screen.':'From your own map, not from a vendor feed.');
-
   const cmax=maxW(cus);
   add('Customer concentration','No single customer over a third',
     cmax==null?null:'largest '+cmax+'%',
     cmax==null?null:cmax<=33,
-    cmax==null?'No customers mapped yet':'Weights are the ones you entered. One customer who can leave is the risk this measures.');
+    cmax==null?'No customers mapped yet':'One customer who can leave is the risk this measures.');
+  add('More than one customer','2 or more recorded',
+    mapped===0?null:cus.length+' recorded',
+    mapped===0?null:cus.length>=2,
+    mapped===0?'Nothing mapped for this company yet':'One buyer setting the price is a weak position to be in.');
 
+  /* ---- who they buy from ---- */
+  add('Who they buy from is mapped','At least one supplier recorded',
+    mapped===0?null:sup.length+' recorded',
+    mapped===0?null:sup.length>0,
+    mapped===0?'Nothing mapped for this company yet. Supply chain screen.':'From your own map, not from a vendor feed.');
+  const smax=maxW(sup);
+  add('Supplier concentration','No single supplier over a third',
+    smax==null?null:'largest '+smax+'%',
+    smax==null?null:smax<=33,
+    smax==null?'No suppliers mapped yet':'The part they cannot make themselves, from one place. This is the one that stops production.');
   add('More than one supplier','2 or more recorded',
     mapped===0?null:sup.length+' recorded',
     mapped===0?null:sup.length>=2,
     mapped===0?'Nothing mapped for this company yet':'A single source of supply is a single point of failure.');
+
+  /* ---- and whether either side is in trouble, by this terminal's own score ---- */
+  const su=unhealthy(sup), cu=unhealthy(cus);
+  add('Suppliers you would not own','None scoring at or under your sell line',
+    su==null?null:su.bad+' of '+su.seen+' scored',
+    su==null?null:su.bad===0,
+    su==null?'No mapped supplier has a ticker this terminal has scored':'A supplier you would sell is a supplier that may not deliver.'+(su.bad?' '+su.names.join(', '):''));
+  add('Customers you would not own','None scoring at or under your sell line',
+    cu==null?null:cu.bad+' of '+cu.seen+' scored',
+    cu==null?null:cu.bad===0,
+    cu==null?'No mapped customer has a ticker this terminal has scored':'A customer you would sell is revenue that may not arrive.'+(cu.bad?' '+cu.names.join(', '):''));
 
   return {checks,newsCount};
 }
@@ -5378,7 +5433,7 @@ async function scoreStock(sym){
     if(typeof newsCache!=='undefined'&&newsCache[cacheKey])newsItems=newsCache[cacheKey].items;
     else if(typeof screenerRunning==='undefined'||!screenerRunning)newsItems=await fhNews(sym,30);
   }catch(e){ newsItems=null; }
-  const ctx=contextChecks(newsItems,(D.relations&&D.relations[sym])||null);
+  const ctx=contextChecks(newsItems,(D.relations&&D.relations[sym])||null,D.analyses||{});
   out.context=ctx.checks; out.newsCount=ctx.newsCount;
 
   /* ---- RISK-ADJUSTED OUTLOOK — Sharpe-ratio rating + 1-yr range (same math as the Monte Carlo tool) ---- */
@@ -5472,8 +5527,13 @@ const CHECK_WEIGHT={
   /* Momentum: is the market agreeing yet */
   'Beating the Market':7, '6-Month Return':6, '12-Month Return':6, 'Near 52-Week High':5,
   /* The news and who they trade with */
-  'Legal and regulatory news':7, 'Customer concentration':6, 'Layoffs or restructuring':5,
-  'More than one supplier':4, 'Press coverage':2, 'Who they sell to is mapped':2,
+  'Legal and regulatory news':7, 'Layoffs or restructuring':5, 'Press coverage':2,
+  'Customer concentration':6, 'More than one customer':4, 'Who they sell to is mapped':2,
+  /* Suppliers mirror customers exactly, added 2026-10-07: there were three customer checks and a
+     bare supplier count, and a single source of supply is the one that stops production. */
+  'Supplier concentration':6, 'More than one supplier':4, 'Who they buy from is mapped':2,
+  /* Both sides read this terminal's own score for any counterparty that carries a ticker. */
+  'Suppliers you would not own':5, 'Customers you would not own':5,
   /* Wall Street: what everyone else thinks. They used to gate nothing at all; now they count, at
      the bottom of the scale, which is present in the verdict and unable to decide it. */
   'Price Target Upside':4, 'Analyst Consensus':3, 'Volume Trend':3,
@@ -7691,7 +7751,7 @@ function recordCall(sym,sc,verdictKey,verdictLabel,track){
    checks without a new version here would turn every call before it into the track record of a
    scorecard nobody can use any more. The test suite hashes scoreStock() and CHECK_ORDER against
    this version: change either, bump the version, and say why in PRD §26. */
-const SCORECARD_VERSION='2.0 (2026-10-06)';
+const SCORECARD_VERSION='2.1 (2026-10-07)';
 const CHECK_ORDER=[
   'Revenue Growth (YoY)','Gross Margin','Operating Margin','Free Cash Flow','Cash vs Debt',
   'Current Ratio','ROE','EPS Beats','Revenue Guidance','Insider Buying','Clear Growth Runway',
@@ -13642,6 +13702,56 @@ async function brokerSync(){
     toast(res.text);
   }catch(e){ broBusy(false,''); toast(e.message); }
 }
+/* ================= THE MAP FILLS ITSELF FOR WHAT YOU OWN (2026-10-07) =================
+
+   Eight of the context checks read the supply-chain map, and the map is filled by hand. Nobody
+   fills it. Eight checks that are permanently null are not analysis, they are a quarter of the
+   verdict's weight sitting at "unknown" forever and dragging confidence down with it.
+
+   The pre-fill already existed and already answered this: /map/prefill asks a model for a company's
+   principal suppliers and customers and the worker caches it per symbol. It just only ever ran when
+   somebody opened the Supply chain screen and typed a ticker, which is the same reason the map was
+   empty in the first place.
+
+   So it runs for holdings, on the way in, once each. Holdings only, not the watchlist: this costs a
+   model call per company and the worker caps it at ten a minute, so it is spent on the names
+   somebody's money is actually in.
+
+   WHAT IT WRITES IS MARKED. Every entry carries prefilled:true, which the Supply chain screen
+   already renders as a "model" tag, because a model's idea of who supplies whom is a starting point
+   for somebody to correct and not a filing. An entry a person has edited is never overwritten: the
+   pre-fill only ever runs for a company with nothing mapped at all. */
+async function prefillChains(){
+  if(!D||isDemoUser())return;
+  const code=brokerCode();
+  if(!code)return;
+  const todo=(D.holdings||[]).filter(h=>h.sym&&h.type==='Stock')
+    .map(h=>h.sym)
+    .filter(sym=>{ const r=(D.relations||{})[sym]; return !r||((r.suppliers||[]).length+(r.customers||[]).length)===0; })
+    .filter(sym=>!(D.chainTried||{})[sym])
+    .slice(0,6);
+  if(!todo.length)return;
+  if(!D.chainTried)D.chainTried={};
+  for(const sym of todo){
+    if(!sessionAlive())return;
+    /* Marked as tried before the request, not after: a company the model has no idea about must not
+       be asked again on every sign-in forever. */
+    D.chainTried[sym]=Date.now();
+    try{
+      const r=await fetch(INVITE_WORKER+'/map/prefill',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({code,symbol:sym})});
+      if(!r.ok)continue;
+      const j=await r.json();
+      if(!sessionAlive())return;
+      const rel=relationsFor(sym);
+      if((rel.suppliers.length+rel.customers.length)>0)continue;   // somebody filled it meanwhile
+      (j.suppliers||[]).forEach(x=>rel.suppliers.push({name:x.name,ticker:x.ticker||'',weight:x.weight||10,note:x.note||'',prefilled:true}));
+      (j.customers||[]).forEach(x=>rel.customers.push({name:x.name,ticker:x.ticker||'',weight:x.weight||10,note:x.note||'',prefilled:true}));
+    }catch(e){ /* silent: nobody asked for this and a missing map is already handled as unknown */ }
+  }
+  saveDB();
+}
+
 /* ================= EVERYTHING, ON THE WAY IN (2026-10-07) =================
 
    The owner's instruction: whenever I enter the terminal it refreshes everything, so it is all up
@@ -13699,6 +13809,10 @@ async function catchUpEverything(){
     if(!sessionAlive())return;
     /* The list of what needs doing, redrawn whether or not the dashboard is the open tab. */
     try{ renderCommand(); }catch(e){}
+    /* After the scores, because the two counterparty-health checks read them. */
+    catchUpStatus('Checking who they buy from and sell to\u2026');
+    try{ await prefillChains(); }catch(e){}
+    if(!sessionAlive())return;
     catchUpStatus('Reading the news\u2026');
     try{ if(typeof loadNews==='function'){ _newsAutoLoaded=true; await loadNews(false); } }catch(e){}
     if(!sessionAlive())return;

@@ -548,6 +548,22 @@ record arrive. Done and decided:
     recorded after this carries a different policy hash and cannot pool with the old ones. That is
     intended: they were made by a different system.
 
+- **Scorecard v2.1, 2026-10-07. Five checks added; the scoring method is unchanged.** A minor
+  number, because v2.0 changed how checks count and this only changes which ones there are, so the
+  weighted score means the same thing either side of it.
+  - Suppliers now mirror customers: **Supplier concentration** (6), **Who they buy from is mapped**
+    (2), and **More than one customer** (4) completing the pair that already existed the other way.
+    There were three customer checks and a bare supplier count, which had it backwards: the company
+    that stops shipping is the one whose single supplier had a fire.
+  - **Suppliers you would not own** (5) and **Customers you would not own** (5) read this terminal's
+    own weighted score for any counterparty that carries a ticker, against the same sell line. A
+    supplier you would sell is a supplier that may not deliver; a customer you would sell is revenue
+    that may not arrive. Costs nothing: the score is already there if the name has been looked at.
+  - 31 checks became 36; the news-and-chain section went from 15.7% of the total weight to 25.5%.
+  - **The map fills itself for holdings** on the way in, via the pre-fill route that already
+    existed, because eight of these read a hand-entered map that nobody enters. Marked as the
+    model's guess, never overwriting a human edit, capped at six companies a sign-in.
+
 - **The data licence.** Finnhub's terms make every plan personal and forbid redistribution or
   business use without written approval. The worker's Finnhub key therefore serves only the
   operator's own devices (the `/finnhub` proxy behind the sync key, the operator's calendar). What

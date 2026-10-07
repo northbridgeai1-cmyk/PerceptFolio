@@ -39,9 +39,17 @@ const liftConst = (name, close) => {
 
 /* NEWS_THEMES is lifted, not restated: these regexes are the actual classifier, and a suite that
    carried its own copy would pass while the page did something else. */
-const contextChecks = new Function(
-  liftConst('const NEWS_THEMES=[', '\n];') + '\n' +
-  lift('function contextChecks(newsItems,rel)') + '\nreturn contextChecks;')();
+/* contextChecks gained a third argument on 2026-10-07: the scores, so a counterparty that carries
+   a ticker can be judged by this terminal's own weighted score. weightedScore and sellAt come with
+   it, lifted rather than stubbed, because what those two checks mean IS that score and that line. */
+const CORE =
+  liftConst('const CHECK_WEIGHT={', '\n};') + '\n' + liftConst('const DEFAULT_WEIGHT=', ';') + '\n' +
+  liftConst('const SCORED_SECTIONS=', ';') + '\n' + lift('function allScoredChecks(sc)') + '\n' +
+  lift('function weightOf(c)') + '\n' + lift('function weightedScore(sc)') + '\n' +
+  lift('function sellAt()') + '\n';
+const contextChecks = new Function('D',
+  CORE + liftConst('const NEWS_THEMES=[', '\n];') + '\n' +
+  lift('function contextChecks(newsItems,rel,scores)') + '\nreturn contextChecks;')({ rules: { sellAt: 40 } });
 
 let pass = 0, fail = 0;
 const t = (n, ok, got) => { if (ok) { pass++; console.log('  PASS  ' + n); }
@@ -49,7 +57,7 @@ const t = (n, ok, got) => { if (ok) { pass++; console.log('  PASS  ' + n); }
 
 const story = h => ({ headline: h, summary: '' });
 const by = (r, name) => r.checks.find(c => c.name === name);
-const run = (news, rel) => contextChecks(news, rel);
+const run = (news, rel, scores) => contextChecks(news, rel, scores || {});
 
 console.log('\nNOT FETCHED IS NULL, NOT A FAILURE');
 {
@@ -112,8 +120,9 @@ console.log('\nTHE COUNTS ARE COUNTS');
 console.log('\nAN UNMAPPED COMPANY HAS NOT FAILED ANYTHING');
 {
   const r = run([], null);
-  const chain = ['Who they sell to is mapped', 'Customer concentration', 'More than one supplier'];
-  t('all three supply-chain checks abstain', chain.every(n => by(r, n).pass === null), chain.map(n => by(r, n).pass));
+  const chain = ['Who they sell to is mapped', 'Customer concentration', 'More than one customer',
+    'Who they buy from is mapped', 'Supplier concentration', 'More than one supplier'];
+  t('all six supply-chain checks abstain', chain.every(n => by(r, n).pass === null), chain.map(n => by(r, n).pass));
   t('and say what to do about it', /Supply chain screen/.test(by(r, 'Who they sell to is mapped').note));
 }
 {
@@ -155,16 +164,76 @@ console.log('\nAND A MAPPED ONE IS SCORED ON WHAT WAS ENTERED');
 console.log('\nTHE SHAPE scoreStock DEPENDS ON');
 {
   const r = run([], null);
-  t('six checks, always', r.checks.length === 6, r.checks.length);
+  t('eleven checks, always', r.checks.length === 11, r.checks.length);
   t('every one carries a name, a target and a note', r.checks.every(c => c.name && c.target && typeof c.note === 'string'));
   t('pass is only ever true, false or null', r.checks.every(c => c.pass === true || c.pass === false || c.pass === null));
   /* scoreStock tallies cScore/cTotal exactly as it does the other sections. */
   const score = r.checks.filter(c => c.pass === true).length, total = r.checks.filter(c => c.pass !== null).length;
   t('it tallies like every other section', score === 2 && total === 3, { score, total });
+
+  /* ---- WHO THEY BUY FROM (2026-10-07) ---- */
+  console.log('\nSUPPLIERS ARE CHECKED LIKE CUSTOMERS, NOT COUNTED LIKE FURNITURE');
+  {
+    const m = run([], { suppliers: [{ name: 'Sole', weight: 80 }], customers: [{ name: 'A', weight: 20 }, { name: 'B', weight: 20 }] });
+    t('one supplier at 80% fails concentration', by(m, 'Supplier concentration').pass === false, by(m, 'Supplier concentration').value);
+    t('and the note says it is the one that stops production', /stops production/.test(by(m, 'Supplier concentration').note));
+    t('a single supplier fails the count', by(m, 'More than one supplier').pass === false);
+    t('two spread customers pass theirs', by(m, 'Customer concentration').pass === true && by(m, 'More than one customer').pass === true);
+    t('and both sides report being mapped', by(m, 'Who they buy from is mapped').pass === true && by(m, 'Who they sell to is mapped').pass === true);
+  }
+  {
+    const m = run([], { suppliers: [{ name: 'A', weight: 30 }, { name: 'B', weight: 30 }], customers: [{ name: 'Only', weight: 90 }] });
+    t('the mirror holds: spread suppliers pass, one customer fails', by(m, 'Supplier concentration').pass === true && by(m, 'Customer concentration').pass === false);
+    t('one customer fails the count too', by(m, 'More than one customer').pass === false, by(m, 'More than one customer').value);
+  }
+  {
+    t('33% is not over a third for suppliers either',
+      by(run([], { suppliers: [{ name: 'S', weight: 33 }], customers: [] }), 'Supplier concentration').pass === true);
+    t('34% is', by(run([], { suppliers: [{ name: 'S', weight: 34 }], customers: [] }), 'Supplier concentration').pass === false);
+  }
+
+  console.log('\nA COUNTERPARTY IS JUDGED BY THIS TERMINAL\'S OWN SCORE');
+  {
+    /* Build a score object that comes out at 100% and one that comes out at 0%. */
+    const Q = ['Free Cash Flow', 'Cash vs Debt', 'Revenue Growth (YoY)', 'Gross Margin', 'Operating Margin', 'ROE'];
+    const good = { error: null, quality: Q.map(n => ({ name: n, pass: true })) };
+    const bad = { error: null, quality: Q.map(n => ({ name: n, pass: false })) };
+    const rel = { suppliers: [{ name: 'Sick', ticker: 'SICK', weight: 20 }, { name: 'Fine', ticker: 'FINE', weight: 20 }],
+                  customers: [{ name: 'Fine2', ticker: 'FINE', weight: 20 }, { name: 'B', weight: 20 }] };
+    const m = run([], rel, { SICK: bad, FINE: good });
+    t('a supplier scoring under the sell line fails the check', by(m, 'Suppliers you would not own').pass === false, by(m, 'Suppliers you would not own').value);
+    t('and it names which one', /SICK/.test(by(m, 'Suppliers you would not own').note), by(m, 'Suppliers you would not own').note);
+    t('a healthy customer passes', by(m, 'Customers you would not own').pass === true, by(m, 'Customers you would not own').value);
+    t('counterparties with no ticker are not counted either way', by(m, 'Customers you would not own').value === '0 of 1 scored');
+  }
+  {
+    const rel = { suppliers: [{ name: 'NoTicker', weight: 50 }], customers: [] };
+    t('a map with no tickers abstains rather than passing for free',
+      by(run([], rel, {}), 'Suppliers you would not own').pass === null);
+    t('and says why', /no mapped supplier has a ticker/i.test(by(run([], rel, {}), 'Suppliers you would not own').note));
+  }
+  {
+    const rel = { suppliers: [{ name: 'X', ticker: 'X', weight: 50 }], customers: [] };
+    t('a ticker that errored is not counted', by(run([], rel, { X: { error: 'NO_DATA' } }), 'Suppliers you would not own').pass === null);
+  }
+
+  console.log('\nAND THE MAP FILLS ITSELF FOR WHAT YOU OWN');
+  {
+    t('the pre-fill runs on the way in', /try\{ await prefillChains\(\); \}catch/.test(src));
+    t('holdings only, not the watchlist', /\(D\.holdings\|\|\[\]\)\.filter\(h=>h\.sym&&h\.type==='Stock'\)/.test(src)
+      && !/prefillChains[\s\S]{0,400}watchlist/.test(src));
+    t('only for a company with nothing mapped at all',
+      /return !r\|\|\(\(r\.suppliers\|\|\[\]\)\.length\+\(r\.customers\|\|\[\]\)\.length\)===0;/.test(src));
+    t('a company it could not answer for is not asked again every sign-in', /D\.chainTried\[sym\]=Date\.now\(\);/.test(src));
+    t('and what it writes is marked as the model\'s guess', /prefilled:true/.test(src));
+    t('it never overwrites something a person filled in meanwhile',
+      /if\(\(rel\.suppliers\.length\+rel\.customers\.length\)>0\)continue;/.test(src));
+    t('and it is capped per sign-in', /\.slice\(0,6\);/.test(src));
+  }
 }
 {
   t('scoreStock calls it and stores both halves',
-    /const ctx=contextChecks\(newsItems,\(D\.relations&&D\.relations\[sym\]\)\|\|null\);/.test(src)
+    /const ctx=contextChecks\(newsItems,\(D\.relations&&D\.relations\[sym\]\)\|\|null,D\.analyses\|\|\{\}\);/.test(src)
     && /out\.context=ctx\.checks; out\.newsCount=ctx\.newsCount;/.test(src));
   t('and tallies it beside the others',
     /out\.cScore=out\.context\.filter\(c=>c\.pass===true\)\.length;/.test(src)

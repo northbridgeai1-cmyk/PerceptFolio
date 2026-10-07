@@ -91,14 +91,30 @@ is in Settings, it names itself when it blocks a buy, and setting it to 0 switch
 
 ## The news and who they trade with
 
+Expanded 2026-10-07. There were three customer checks and a bare count of suppliers, which is
+lopsided: the company that stops shipping is the one whose single supplier had a fire. Suppliers now
+mirror customers exactly, and both sides are checked for health using this terminal's own score.
+
 | # | Check | 1-10 | Why |
 |---|---|---|---|
 | 1 | Legal and regulatory news | **7** | A lawsuit or a probe is the kind of thing that changes a business, and it is free to count. |
-| 2 | Customer concentration | **6** | One customer who can leave is the risk that ends companies. Typed, so often blank. |
-| 3 | Layoffs or restructuring | **5** | Real signal, ambiguous direction: it is both distress and discipline. |
-| 4 | More than one supplier | **4** | Single points of failure matter. Typed. |
-| 5 | Press coverage | **2** | Thin. Mostly a proxy for size, which the other checks already see. |
-| 6 | Who they sell to is mapped | **2** | Closer to a prompt to fill the map than a fact about the company. |
+| 2 | Customer concentration | **6** | One customer who can leave is the risk that ends companies. |
+| 3 | Supplier concentration | **6** | The part they cannot make themselves, from one place. This is the one that stops production. |
+| 4 | Layoffs or restructuring | **5** | Real signal, ambiguous direction: it is both distress and discipline. |
+| 5 | Suppliers you would not own | **5** | Any mapped supplier with a ticker, scored by this terminal. A supplier you would sell is a supplier that may not deliver. |
+| 6 | Customers you would not own | **5** | Same, the other way: a customer you would sell is revenue that may not arrive. |
+| 7 | More than one supplier | **4** | A single source of supply is a single point of failure. |
+| 8 | More than one customer | **4** | One buyer setting the price is a weak position to be in. |
+| 9 | Press coverage | **2** | Thin. Mostly a proxy for size, which the other checks already see. |
+| 10 | Who they sell to is mapped | **2** | Closer to a prompt to fill the map than a fact about the company. |
+| 11 | Who they buy from is mapped | **2** | Same. |
+
+**The map fills itself now**, for holdings, on the way in. Eight of these read a map that is entered
+by hand, and nobody enters it; eight permanently-null checks are not analysis, they are a quarter of
+the verdict's weight stuck at "unknown". `/map/prefill` already existed and already answered this, it
+just only ran when somebody opened the Supply chain screen and typed a ticker. It now runs for
+holdings, once each, capped at six a sign-in, and everything it writes is marked as the model's
+guess for somebody to correct. It never overwrites an entry a person edited.
 
 ## Wall Street: what everyone else thinks
 

@@ -76,11 +76,18 @@ console.log('\nTHE DOCUMENT AND THE CODE ARE THE SAME TABLE');
   const codeKeys = Object.keys(CHECK_WEIGHT);
   const matched = codeKeys.filter(k => inDoc[k] !== undefined);
   t('most checks are named identically in both', matched.length >= 24, { matched: matched.length, of: codeKeys.length });
+  /* The five added on 2026-10-07 must reach ANALYSIS-AUDIT.md too, or the document stops being the
+     table and becomes a snapshot of what it used to be. */
+  for (const k of ['Supplier concentration', 'Who they buy from is mapped', 'More than one customer',
+                   'Suppliers you would not own', 'Customers you would not own'])
+    t('the audit documents "' + k + '"', inDoc[k] === CHECK_WEIGHT[k], { doc: inDoc[k], code: CHECK_WEIGHT[k] });
   const wrong = matched.filter(k => inDoc[k] !== CHECK_WEIGHT[k]);
   t('and every one of those carries the same number', wrong.length === 0,
     wrong.map(k => ({ check: k, doc: inDoc[k], code: CHECK_WEIGHT[k] })));
   t('every weight is on the 1 to 10 scale', codeKeys.every(k => CHECK_WEIGHT[k] >= 1 && CHECK_WEIGHT[k] <= 10));
-  t('all 31 checks are weighted', codeKeys.length === 31, codeKeys.length);
+  /* 36 since 2026-10-07: suppliers gained the three checks customers already had, and both sides
+     gained a health check that reads this terminal's own score for any counterparty with a ticker. */
+  t('all 36 checks are weighted', codeKeys.length === 36, codeKeys.length);
   /* Every check the terminal actually adds must have a weight, or it silently counts as 5. */
   const added = [...src.matchAll(/add\(out\.(?:quality|priceChecks|momentum|wallStreet),'([^']+)'/g)].map(m => m[1]);
   const ctx = [...src.matchAll(/^  add\('([^']+)'/gm)].map(m => m[1]);
