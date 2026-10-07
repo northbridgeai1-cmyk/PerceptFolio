@@ -413,9 +413,11 @@ t('and it still falls back if that block ever moves',
   /if\(!host\)\{ host=document\.getElementById\('greetingText'\)/.test(term));
 /* Telling somebody to set up a portfolio they can see five holdings of reads as software that has
    not noticed them. */
+/* It used to name the step and tell the reader to press a button. Entering the terminal now does
+   that work by itself (catchUpEverything), so the greeting reports it rather than requesting it. */
 t('the greeting names the step that is actually outstanding',
   /if\(isNew\)gs\.textContent=done1/.test(term) &&
-  /Press Run review, at the foot of this screen, to price your book/.test(term));
+  /Pricing your book and checking everything now\. Nothing for you to press\./.test(term));
 
 /* ============ THE FOOT OF THE DASHBOARD FOLDS (2026-09-29) ============
    Three blocks landed here at once when Command was removed and the owner said it read as a pile.
@@ -1804,7 +1806,10 @@ G('Closed with evidence, not assurance');
 /* ==================== M6: KRONOS ==================== */
 G('A model is one more input, graded like everything else');
 {
-  t('the kronos service is a Modal app that checks a service token and loads the open model once', /modal\.App\("perceptfolio-kronos"/.test(read('kronos/app.py')) && /KRONOS_TOKEN/.test(read('kronos/app.py')) && /NeoQuasar\/Kronos-small/.test(read('kronos/app.py')));
+  /* The Modal service was deleted on 2026-10-07 with the panel and the worker route that used it,
+     so there is no app.py left to describe. What is still worth holding is that nothing anywhere
+     points at it, which the next assertion already does for the public site. */
+  t('the kronos service is gone, not merely unreferenced', !exists('kronos/app.py') && !exists('scripts/kronos-check.mjs'));
   /* The bridge went with the panel on 2026-10-06: an endpoint nothing calls is an endpoint nobody
      is watching, and this one still spent a Modal invocation for anyone who found it. */
   /* Checked against CODE, not against prose: the note explaining the removal necessarily names

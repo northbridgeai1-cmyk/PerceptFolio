@@ -1389,6 +1389,9 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <div id="greetingBlock">
     <div class="greeting" id="greetingText">Welcome</div>
     <div class="greeting-sub" id="greetingSub">Here's where things stand today.</div>
+    <!-- One line, only while the catch-up is working or just after it finished. It is not an alert
+         and it does not sit there: see catchUpEverything. -->
+    <div class="muted" id="catchUpLine" style="display:none;font-size:12.5px;margin-top:6px"></div>
   </div>
   <!-- The dashboard. -->
   <div id="personalDashboardBody">
@@ -3977,6 +3980,8 @@ async function finishLogin(email){
   try{ if(typeof applyNavLevel==='function')applyNavLevel(); fillLevelInput(); }catch(e){}
   /* Deliberately not awaited. See autoBrokerSync: entry must never wait on a broker. */
   try{ autoBrokerSync(); }catch(e){}
+  /* And everything else, also not awaited. See catchUpEverything. */
+  try{ catchUpEverything(); }catch(e){}
 }
 /* Screener/Risk/Monte Carlo results (and their Chart.js instances) live in module-level globals
    outside of D, so a plain in-memory account switch (switchAccount, which does not reload the
@@ -12395,7 +12400,9 @@ function renderAll(){
        their portfolio set up, under five holdings they can see, reads as software that has not
        noticed them. Say the step that is actually outstanding. */
     if(isNew)gs.textContent=done1
-      ? 'Press Run review, at the foot of this screen, to price your book and see what needs you.'
+      /* It used to read "Press Run review, at the foot of this screen". Entering the terminal now
+         does that by itself, so the sentence was describing work that had already started. */
+      ? 'Pricing your book and checking everything now. Nothing for you to press.'
       : 'Let\'s get your portfolio set up below.';
     /* "Nice." is gone. A one-day move is noise and congratulating the operator on it trains them to
        read noise as skill — the precise habit this app exists to break. State the number, then say
@@ -13593,6 +13600,78 @@ async function brokerSync(){
     toast(res.text);
   }catch(e){ broBusy(false,''); toast(e.message); }
 }
+/* ================= EVERYTHING, ON THE WAY IN (2026-10-07) =================
+
+   The owner's instruction: whenever I enter the terminal it refreshes everything, so it is all up
+   to date and I do not have to do more work.
+
+   WHAT ALREADY HAPPENED ON ENTRY, and it was more than it looked: the book came down from the
+   server, a connected broker was read, and refreshAll priced every holding and re-scored every
+   holding and watchlist name. The gap was not the data. It was that three things still waited to be
+   asked for, and the screen still opened by telling somebody to press a button:
+
+     - the news loaded only when the News tab was opened
+     - the market's own readings loaded only when the Market tab was opened
+     - "what needs you" was redrawn on opening the dashboard, so a refresh that finished while the
+       reader was on another screen left a stale list behind it
+     - and the greeting said "Press Run review, at the foot of this screen", which is the exact
+       sentence an instruction to stop making them work should delete
+
+   So this is one routine that runs all of it, in the order that matters most first, and says so
+   while it works.
+
+   ORDER IS DELIBERATE AND IT IS NOT "cheapest first". Prices and scores come first because they are
+   what every other number on every other screen is computed from, and because they are the slowest:
+   starting them last would mean the fast things finish into a screen that is still wrong. News and
+   the market readings follow, because they are context rather than arithmetic.
+
+   IT NEVER BLOCKS AND IT NEVER SHOUTS. Nothing here is awaited by the caller. Every step is wrapped,
+   so a failing step cannot stop the ones after it, and a failure is silent: the reader did not ask
+   for this and cannot do anything about a rate limit. Each screen still has its own button, which
+   still says what went wrong when pressed.
+
+   IT RESPECTS A NO. Somebody who set auto-refresh off in Settings gets none of it, because that
+   setting has always meant exactly this and quietly overriding it would be the opposite of the
+   instruction: it would be making them do work to stop work happening. */
+const CATCH_UP_GAP_MS=10*60*1000;
+let _catchingUp=false;
+function catchUpStatus(msg){
+  const el=document.getElementById('catchUpLine');
+  if(!el)return;
+  el.textContent=msg||'';
+  el.style.display=msg?'':'none';
+}
+async function catchUpEverything(){
+  if(_catchingUp||!D)return;
+  if(D.rules&&D.rules.autoRefresh==='no')return;
+  if(!hasMarketData())return;
+  /* finishLogin runs on a reload as well as a sign-in. Re-pricing a whole book every time somebody
+     refreshes a tab is how an account meets Finnhub's minute limit and then sees nothing at all. */
+  if(D.lastCatchUp&&Date.now()-D.lastCatchUp<CATCH_UP_GAP_MS)return;
+  _catchingUp=true;
+  D.lastCatchUp=Date.now();
+  try{
+    catchUpStatus('Bringing everything up to date\u2026');
+    /* Prices and every score. This is the same work the Run review button does. */
+    try{ await refreshAllSoon(); }catch(e){}
+    if(!sessionAlive())return;
+    /* The list of what needs doing, redrawn whether or not the dashboard is the open tab. */
+    try{ renderCommand(); }catch(e){}
+    catchUpStatus('Reading the news\u2026');
+    try{ if(typeof loadNews==='function'){ _newsAutoLoaded=true; await loadNews(false); } }catch(e){}
+    if(!sessionAlive())return;
+    catchUpStatus('Checking the market\u2026');
+    try{ if(typeof loadMarketData==='function')await loadMarketData(false); }catch(e){}
+    try{ if(typeof loadFearGreed==='function')await loadFearGreed(false); }catch(e){}
+    if(!sessionAlive())return;
+    try{ renderAll(); renderCommand(); }catch(e){}
+    saveDB();
+    catchUpStatus('Up to date as of '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'. Nothing needs pressing.');
+    /* The finished line is not an alert, so it goes quiet on its own rather than sitting there. */
+    setTimeout(()=>{ try{ catchUpStatus(''); }catch(e){} }, 12000);
+  }finally{ _catchingUp=false; }
+}
+
 /* ================= SYNC THE BROKER ON THE WAY IN (2026-10-06) =================
 
    The owner's instruction: whenever I enter, it syncs to the broker and reloads everything. Before
