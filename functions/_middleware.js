@@ -39,10 +39,10 @@ const HEADERS = {
 
 /* The terminal and admin are single files with inline script and style by design, so their CSP
    keeps 'unsafe-inline'; the meta CSP inside each file says why. worker-src 'self' is for
-   the World view's globe (CesiumJS, vendored), whose geometry workers are same-origin module
-   workers under /vendor/cesium/Workers; nothing else on the site makes a worker. The two arcgisonline hosts are Esri's World Imagery, the
-   satellite layer the World view fades in as the camera descends; img-src for the tiles,
-   connect-src for the service description.
+   the World view's globe. THAT WENT ON 2026-10-06, and with it the allowances it alone needed:
+   worker-src for CesiumJS's same-origin geometry workers, and the two arcgisonline hosts for Esri's
+   satellite imagery. Nothing else on the site makes a worker or loads a tile, so the policy is
+   narrower now than at any point since those were added.
 
    img-src ON THE GATED PATHS NOW ALLOWS ANY https IMAGE, which is a real widening and is here for
    one reason: the News screen shows the publisher's own photograph with each headline, and those
@@ -54,7 +54,8 @@ const HEADERS = {
    cannot run anything. The narrower alternative, proxying every thumbnail through the Worker, was
    not taken because it puts the Worker in the path of every image on a news page and buys only the
    IP back. 'wasm-unsafe-eval'
-   lets Cesium compile the mesh decoders it instantiates at load (unused here, noisy if refused);
+   was Cesium's; it is kept only because removing it needs a check that nothing else in the
+   terminal instantiates WebAssembly, which has not been done;
    it permits WebAssembly compilation only, never string evaluation, which stays forbidden. The public site, built by Vite,
    gets the strict policy: no inline script, no inline style, nothing from anywhere but here and
    the worker. Stripe's hosted Checkout is a redirect, not an embed, so it needs no allowance.
@@ -69,7 +70,7 @@ function csp(path, env) {
   const worker = (env.WORKER_URL || '').replace(/\/+$/, '');
   const connect = ["'self'", worker, 'https://*.workers.dev', 'https://finnhub.io', 'https://formsubmit.co'].filter(Boolean).join(' ');
   if (GATED.some(re => re.test(path))) {
-    return `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: ; font-src 'self' data:; connect-src ${connect} https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
+    return `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: ; font-src 'self' data:; connect-src ${connect}; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'`;
   }
   if (FRAMEABLE.test(path)) {
     /* Pages injects the Web Analytics beacon into this document as well; admitted here so the

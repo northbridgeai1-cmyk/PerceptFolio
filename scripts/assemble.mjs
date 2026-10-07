@@ -52,8 +52,20 @@ copy('admin.html');                            // gated, operator only
 copy('enter');                                 // the door
 copy('functions');                             // the gate, /api/enter, /api/leave, /api/portal
 copy('fonts'); copy('demo'); copy('preview'); copy('verify'); copy('call'); copy('favicon.svg'); copy('manifest.json'); copy('sw.js'); copy('robots.txt'); copy('sitemap.xml');
-copy('vendor');                                // Chart.js and Cesium, served from this origin (see vendor/README.md)
-copy('world/data'); copy('world/ne110.json'); copy('world/places.json');  // the World view's bundled plant layers and the country polygons; catalog.mjs and the extract script are source, not product
+/* CESIUM AND THE WORLD DATA STOPPED SHIPPING ON 2026-10-06, with the globe they were for.
+
+   They were 22.7MB of a 25MB deploy: 8.5MB of vendored Cesium and 14MB of extracted plant data,
+   downloaded by every Pages build whether or not anybody opened the tab. ANALYSIS-AUDIT.md has the
+   globe in the list of things that reach no verdict, and neither the side-hustler nor the
+   once-a-month investor has any use for it, so 91% of the download was serving 0% of the answer.
+
+   Chart.js is still vendored and still needed, so `vendor` is copied file by file rather than
+   wholesale: a later `copy('vendor')` would quietly bring Cesium back the moment anyone restored
+   the directory. */
+for (const f of fs.readdirSync('vendor')) {
+  if (f === 'cesium') continue;
+  copy(path.join('vendor', f));
+}
 /* No 404.html on Pages: its absence is what makes Pages serve index.html for unknown paths, which
    is how /pricing, /apply and the rest reach the React router. The app has its own not-found page. */
 for (const f of ['icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable.svg', 'icon-maskable-512.png', 'apple-touch-icon.png', 'thanks.html']) copy(f);

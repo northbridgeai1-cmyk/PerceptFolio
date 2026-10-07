@@ -494,9 +494,7 @@ t('a full code names the screen that frees a slot', /On either of them open Sett
 t('the worker reports whether market data is being refused, and admin shows it in red', /body\.data = \{ included: 'everyone', dataTiers: env\.DATA_TIERS \|\| null/.test(worker) && /DATA_TIERS is set: accounts outside it are refused market data/.test(worker) && /Market data is being refused\./.test(read('admin.html')));
 t('the licence trigger is one constant and the live clients are counted against it', /const LICENCE_AT = 5;/.test(worker) && /buyCommercialFeedAt: LICENCE_AT, due: live >= LICENCE_AT/.test(worker) && /commercial data plan at/.test(read('admin.html')));
 t('sync is by access code only (2026-09-22): no URL or key fields and no saveSyncConfig, the config drops a key an older build kept, every sync names the device, a third device is refused with the list and can forget one, saving the access code turns sync on', !/id="syncUrlInput"|id="syncKeyInput"/.test(term) && !/function saveSyncConfig\(/.test(term) && /if\(syncCfg&&syncCfg\.key\)\{/.test(term) && /'&device='\+encodeURIComponent\(deviceId\(\)\)\+'&name='/.test(term) && /res\.status===409/.test(term) && /function renderSyncDevices\(devs,refused\)/.test(term) && /async function forgetDevice\(id\)/.test(term) && /url\.pathname === '\/usync\/forget'/.test(worker) && /devs\.length >= DEVICE_LIMIT/.test(worker) && /'udev:' \+ code/.test(worker) && /url\.pathname === '\/usync\/devices'/.test(worker) && /The code is also how this device syncs; saving it here is enough/.test(term));
-t('the World searches a country and lists what is made: a country name, alias or code puts every plant the bundle places in it on the globe, and the list on the right is product phrases that filter the globe, not countries', /function countryCode\(q\)\{/.test(term) && /function showCountry\(cc\)\{/.test(term) && /var cc=countryCode\(q\); if\(cc\)\{ showCountry\(cc\); return; \}/.test(term) && /function prodPhrases\(p\)\{/.test(term) && /window\.wdProduct=function\(w\)\{/.test(term) && !/onclick="wdCountry\(\\''\+esc\(k\)\+'\\'\)"/.test(term) && /'ecuador'|Ecuador/.test(term) && /ALIAS\[b\]/.test(term));
 t('the worker answers the site\'s own Pages address as well as the domain, by the request\'s origin, and nothing else', /const SITE_ORIGINS = \/\^https:\\\/\\\/\(perceptfolio\\\.com\|perceptfolio\\\.pages\\\.dev\|\[a-z0-9-\]\+\\\.perceptfolio\\\.pages\\\.dev\)\$\//.test(worker) && /env = originView\(env, request\);/.test(worker) && /return Object\.assign\(Object\.create\(env\), \{ ALLOWED_ORIGIN: o \}\);/.test(worker));
-t('the World\'s trade view (2026-09-22): the worker asks UN Comtrade one call a second with a month\'s cache and a per-address cap, a country\'s headings come in two steps (chapters, then the top chapters\' headings), a product word is ranked by world value, and the terminal draws routes as ships with the seller\'s flag that say they are markers, not vessels', /url\.pathname === '\/trade' \|\| url\.pathname === '\/trade\/partners' \|\| url\.pathname === '\/trade\/product'/.test(worker) && /await tooMany\(env, request, 'trade', 30\)/.test(worker) && /let comtradeQueue = Promise\.resolve\(\), comtradeLast = 0;/.test(worker) && /const wait = 1100 - \(Date\.now\(\) - comtradeLast\);/.test(worker) && /expirationTtl: TRADE_TTL/.test(worker) && /cmdCode: 'AG2'/.test(worker) && /async function hsBiggest\(cands\)/.test(worker) && /function drawRoutesNow\(list,info\)/.test(term) && /shipImage\(p\.from\)/.test(term) && /A route marker, not a vessel/.test(term) && /function tradeList\(title,t,cc,flow\)/.test(term) && /window\.wdTrade=function\(cc,code,flow\)/.test(term) && /function tradeSearch\(q\)/.test(term) && /HS_PLAIN\[String\(code\)\]/.test(term));
 t('the demo profile is flagged in storage', /isDemo:true/.test(term));
 t('the demo is rebuilt on each sign-in, not reused', /DB\.profiles\[DEMO_ID\]=\{/.test(term));
 t('a demo session is visually unmistakable', /body\.is-demo #app::before/.test(term) && /classList\.toggle\('is-demo'/.test(term));
@@ -813,9 +811,6 @@ t('the cycle card never feeds a verdict', !/renderCycle\([^)]*\)[^\n]*levels\.pu
 /* The thesis is a sheet behind the holding's menu. */
 t('the thesis form is a sheet, not a panel on the tab', /<div class="addwrap" id="thesisWrap">/.test(term) && /function openThesis\(sym\)/.test(term));
 t('the holding menu opens it', /run:"openThesis\('"\+sym\+"'\)"/.test(term));
-/* World: a product word finds plants; the owner is named with its ticker. */
-t('a World search reads the bundle by name, operator and product', /localMatches\(q,true\)/.test(term) && /\(products&&r\[5\]&&rx\.test\(r\[5\]\)\)/.test(term));
-t('the owner\'s ticker comes from Wikidata, the holding or the listing, never a short word', /function tickerFor\(f\)/.test(term) && /head\.length>=4&&UNI\[head\]&&\(n>=2\|\|head\.length>=5\)/.test(term));
 t('a paused grant loses macro data too', /return rec\.paused \? null : rec/.test(worker));
 t('the terminal presents its invite code when it has no sync key',
   /codeParam=syncConfigured\(\)\?'':'&code='/.test(term));
@@ -1842,103 +1837,37 @@ G('History is there on the first visit');
 }
 
 /* ==================== M9: THE WORLD, ON A GLOBE ==================== */
-G('The world map of factories: God\'s Eye View\'s approach, this site\'s data');
-{
-  const mw = read('functions/_middleware.js'), asm = read('scripts/assemble.mjs'), sw = read('sw.js');
-  /* Which tabs hide behind More stopped being a literal array on 2026-10-06 and became whatever
-     sits above the account's experience level, so this now checks the level map rather than the
-     list that used to be written out. World is level 2, which is the same claim the old assertion
-     made: it is in the sidebar, and a beginner does not meet it until they open More. */
-  t('the World tab exists, is reachable from the sidebar, and hides behind More with the other advanced tabs', /id="tab-world"/.test(term) && /data-tab="world"/.test(term) && /world:2/.test(term) && /function advTabs\(\)/.test(term) && /return Object\.keys\(map\)\.filter\(function\(t\)\{ return map\[t\]>lvl; \}\);/.test(term));
-  /* The levels themselves, since the sidebar is now the main thing a new subscriber sees. */
-  t('three levels, and the beginner gets the owner\'s six screens', /const LEVELS=\['beginner','intermediate','advanced'\];/.test(term)
-    && /dashboard:0, portfolio:0, watchlist:0, analyzer:0, news:0, settings:0,/.test(term)
-    && /history:1, screener:1, market:1, risk:1,/.test(term)
-    && /map:2, world:2, projections:2, alerts:2,/.test(term)
-    /* There is no clients tab; it went with the business terminal. A phantom key made the Settings
-       note say "6 of 15" over a sidebar of fourteen. */
-    && !/clients:2/.test(term));
-  t('every tab the level map names is a tab that exists',
-    Object.keys({dashboard:0,portfolio:0,watchlist:0,analyzer:0,news:0,settings:0,history:1,screener:1,market:1,risk:1,map:2,world:2,projections:2,alerts:2})
-      .every(k => term.includes('data-tab="' + k + '"')));
-  t('an unanswered level is beginner, not advanced', /return i<0\?0:i;/.test(term));
-  t('the level is an account setting, changeable in Settings, and the survey asks for it',
-    /<select id="setLevel" onchange="setUserLevel\(this\.value\)">/.test(term)
-    && /{ t: 'This is new to me', d: 'Six screens\./.test(term)
-    && /D\.rules\.level=LEVELS\.indexOf\(a\.level\)<0\?'beginner':a\.level;/.test(term));
-  t('nothing is locked at any level: More still reveals everything, and an off-level tab opened by a chip or the search expands the list',
-    /ADV\.indexOf\(t\)>-1&&nav\.classList\.contains\('pf-compact'\)/.test(term)
-    && /window\.applyNavLevel=function\(\)/.test(term));
-  /* A beginner is given a shorter page, never a different answer. */
-  t('a beginner gets the verdict with the working folded, not a simpler verdict',
-    /<details class="an-work"'\+\(userLevel\(\)>0\?' open':''\)/.test(term)
-    && /Show me how it got there/.test(term)
-    && !/userLevel\(\)[^\n]*verdictOf/.test(term));
-  t('Cesium is vendored, not loaded from a CDN, and only when the tab opens', /BASE='\/vendor\/cesium\/'/.test(term) && /s\.src=BASE\+'Cesium\.js'/.test(term) && !/cdnjs\.cloudflare\.com\/ajax\/libs\/cesium/.test(term) && exists('vendor/cesium/Cesium.js') && exists('vendor/cesium/Workers/createGeometry.js') && exists('vendor/cesium/LICENSE.md'));
-  const cz = read('vendor/cesium/Cesium.js');
-  t('the vendored Cesium carries the two CSP patches: Knockout finds the global without eval, and workers come from Workers/ as same-origin modules', /var t=this\|\|globalThis,n=t\.document/.test(cz) && !/\(0,eval\)\("this"\)/.test(cz) && /if\(!1&&!n&&typeof CESIUM_WORKERS<"u"\)/.test(cz) && /new C\.CesiumWidget\('wdGlobe'/.test(term) && !/new C\.Viewer\(/.test(term));
-  t('the globe is Natural Earth II from this origin at world scale: no Cesium ion token, no Google, no OSM tile server; Esri only as the satellite layer below 4,000 km', /Ion\.defaultAccessToken=''/.test(term) && /Assets\/Textures\/NaturalEarthII/.test(term) && exists('vendor/cesium/Assets/Textures/NaturalEarthII/tilemapresource.xml') && !/tile\.openstreetmap\.org|api\.cesium\.com|googleapis/.test(term) && (term.match(/arcgisonline/g) || []).length <= 5);
-  t('both CSPs allow same-origin workers and wasm compilation for Cesium, and still forbid eval and blob: scripts', (() => { const meta = term.match(/http-equiv="Content-Security-Policy" content="([^"]*)"/)[1]; return /worker-src 'self';/.test(meta) && /worker-src 'self';/.test(mw) && /'wasm-unsafe-eval'/.test(meta) && /'wasm-unsafe-eval'/.test(mw) && !/'unsafe-eval'/.test(meta) && !/'unsafe-eval'/.test(mw) && !/blob:/.test(meta.match(/script-src[^;]*/)[0]) && !/worker-src[^;]*blob:/.test(mw); })());
-  t('the Pages build ships vendor/ (Chart.js was silently missing on Pages) and the World data', /copy\('vendor'\)/.test(asm) && /copy\('world\/data'\)/.test(asm) && /copy\('world\/ne110\.json'\)/.test(asm) && !/copy\('world'\)/.test(asm));
-  const idx = exists('world/data/index.json') ? JSON.parse(read('world/data/index.json')) : null;
-  t('the bundled manifest names both licences and carries a country table and per-layer counts and dates', !!idx && /ODbL/.test(idx.source) && /CC0/.test(idx.source) && idx.countries && idx.countries.TW === 'Taiwan' && Array.isArray(idx.industries) && idx.industries.length >= 12 && idx.industries.every(i => 'count' in i && 'asOf' in i && 'file' in i && 'partial' in i));
-  const layers = idx ? idx.industries.filter(i => exists('world/data/' + i.file)).map(i => JSON.parse(read('world/data/' + i.file))) : [];
-  t('every shipped layer is compact features with a name and coordinates, a source flag, and provenance', layers.length > 0 && layers.every(l => l.provenance && Array.isArray(l.features) && l.features.every(f => typeof f.n === 'string' && f.n && Number.isFinite(f.la) && Number.isFinite(f.lo) && /^[ow]+$/.test(f.s || 'o') && !('_tags' in f))));
-  t('no layer carries contact fields or anything but plant facts', layers.every(l => l.features.every(f => Object.keys(f).every(k => ['i','n','la','lo','o','p','c','w','q','t','s','pl'].includes(k)))));
-  t('websites in the layers are http(s) only, so a click can never run a scheme', layers.every(l => l.features.every(f => !f.w || /^https:\/\/|^http:\/\//.test(f.w))));
-  const cat = read('world/catalog.mjs');
-  t('the catalogue matches operators as whole words, case-insensitively, and the extractor never sends a regex to Overpass', /\(\^\|\[\^A-Za-z\]\)/.test(cat) && /keywords:/.test(cat) && /wikidata:/.test(cat) && /BASE_SETS/.test(read('scripts/world-extract.mjs')) && /out:csv/.test(read('scripts/world-extract.mjs')) && !/\["name"~/.test(read('scripts/world-extract.mjs')));
-  t('the search box routes an industry phrase to a bundled layer and a company to the worker, and the worker route is code-gated', /function route\(phrase\)/.test(term) && /INVITE_WORKER\+'\/world'/.test(term) && /url\.pathname === '\/world'/.test(worker) && /grantIsLive\(env, code\)/.test(worker.slice(worker.indexOf("url.pathname === '/world'"), worker.indexOf("url.pathname === '/world'") + 800)));
-  t('the worker sends the phrase to Nominatim as a plain term, identified, at most once a second, caps the answer and caches a week', /\[A-Za-z0-9&'\.\\- \]\{2,40\}/.test(worker) && /nominatim\.openstreetmap\.org\/search/.test(worker) && /PerceptFolio-world\/1\.0/.test(worker) && /nominatim:last/.test(worker) && /WORLD_CAP = 200/.test(worker) && /expirationTtl: 7 \* 86400/.test(worker) && !/overpass-api|interpreter/i.test(worker));
-  t('the globe’s credit line names the sources; the provenance and the God’s Eye View credit live in world/README.md (the page carries no essays by request)', /OpenStreetMap contributors \(ODbL\)/.test(term) && /Natural Earth II/.test(term) && /God's Eye View|God’s Eye View/.test(read('world/README.md')) && /incomplete by nature/.test(read('world/README.md')));
-  t('plant links open in a new tab without a referrer', /rel="noopener noreferrer"/.test(term.slice(term.indexOf('id="v2-world"'))));
-  t('on a phone the chips are a rail you swipe, the globe follows the box, the panel follows the globe', /@media \(max-width:768px\)\{\s*#tab-world \.wd-form input\{flex:1 1 0;min-width:0\}/.test(term) && /#tab-world \.wd-chips\{flex-wrap:nowrap;overflow-x:auto/.test(term) && /#tab-world \.wd-stage\{grid-template-columns:1fr;gap:12px\}/.test(term));
-  t('the foldable band (781–960) puts the rail up, a 60px gutter on the crease, and the globe and panel on opposite leaves', /@media \(max-width:960px\) and \(min-width:781px\)\{\s*#sidebar\{width:52px!important/.test(term) && /\.grid-2\{gap:60px\}/.test(term) && /#tab-world \.wd-stage\{grid-template-columns:1fr 1fr;gap:60px/.test(term));
-  t('the landing page keeps its own foldable band at the same widths', /@media \(max-width:960px\) and \(min-width:781px\)/.test(read('index.html')) && /max-width: ?960px\) and \(min-width: ?781px/.test(read('site/src/index.css')));
-  t('the terminal viewport meta covers the notch and resizes for the keyboard', /viewport-fit=cover/.test(term) && /interactive-widget=resizes-content/.test(term));
-  t('the layers are complete: fifteen, none partial, every plant named and placed or honestly unplaced', (() => { const idx2 = JSON.parse(read('world/data/index.json')); return idx2.industries.length === 15 && idx2.industries.every(i => !i.partial && i.count >= 100); })());
-  t('heatmaps: holdings as a squarified treemap by value and day change, sectors as the eleven SPDR ETFs, in Market, free quotes only', /id="v2-heat"/.test(term) && /function treemap\(items,W,H\)/.test(term) && /\['XLK','Technology'\]/.test(term) && /Math\.min\(1,Math\.abs\(pct\)\/3\)/.test(term) && /if\(t==='market'\)setTimeout\(load,30\)/.test(term) && !/finnhub\.io\/api\/v1\/stock\/candle/.test(term.slice(term.indexOf('id="v2-heat"'))));
-  t('your holdings on World: one request for every name, bundle matches first, Nominatim on top, a colour per holding, a legend that flies', /INVITE_WORKER\+'\/world\/batch'/.test(term) && /function localMatches\(name,products\)/.test(term) && /function mergeNear\(base,extra\)/.test(term) && /wd-chip-mine/.test(term) && /flyTo\(set\.features\.filter/.test(term) && /UNKNOWN\[sym\]\?\[\]:localMatches\(q\)/.test(term) && /NAMES\[sym\]=n; delete UNKNOWN\[sym\];/.test(term) && /url\.pathname === '\/world\/batch'/.test(worker));
-  t('the all-plants index ships beside the layers, one row a plant', (() => { const a = JSON.parse(read('world/data/all.json')); return Array.isArray(a.rows) && a.rows.length > 20000 && a.columns[0] === 'name' && a.rows.every(r => (r.length === 7 || r.length === 8) && typeof r[0] === 'string' && Number.isFinite(r[2]) && Number.isFinite(r[3])); })());
-  t('the analyst counts carry a twelve-month trend: stacked monthly bars, buy share first to last', /analystsHistory: history/.test(worker) && /recs\.slice\(0, 12\)/.test(worker) && /f\.analystsHistory\.slice\(\)\.reverse\(\)/.test(term) && /aria-label="Analyst counts by month"/.test(term) && /buy share/.test(term));
-  t('the World layers refresh themselves monthly through a pull request, base sets cached for the month, no secrets', (() => { const y = read('.github/workflows/world-refresh.yml'); return /cron: '17 6 1 \* \*'/.test(y) && /actions\/cache@v4/.test(y) && /world\/\.cache/.test(y) && /world-extract\.mjs --force/.test(y) && /create-pull-request@v7/.test(y) && /add-paths: world\/data/.test(y) && !/secrets\./.test(y); })());
-  t('every regex-escape helper reads the dollar-ampersand literally (a String.replace once swallowed it into the matched text)', (term.match(/replace\(\/\[\.\*\+\?\^\$\{\}\(\)\|\[\\\]\\\\\]\/g,'\\\\\$&'\)/g) || []).length >= 2 && !/'\\\\  window\./.test(term) && !/'\\\\<\/body>/.test(term));
-  t('satellite on the way down: Esri World Imagery layered over Natural Earth II, faded in below 4,000 km, only requested when shown, both CSPs allow exactly those hosts', /ArcGisMapServerImageryProvider\.fromUrl\('https:\/\/services\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer'/.test(term) && /function satFade\(\)/.test(term) && /hgt>4e6\?0:hgt<1\.2e6\?1/.test(term) && /sat\.show=a>0/.test(term) && /ctl\.minimumZoomDistance=600;/.test(term) && /img-src 'self' data: blob: https:/.test(term) && /img-src 'self' data: blob: https: /.test(mw) && /connect-src \$\{connect\} https:\/\/services\.arcgisonline\.com https:\/\/server\.arcgisonline\.com/.test(mw));
-  /* img-src on the gated paths stopped naming the two Esri hosts on 2026-10-05 and now admits any
-     https image, because the News screen shows the publisher's own photograph and there is no host
-     list to write for every outlet in the world. The satellite tiles still load: they were always
-     https. What this assertion can still hold is the part that was never about images, which is
-     that connect-src names those two hosts and nothing else, and that widening img-src did not
-     drag script-src or the frame rules along with it. Checked properly, by running csp(), in
-     test/newspage.mjs. */
-  t('the intro paragraphs are gone, not folded: none standing, none behind a summary', !/class="aside about"/.test(term) && !/<p class="muted" style="margin-bottom:12px/.test(term));
-  t('five years of history: the worker serves 5y, the device keeps it outside the synced log, charts and windows read it', /dailyBars\(env, sym, 1830\)/.test(worker) && /HKEY='pf_hist_v1'/.test(term) && /window\.longSeries=function\(sym\)/.test(term) && /longSeries\(sym\)\)\|\|\(D\.priceLog\|\|\{\}\)\[sym\]/.test(term) && /histFill\(sym\);   \/\* five years/.test(term) && /HMAX=120/.test(term));
-  t('the whole listing is built in: /universe daily from the SEC\'s public file, name search in the palette, a whole-market scan in the Screener', /url\.pathname === '\/universe'/.test(worker) && /company_tickers_exchange\.json/.test(worker) && !/stock\/symbol\?exchange=US/.test(worker) && /window\.universeMatches=function/.test(term) && /universeMatches\(raw,6\)/.test(term) && /window\.scanUniverse=function/.test(term) && /onclick="scanUniverse\(\)"/.test(term) && /startScreener\(givenList\)/.test(term));
-  t('no About-this asides, no World aside, no Kelly essay, no Kronos operator note: the numbers stand on their own', !/class="aside about"/.test(term) && !/What.s automatic and what isn.t<\/summary><div>An industry or a company/.test(term) && !/Kelly maximises the growth rate/.test(term) && !/deploy <code>kronos\/app\.py<\/code>/.test(term));   /* kOut went with the Kelly card */
-  /* Which one am I on: every row of choices marks its selected button with one class and the aria
-     state, never with an inline colour and never with colour alone. */
-  t('a row of choices marks the chosen one with a class and aria-pressed', /function markChoice\(prefix,values,chosen\)/.test(term) && /b\.classList\.toggle\('is-on',on\)/.test(term) && /b\.setAttribute\('aria-pressed',on\?'true':'false'\)/.test(term) && /\.btn\.is-on,\.btn-ghost\.is-on\{background:color-mix/.test(term) && /markChoice\('grBtn_',\[30,365,1095,0\],graphRange\)/.test(term) && /markChoice\('mvBtn_'/.test(term));
-  /* The market scan: the whole listing is thousands of names at four calls each, so it walks and
-   says how far it has walked, and it shows only the two verdicts that mean something. */
-t('the market scan walks the listing, keeps its place, and shows only buys and sells', /function startMarketScan\(\)/.test(term) && /rows=await loadUniverse\(\)/.test(term) && /s\.cursor\+\+;/.test(term) && /if\(v\.key==='buy'\|\|v\.key==='sell'\)/.test(term) && /of '\+rows\.length\.toLocaleString\(\)/.test(term));
-t('a scan find older than a week is dropped', /const SCAN_STALE_MS=7\*864e5;/.test(term) && /\(s\.hits\|\|\[\]\)\.filter\(h=>h\.at>cut\)/.test(term));
-t('the scan states the bars it is using and can be stopped or started over', /Your lines: '\+buyAt\(\)\+'% or more to buy/.test(term) && /function stopMarketScan\(\)/.test(term) && /function clearMarketScan\(\)/.test(term));
-t('the calendar effects panel sits directly under the move it is context for', term.indexOf('The move, in context') < term.indexOf('Calendar effects</h3>') && term.indexOf('Calendar effects</h3>') < term.indexOf('Rates and the economy</h3>'));
-  /* The globe is created when the World tab opens, before its map tiles arrive; with render-on-demand
-     nothing repainted and the first look was white borders on a black ball. */
-  t('the World hint lets clicks through and sits out of the globe\'s way', /#tab-world \.wd-idle \.mv-empty\{pointer-events:none/.test(term) && /#tab-world \.wd-idle\{position:absolute;inset:auto 0 0 0/.test(term));
-t('the globe asks for a frame as its map tiles arrive', /sc\.globe\.tileLoadProgressEvent\.addEventListener\(function\(\)\{ sc\.requestRender\(\); \}\)/.test(term));
-  t('the Top button is round with an up arrow', /border-radius:50%;width:44px;height:44px/.test(term) && /b\.innerHTML='<svg viewBox="0 0 24 24"[^']*M12 19V6/.test(term) && !/b\.textContent='Top'/.test(term));
-  t('Market: the heat card sits after Calendar effects; Today’s heat switches between the holdings and the market (Dow 30 and twelve mega-caps)', /var after=cards\[1\]\|\|cards\[0\]/.test(term) && /window\.heatMode=function\(m\)/.test(term) && /function marketList\(\)/.test(term) && /P\.dow30/.test(term) && /P\.megatech/.test(term) && /ht-market/.test(term));
-  t('World says where a plant is in words: the extractor stamps the nearest Natural Earth place, the geocoder’s address for live results, the terminal for the rest; no coordinates in the detail', exists('world/places.json') && JSON.parse(read('world/places.json')).rows.length > 7000 && /function placeOf\(lat, lon, cc\)/.test(read('scripts/world-extract.mjs')) && /if \(pl\) f\.pl = pl;/.test(read('scripts/world-extract.mjs')) && /const city = a\.city \|\| a\.town \|\| a\.village/.test(worker) && /function placeOf\(lat,lon,cc\)/.test(term) && /esc\(f\.pl\|\|nm\[f\.c\]\|\|f\.c\|\|'Unplaced'\)/.test(term) && !/f\.la\.toFixed\(3\)\+', '\+f\.lo\.toFixed\(3\)/.test(term) && /copy\('world\/places\.json'\)/.test(read('scripts/assemble.mjs')));
-  t('the Map opens pre-filled from the model, once per symbol, labelled, never over a map the person touched', /url\.pathname === '\/map\/prefill'/.test(worker) && /'mapfill:' \+ sym/.test(worker) && /window\.prefillMap=function\(sym\)/.test(term) && /if\(rel\.suppliers\.length\|\|rel\.customers\.length\|\|rel\.prefilledAt\)return;/.test(term) && /prefilled:true/.test(term) && /x\.prefilled\?' <span class="pill pill-na"/.test(term) && /prefillMap\(t\);/.test(term));
-  t('www lands on the bare domain before the gate runs, so there is one account store', /url\.hostname === 'www\.perceptfolio\.com'/.test(mw) && mw.indexOf("url.hostname === 'www.perceptfolio.com'") < mw.indexOf('if (!GATED.some'));
-  t('sw.js was bumped for the new terminal', /perceptfolio-v170/.test(sw));
-  t('the sign-in card says when it is the saved copy: a HEAD to its own address, which the worker never answers from cache', /id="authStale"/.test(term) && term.includes("fetch(location.pathname,{method:'HEAD',cache:'no-store'})") && /cannot be reached from this network\. This is the copy saved on this device/.test(term));
-  t('Spanish covers the World chrome', /'World': 'Mundo'/.test(read('i18n/es.js')) && /'Where the plants are'/.test(read('i18n/es.js')) && read('i18n/es.js') === read('site/public/i18n/es.js'));
-}
+G('The World globe was removed on 2026-10-06')
 
-/* ==================== BILLING (worker) ==================== */
+/* It put every plant OpenStreetMap knows onto a CesiumJS globe. It was the most impressive thing
+   in the terminal and it was 22.7MB of a 25MB deploy: 8.5MB of vendored Cesium and 14MB of
+   extracted plant data, downloaded by every build whether or not anybody opened the tab.
+   ANALYSIS-AUDIT.md already listed it among the things that reach no verdict, the 2026-10-04
+   walkthrough called it an expert screen with no starter state, and neither of the two people this
+   product is for has a use for it. Ninety-one percent of the download, nought percent of the answer.
+
+   The twenty-odd assertions that stood here described how it worked. What is worth asserting now is
+   that it is gone from every layer rather than merely hidden, and that the two things easily
+   confused with it survived. */
+t('the globe is gone from the terminal', !/id="tab-world"/.test(term) && !/data-tab="world"/.test(term)
+  && !/wdGlobe/.test(term) && !/CESIUM/.test(term) && !/vendor\/cesium/.test(term));
+t('and so are its dead stylesheet selectors', !/#tab-world/.test(term));
+t('the level map no longer offers a tab that does not exist', !/world:2/.test(term));
+t('the worker routes went with it', !/url\.pathname === '\/world'/.test(worker)
+  && !/url\.pathname === '\/world\/batch'/.test(worker)
+  && !/'\/world', '\/world\/batch'/.test(worker));
+t('the files are no longer shipped', !exists('dist/world') && !exists('dist/vendor/cesium'));
+/* Chart.js lives in vendor/ too and is still needed, so the build copies that directory file by
+   file now. A later wholesale copy would quietly ship Cesium again the moment anyone restored it. */
+t('but Chart.js still ships, which is why vendor is copied file by file', exists('dist/vendor/chart-4.4.1.umd.min.js')
+  && /if \(f === 'cesium'\) continue;/.test(read('scripts/assemble.mjs')));
+t('the removal says what it was and why it went', /THE WORLD GLOBE WAS REMOVED ON 2026-10-06/.test(term)
+  && /91% of the download and 0% of the answer/.test(term));
+/* The two things that share letters with it and are not it. */
+t('the News screen\'s headline feed is untouched', /url\.pathname === '\/worldnews'/.test(worker) && exists('test/worldnews.mjs'));
+t('and the Supply chain screen, which the owner asked for by name, is untouched',
+  /id="tab-map"/.test(term) && /data-tab="map"/.test(term) && /map:2/.test(term));
+
 G('Stripe does the money; the worker does the access');
 {
   t('billing routes are public, before the sync-key gate', worker.indexOf('const billed = await handleBilling') < worker.indexOf('// Auth: Authorization: Bearer <SYNC_SECRET>'));
@@ -2185,7 +2114,9 @@ t('no rounded frame is drawn around a table', !/border:1px solid var\(--border\)
 /* The door keeps the code it was opened with, for a profile that has none of its own. */
 t('the door keeps the code for the terminal', /localStorage\.setItem\('pf_door_code', payload\.code\)/.test(read('enter/enter.js')));
 /* Was ten; the Model view's own code() helper went with the panel on 2026-10-06. */
-t('every model helper, the settings status, the macro helpers and the door read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 9);
+/* Was ten, then nine when the Kronos panel went, now eight: the globe had a code() helper of its
+   own for the company-search route. */
+t('every model helper, the settings status, the macro helpers and the door read the door code', (term.match(/localStorage\.getItem\('pf_door_code'\)/g) || []).length === 8);
 /* The greeting was chatbot furniture; a statement is headed by its date. */
 t('the dashboard and command screens are headed by the date', /function dateLine\(\)/.test(term) && !/'Good '\+period/.test(term));
 t('no headings are typed in Title Case',

@@ -781,7 +781,7 @@ async function handle(request, env) {
   if (url.pathname === '/version' && request.method === 'GET') {
     const body = {
       version: WORKER_VERSION,
-      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/staffcode', '/forget', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/history', '/council', '/world', '/world/batch', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
+      routes: ['/version', '/request', '/invite', '/requests', '/decide', '/pause', '/staffcode', '/forget', '/status', '/callreg', '/marks', '/chain', '/usync', '/summarise', '/fred', '/finnhub', '/data', '/usync/devices', '/usync/forget', '/trade', '/trade/partners', '/trade/product', '/?slot=', '/checkout', '/checkout/confirm', '/stripe/webhook', '/portal', '/quote', '/checkemail', '/pause/code', '/door', '/door/clear', '/history', '/council', '/universe', '/popular', '/map/prefill', '/record', '/notify', '/share', '/token', '/me', '/me/schema', '/filings', '/calendar', '/holders', '/worldnews', '/feargreed', '/broker/link', '/broker/status', '/broker/sync', '/broker/unlink']
     };
     const auth0 = request.headers.get('Authorization') || '';
     const tok0 = auth0.startsWith('Bearer ') ? auth0.slice(7) : '';
@@ -3878,58 +3878,13 @@ async function handleBilling(request, env, url) {
      objects (works, industrial land, plants, data centres, quarries) come back. A busy geocoder is
      a 503 with a plain sentence, never a cached failure. Country stamping happens in the terminal
      for anything Nominatim did not place. */
-  if (url.pathname === '/world' && request.method === 'POST') {
-    if (await tooMany(env, request, '/world', 10)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
-    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    const code = clean(body.code, 12).toUpperCase();
-    if (!(await grantIsLive(env, code))) return json({ error: 'A live access code is required.' }, 401, env);
-    const q = clean(body.q, 40).replace(/\s+/g, ' ');
-    if (q.length < 2 || !/^[A-Za-z0-9&'.\- ]{2,40}$/.test(q)) return json({ error: 'Search for a company name: letters, digits, spaces, & . - and apostrophes, 2 to 40 characters.' }, 400, env);
-    const key = 'world:q:' + q.toLowerCase();
-    const cached = await env.PF_SYNC.get(key); if (cached) return json(Object.assign(JSON.parse(cached), { cached: true }), 200, env);
-    const r = await nominatim(env, q);
-    if (!r.ok) return json({ error: r.error }, 503, env);
-    const features = worldFeatures(r.results);
-    const result = { q, count: features.length, saturated: r.results.length >= WORLD_CAP, asOf: new Date().toISOString().slice(0, 10), source: 'OpenStreetMap contributors, ODbL 1.0, via Nominatim. Community-mapped; incomplete by nature.', features, cached: false };
-    await env.PF_SYNC.put(key, JSON.stringify(result), { expirationTtl: 7 * 86400 });
-    return json(result, 200, env);
-  }
+  /* /world and /world/batch WERE REMOVED ON 2026-10-06 with the globe they served. They searched
+     OpenStreetMap's Overpass mirrors for a company's plants and cached the answer. Nothing calls
+     them now, and an endpoint nothing calls is an endpoint nobody is watching.
 
-  /* ---- POST /world/batch {code, qs:[...]} : every plant of every company you hold, one request ----
-     Twelve holdings would be twelve /world calls and trip the per-IP limiter on the eleventh, so
-     the terminal sends the names together. Each name is validated exactly as /world does, served
-     from the same week-long cache when it can be, and asked of Nominatim one call a second when it
-     cannot, so a first look at twelve unseen names takes about twelve seconds and the second look
-     is instant. Twenty names at most; a name that fails simply comes back empty and says so. */
-  if (url.pathname === '/world/batch' && request.method === 'POST') {
-    if (await tooMany(env, request, '/world/batch', 5)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
-    let body; try { body = await request.json(); } catch (e) { return json({ error: 'Body is not valid JSON.' }, 400, env); }
-    const code = clean(body.code, 12).toUpperCase();
-    if (!(await grantIsLive(env, code))) return json({ error: 'A live access code is required.' }, 401, env);
-    const raw = Array.isArray(body.qs) ? body.qs.slice(0, 20) : [];
-    const qs = [...new Set(raw.map(q => clean(q, 40).replace(/\s+/g, ' ')).filter(q => q.length >= 2 && /^[A-Za-z0-9&'.\- ]{2,40}$/.test(q)))];
-    if (!qs.length) return json({ error: 'Send up to twenty company names.' }, 400, env);
-    const results = {};
-    for (const q of qs) {
-      const key = 'world:q:' + q.toLowerCase();
-      const cached = await env.PF_SYNC.get(key);
-      if (cached) { const c = JSON.parse(cached); results[q] = { count: c.count, features: c.features, cached: true }; continue; }
-      const r = await nominatim(env, q);
-      if (!r.ok) { results[q] = { count: 0, features: [], error: r.error }; continue; }
-      const features = worldFeatures(r.results);
-      const result = { q, count: features.length, saturated: r.results.length >= WORLD_CAP, asOf: new Date().toISOString().slice(0, 10), source: 'OpenStreetMap contributors, ODbL 1.0, via Nominatim. Community-mapped; incomplete by nature.', features, cached: false };
-      await env.PF_SYNC.put(key, JSON.stringify(result), { expirationTtl: 7 * 86400 });
-      results[q] = { count: features.length, features, cached: false };
-    }
-    return json({ asOf: new Date().toISOString().slice(0, 10), source: 'OpenStreetMap contributors, ODbL 1.0, via Nominatim. Community-mapped; incomplete by nature.', results }, 200, env);
-  }
+     NOT removed, and not the same thing: /worldnews, which is the headline feed behind the News
+     screen and has nothing to do with the globe beyond sharing five letters. */
 
-  /* ---- GET /universe : every US-listed common stock, symbol and name, refreshed daily ----
-     So the terminal has the whole market built in rather than only what a person typed: the
-     search box resolves a company name to its ticker, the Screener can scan the whole listing,
-     and nothing waits for a list to be pasted. Finnhub's symbol list through the Worker's own key
-     (the listing is public data), filtered to common stock on the primary US venues, cached in KV
-     for the day. About 6,000 rows, symbol, name, venue. */
   if (url.pathname === '/universe' && request.method === 'GET') {
     if (await tooMany(env, request, '/universe', 30)) return json({ error: 'Too many requests. Try again in a minute.' }, 429, env);
     const day = new Date().toISOString().slice(0, 10), ck = 'universe:' + day;

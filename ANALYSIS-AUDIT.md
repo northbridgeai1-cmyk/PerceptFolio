@@ -122,8 +122,16 @@ Not everything the terminal computes is a judgement about a company. These stay 
 | Monte Carlo, the stock projection | Arithmetic on an assumed average return. Circular: feeding it back in would score a company on an assumption about it. |
 | Beta, volatility, liquidity | Properties of the **position**, which is why they drive sizing instead. A volatile stock is not a worse company. |
 | Concentration (% of book) | A fact about the owner's book, not the company. Drives the keep/look/sell list, correctly. |
-| Supply chain map, World, Seasonal, Cycle, Hindsight, Counterfactual | Context and research. None is evidence about whether this company is worth owning today. |
+| Supply chain map, Seasonal, Cycle, Hindsight, Counterfactual | Context and research. None is evidence about whether this company is worth owning today. |
 | Fear and greed | A market mood reading. Deliberately reaches no verdict, and should not start now. |
+
+## Removed outright, 2026-10-06
+
+| Thing | Why |
+|---|---|
+| The World globe | 22.7MB of a 25MB deploy: 8.5MB of vendored Cesium, 14MB of extracted plant data, downloaded by every build whether or not anybody opened the tab. It reached no verdict, the walkthrough called it an expert screen with no starter state, and neither user has a use for it. 91% of the download, 0% of the answer. |
+
+The deploy went from **25MB to 2.4MB**.
 
 ## What the two users actually need from all this
 

@@ -14,7 +14,7 @@
          this origin, the worker and Finnhub, so an injected script cannot exfiltrate a portfolio
          to an arbitrary host; object-src and frame-src are closed; base-uri cannot be rewritten
          to redirect every relative URL. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io https://services.arcgisonline.com https://server.arcgisonline.com; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.workers.dev https://finnhub.io; form-action 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover,interactive-widget=resizes-content">
 <title>PerceptFolio | Your Portfolio Quant</title>
@@ -1093,7 +1093,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 #sidebar nav button.pf-more{color:var(--muted)}
 /* Model view (Projections). One row of controls that never wraps its button; an empty state that
    looks designed rather than logged. */
-@media (max-width:600px){#pfModel .mv-form{width:100%}#pfModel .mv-form input{flex:1;min-width:0}#pfModel .mv-form .btn{width:100%}}
 </style>
 </head>
 <body>
@@ -1235,8 +1234,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <symbol id="i-market" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
   <symbol id="i-news" viewBox="0 0 24 24"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1z"/><path d="M18 8h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2"/><line x1="7" y1="8.5" x2="14" y2="8.5"/><line x1="7" y1="12" x2="14" y2="12"/><line x1="7" y1="15.5" x2="11" y2="15.5"/></symbol>
   <symbol id="i-map" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><line x1="8.5" y1="10.6" x2="15.5" y2="6.4"/><line x1="8.5" y1="13.4" x2="15.5" y2="17.6"/></symbol>
-  <symbol id="i-world" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="3.6" ry="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M4.6 7.5h14.8M4.6 16.5h14.8"/></symbol>
-  <symbol id="i-screener" viewBox="0 0 24 24"><polygon points="21.5 3.5 2.5 3.5 10 12.4 10 19 14 21 14 12.4 21.5 3.5"/></symbol>
+    <symbol id="i-screener" viewBox="0 0 24 24"><polygon points="21.5 3.5 2.5 3.5 10 12.4 10 19 14 21 14 12.4 21.5 3.5"/></symbol>
   <symbol id="i-analyzer" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></symbol>
   <symbol id="i-risk" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9.5" x2="12" y2="13.5"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
   <symbol id="i-projections" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
@@ -1339,7 +1337,6 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
     <button data-tab="market" id="navMarket" onclick="showTab('market')" data-tip="The market"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-market"/></svg></span><span class="lbl">The market</span><span class="shortlbl">Market</span></button>
     <button data-tab="news" id="navNews" onclick="showTab('news')" data-tip="News"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-news"/></svg></span><span class="lbl">News</span><span class="shortlbl">News</span></button>
     <button data-tab="map" id="navMap" onclick="showTab('map')" data-tip="Supply chain"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg></span><span class="lbl">Supply chain</span><span class="shortlbl">Chain</span></button>
-    <button data-tab="world" id="navWorld" onclick="showTab('world')" data-tip="World"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-world"/></svg></span><span class="lbl">World</span><span class="shortlbl">World</span></button>
     <button data-tab="screener" id="navScreener" onclick="showTab('screener')" data-tip="Find stocks"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-screener"/></svg></span><span class="lbl">Find stocks</span><span class="shortlbl">Find</span></button>
     <button data-tab="analyzer" id="navAnalyzer" onclick="showTab('analyzer')" data-tip="Analyze"><span class="ico"><svg viewBox="0 0 24 24"><use href="#i-analyzer"/></svg></span><span class="lbl">Analyze</span><span class="shortlbl">Check</span></button>
     <div class="nav-sep"></div>
@@ -2057,32 +2054,21 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <details class="aside"><summary>What's automatic and what isn't</summary><div>The centre company's profile and the "similar companies" row come from Finnhub and fill in on their own. Suppliers and customers are yours to enter. Institutional holders were deliberately left out: the free source for that is quarterly 13F filings, which are up to four months stale, exclude short positions entirely, and would list Vanguard, BlackRock and State Street at the top of nearly every company you could look up. A list that says the same thing about everything isn't worth the screen space.</div></details>
 </div>
 
-<!-- WORLD: where the plants are, on a globe. Data from OpenStreetMap through world/data (bundled
-     industry layers) and the worker's /world route (company search). Cesium is loaded the first time
-     the tab opens, from /vendor/cesium, so nobody who never opens it pays for it. -->
-<div id="tab-world" class="tabs-hidden">
-  <div class="card wd-intro">
-    <h3>Where the plants are</h3>
-    <div class="wd-form">
-      <input id="wdQ" placeholder="a product, a company or a country: fish, TSMC, Ecuador" autocomplete="off" onkeydown="if(event.key==='Enter')wdSearch()">
-      <button class="btn" onclick="wdSearch()">Show</button>
-      <span class="muted" id="wdStatus" aria-live="polite"></span>
-    </div>
-    <div class="wd-chips" id="wdChips" role="group" aria-label="Industries"></div>
-  </div>
-  <div class="card wd-stage" style="margin-top:16px">
-    <div class="wd-globe-wrap">
-      <div id="wdGlobe" aria-label="Globe"></div>
-      <div class="wd-tip" id="wdTip" hidden></div>
-      <div class="wd-idle" id="wdIdle"><div class="mv-empty"><span class="dot"></span><div><b>Click a country.</b> Or pick an industry above, or type a product or a company.</div></div></div>
-    </div>
-    <div class="wd-side">
-      <div id="wdLegend"></div>
-      <div id="wdDetail"></div>
-    </div>
-  </div>
-</div>
+<!-- THE WORLD GLOBE WAS REMOVED ON 2026-10-06, on the owner's instruction to take out what is
+     genuinely not needed.
 
+     It put every plant OpenStreetMap knows for an industry or a company onto a CesiumJS globe, with
+     Esri satellite imagery fading in on the way down. It was the most impressive thing in the
+     terminal and it was 22.7MB of the 25MB this site shipped: 8.5MB of vendored Cesium and 14MB of
+     extracted plant data, downloaded by a Pages deploy whether or not anybody opened the tab.
+
+     ANALYSIS-AUDIT.md already had it in the list of things that reach no verdict, the 2026-10-04
+     walkthrough called it an expert screen with no starter state, and neither of the two people
+     this product is for, the side-hustler and the once-a-month investor, has any use for it. A
+     feature that is 91% of the download and 0% of the answer is the definition of taking up space.
+
+     What is NOT removed and must not be confused with it: /worldnews, which is the headline feed
+     behind the News screen, and the Supply chain screen, which the owner asked for by name. -->
 <!-- MARKET -->
 <div id="tab-market" class="tabs-hidden">
 
@@ -14442,7 +14428,7 @@ const LEVELS=['beginner','intermediate','advanced'];
 const TAB_LEVEL={
   dashboard:0, portfolio:0, watchlist:0, analyzer:0, news:0, settings:0,
   history:1, screener:1, market:1, risk:1,
-  map:2, world:2, projections:2, alerts:2,
+  map:2, projections:2, alerts:2,
   /* `clients` was listed here and there is no such tab: it went with the business terminal on
      2026-09-27. A phantom key costs nothing functionally and told the reader "6 of 15 screens"
      when the sidebar has fourteen, which is the kind of small lie that makes somebody stop
@@ -19596,695 +19582,6 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
      limits that actually decide a size. The five sizing limits are the answer to how much. */
 })();
 </script>
-<style id="v2-world">
-/* World: the globe of plants. Scoped to the tab so the Cesium widget CSS cannot leak into the rest
-   of the terminal, and the terminal's tokens cannot fight the canvas. */
-#tab-world .wd-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-#tab-world .wd-form input{flex:1 1 300px;min-width:220px;height:40px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 12px;color:var(--text);font:inherit}
-#tab-world .wd-form input:focus{outline:none;border-color:var(--brand2);box-shadow:0 0 0 3px var(--glow)}
-#tab-world .wd-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-#tab-world .wd-chip{display:inline-flex;align-items:center;gap:7px;padding:6px 11px 6px 9px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--muted);font:500 12.5px/1 inherit;cursor:pointer;transition:border-color .12s,color .12s,background .12s}
-#tab-world .wd-chip i{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
-#tab-world .wd-chip small{font-family:var(--mono);font-size:11px;color:var(--muted)}
-#tab-world .wd-chip:hover{color:var(--text);border-color:var(--muted)}
-#tab-world .wd-chip.on{color:var(--text);background:var(--panel2);border-color:var(--c)}
-#tab-world .wd-chip-mine{--c:var(--brand2);color:var(--text);border-color:var(--brand2)}
-#tab-world .wd-chip-mine i{background:conic-gradient(#3b82f6,#22c55e,#f59e0b,#ec4899,#a78bfa,#3b82f6)}
-#tab-world .wd-holds{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
-#tab-world .wd-holds li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:13px;padding:4px 6px;margin:0 -6px;border-radius:6px}
-#tab-world .wd-holds li.on{cursor:pointer}
-#tab-world .wd-holds li.on:hover{background:var(--panel2)}
-#tab-world .wd-holds li:not(.on){color:var(--muted)}
-#tab-world .wd-holds i{width:10px;height:10px;border-radius:50%;display:inline-block}
-#tab-world .wd-holds b{font-family:var(--mono);font-weight:600;margin-right:4px}
-#tab-world .wd-holds em{font:12px var(--mono);color:var(--muted);font-style:normal}
-#tab-world .wd-stage{display:grid;grid-template-columns:minmax(0,1fr) 272px;gap:16px}
-#tab-world .wd-globe-wrap{position:relative;min-height:540px;border-radius:10px;overflow:hidden;background:#07090f;border:1px solid var(--border)}
-#wdGlobe{position:absolute;inset:0}
-#wdGlobe .cesium-widget,#wdGlobe .cesium-widget canvas{width:100%;height:100%;touch-action:none}
-#wdGlobe .cesium-widget-credits{font:11px/1.4 var(--mono);color:#9aa3b2;padding:5px 8px;background:rgba(7,9,15,.6);border-top-right-radius:6px}
-#wdGlobe .cesium-widget-credits a{color:#c3c9d4}
-#tab-world .wd-tip{position:absolute;z-index:3;pointer-events:none;transform:translate(14px,14px);max-width:260px;padding:6px 10px;border-radius:8px;background:var(--panel);color:var(--text);border:1px solid var(--border);box-shadow:var(--el-3);font-size:12.5px;line-height:1.4}
-/* The hint sat in the middle of the globe and, because .mv-empty takes pointer events, it ate
-   the very click it was asking for: "Click a country" was unclickable through the card. It now
-   sits at the bottom, out of the way of the planet, and lets every click through. */
-#tab-world .wd-idle{position:absolute;inset:auto 0 0 0;z-index:2;display:grid;place-items:end center;padding:0 24px 18px;pointer-events:none}
-#tab-world .wd-idle .mv-empty{pointer-events:none;background:rgba(7,9,15,.82);backdrop-filter:blur(4px)}
-/* Start here: a step is a number, a line and a button; a done step is ticked and dimmed. */
-.welcome-card .wc-step{display:flex;gap:12px;align-items:flex-start}
-.welcome-card .wc-step>div{flex:1;line-height:1.55}
-.welcome-card .wc-step .btn{margin-left:8px;vertical-align:middle}
-.welcome-card .wc-step.wc-done{opacity:.6}
-.welcome-card .wc-step.wc-done .step-num{background:var(--green,#2ea043);color:#fff}
-#tab-world .wd-idle[hidden],#tab-world .wd-tip[hidden]{display:none}
-#tab-world .mv-empty{display:block;padding:14px 16px;border:1px solid var(--border);border-radius:4px;background:var(--bg);max-width:440px;pointer-events:auto}
-#tab-world .wd-idle .mv-empty{background:rgba(14,15,18,.88);backdrop-filter:blur(6px);color:#f2f3f5}
-#tab-world .mv-empty .dot{display:none}
-#tab-world .mv-empty b{display:block;font-size:14px;margin-bottom:4px}
-#tab-world .mv-empty p{margin:0;font-size:13px;line-height:1.55;color:var(--muted);max-width:60ch}
-#tab-world .wd-side{display:flex;flex-direction:column;gap:12px;min-width:0}
-#tab-world .wd-legend h4,#tab-world .wd-detail h4{margin:0 0 4px;font-size:15px;line-height:1.3}
-#tab-world .wd-meta{font:12px/1.5 var(--mono);color:var(--muted)}
-#tab-world .wd-countries{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
-#tab-world .wd-countries li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:13px;align-items:center}
-#tab-world .wd-countries li.pick{cursor:pointer}
-#tab-world .wd-countries li.pick:hover span:first-child{text-decoration:underline;text-underline-offset:.2em}
-#tab-world .wd-countries li.on span:first-child{font-weight:700;color:var(--brand2)}
-#tab-world .wd-meta a{color:var(--accent)}
-/* Rates and the economy: tiles in the stat idiom, and the curve. */
-.rates-sec{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
-.rates-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.rate-tile{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel2)}
-.rate-tile .rl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
-.rate-tile .rv{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:3px;line-height:1.1}
-.rate-tile .rc{font-size:11.5px;margin-top:4px;font-variant-numeric:tabular-nums;min-height:15px}
-.rate-tile .rd{font-size:10.5px;color:var(--muted);margin-top:4px}
-.rates-curve{display:flex;align-items:center;gap:16px;margin-top:12px;flex-wrap:wrap}
-.rates-curve svg{max-width:100%;height:auto;flex:0 0 auto}
-.rates-curve .ax{font-family:var(--mono);font-size:9.5px;fill:var(--muted)}
-.rates-curve .now{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-.rates-curve .was{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-dasharray:4 4;opacity:.7}
-.rates-curve .dot{fill:var(--accent)}
-.rates-curve-note{font-size:12.5px;line-height:1.6;flex:1 1 180px}
-.rates-curve-note .rl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-right:4px}
-.rates-legend{display:flex;gap:14px;font-size:11.5px;margin-top:2px}
-.rates-legend i{display:inline-block;width:18px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:6px}
-.rates-legend i.was{border-top:1.5px dashed var(--muted)}
-.rates{display:flex;flex-wrap:wrap;gap:6px 0;font-size:13.5px;align-items:baseline}
-.rates i{display:inline-block;width:1px;height:14px;background:var(--border);margin:0 14px;vertical-align:middle}
-.rates b{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums}
-@media(max-width:600px){.rates i{display:none}.rates>span{flex:1 1 45%}}
-#tab-world .wd-countries li b{font-family:var(--mono);font-weight:600}
-#tab-world .wd-countries .bar{grid-column:1/-1;height:3px;border-radius:2px;background:var(--c);opacity:.6}
-#tab-world .wd-h5{margin:16px 0 0;font-size:12.5px;font-weight:600;color:var(--text)}
-#tab-world .wd-src{font:11.5px/1.4 var(--mono);color:var(--muted);margin:6px 0 0}
-#tab-world .wd-trade li b{font-size:12px}
-#tab-world .wd-flag{font-size:15px;margin-right:4px}
-#tab-world .wd-detail{border-top:1px solid var(--border);padding-top:12px}
-#tab-world .wd-kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13px;margin-top:8px;line-height:1.45}
-#tab-world .wd-kv span:first-child{color:var(--muted)}
-#tab-world .wd-kv .mono{font-family:var(--mono);font-size:12px}
-#tab-world .wd-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-#tab-world .wd-links a{text-decoration:none;display:inline-flex;align-items:center;padding:8px 12px}
-/* Phones (768 and under, where the terminal's own phone layout lives): the globe is what you came
-   for, so it sits right under the box; the fifteen chips become one rail you swipe, not a column
-   that pushes the globe off the screen; the explanation moves under the chips; the panel follows
-   the globe. Chips grow to a thumb's height on a coarse pointer. */
-@media (max-width:768px){
-  #tab-world .wd-form input{flex:1 1 0;min-width:0}
-  #tab-world .wd-form .btn{flex:none}
-  #tab-world .wd-form #wdStatus{flex-basis:100%}
-  #tab-world .wd-chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
-  #tab-world .wd-chips::-webkit-scrollbar{display:none}
-  #tab-world .wd-chip{flex:none;scroll-snap-align:start}
-  #tab-world .wd-stage{grid-template-columns:1fr;gap:12px}
-  #tab-world .wd-globe-wrap{min-height:min(62vh,480px)}
-  #tab-world .wd-idle{padding:14px}
-  #tab-world .wd-idle .mv-empty{padding:12px 14px}
-  #tab-world .wd-side{gap:10px}
-}
-@media (pointer:coarse){#tab-world .wd-chip{min-height:40px;padding-left:12px;padding-right:13px}}
-/* The foldable band. An unfolded iPhone Duo is 890px wide with a crease down the centre and Safari
-   exposes neither (the landing page uses the same band). The sidebar becomes the rail here, so the
-   content's centre lands within a wide gutter of the crease; two-column grids keep their columns
-   with that gutter on the crease; the World stage puts the globe on the left leaf and the panel on
-   the right, which is what a hinge is for. A rotated unfolded Duo (626) and the folded one (466)
-   fall into the phone layout above. */
-@media (max-width:960px) and (min-width:781px){
-  #sidebar{width:52px!important;padding:8px 4px;padding-left:calc(4px + env(safe-area-inset-left))}
-  #sidebar .lbl{display:none}
-  #sidebar nav button{justify-content:center;padding:11px 0}
-  #sidebar nav button .ico{font-size:18px}
-  #sideToggle,.hd-where,.hd-div{display:none}
-  .nav-sep{margin:6px 8px}
-  .badge{position:absolute;top:5px;right:5px;margin-left:0}
-  .grid-2{gap:60px}
-  .grid-3{grid-template-columns:1fr 1fr;gap:60px}
-  #tab-world .wd-stage{grid-template-columns:1fr 1fr;gap:60px;align-items:start}
-  #tab-world .wd-globe-wrap{min-height:min(72vh,560px)}
-  #tab-world .wd-side{position:sticky;top:calc(72px + env(safe-area-inset-top))}
-}
-</style>
-<script>
-/* World: every plant OpenStreetMap knows for an industry or a company, on a CesiumJS globe.
-   The pattern is God's Eye View's: bundled OSM extracts for the standing layers, a proxied,
-   bounded, cached Overpass query for the live question, and honest labels about coverage.
-   Cesium (5.7 MB) loads the first time this tab opens and never before. */
-(function(){
-  var BASE='/vendor/cesium/', DATA='/world/data/';
-  var IDX=null, SET=null, viewer=null, points=null, NE=null, loadP=null, sat=null;
-  var borders=null, hl=null, labels=null, atlasDone=false, FILTER=null;   /* the atlas: borders and names; FILTER is a country code or null */
-  var PW=null;   /* the product filter: one of the phrases in the list on the right, or null */
-  function satFade(){ if(!viewer||!sat)return; var hgt=viewer.camera.positionCartographic.height, a=hgt>4e6?0:hgt<1.2e6?1:(4e6-hgt)/(4e6-1.2e6); if(Math.abs((sat.alpha||0)-a)<0.01&&sat.show===(a>0))return; sat.alpha=a; sat.show=a>0; viewer.scene.requestRender(); }
-  function $(id){return document.getElementById(id);}
-  function code(){ try{ var p=USER&&DB&&DB.profiles&&DB.profiles[USER]; return (p&&(p.invite||p.inviteCode||p.code))||localStorage.getItem('pf_door_code')||''; }catch(e){ return ''; } }
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
-  function status(msg){ var s=$('wdStatus'); if(s)s.textContent=msg||''; }
-  function names(){ return (IDX&&IDX.countries)||{}; }
-
-  /* ---- the manifest and the industry chips ---- */
-  function loadIndex(){
-    if(IDX)return Promise.resolve(IDX);
-    return fetch(DATA+'index.json',{cache:'no-cache'}).then(function(r){ if(!r.ok)throw new Error('index'); return r.json(); }).then(function(j){ IDX=j; renderChips(); return j; });
-  }
-  function renderChips(){
-    var box=$('wdChips'); if(!box)return; box.innerHTML='';
-    var mine=document.createElement('button'); mine.type='button'; mine.className='wd-chip wd-chip-mine'; mine.dataset.id='mine'; mine.innerHTML='<i></i>Your holdings'; mine.onclick=function(){ $('wdQ').value=''; wdHoldings(); }; box.appendChild(mine);
-    (IDX.industries||[]).forEach(function(ind){
-      var b=document.createElement('button'); b.type='button'; b.className='wd-chip'; b.style.setProperty('--c',ind.color); b.dataset.id=ind.id;
-      b.innerHTML='<i></i>'+esc(ind.label)+(ind.count?' <small>'+ind.count+'</small>':'');
-      b.onclick=function(){ $('wdQ').value=''; showIndustry(ind.id); };
-      box.appendChild(b);
-    });
-  }
-  function markChip(id){ document.querySelectorAll('#wdChips .wd-chip').forEach(function(b){ b.classList.toggle('on',b.dataset.id===id); }); }
-
-  /* ---- Cesium, on first use ---- */
-  function loadCesium(){
-    if(window.Cesium)return Promise.resolve();
-    if(loadP)return loadP;
-    window.CESIUM_BASE_URL=BASE;
-    var link=document.createElement('link'); link.rel='stylesheet'; link.href=BASE+'Widgets/widgets.css'; document.head.appendChild(link);
-    loadP=new Promise(function(res,rej){ var s=document.createElement('script'); s.src=BASE+'Cesium.js'; s.onload=function(){res();}; s.onerror=function(){ loadP=null; rej(new Error('the globe did not load')); }; document.head.appendChild(s); });
-    return loadP;
-  }
-  function ensureViewer(){
-    if(viewer)return Promise.resolve(viewer);
-    return loadCesium().then(function(){
-      var C=window.Cesium;
-      C.Ion.defaultAccessToken='';   /* nothing here comes from Cesium ion; the imagery is served from this site */
-      /* The library's own credit, as text: the npm package ships no logo image, and a broken icon is worse than a word. */
-      C.CreditDisplay.cesiumCredit=new C.Credit('<a href="https://cesium.com/" target="_blank" rel="noopener noreferrer">CesiumJS</a>',true);
-      var imagery=C.TileMapServiceImageryProvider.fromUrl(C.buildModuleUrl('Assets/Textures/NaturalEarthII'),{credit:new C.Credit('Natural Earth II · OpenStreetMap contributors (ODbL)')});
-      /* CesiumWidget, not Viewer: the Viewer layer is toolbar widgets bound with Knockout, none of
-         which this page wants, and Knockout parses bindings with new Function, which the CSP forbids. */
-      viewer=new C.CesiumWidget('wdGlobe',{
-        baseLayer:C.ImageryLayer.fromProviderAsync(imagery), terrainProvider:new C.EllipsoidTerrainProvider(),
-        skyBox:false,skyAtmosphere:new C.SkyAtmosphere(),requestRenderMode:true,maximumRenderTimeChange:Infinity,
-        contextOptions:{webgl:{alpha:false,antialias:true,powerPreference:'low-power'}}
-      });
-      var sc=viewer.scene;
-      /* requestRenderMode draws a frame only when one is asked for. The base map's tiles arrive
-         after the first frame, so without this the first look is white borders on a black ball:
-         the globe is there and its map is not, which is what "the World is not working" looked
-         like. Each tile batch asks for a frame; the event stops firing when the globe settles. */
-      sc.globe.tileLoadProgressEvent.addEventListener(function(){ sc.requestRender(); });
-      sc.backgroundColor=C.Color.fromCssColorString('#07090f'); sc.globe.baseColor=C.Color.fromCssColorString('#101827');
-      sc.globe.showGroundAtmosphere=true; sc.globe.depthTestAgainstTerrain=true; sc.fog.enabled=false; sc.highDynamicRange=false;
-      if(sc.sun)sc.sun.show=false; if(sc.moon)sc.moon.show=false;
-      var ctl=sc.screenSpaceCameraController; ctl.minimumZoomDistance=600; ctl.maximumZoomDistance=32000000; ctl.enableTilt=false;
-      /* Satellite on the way down. Natural Earth II is a world map and blurs below a few hundred
-         kilometres, so Esri World Imagery is layered above it and faded in between 4,000 km and
-         1,200 km of altitude: the globe stays a globe, and a plant becomes a roof. The tiles are
-         only requested once the layer is visible, so a look at the world costs no tile at all. */
-      C.ArcGisMapServerImageryProvider.fromUrl('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer',{credit:new C.Credit('Satellite imagery: Esri, Maxar, Earthstar Geographics, and the GIS User Community'),enablePickFeatures:false})
-        .then(function(p){ sat=viewer.imageryLayers.addImageryProvider(p); sat.alpha=0; sat.show=false; satFade(); })
-        .catch(function(){ sat=null; });
-      viewer.camera.percentageChanged=0.03; viewer.camera.changed.addEventListener(satFade);
-      /* Open on the whole planet, Atlantic-centred, so the first look is the world and not a hemisphere. */
-      viewer.camera.setView({destination:C.Cartesian3.fromDegrees(10,22,1.75e7)});
-      borders=sc.primitives.add(new C.PolylineCollection());
-      hl=sc.primitives.add(new C.PolylineCollection());
-      labels=sc.primitives.add(new C.LabelCollection());
-      points=sc.primitives.add(new C.PointPrimitiveCollection());
-      routes=sc.primitives.add(new C.PolylineCollection());
-      ships=sc.primitives.add(new C.BillboardCollection());
-      drawAtlas();
-      var h=new C.ScreenSpaceEventHandler(sc.canvas), last=0;
-      h.setInputAction(function(m){
-        var now=Date.now(); if(now-last<40)return; last=now;
-        var p=sc.pick(m.endPosition), tip=$('wdTip'), f=p&&p.id&&p.id.n?p.id:null;
-        if(f){ var ol=ownerLine(f); tip.textContent=f.n+(ol&&ol!==f.n?' · '+ol:(tickerFor(f)?' ('+tickerFor(f)+')':''))+(f.pl?' · '+f.pl:(names()[f.c]?' · '+names()[f.c]:'')); tip.style.left=m.endPosition.x+'px'; tip.style.top=m.endPosition.y+'px'; tip.hidden=false; sc.canvas.style.cursor='pointer'; }
-        else { tip.hidden=true; sc.canvas.style.cursor=''; }
-      },C.ScreenSpaceEventType.MOUSE_MOVE);
-      /* A click on a plant opens it; a click on the ground picks that country, and the set
-         narrows to what it has there. The same click on the same country widens it again. */
-      h.setInputAction(function(m){
-        var p=sc.pick(m.position); if(p&&p.id&&p.id.ship){ showRouteDetail(p.id); return; } if(p&&p.id&&p.id.n){ showDetail(p.id); return; }
-        if(!NE)return;
-        var cart=viewer.camera.pickEllipsoid(m.position,sc.globe.ellipsoid); if(!cart)return;
-        var cg=C.Cartographic.fromCartesian(cart), cc=countryOf(C.Math.toDegrees(cg.longitude),C.Math.toDegrees(cg.latitude));
-        if(!cc)return;
-        /* The map is the default: with nothing loaded, or with another country up, a click on a
-           country opens that country (its plants and what it sells and buys). With an industry
-           set up, a click narrows the set to that country and a second click widens it again. */
-        if(!SET||SET.country){ if(!SET||SET.country!==cc)showCountry(cc); return; }
-        toggleCountry(cc);
-      },C.ScreenSpaceEventType.LEFT_CLICK);
-      return viewer;
-    });
-  }
-
-  /* ---- the atlas ---- */
-  function ringArea(r){ var a=0; for(var i=0,j=r.length-1;i<r.length;j=i++)a+=(r[j][0]+r[i][0])*(r[j][1]-r[i][1]); return a/2; }
-  function ringCentroid(r){ var a=0,cx=0,cy=0; for(var i=0,j=r.length-1;i<r.length;j=i++){ var f=r[j][0]*r[i][1]-r[i][0]*r[j][1]; a+=f; cx+=(r[j][0]+r[i][0])*f; cy+=(r[j][1]+r[i][1])*f; } if(Math.abs(a)<1e-9){ var sx=0,sy=0; r.forEach(function(p){sx+=p[0];sy+=p[1];}); return [sx/r.length,sy/r.length]; } a*=3; return [cx/a,cy/a]; }
-  var FONT='-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
-  function drawAtlas(){
-    if(atlasDone||!viewer)return; atlasDone=true;
-    var C=window.Cesium, sc=viewer.scene;
-    loadNE().then(function(){
-      var line=C.Material.fromType('Color',{color:C.Color.fromCssColorString('#ffffff').withAlpha(0.26)});
-      NE.forEach(function(c){
-        c.polys.forEach(function(poly){ poly.forEach(function(ring){ if(ring.length<3)return; var arr=[]; ring.forEach(function(pt){ arr.push(pt[0],pt[1],120); }); borders.add({positions:C.Cartesian3.fromDegreesArrayHeights(arr),width:1,material:line}); }); });
-        /* The name sits on the largest piece of the country and appears at a height that suits its
-           size: continents from space, small countries once they fill the view. */
-        var big=null,ba=0; c.polys.forEach(function(poly){ var a=Math.abs(ringArea(poly[0])); if(a>ba){ba=a;big=poly[0];} }); if(!big)return;
-        var cen=ringCentroid(big), far=ba>60?1.8e7:ba>10?7e6:ba>1.5?3e6:1.3e6;
-        labels.add({position:C.Cartesian3.fromDegrees(cen[0],cen[1],300),text:String(c.name||'').toUpperCase(),font:'600 12px '+FONT,fillColor:C.Color.fromCssColorString('#eef1f6').withAlpha(.9),outlineColor:C.Color.fromCssColorString('#07090f').withAlpha(.95),outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,horizontalOrigin:C.HorizontalOrigin.CENTER,verticalOrigin:C.VerticalOrigin.CENTER,distanceDisplayCondition:new C.DistanceDisplayCondition(0,far)});
-      });
-      sc.requestRender();
-    }).catch(function(){});
-    loadPlaces().then(function(){
-      PLACES.forEach(function(p){
-        var pop=p[5]||0; if(pop<50000)return;
-        var far=pop>=3e6?1.1e7:pop>=1e6?4.5e6:pop>=5e5?2.2e6:pop>=2.5e5?1.1e6:pop>=1e5?5.5e5:2.6e5;
-        labels.add({position:C.Cartesian3.fromDegrees(p[4],p[3],150),text:p[0],font:(pop>=1e6?'500 12px ':'11px ')+FONT,fillColor:C.Color.fromCssColorString('#ffffff').withAlpha(.88),outlineColor:C.Color.fromCssColorString('#07090f').withAlpha(.9),outlineWidth:2,style:C.LabelStyle.FILL_AND_OUTLINE,horizontalOrigin:C.HorizontalOrigin.LEFT,verticalOrigin:C.VerticalOrigin.CENTER,pixelOffset:new C.Cartesian2(5,0),distanceDisplayCondition:new C.DistanceDisplayCondition(0,far)});
-      });
-      sc.requestRender();
-    }).catch(function(){});
-  }
-  function highlight(cc){
-    var C=window.Cesium; hl.removeAll(); if(!cc||!NE)return;
-    var c=NE.filter(function(x){return x.cc===cc;})[0]; if(!c)return;
-    var mat=C.Material.fromType('Color',{color:C.Color.fromCssColorString('#1f9e8c')});
-    c.polys.forEach(function(poly){ poly.forEach(function(ring){ if(ring.length<3)return; var arr=[]; ring.forEach(function(pt){ arr.push(pt[0],pt[1],160); }); hl.add({positions:C.Cartesian3.fromDegreesArrayHeights(arr),width:2.2,material:mat}); }); });
-  }
-  /* ---- the country filter ---- */
-  window.wdCountry=function(cc){ toggleCountry(cc); };
-  function toggleCountry(cc){
-    if(!SET)return;
-    PW=null;
-    if(FILTER===cc){ FILTER=null; highlight(null); draw(SET,true); legend(SET); status(''); return; }
-    var fs=SET.features.filter(function(f){return f.c===cc;});
-    if(!fs.length){ status('Nothing from '+esc(SET.label)+' in '+(names()[cc]||cc)+'.'); return; }
-    FILTER=cc; highlight(cc); status('');
-    draw(Object.assign({},SET,{features:fs}),true); legend(SET);
-  }
-
-  /* ---- drawing a set ---- */
-  function draw(set,keepFilter){
-    var C=window.Cesium; points.removeAll();
-    if(!keepFilter){ FILTER=null; PW=null; if(hl)hl.removeAll(); clearTrade(); }
-    var color=C.Color.fromCssColorString(set.color||'#3b82f6'), outline=C.Color.BLACK.withAlpha(.7), pos=[];
-    var cols={};
-    set.features.forEach(function(f){ var c3=C.Cartesian3.fromDegrees(f.lo,f.la,1500); pos.push(c3); var col=f.col?(cols[f.col]||(cols[f.col]=C.Color.fromCssColorString(f.col))):color; points.add({position:c3,pixelSize:6.5,color:col,outlineColor:outline,outlineWidth:1,id:f}); });
-    if(pos.length){
-      /* A set spread around the planet has a bounding sphere centred near the Earth's core, which no
-         cartographic conversion survives; the circular mean of the longitudes is what the camera wants. */
-      var sph=C.BoundingSphere.fromPoints(pos), sx=0, sy=0, sl=0;
-      set.features.forEach(function(f){ var r=f.lo*Math.PI/180; sx+=Math.cos(r); sy+=Math.sin(r); sl+=f.la; });
-      var mlon=Math.atan2(sy,sx)*180/Math.PI, mlat=sl/set.features.length;
-      if(sph.radius>2.6e6){ viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(mlon,Math.max(-40,Math.min(50,mlat)),1.75e7),duration:1.1}); }
-      else { viewer.camera.flyToBoundingSphere(sph,{duration:1.1,offset:new C.HeadingPitchRange(0,-C.Math.PI_OVER_TWO,Math.max(sph.radius*3.4,1200000))}); }
-    }
-    $('wdIdle').hidden=true; viewer.resize(); viewer.scene.requestRender();
-  }
-  /* Fly the camera to one group of plants (a holding's), or to the whole set. */
-  function flyTo(feats){
-    var C=window.Cesium; if(!viewer||!feats.length)return;
-    var pos=feats.map(function(f){return C.Cartesian3.fromDegrees(f.lo,f.la,1500);}), sph=C.BoundingSphere.fromPoints(pos);
-    if(sph.radius>2.6e6){ var sx=0,sy=0,sl=0; feats.forEach(function(f){ var r=f.lo*Math.PI/180; sx+=Math.cos(r); sy+=Math.sin(r); sl+=f.la; }); viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(Math.atan2(sy,sx)*180/Math.PI,Math.max(-40,Math.min(50,sl/feats.length)),1.75e7),duration:1.1}); }
-    else viewer.camera.flyToBoundingSphere(sph,{duration:1.1,offset:new C.HeadingPitchRange(0,-C.Math.PI_OVER_TWO,Math.max(sph.radius*3.4,1200000))});
-    viewer.scene.requestRender();
-  }
-  function legend(set){
-    if(set.groups&&FILTER){
-      var nmF=names(), inC=set.features.filter(function(f){return f.c===FILTER;}), cnt={}; inC.forEach(function(f){ cnt[f.sym]=(cnt[f.sym]||0)+1; });
-      $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+(nmF[FILTER]||FILTER)+' · '+inC.length+' of '+set.features.length+' plants · <a href="#" onclick="wdCountry(\''+esc(FILTER)+'\');return false">Show all</a></div>'+
-        '<ul class="wd-holds">'+set.groups.filter(function(g){return cnt[g.sym];}).map(function(g){ return '<li class="on" data-s="'+esc(g.sym)+'"><i style="background:'+esc(g.col)+'"></i><span><b>'+esc(g.sym)+'</b> '+esc(g.name)+'</span><em>'+cnt[g.sym]+'</em></li>'; }).join('')+'</ul></div>';
-      $('wdLegend').querySelectorAll('li.on').forEach(function(li){ li.onclick=function(){ flyTo(inC.filter(function(f){return f.sym===li.dataset.s;})); }; });
-      return;
-    }
-    if(set.groups){
-      $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+set.features.length+' plants · '+set.groups.length+' holdings · OpenStreetMap as of '+esc(set.asOf||'')+'</div>'+
-        '<ul class="wd-holds">'+set.groups.map(function(g,i){ return '<li'+(g.count?' class="on" data-i="'+i+'"':'')+'><i style="background:'+esc(g.col)+'"></i><span><b>'+esc(g.sym)+'</b> '+esc(g.name)+'</span><em>'+(g.count?g.count:(g.unknown?'no name (needs the data key)':'none drawn'))+'</em></li>'; }).join('')+'</ul>'+
-        (set.note?'<p class="muted" style="font-size:12.5px;margin:10px 0 0">'+esc(set.note)+'</p>':'')+'<p class="muted" style="font-size:12.5px;margin:10px 0 0">Each holding was looked up by its short name, in the bundle and live; a company with nothing drawn on OpenStreetMap under that name shows none. Click a holding to fly to its plants.</p></div>';
-      $('wdLegend').querySelectorAll('li.on').forEach(function(li){ li.onclick=function(){ var g=set.groups[+li.dataset.i]; flyTo(set.features.filter(function(f){return f.sym===g.sym;})); }; });
-      return;
-    }
-    /* What they make. The rows are the product phrases on the plants in view (the country's when
-       one is picked), most common first; a row filters the globe to that product, and again clears
-       it. Where they are is the globe's job: the atlas draws the borders, and a country is a
-       click on it or a word in the search. */
-    var inView=FILTER?set.features.filter(function(f){return f.c===FILTER;}):set.features, nm=names();
-    var by={}; inView.forEach(function(f){ prodPhrases(f.p).forEach(function(w){ by[w]=(by[w]||0)+1; }); });
-    var top=Object.keys(by).sort(function(a,b){return by[b]-by[a]||a.localeCompare(b);}).slice(0,12), max=by[top[0]]||1;
-    if(PW&&top.indexOf(PW)<0&&by[PW])top.push(PW);
-    var cs={}; set.features.forEach(function(f){ if(f.c)cs[f.c]=1; }); var countries=Object.keys(cs).length;
-    var head=FILTER?(nm[FILTER]||FILTER)+' · '+inView.length+' of '+set.features.length+' plants · <a href="#" onclick="wdCountry(\''+esc(FILTER)+'\');return false">Show all</a>':(set.country?set.features.length+' plants on the globe':set.features.length+' plants · '+countries+' countries');
-    /* What the country sells and buys, and who sells the product searched: UN Comtrade, when it
-       has answered; the plants' own products follow, as the filter they always were. */
-    var trade='';
-    if(set.country){ var T=TRADE[set.country]||{}; trade=tradeList('Sells abroad',T.X,set.country,'X')+tradeList('Buys abroad',T.M,set.country,'M'); }
-    var tq=(TQ&&TQ.code&&String(TQ.q).toLowerCase()===String(set.q||set.label).toLowerCase())?TQ:null;
-    if(tq){ var xm=tq.exporters.length?tq.exporters[0].value:1; trade='<h5 class="wd-h5">Who sells '+esc(shortHs(tq.name,tq.code)).toLowerCase()+' · '+esc(String(tq.year))+'</h5><ul class="wd-countries wd-trade" style="--c:#e0b25a">'+tq.exporters.slice(0,10).map(function(e){ var on=TRADE_ON&&TRADE_ON.cc===e.cc&&TRADE_ON.code===tq.code; return '<li class="pick'+(on?' on':'')+'" onclick="wdTradeFrom(\''+esc(e.cc)+'\')"><span><span class="wd-flag">'+flagOf(e.cc)+'</span>'+esc(nm[e.cc]||e.name)+'</span><b>'+fmtUsd(e.value)+'</b><span class="bar" style="width:'+Math.max(4,Math.round(e.value/xm*100))+'%"></span></li>'; }).join('')+'</ul><p class="wd-src">HS '+esc(tq.code)+' · '+esc(tq.source||'UN Comtrade')+(tq.routes===null?' · asking for the routes…':'')+'</p>'; }
-    $('wdLegend').innerHTML='<div class="wd-legend"><h4>'+esc(set.label)+'</h4><div class="wd-meta">'+head+(set.features.length?' · OpenStreetMap as of '+esc(set.asOf||''):'')+'</div>'+trade+
-      (set.saturated?'<p class="muted" style="font-size:12.5px;margin:8px 0 0">'+esc(set.note||'The source capped this answer, so the map is a sample rather than the whole set.')+'</p>':'')+
-      (set.partial?'<p class="muted" style="font-size:12.5px;margin:8px 0 0">Part of the source could not be reached when this layer was built, so the count is a floor.</p>':'')+
-      (top.length?(trade?'<h5 class="wd-h5">Made on the globe</h5>':'')+'<ul class="wd-countries" style="--c:'+esc(set.color)+'">'+top.map(function(k){ return '<li class="pick'+(PW===k?' on':'')+'" onclick="wdProduct(\''+esc(k).replace(/'/g,'&#39;')+'\')"><span>'+esc(k)+'</span><b>'+by[k]+'</b><span class="bar" style="width:'+Math.max(4,Math.round(by[k]/max*100))+'%"></span></li>'; }).join('')+'</ul>':(set.features.length?'<p class="muted" style="font-size:13px;margin:10px 0 0">No product tags on these plants.</p>':(trade?'':'<p class="muted" style="font-size:13px;margin:10px 0 0">Nothing drawn on OpenStreetMap under that name. Try the company’s short name, or an industry above.</p>')))+'</div>';
-  }
-  /* ---- Trade: what a country sells and buys, and the routes it goes by (UN Comtrade) ----
-     The plants are what OpenStreetMap carries. What a country makes, in the sense that matters to
-     a portfolio, is what it sells abroad, and UN Comtrade has that as each country filed it: the
-     headings by value, who bought them, and who sells a product the search names. A route is drawn
-     as a ship with the seller's flag on the great circle to the buyer, and the card says what it
-     is: a marker for a trade flow in the year filed, not a vessel. Values in US dollars. */
-  var ships=null, routes=null, TRADE={}, TRADE_ON=null, TQ=null;
-  function fmtUsd(v){ v=+v||0; if(v>=1e9)return '$'+(v/1e9).toFixed(v>=2e10?0:1)+'bn'; if(v>=1e6)return '$'+Math.round(v/1e6)+'m'; if(v>=1e3)return '$'+Math.round(v/1e3)+'k'; return '$'+Math.round(v); }
-  function flagOf(cc){ cc=String(cc||'').toUpperCase(); if(!/^[A-Z]{2}$/.test(cc))return ''; return String.fromCodePoint(0x1F1E6+cc.charCodeAt(0)-65,0x1F1E6+cc.charCodeAt(1)-65); }
-  /* The HS heading's name in a list's width: the plain word for the common ones, the filing's own
-     wording, cut before its first qualifier, for the rest. The card always shows the full heading. */
-  var HS_PLAIN={'0201':'Beef','0202':'Frozen beef','0203':'Pork','0207':'Poultry','0302':'Fresh fish','0303':'Frozen fish','0304':'Fish fillets','0306':'Shrimp and crustaceans','0307':'Molluscs','0402':'Milk powder','0406':'Cheese','0603':'Cut flowers','0709':'Vegetables','0710':'Frozen vegetables','0803':'Bananas','0804':'Avocados, mangoes, pineapples','0805':'Citrus fruit','0806':'Grapes','0808':'Apples and pears','0810':'Berries','0901':'Coffee','0902':'Tea','1001':'Wheat','1005':'Maize','1006':'Rice','1201':'Soya beans','1507':'Soya oil','1509':'Olive oil','1511':'Palm oil','1602':'Prepared meat','1604':'Canned fish (tuna and others)','1605':'Prepared shrimp','1701':'Sugar','1704':'Sweets','1801':'Cocoa beans','1806':'Chocolate','2009':'Fruit juice','2204':'Wine','2208':'Spirits','2401':'Raw tobacco','2402':'Cigarettes','2601':'Iron ore','2603':'Copper ore','2701':'Coal','2707':'Coal-tar oils','2709':'Crude oil','2710':'Refined oil products','2711':'Petroleum gas','2716':'Electricity','3002':'Vaccines and blood products','3004':'Medicines','3102':'Nitrogen fertilisers','3105':'Fertilisers','3901':'Polyethylene','3902':'Polypropylene','4011':'Tyres','4407':'Sawn wood','4703':'Wood pulp','6110':'Knitwear','6204':'Women\u2019s suits and dresses','6403':'Footwear','7102':'Diamonds','7108':'Gold','7113':'Jewellery','7208':'Flat steel','7601':'Aluminium','8411':'Turbines','8471':'Computers','8473':'Computer parts','8504':'Transformers','8517':'Phones','8541':'Semiconductor devices','8542':'Chips (integrated circuits)','8703':'Cars','8708':'Car parts','8802':'Aircraft','8901':'Ships','9018':'Medical instruments','9401':'Seats','9403':'Furniture','160414':'Canned tuna','030617':'Frozen shrimp','160529':'Prepared shrimp'};
-  function shortHs(n,code){
-    if(code&&HS_PLAIN[String(code)])return HS_PLAIN[String(code)];
-    var t=String(n||'').split(/[;,]/)[0].replace(/\s*\([^)]*\)\s*/g,' ').replace(/\s+/g,' ').trim();
-    if(t.length<=34)return t;
-    var cut=t.slice(0,34); cut=cut.slice(0,Math.max(cut.lastIndexOf(' '),20)); return cut+'\u2026';
-  }
-  var CENTRES={};
-  function countryCentre(cc){
-    if(CENTRES[cc]!==undefined)return CENTRES[cc];
-    var c=NE&&NE.filter(function(x){return x.cc===cc;})[0]; if(!c){ CENTRES[cc]=null; return null; }
-    var best=null, ba=0; c.polys.forEach(function(poly){ var a=Math.abs(ringArea(poly[0])); if(a>ba){ ba=a; best=poly[0]; } });
-    CENTRES[cc]=best?ringCentroid(best):null; return CENTRES[cc];
-  }
-  var SHIP_IMG={};
-  function shipImage(cc){
-    if(SHIP_IMG[cc])return SHIP_IMG[cc];
-    var cv=document.createElement('canvas'), dpr=2; cv.width=72*dpr; cv.height=40*dpr; var x=cv.getContext('2d'); x.scale(dpr,dpr);
-    x.font='24px '+FONT; x.textBaseline='middle'; x.textAlign='center'; x.fillText('\uD83D\uDEA2',22,21);
-    x.font='20px '+FONT; x.fillText(flagOf(cc)||cc,52,21);
-    SHIP_IMG[cc]=cv; return cv;
-  }
-  function clearTrade(){ if(ships)ships.removeAll(); if(routes)routes.removeAll(); TRADE_ON=null; }
-  /* The plants of a product search arrive on their own clock; drawing them clears the globe, so the routes already found for the same word go back on. */
-  function keepRoutes(){ if(TQ&&TQ.routes&&SET&&String(SET.q||SET.label).toLowerCase()===String(TQ.q).toLowerCase())drawRoutes(TQ.routes,{code:TQ.code,name:TQ.name,flow:'X'}); }
-  /* list: [{from,to,toName,value,share,year}]; several routes from one seller sit at different
-     points of their arcs so the ships do not stack. */
-  function drawRoutes(list,info){
-    /* The globe may still be loading when the first answer lands, and the centres come from the
-       atlas file, which a product search may not have loaded yet: both are waited for. */
-    ensureViewer().then(loadNE).then(function(){ drawRoutesNow(list,info); }).catch(function(){});
-  }
-  function drawRoutesNow(list,info){
-    clearTrade(); var C=window.Cesium, gold=C.Color.fromCssColorString('#ff9f1c'), seen={};
-    list.forEach(function(p){
-      var a=countryCentre(p.from), b=countryCentre(p.to); if(!a||!b||p.from===p.to)return;
-      var g=new C.EllipsoidGeodesic(C.Cartographic.fromDegrees(a[0],a[1]),C.Cartographic.fromDegrees(b[0],b[1])), pts=[];
-      for(var k=0;k<=48;k++){ var c=g.interpolateUsingFraction(k/48); pts.push(C.Cartesian3.fromRadians(c.longitude,c.latitude,3000)); }
-      routes.add({positions:pts,width:2.2,material:C.Material.fromType('PolylineDash',{color:gold,gapColor:C.Color.TRANSPARENT,dashLength:16})});
-      seen[p.from]=(seen[p.from]||0)+1; var m=g.interpolateUsingFraction([0.5,0.36,0.64,0.26,0.74,0.44][(seen[p.from]-1)%6]);
-      ships.add({position:C.Cartesian3.fromRadians(m.longitude,m.latitude,4000),image:shipImage(p.from),scale:0.5,verticalOrigin:C.VerticalOrigin.CENTER,horizontalOrigin:C.HorizontalOrigin.CENTER,disableDepthTestDistance:Number.POSITIVE_INFINITY,
-        id:Object.assign({ship:true,n:shortHs(info.name,info.code)+' · '+(names()[p.from]||p.from)+' \u2192 '+(names()[p.to]||p.toName||p.to)},p,{code:info.code,name:info.name,flow:info.flow||'X'})});
-    });
-    /* The camera takes in every route: the ships are the point, and the last view was a country's plants. */
-    var all=[]; list.forEach(function(p){ var a=countryCentre(p.from), b=countryCentre(p.to); if(a)all.push(C.Cartesian3.fromDegrees(a[0],a[1],0)); if(b)all.push(C.Cartesian3.fromDegrees(b[0],b[1],0)); });
-    if(all.length>1){ var sph=C.BoundingSphere.fromPoints(all); if(sph.radius>2.6e6){ var sx=0,sy=0,sl=0,n=0; list.forEach(function(p){ [countryCentre(p.from),countryCentre(p.to)].forEach(function(q){ if(!q)return; var r=q[0]*Math.PI/180; sx+=Math.cos(r); sy+=Math.sin(r); sl+=q[1]; n++; }); }); viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(Math.atan2(sy,sx)*180/Math.PI,Math.max(-40,Math.min(50,sl/n)),1.75e7),orientation:{heading:0,pitch:-C.Math.PI_OVER_TWO,roll:0},duration:1.1}); } else viewer.camera.flyToBoundingSphere(sph,{duration:1.1,offset:new C.HeadingPitchRange(0,-C.Math.PI_OVER_TWO,Math.max(sph.radius*2.6,1500000))}); }
-    viewer.scene.requestRender();
-  }
-  function madeBy(cc,hsName){
-    var words=String(hsName||'').toLowerCase().split(/[^a-z]+/).filter(function(w){ return w.length>=4&&!NOT_PRODUCT[w]&&['fresh','dried','frozen','other','whole','than','including','excluding','preparations','preserved','prepared','shell','oils','from','with','their','parts'].indexOf(w)<0; });
-    if(!words.length)return [];
-    return (SET&&SET.features||[]).filter(function(f){ if(f.c!==cc||!f.p)return false; var p=String(f.p).toLowerCase(); return words.some(function(w){ return p.indexOf(w.replace(/s$/,''))>=0; }); }).slice(0,5);
-  }
-  function showRouteDetail(r){
-    var nm=names(), from=nm[r.from]||r.from, to=nm[r.to]||r.toName||r.to, makers=madeBy(r.from,r.name);
-    $('wdDetail').innerHTML='<div class="wd-detail"><h4><span class="wd-flag">'+flagOf(r.from)+'</span>'+esc(shortHs(r.name,r.code))+'</h4><div class="wd-kv">'+
-      '<span>From</span><span>'+esc(from)+'</span><span>To</span><span>'+esc(to)+'</span>'+
-      '<span>Value</span><span>'+fmtUsd(r.value)+' in '+esc(String(r.year||''))+(r.share?' · '+Math.round(r.share*100)+'% of what '+esc(from)+' sells of it':'')+'</span>'+
-      '<span>Heading</span><span>HS '+esc(r.code)+' · '+esc(r.name)+'</span>'+
-      (makers.length?'<span>Made there by</span><span>'+makers.map(function(f){ var tk=tickerFor(f); return esc(f.n)+(tk?' <span class="mono">('+esc(tk)+')</span>':''); }).join('<br>')+'</span>':'')+
-      '</div><p class="muted" style="font-size:12.5px;margin:10px 0 0">A route marker, not a vessel: the flow from seller to buyer as filed with UN Comtrade.</p></div>';
-  }
-  function tradeList(title,t,cc,flow){
-    if(!t)return '<h5 class="wd-h5">'+title+'</h5><p class="muted" style="font-size:12.5px;margin:4px 0 0">Asking UN Comtrade\u2026</p>';
-    if(t.error)return '<h5 class="wd-h5">'+title+'</h5><p class="muted" style="font-size:12.5px;margin:4px 0 0">'+esc(t.error)+'</p>';
-    var rows=(t.top&&t.top.length?t.top:t.chapters||[]).slice(0,10), max=rows.length?rows[0].value:1;
-    return '<h5 class="wd-h5">'+title+' · '+esc(String(t.year))+' · '+fmtUsd(t.total)+'</h5><ul class="wd-countries wd-trade" style="--c:'+(flow==='X'?'#e0b25a':'#6c8cc9')+'">'+rows.map(function(r){ var on=TRADE_ON&&TRADE_ON.cc===cc&&TRADE_ON.code===r.code&&TRADE_ON.flow===flow; return '<li class="pick'+(on?' on':'')+'" onclick="wdTrade(\''+esc(cc)+'\',\''+esc(r.code)+'\',\''+flow+'\')"><span>'+esc(shortHs(r.name,r.code))+'</span><b>'+fmtUsd(r.value)+'</b><span class="bar" style="width:'+Math.max(4,Math.round(r.value/max*100))+'%"></span></li>'; }).join('')+'</ul><p class="wd-src">'+esc(t.source||'UN Comtrade')+'</p>';
-  }
-  function askTrade(path){ return fetch(INVITE_WORKER+path).then(function(r){ return r.json().then(function(j){ return (r.ok&&j&&!j.error)?j:{error:(j&&j.error)||('HTTP '+r.status)}; }); }).catch(function(){ return {error:'UN Comtrade could not be reached through the worker.'}; }); }
-  function loadTrade(cc){
-    if(TRADE[cc]&&TRADE[cc].X&&TRADE[cc].M)return Promise.resolve(TRADE[cc]);
-    TRADE[cc]=TRADE[cc]||{};
-    return askTrade('/trade?country='+cc+'&flow=X').then(function(x){ TRADE[cc].X=x; if(SET&&SET.country===cc)legend(SET); return askTrade('/trade?country='+cc+'&flow=M'); }).then(function(m){ TRADE[cc].M=m; if(SET&&SET.country===cc)legend(SET); return TRADE[cc]; });
-  }
-  /* A product of a country: its buyers (or sellers) as routes, and the card. Again clears it. */
-  window.wdTrade=function(cc,code,flow){
-    if(TRADE_ON&&TRADE_ON.cc===cc&&TRADE_ON.code===code&&TRADE_ON.flow===flow){ clearTrade(); if(SET)legend(SET); $('wdDetail').innerHTML=''; return; }
-    var T=TRADE[cc]&&TRADE[cc][flow], yr=(T&&T.year)||'', nm=names();
-    status('Asking UN Comtrade who '+(flow==='X'?'buys':'sells')+' it\u2026');
-    askTrade('/trade/partners?country='+cc+'&code='+encodeURIComponent(code)+'&flow='+flow+(yr?'&year='+yr:'')).then(function(j){
-      if(j.error){ status(j.error); return; }
-      var list=(j.partners||[]).slice(0,6).map(function(p){ return flow==='X'?{from:cc,to:p.cc,toName:p.name,value:p.value,share:p.share,year:j.year}:{from:p.cc,to:cc,toName:nm[cc]||cc,value:p.value,share:p.share,year:j.year}; });
-      drawRoutes(list,{code:code,name:j.name,flow:flow});
-      TRADE_ON={cc:cc,code:code,flow:flow,name:j.name}; if(SET)legend(SET); status('');
-      var here=nm[cc]||cc, makers=madeBy(cc,j.name);
-      $('wdDetail').innerHTML='<div class="wd-detail"><h4><span class="wd-flag">'+flagOf(cc)+'</span>'+esc(shortHs(j.name,code))+'</h4><div class="wd-kv">'+
-        '<span>'+(flow==='X'?'Sold abroad':'Bought abroad')+'</span><span>'+fmtUsd(j.total)+' in '+esc(String(j.year))+'</span>'+
-        '<span>'+(flow==='X'?'Buyers':'Sellers')+'</span><span>'+(j.partners||[]).slice(0,6).map(function(p){ return '<span class="wd-flag">'+flagOf(p.cc)+'</span>'+esc(nm[p.cc]||p.name)+' <span class="mono">'+fmtUsd(p.value)+'</span>'+(p.share?' · '+Math.round(p.share*100)+'%':''); }).join('<br>')+'</span>'+
-        '<span>Heading</span><span>HS '+esc(code)+' · '+esc(j.name)+'</span>'+
-        (makers.length?'<span>Made there by</span><span>'+makers.map(function(f){ var tk=tickerFor(f); return esc(f.n)+(tk?' <span class="mono">('+esc(tk)+')</span>':''); }).join('<br>')+'</span>':'')+
-        '</div><p class="muted" style="font-size:12.5px;margin:10px 0 0">'+esc(j.source||'UN Comtrade')+'. The ships are route markers, not vessels.</p></div>';
-    });
-  };
-  /* A product searched: who sells it, and the routes when they arrive. */
-  function tradeSearch(q){
-    TQ=null;
-    askTrade('/trade/product?q='+encodeURIComponent(q)).then(function(j){
-      if(j.error||!j.code)return;
-      TQ=j; TQ.q=q; status('');
-      if(!SET||String(SET.q||SET.label).toLowerCase()!==q.toLowerCase()){ SET={label:q,q:q,color:'#c98a3f',features:[],asOf:''}; ensureViewer().then(function(){ draw(SET); legend(SET); }); }
-      else legend(SET);
-      return askTrade('/trade/product?q='+encodeURIComponent(q)+'&routes=1').then(function(r){
-        if(r.error||!r.routes||!TQ||TQ.q!==q)return;
-        TQ.routes=r.routes; drawRoutes(r.routes,{code:j.code,name:j.name,flow:'X'}); if(SET)legend(SET);
-      });
-    });
-  }
-  window.wdTradeFrom=function(cc){
-    if(!TQ||!TQ.code)return;
-    if(TRADE_ON&&TRADE_ON.cc===cc&&TRADE_ON.code===TQ.code){ TRADE_ON=null; if(TQ.routes){ drawRoutes(TQ.routes,{code:TQ.code,name:TQ.name,flow:'X'}); } else clearTrade(); if(SET)legend(SET); $('wdDetail').innerHTML=''; return; }
-    var nm=names();
-    status('Asking UN Comtrade who buys it from '+(nm[cc]||cc)+'\u2026');
-    askTrade('/trade/partners?country='+cc+'&code='+encodeURIComponent(TQ.code)+'&flow=X'+(TQ.year?'&year='+TQ.year:'')).then(function(j){
-      if(j.error){ status(j.error); return; }
-      drawRoutes((j.partners||[]).slice(0,6).map(function(p){ return {from:cc,to:p.cc,toName:p.name,value:p.value,share:p.share,year:j.year}; }),{code:TQ.code,name:j.name,flow:'X'});
-      TRADE_ON={cc:cc,code:TQ.code,flow:'X',name:j.name}; if(SET)legend(SET); status('');
-      var makers=madeBy(cc,j.name);
-      $('wdDetail').innerHTML='<div class="wd-detail"><h4><span class="wd-flag">'+flagOf(cc)+'</span>'+esc(nm[cc]||cc)+' · '+esc(shortHs(j.name,code))+'</h4><div class="wd-kv">'+
-        '<span>Sold abroad</span><span>'+fmtUsd(j.total)+' in '+esc(String(j.year))+'</span>'+
-        '<span>Buyers</span><span>'+(j.partners||[]).slice(0,6).map(function(p){ return '<span class="wd-flag">'+flagOf(p.cc)+'</span>'+esc(nm[p.cc]||p.name)+' <span class="mono">'+fmtUsd(p.value)+'</span>'+(p.share?' · '+Math.round(p.share*100)+'%':''); }).join('<br>')+'</span>'+
-        '<span>Heading</span><span>HS '+esc(TQ.code)+' · '+esc(j.name)+'</span>'+
-        (makers.length?'<span>Made there by</span><span>'+makers.map(function(f){ var tk=tickerFor(f); return esc(f.n)+(tk?' <span class="mono">('+esc(tk)+')</span>':''); }).join('<br>')+'</span>':'')+
-        '</div><p class="muted" style="font-size:12.5px;margin:10px 0 0">'+esc(j.source||'UN Comtrade')+'. The ships are route markers, not vessels.</p></div>';
-    });
-  };
-  /* A plant's product tag, as phrases: "steel;pipes" is steel and pipes, "solar panels" stays one.
-     The tag also carries what OpenStreetMap calls the land ("industrial land", "works", "factory"),
-     which says nothing about what is made and is left out. */
-  var NOT_PRODUCT={'yes':1,'no':1,'industrial':1,'industrial land':1,'industrial area':1,'industrial site':1,'works':1,'factory':1,'factories':1,'plant':1,'plants':1,'manufacturing':1,'manufacture':1,'manufacturer':1,'industry':1,'general':1,'other':1,'others':1,'misc':1,'various':1,'unknown':1,'none':1,'company':1,'site':1,'area':1,'land':1,'warehouse':1,'depot':1,'production':1,'products':1,'product':1};
-  function prodPhrases(p){
-    if(!p)return []; var seen={}, out=[];
-    String(p).toLowerCase().replace(/_/g,' ').split(/[;,|\/]+/).forEach(function(x){ x=x.replace(/\s+/g,' ').trim(); if(x.length>=3&&!NOT_PRODUCT[x]&&!seen[x]){ seen[x]=1; out.push(x); } });
-    return out;
-  }
-  window.wdProduct=function(w){
-    if(!SET)return;
-    PW=(PW===w)?null:w;
-    var fs=SET.features.filter(function(f){ return (!FILTER||f.c===FILTER)&&(!PW||prodPhrases(f.p).indexOf(PW)>=0); });
-    draw(Object.assign({},SET,{features:fs}),true); legend(SET); status(PW?fs.length+' making '+PW:'');
-  };
-  /* ---- a country: everything the bundle places inside it ----
-     "Ecuador", "USA", "EC": a search that names a country puts every plant the bundle has in it on
-     the globe, biggest names first when there are more than the globe wants, and the list on the
-     right says what they make. */
-  var ALIAS={'usa':'US','united states':'US','america':'US','u s':'US','u s a':'US','uk':'GB','britain':'GB','great britain':'GB','england':'GB','scotland':'GB','wales':'GB','china':'CN','prc':'CN','korea':'KR','holland':'NL','czechia':'CZ','turkiye':'TR','ivory coast':'CI','congo':'CD','drc':'CD','laos':'LA','burma':'MM','eswatini':'SZ','swaziland':'SZ','uae':'AE','emirates':'AE','iran':'IR','syria':'SY','russia':'RU','vietnam':'VN','viet nam':'VN','macedonia':'MK','moldova':'MD','bolivia':'BO','venezuela':'VE','tanzania':'TZ','brunei':'BN','cape verde':'CV','palestine':'PS','vatican':'VA','taiwan':'TW','hong kong':'HK','macau':'MO','macao':'MO'};
-  function plainName(x){ return String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ').trim(); }
-  function countryCode(q){
-    var nm=names(), b=plainName(q), t=String(q).trim();
-    if(/^[A-Z]{2}$/.test(t)&&nm[t])return t;
-    if(ALIAS[b]&&nm[ALIAS[b]])return ALIAS[b];
-    var hit=null, n=0, ks=Object.keys(nm);
-    for(var i=0;i<ks.length;i++){ if(plainName(nm[ks[i]])===b)return ks[i]; }
-    if(b.length>=5){ ks.forEach(function(cc){ var v=plainName(nm[cc]); if(v.indexOf(b)===0||v.indexOf(' '+b)>=0){ hit=cc; n++; } }); if(n===1)return hit; }
-    return null;
-  }
-  function showCountry(cc){
-    var nm=names()[cc]||cc, CAP=6000; markChip(null); status('Loading '+nm+'\u2026'); $('wdDetail').innerHTML='';
-    Promise.all([ensureViewer(),loadAll(),loadUniverseNames(),loadNE()]).then(function(){
-      var rows=[]; for(var i=0;i<ALL.length;i++){ if(ALL[i][4]===cc)rows.push(i); }
-      if(!rows.length){ SET={label:nm,color:'#2f6f9f',country:cc,features:[],asOf:''}; draw(SET); highlight(cc); legend(SET); status(''); loadTrade(cc); var cen=countryCentre(cc); if(cen){ var C=window.Cesium; viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(cen[0],cen[1],3.2e6),duration:1.1}); } return; }
-      var total=rows.length, capped=total>CAP;
-      if(capped){ rows.sort(function(a,b){ return (ALL[b][1]?1:0)-(ALL[a][1]?1:0); }); rows=rows.slice(0,CAP); }
-      var feats=rows.map(function(i){ var r=ALL[i], f={i:'b'+i,n:r[0],la:r[2],lo:r[3],s:'o',c:cc}; if(r[1])f.o=r[1]; if(r[5])f.p=String(r[5]).replace(/_/g,' '); return f; });
-      return stamp(feats).then(function(all){
-        SET={label:nm,color:'#2f6f9f',country:cc,features:all,asOf:(IDX&&IDX.generatedAt||'').slice(0,10),saturated:capped,note:capped?'The bundle places '+total+' plants in '+nm+'; the '+CAP+' with a named operator or a listing come first.':null};
-        draw(SET); highlight(cc); legend(SET); status(''); loadTrade(cc);
-      });
-    }).catch(function(e){ status('Could not show '+nm+': '+e.message+'.'); });
-  }
-  function showDetail(f){
-    var nm=names(), osm={n:'node',w:'way',r:'relation'}[f.i[0]]+'/'+f.i.slice(1);
-    var tk=tickerFor(f);
-    $('wdDetail').innerHTML='<div class="wd-detail"><h4>'+esc(f.n)+(tk&&!f.o?' <span class="mono" style="font-size:13px;color:var(--muted)">('+esc(tk)+')</span>':'')+'</h4><div class="wd-kv">'+(f.sym?'<span>Holding</span><span class="mono">'+esc(f.sym)+'</span>':'')+(f.o?'<span>Operator</span><span>'+esc(f.o)+(tk?' <span class="mono">('+esc(tk)+')</span>':'')+'</span>':'')+(f.p?'<span>Makes</span><span>'+esc(f.p)+'</span>':'')+
-      '<span>Where</span><span>'+esc(f.pl||nm[f.c]||f.c||'Unplaced')+'</span>'+(f.pl&&(nm[f.c]||f.c)&&!(new RegExp(', '+String(nm[f.c]||f.c).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$')).test(f.pl)?'<span>Country</span><span>'+esc(nm[f.c]||f.c)+'</span>':'')+(f.t?'<span>Owner listed as</span><span class="mono">'+esc(f.t)+'</span>':'')+'</div><div class="wd-links">'+
-      (tk&&typeof analyzeStock==='function'?'<button class="btn btn-ghost btn-sm" type="button" onclick="analyzeStock('+JSON.stringify(String(tk).replace(/[^A-Z0-9.\-]/gi,''))+')">Analyze '+esc(tk)+'</button>':'')+
-      (f.w?'<a class="btn btn-ghost btn-sm" href="'+esc(f.w)+'" target="_blank" rel="noopener noreferrer">Website</a>':'')+
-      (/^Q\d+$/.test(f.i)?'<a class="btn btn-ghost btn-sm" href="https://www.wikidata.org/wiki/'+esc(f.i)+'" target="_blank" rel="noopener noreferrer">On Wikidata</a>':'<a class="btn btn-ghost btn-sm" href="https://www.openstreetmap.org/'+esc(osm)+'" target="_blank" rel="noopener noreferrer">On OpenStreetMap</a>')+'</div></div>';
-    var C=window.Cesium; viewer.camera.flyTo({destination:C.Cartesian3.fromDegrees(f.lo,f.la,30000),duration:1.4}); viewer.scene.requestRender();
-  }
-
-  /* ---- an industry: a bundled layer ---- */
-  function showIndustry(id){
-    var ind=IDX&&(IDX.industries||[]).filter(function(i){return i.id===id;})[0]; if(!ind)return;
-    markChip(id); status('Loading '+ind.label+'…'); $('wdDetail').innerHTML='';
-    Promise.all([ensureViewer(),fetch(DATA+ind.file).then(function(r){ if(!r.ok)throw new Error('this layer has not been extracted yet'); return r.json(); })])
-      .then(function(res){ var j=res[1]; SET={label:ind.label,color:ind.color,features:j.features||[],asOf:j.asOf,saturated:!!j.saturated,partial:!!j.partial}; draw(SET); legend(SET); status(''); })
-      .catch(function(e){ status('Could not show '+ind.label+': '+e.message+'.'); });
-  }
-
-  /* ---- a company: live, through the worker ---- */
-  function stamp(feats){
-    var need=feats.some(function(f){return !f.c||!f.pl;}); if(!need)return Promise.resolve(feats);
-    return Promise.all([loadNE(),loadPlaces()]).then(function(){ feats.forEach(function(f){ if(!f.c){ var cc=countryOf(f.lo,f.la)||countryNear(f.la,f.lo); if(cc)f.c=cc; } if(!f.pl){ var pl=placeOf(f.la,f.lo,f.c); if(pl)f.pl=pl; } }); return feats; }).catch(function(){ return feats; });
-  }
-  var neP=null;
-  function loadNE(){
-    if(NE)return Promise.resolve(NE); if(neP)return neP;
-    neP=fetch('/world/ne110.json').then(function(r){return r.json();}).then(function(j){ NE=j.countries; NE.forEach(function(c){ var W=180,E=-180,S=90,N=-90; c.polys.forEach(function(poly){ poly[0].forEach(function(pt){ if(pt[0]<W)W=pt[0]; if(pt[0]>E)E=pt[0]; if(pt[1]<S)S=pt[1]; if(pt[1]>N)N=pt[1]; }); }); c.box=[W,S,E,N]; }); return NE; }).catch(function(){ neP=null; NE=null; throw new Error('the country outlines did not load'); });
-    return neP;
-  }
-  function inRing(ring,x,y){ var inside=false; for(var i=0,j=ring.length-1;i<ring.length;j=i++){ var xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1]; if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)inside=!inside; } return inside; }
-  function countryOf(lon,lat){ for(var i=0;i<NE.length;i++){ var b=NE[i].box; if(lon<b[0]||lon>b[2]||lat<b[1]||lat>b[3])continue; var polys=NE[i].polys; for(var k=0;k<polys.length;k++){ if(!inRing(polys[k][0],lon,lat))continue; var hole=false; for(var m=1;m<polys[k].length;m++)if(inRing(polys[k][m],lon,lat)){hole=true;break;} if(!hole)return NE[i].cc; } } return ''; }
-  function searchCompany(q){
-    markChip(null); status('Looking for '+q+'\u2026'); $('wdDetail').innerHTML='';
-    var ask=fetch(INVITE_WORKER+'/world',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),q:q})}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); }).catch(function(){ return {ok:false,j:{error:'the worker could not be reached'}}; });
-    /* The bundle first: 28,000 plants matched on name, operator and product, so "fish" is every
-       fish plant and "Mosaic" every Mosaic site. The live answer (OpenStreetMap by name) is merged
-       in; a refusal there still leaves the bundle's answer on the globe. */
-    Promise.all([ensureViewer(),loadAll(),ask,loadUniverseNames()]).then(function(res){
-      var r=res[2], local=localMatches(q,true), live=(r.ok&&r.j&&r.j.features)||[], note=null;
-      if(!r.ok&&r.j&&r.j.error)note=/access code|invite code/i.test(r.j.error)?'Live lookup needs an access code (Settings); this is the bundle\u2019s answer.':null;
-      var feats=mergeNear(local,live);
-      if(!feats.length){ if(TQ&&TQ.q===q)return; status(r.ok?'Nothing under that name or product. Try a company\u2019s short name, or an industry above.':((r.j&&r.j.error)||'No answer.')); return; }
-      return stamp(feats).then(function(all){ SET={label:q,q:q,color:'#1f9e8c',features:all,asOf:(r.j&&r.j.asOf)||(IDX&&IDX.generatedAt||'').slice(0,10),saturated:!!(r.j&&r.j.saturated),note:note}; draw(SET); legend(SET); status(''); keepRoutes(); });
-    }).catch(function(e){ status('Could not search: '+e.message+'.'); });
-  }
-  /* ---- a product: one static file a word, built from the whole base set ----
-     "fish" is neither an industry layer nor a company. world/data/products/<word>.json holds every
-     named plant whose product tag mentions the word (capped, and the file says so); index.json
-     lists the words. A query that is a listed company's name stays a company search ("Apple"),
-     otherwise its first word found in the index is taken as the product. */
-  var PRODS=null;
-  function loadProducts(){ if(PRODS)return Promise.resolve(PRODS); return fetch(DATA+'products/index.json').then(function(r){ return r.ok?r.json():null; }).then(function(j){ PRODS=(j&&j.words)||{}; return PRODS; }).catch(function(){ PRODS={}; return PRODS; }); }
-  function productWord(q){
-    if(!PRODS)return null; var b=bare(q); if(UNI&&UNI[b])return null;
-    var words=String(q).toLowerCase().replace(/[^a-z0-9\-\s]/g,' ').split(/\s+/).filter(function(w){return w.length>=3;});
-    for(var i=0;i<words.length;i++){ var w=words[i], forms=[w,w.replace(/ies$/,'y'),w.replace(/es$/,''),w.replace(/s$/,''),w+'s',w+'es']; for(var k=0;k<forms.length;k++)if(PRODS[forms[k]])return forms[k]; }
-    return null;
-  }
-  function showProduct(w,q){
-    markChip(null); status('Loading '+w+'\u2026'); $('wdDetail').innerHTML='';
-    Promise.all([ensureViewer(),fetch(DATA+'products/'+encodeURIComponent(w)+'.json').then(function(r){ if(!r.ok)throw new Error('no file for '+w); return r.json(); }),loadUniverseNames()]).then(function(res){
-      var j=res[1], feats=(j.rows||[]).map(function(r,i){ var f={i:'p'+w+':'+i,n:r[0],la:r[2],lo:r[3],s:'o',p:r[5]}; if(r[1])f.o=r[1]; if(r[4])f.c=r[4]; return f; });
-      return stamp(feats).then(function(all){ SET={label:w.charAt(0).toUpperCase()+w.slice(1),q:q||w,color:'#c98a3f',features:all,asOf:(IDX&&IDX.generatedAt||'').slice(0,10),saturated:!!j.capped,note:j.capped?'The word has '+j.count+' plants on OpenStreetMap; the '+all.length+' with an operator or a Wikidata entry are shown.':null}; draw(SET); legend(SET); status(''); keepRoutes(); });
-    }).catch(function(e){ status('Could not show '+w+': '+e.message+'.'); });
-  }
-  /* ---- the owner's ticker: the listing, matched on the company's short name ---- */
-  var UNI=null, UNIP=null, SUFFIX=/\b(inc|incorporated|corp|corporation|co|company|ltd|limited|plc|llc|lp|sa|ag|nv|se|holdings?|group|the)\b\.?/gi;
-  function bare(s){ return String(s||'').toLowerCase().replace(/&/g,' and ').replace(SUFFIX,' ').replace(/[^a-z0-9]+/g,' ').trim(); }
-  function loadUniverseNames(){
-    if(UNI)return Promise.resolve(UNI); if(UNIP)return UNIP;
-    UNIP=(typeof loadUniverse==='function'?loadUniverse():Promise.resolve([])).then(function(rows){ UNI={}; (rows||[]).forEach(function(r){ var b=bare(r[1]); if(b.length>=4&&!UNI[b])UNI[b]=r[0]; }); return UNI; }).catch(function(){ UNI={}; return UNI; });
-    return UNIP;
-  }
-  /* The listed owner of a plant: the bundle's own ticker (Wikidata), a holding's symbol, or the
-     listing entry whose short name the operator or plant name begins with. Four letters at least,
-     on a word boundary, so "Chips" never becomes a ticker and "Intel Jones Farm" is INTC. */
-  function tickerFor(f){
-    if(f.t)return String(f.t).toUpperCase(); if(f.sym)return f.sym; if(!UNI)return '';
-    var cands=[f.o,f.n].filter(Boolean);
-    for(var i=0;i<cands.length;i++){ var b=bare(cands[i]); if(!b)continue; if(UNI[b])return UNI[b];
-      var words=b.split(' '); for(var n=Math.min(4,words.length);n>=1;n--){ var head=words.slice(0,n).join(' '); if(head.length>=4&&UNI[head]&&(n>=2||head.length>=5))return UNI[head]; } }
-    return '';
-  }
-  function ownerLine(f){ var tk=tickerFor(f), who=f.o||''; if(!who&&tk)who=f.n; return who?(who+(tk?' ('+tk+')':'')):''; }
-
-  /* ---- every plant of every company you hold, in one request ---- */
-  var PALETTE=['#3b82f6','#22c55e','#f59e0b','#ec4899','#a78bfa','#06b6d4','#f97316','#84cc16','#e879f9','#14b8a6','#ef4444','#fbbf24','#0ea5e9','#b45309','#9ca3af','#1f9e8c','#c98a3f','#d9a441','#2ea043','#e5534b'];
-  var NAMES={}, UNKNOWN={};   /* a symbol whose company name the data key could not supply: looked up live only, never matched on the bare ticker */
-  function shortName(name){ var w=String(name||'').replace(/[,.()]/g,' ').split(/\s+/).filter(function(x){ return x&&!/^(inc|corp|corporation|co|company|ltd|limited|plc|ag|sa|nv|se|spa|holdings?|group|the|lp|llc|adr|class|[abc]|com)$/i.test(x); }); return w.slice(0,2).join(' ')||String(name||''); }
-  function nameOf(sym){
-    if(NAMES[sym])return Promise.resolve(NAMES[sym]);
-    var p=typeof getProfile==='function'?getProfile(sym):Promise.reject();
-    return Promise.resolve(p).then(function(pr){ if(!(pr&&pr.name))throw new Error('no name'); var n=shortName(pr.name); NAMES[sym]=n; delete UNKNOWN[sym]; return n; }).catch(function(){ UNKNOWN[sym]=true; return sym; });
-  }
-  /* The bundle's 25,000 plants as one compact table, fetched once: a holding's short name is
-     matched here first, as a whole word in the plant's name or operator, before Nominatim is asked. */
-  /* Natural Earth's populated places, fetched once, so a live result with no place from the geocoder
-     still reads "near Mesa, Arizona" rather than a pair of numbers. */
-  var PLACES=null, REGION_CC={US:1,CA:1,AU:1,BR:1,MX:1,IN:1};
-  function loadPlaces(){ if(PLACES)return Promise.resolve(PLACES); return fetch('/world/places.json').then(function(r){ return r.ok?r.json():null; }).then(function(j){ PLACES=(j&&j.rows)||[]; return PLACES; }).catch(function(){ PLACES=[]; return PLACES; }); }
-  function countryNear(lat,lon){
-    if(!PLACES||!PLACES.length)return '';
-    var cl=Math.cos(lat*Math.PI/180), best=null, bd=Infinity;
-    for(var i=0;i<PLACES.length;i++){ var p=PLACES[i]; var dy=p[3]-lat; if(dy>1.5||dy<-1.5)continue; var dx=(p[4]-lon)*cl; if(dx>1.5||dx<-1.5)continue; var d=dx*dx+dy*dy; if(d<bd){bd=d;best=p;} }
-    return (best&&Math.sqrt(bd)*111<150)?best[2]:'';
-  }
-  function placeOf(lat,lon,cc){
-    if(!PLACES||!PLACES.length)return '';
-    var cl=Math.cos(lat*Math.PI/180), best=null, bd=Infinity;
-    for(var i=0;i<PLACES.length;i++){ var p=PLACES[i]; var dy=p[3]-lat; if(dy>0.75||dy<-0.75)continue; var dx=(p[4]-lon)*cl; if(dx>0.75||dx<-0.75)continue; var d=dx*dx+dy*dy; if(cc&&p[2]&&p[2]!==cc)d*=4; if(d<bd){bd=d;best=p;} }
-    if(!best)return ''; var km=Math.sqrt(bd)*111; if(km>80)return '';
-    var tail=REGION_CC[best[2]]&&best[1]?best[1]:(names()[best[2]]||best[2]);
-    return (km>15?'near ':'')+(tail&&tail!==best[0]?best[0]+', '+tail:best[0]);
-  }
-  var ALL=null;
-  function loadAll(){ if(ALL)return Promise.resolve(ALL); return fetch(DATA+'all.json').then(function(r){ if(!r.ok)throw new Error('all'); return r.json(); }).then(function(j){ ALL=j.rows||[]; return ALL; }).catch(function(){ ALL=[]; return ALL; }); }
-  function localMatches(name,products){
-    var rx=new RegExp('(^|[^A-Za-z])('+String(name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')([^A-Za-z]|$)','i'), out=[];
-    for(var i=0;i<ALL.length&&out.length<(products?1500:400);i++){ var r=ALL[i]; if(rx.test(r[0])||(r[1]&&rx.test(r[1]))||(products&&r[5]&&rx.test(r[5]))){ var f={i:'b'+i,n:r[0],la:r[2],lo:r[3],s:'o'}; if(r[1])f.o=r[1]; if(r[4])f.c=r[4]; if(r[5])f.p=r[5].replace(/_/g,' '); if(r[6])f.q=r[6]; if(r[7])f.pl=r[7]; out.push(f); } }
-    return out;
-  }
-  function mergeNear(base,extra){
-    var out=base.slice();
-    extra.forEach(function(f){ var dup=out.some(function(g){ return g.n.toLowerCase()===f.n.toLowerCase()&&Math.abs(g.la-f.la)<0.02&&Math.abs((g.lo-f.lo)*Math.cos(f.la*Math.PI/180))<0.02; }); if(!dup)out.push(f); });
-    return out;
-  }
-  window.wdHoldings=function(){
-    var syms=[]; ((typeof D!=='undefined'&&D&&D.holdings)||[]).forEach(function(x){ if(x&&x.sym&&isFinite(x.shares)&&x.shares>0&&syms.indexOf(x.sym)<0)syms.push(x.sym); });
-    syms=syms.slice(0,20);
-    if(!syms.length){ status('No holdings yet. Add some in Portfolio and come back.'); return; }
-    markChip('mine'); status('Looking up '+syms.length+' holdings…'); $('wdDetail').innerHTML='';
-    Promise.all([ensureViewer(),loadIndex(),Promise.all(syms.map(nameOf)),loadAll()]).then(function(res){
-      var namesBy=res[2], qs=namesBy.slice();
-      return fetch(INVITE_WORKER+'/world/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code(),qs:qs})}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); }).catch(function(){ return {ok:false,j:{error:'the worker could not be reached'}}; }).then(function(r){
-        var liveErr=null;
-        if(!r.ok){ liveErr=(r.j&&r.j.error)||'No answer from the worker.'; r={ok:true,j:{results:{},asOf:(IDX&&IDX.generatedAt||'').slice(0,10)}}; }
-        var feats=[], groups=[];
-        syms.forEach(function(sym,i){ var q=namesBy[i], got=(r.j.results&&r.j.results[q])||{features:[]}, col=PALETTE[i%PALETTE.length]; var fs=mergeNear(UNKNOWN[sym]?[]:localMatches(q),got.features||[]).map(function(f){ var g=Object.assign({},f); g.sym=sym; g.col=col; g.i=sym+':'+f.i; return g; }); feats=feats.concat(fs); groups.push({sym:sym,name:UNKNOWN[sym]?'':q,col:col,count:fs.length,unknown:!!UNKNOWN[sym]}); });
-        return stamp(feats).then(function(all){ SET={label:'Your holdings',color:'#1f9e8c',features:all,asOf:r.j.asOf,groups:groups,note:liveErr?'The live lookup did not run ('+liveErr.replace(/\.$/,'')+'); these are the bundle’s matches only.':null}; draw(SET); legend(SET); status(''); });
-      });
-    }).catch(function(e){ status('Could not look up the holdings: '+e.message+'.'); });
-  };
-  /* ---- the box: a phrase with an industry word in it opens that layer; anything else is a company ---- */
-  function route(phrase){
-    var p=' '+String(phrase).toLowerCase().replace(/[^a-z0-9\-\s]/g,' ').replace(/\s+/g,' ').trim()+' ', best=null, len=0;
-    (IDX.industries||[]).forEach(function(ind){ (ind.keywords||[]).forEach(function(k){ if(k.length>len&&p.indexOf(' '+k+' ')>=0){ best=ind.id; len=k.length; } }); });
-    return best;
-  }
-  window.wdSearch=function(){
-    var q=($('wdQ').value||'').replace(/\s+/g,' ').trim(); if(!q)return;
-    if(/^(my |your |our )?(holdings|portfolio|positions)$/i.test(q)){ wdHoldings(); return; }
-    Promise.all([loadIndex(),loadProducts(),loadUniverseNames()]).then(function(){ var cc=countryCode(q); if(cc){ showCountry(cc); return; } var id=route(q); if(id){ showIndustry(id); return; } var w=productWord(q); if(!(UNI&&UNI[bare(q)]))tradeSearch(q); if(w)showProduct(w,q); else searchCompany(q); }).catch(function(){ status('The industry list did not load.'); });
-  };
-  /* From a ticker: the company's short name, legal suffixes dropped. "Taiwan Semiconductor Manufacturing Co Ltd" → "Taiwan Semiconductor". */
-  window.wdFromTicker=function(sym){
-    loadIndex().then(function(){ return typeof getProfile==='function'?getProfile(sym):null; }).then(function(p){ $('wdQ').value=shortName((p&&p.name)||sym); wdSearch(); }).catch(function(){ $('wdQ').value=sym; wdSearch(); });
-  };
-  var _st=window.showTab; if(typeof _st==='function'){ window.showTab=function(t){ var r=_st.apply(this,arguments); if(t==='world'){ loadIndex().catch(function(){ status('The industry list did not load.'); }); if(viewer){ viewer.resize(); viewer.scene.requestRender(); } else { /* the world map is the default view: draw the globe and its borders as soon as the tab opens, so there is something to click */ Promise.all([ensureViewer(),loadNE()]).then(function(){ viewer.resize(); viewer.scene.requestRender(); }).catch(function(){}); } } return r; }; }
-})();
-</script>
 <style id="v2-heat">
 /* Today's heat: a treemap of the holdings sized by value and coloured by the day's move, and the
    eleven sectors as equal tiles. Colour runs from the terminal's red to its green through the
@@ -20331,7 +19628,7 @@ body{background:var(--bg)}
 /* Type. Headings and the figures that matter in the display face; everything else on the system
    stack, so paragraphs read the same as the door. */
 h1,h2,.greeting,.auth-h1,.auth-title,.section-title,.list-head-name,.welcome-card h2,.hero-value,.big,.rec-val,
-.stat-value,.prob-v,.list-card-n,.research-stat,#pfModel .mv-title{font-family:var(--display)}
+.stat-value,.prob-v,.list-card-n,.research-stat{font-family:var(--display)}
 .hero-value{font-weight:700;letter-spacing:-.03em;font-size:44px}
 .big{font-weight:700}
 .rec-val{font-weight:700;letter-spacing:-.03em}
@@ -20342,12 +19639,12 @@ h1,h2,.greeting,.auth-h1,.auth-title,.section-title,.list-head-name,.welcome-car
 
 /* Labels. Sentence case in the body face, 12px, muted. Monospace stays where alignment matters. */
 .card h3,.section-title,.hero-label,.stat-label,.prob-head,.prob-k,.rec-head,.md-head,.research-stat-label,
-th,.list-row-tag,.list-card-tag,#pfModel .mv-kicker,.auth-eyebrow,.auth-foot,.tour-eyebrow,.tour-tag,
+th,.list-row-tag,.list-card-tag,.auth-eyebrow,.auth-foot,.tour-eyebrow,.tour-tag,
 .auth-switch button,.hd-where,#sidebar nav button,.side-foot,.btn-ghost,.btn-danger,.logo,.rec-unit
   {font-family:inherit;text-transform:none;letter-spacing:0}
 .card h3{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px}
 .section-title{font-family:var(--display);font-size:17px;font-weight:700;color:var(--text);margin:36px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);letter-spacing:-.01em}
-.hero-label,.stat-label,.prob-head,.prob-k,.rec-head,.md-head,.research-stat-label,#pfModel .mv-kicker{font-size:12px;font-weight:500;color:var(--muted)}
+.hero-label,.stat-label,.prob-head,.prob-k,.rec-head,.md-head,.research-stat-label{font-size:12px;font-weight:500;color:var(--muted)}
 th{font-size:12px;font-weight:500}
 .list-row-tag,.list-card-tag,.tour-tag{font-size:11px;font-weight:500;border-radius:3px}
 .auth-eyebrow,.tour-eyebrow{font-size:13px;font-weight:500;color:var(--muted)}
@@ -20367,7 +19664,7 @@ th{font-size:12px;font-weight:500}
 .side-foot{font-size:11px}
 
 /* Controls. One radius, one weight, no monospace on a button. */
-input,select,textarea,.btn,.btn-add,.icon-btn,.btn-ghost,.btn-danger,.auth-switch,.list-pick,.ovf-menu,.ovf-item,#tab-world .wd-chip,.nw-win{border-radius:4px}
+input,select,textarea,.btn,.btn-add,.icon-btn,.btn-ghost,.btn-danger,.auth-switch,.list-pick,.ovf-menu,.ovf-item,.nw-win{border-radius:4px}
 .auth-switch button{border-radius:3px;font-size:13px;font-weight:500}
 .btn-ghost,.btn-danger{font-size:13px;font-weight:500}
 .btn-add .plus{color:var(--text)}
@@ -20414,10 +19711,7 @@ main .card .list-rows,.list-rows{border:0;border-top:1px solid var(--border);bor
 .empty{text-align:left;padding:12px 0;font-size:13px}
 .disclaimer{text-align:left;font-size:11.5px;padding:16px 0;margin-top:32px}
 /* Frames around drawn things go too; a globe and a treemap have their own edges. */
-#tab-world .wd-globe-wrap{border:0;border-radius:4px}
 #pfHeat .ht-map{border:0;border-radius:4px}
-#tab-world .wd-chip{border-color:transparent;background:var(--panel2)}
-#tab-world .wd-chip.on{border-color:var(--c)}
 /* Controls that were outlined squares: the quiet button, the icon button, the language switch
    and the sign-in toggle become fills or underlines. The primary button stays a solid block. */
 .btn-ghost,.btn-danger{border-color:transparent;background:var(--panel2)}
@@ -20487,7 +19781,6 @@ main .card .list-rows,.list-rows{border:0;border-top:1px solid var(--border);bor
   .rec-foot{flex-direction:column;gap:4px}
   .set-menu{gap:2px 16px}
   .set-menu button{font-size:13px;padding:6px 0}
-  #tab-world .wd-globe-wrap{min-height:min(60vh,440px)}
   .prob-row{grid-template-columns:1fr}
   .disclaimer{font-size:11px}
 }
@@ -20519,9 +19812,9 @@ body.theme-light .gs-panel,body.theme-light .ovf-menu,body.theme-light .addwrap>
 body.theme-light.is-demo #app::before{background:#e0b25a}
 
 /* Fields are underlines. A form on paper has a line to write on, not a box to fill. */
-input,select,textarea,#globalSearch,.prob-own input,#pfModel .mv-form input,#pfModel .mv-form select,#tab-world .wd-form input,.list-pick,.mycall
+input,select,textarea,#globalSearch,.prob-own input,.list-pick,.mycall
   {border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;padding:8px 0;box-shadow:none;height:auto}
-input:focus,select:focus,textarea:focus,#globalSearch:focus,#tab-world .wd-form input:focus,.prob-own input:focus,#pfModel .mv-form input:focus,#pfModel .mv-form select:focus
+input:focus,select:focus,textarea:focus,#globalSearch:focus,.prob-own input:focus
   {border-color:var(--text);background:transparent;box-shadow:none;outline:none}
 input[type=checkbox],input[type=radio]{border:0;padding:0;width:auto;height:auto;accent-color:var(--text)}
 input[type=date]{padding-right:0}
@@ -20578,10 +19871,6 @@ select{padding-right:20px}
 header{background:var(--bg)}
 .avatar{background:var(--panel2);border:0}
 .card h3{font-family:var(--display);font-size:15px;font-weight:700;letter-spacing:-.01em}
-#tab-world .wd-chip{background:transparent;border:0;padding:5px 0;border-radius:0;color:var(--muted);text-decoration:underline;text-decoration-color:transparent;text-underline-offset:.24em}
-#tab-world .wd-chip:hover{color:var(--text)}
-#tab-world .wd-chip.on{background:transparent;border:0;color:var(--text);text-decoration-color:currentColor}
-#tab-world .wd-chips{gap:4px 18px}
 #pfHeat .ht-scale{color:var(--muted)}
 .chart-box canvas{border-radius:0}
 @media(max-width:600px){
@@ -20610,9 +19899,9 @@ table thead th{background:transparent}
 /* This is the .btn-sm the page actually uses; the one near the top of the file is overridden by
    it. Change button sizing here. */
 .btn-sm{padding:7px 14px}
-input,select,textarea,#globalSearch,.prob-own input,#pfModel .mv-form input,#pfModel .mv-form select,#tab-world .wd-form input,.list-pick,.mycall
+input,select,textarea,#globalSearch,.prob-own input,.list-pick,.mycall
   {border:0;border-radius:10px;background:var(--panel2);padding:9px 12px;box-shadow:none}
-input:focus,select:focus,textarea:focus,#globalSearch:focus,#tab-world .wd-form input:focus,.prob-own input:focus,#pfModel .mv-form input:focus,#pfModel .mv-form select:focus
+input:focus,select:focus,textarea:focus,#globalSearch:focus,.prob-own input:focus
   {border:0;background:var(--panel2);box-shadow:0 0 0 2px var(--border);outline:none}
 input[type=checkbox],input[type=radio]{background:transparent;padding:0;border-radius:4px;box-shadow:none}
 textarea{border-radius:12px}
@@ -20626,7 +19915,6 @@ select{padding-right:26px}
 #pfHeat .ht-tile.ht-cell,#pfHeat .ht-sec{border-radius:10px}
 #pfHeat .ht-map{border-radius:12px}
 #pfHeat .ht-tile{border-color:transparent}
-#tab-world .wd-globe-wrap{border-radius:16px}
 .chart-box canvas{border-radius:12px}
 .rec-bar,.rec-bar i{border-radius:999px}
 .addwrap>.card,.addwrap.open>.card{border-radius:18px;border:0}
