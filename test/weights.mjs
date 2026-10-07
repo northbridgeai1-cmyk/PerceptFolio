@@ -34,10 +34,10 @@ const CORE =
   lift('function weightedScore(sc)') + '\n' + lift('function sectionBreakdown(sc)') + '\n';
 
 const { CHECK_WEIGHT, weightedScore, sectionBreakdown } =
-  new Function(CORE + 'return {CHECK_WEIGHT, weightedScore, sectionBreakdown};')();
+  new Function('D', CORE + 'return {CHECK_WEIGHT, weightedScore, sectionBreakdown};')({ rules: {} });
 
 const build = rules => new Function('D', 'thesisFor',
-  CORE + liftConst('const THIN_BELOW=', ';') + '\n' + liftConst('const JUDGE_ABOVE=', ';') + '\n' +
+  CORE + liftConst('const THIN_BELOW_DEFAULT=', ';') + '\n' + lift('function thinBelow()') + '\n' + liftConst('const JUDGE_ABOVE_DEFAULT=', ';') + '\n' + lift('function judgeAbove()') + '\n' +
   lift('function buyAt()') + '\n' + lift('function sellAt()') + '\n' +
   lift('function verdictOf(sc,isHolding,sym)') + '\nreturn verdictOf;')({ rules }, () => null);
 
@@ -189,6 +189,42 @@ console.log('\nIT STILL NAMES A REASON, NOT JUST A NUMBER');
   t('the owner is told it is a position to close', /position to think about closing/.test(V(allFail, true, 'X').why));
 }
 
+console.log('\nTHE WEIGHTS ARE A DEFAULT, AND THE OWNER\'S NUMBER WINS');
+{
+  /* "Some things are more important than others" and which ones is the owner's call. Every weight
+     in CHECK_WEIGHT is a default that a number in Settings overrides. */
+  const weighted = rules => new Function('D', CORE + 'return weightedScore;')({ rules });
+  const sc = mk((n, k, i) => (k === 'quality' && i < 2) ? false : (k === 'quality' ? true : null));
+  const shipped = weighted({})(sc).score;
+  /* Free Cash Flow is a 9 by default. Set it to 0 and failing it must stop costing anything. */
+  const ignored = weighted({ weights: Object.assign({}, CHECK_WEIGHT, { 'Free Cash Flow': 0 }) })(sc).score;
+  t('a user weight overrides the shipped default', ignored !== shipped, { shipped, ignored });
+  t('and zeroing a failed check raises the score', ignored > shipped, { shipped, ignored });
+  /* A zero weight is "I do not care", not "delete": the check still answers and still shows. */
+  const z = weighted({ weights: Object.assign({}, CHECK_WEIGHT, { 'Free Cash Flow': 0 }) })(sc);
+  t('a zero-weight check still counts as answered for confidence', z.confidence > 0, z.confidence);
+  /* An unlisted check still falls back to the shipped default rather than vanishing. */
+  const partial = weighted({ weights: { 'Free Cash Flow': 1 } })(sc);
+  t('checks the user did not touch keep their shipped weight', partial.score !== null && partial.answered > 1, partial);
+}
+{
+  /* Changing a weight is a system change, so it goes through the same gate as moving a bar. */
+  t('the weights editor uses the same rule-change gate as the bars',
+    /if\(rulesDiffer\(before,after\)&&!recordRuleChange\(before,after\)\)return;/.test(src));
+  t('the gate is one shared implementation, not two copies', (src.match(/function recordRuleChange\(before,after\)/g) || []).length === 1);
+  t('the snapshot can see the weights, or a change would be unattributable', /weights:w\?Object\.keys\(w\)\.sort\(\)/.test(src));
+  t('and everything at zero is refused rather than silently kept',
+    /Every weight is zero, so nothing could be scored/.test(src));
+  t('the editor shows each section\'s share as you type', /function renderWeightShares\(\)/.test(src)
+    && /oninput="renderWeightShares\(\)"/.test(src));
+  t('all 36 checks are listed in the editor', /const CHECK_NAMES=\{/.test(src)
+    && ['quality', 'priceChecks', 'momentum', 'context', 'wallStreet'].every(k => new RegExp(k + ':\\[').test(src)));
+  t('and each one shows what it asks for', /const CHECK_TARGET=\{/.test(src));
+  t('both confidence thresholds are editable too', /id="setJudgeAbove"/.test(src) && /id="setThinBelow"/.test(src));
+  t('and the warning line cannot be pushed below the refusal line',
+    /The warning line cannot sit below the refuse-to-judge line/.test(src));
+}
+
 console.log('\nBELOW THE FLOOR THERE IS NO VERDICT AT ALL');
 {
   /* Found by a council review and verified by running it: one answered check that passed scored
@@ -214,7 +250,7 @@ console.log('\nBELOW THE FLOOR THERE IS NO VERDICT AT ALL');
   t('between the floor and the warning a verdict is still given', ['BUY', 'HOLD', 'SELL'].includes(v.label),
     { label: v.label, confidence: v.confidence });
   t('and it is above the floor', v.confidence >= 40, v.confidence);
-  const floor = liftConst('const JUDGE_ABOVE=', ';'), warn = liftConst('const THIN_BELOW=', ';');
+  const floor = liftConst('const JUDGE_ABOVE_DEFAULT=', ';'), warn = liftConst('const THIN_BELOW_DEFAULT=', ';');
   t('the floor is lower than the warning line', /40/.test(floor) && /55/.test(warn), { floor, warn });
 }
 {

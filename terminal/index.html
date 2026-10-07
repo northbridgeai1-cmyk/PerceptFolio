@@ -2654,10 +2654,30 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
       <div class="field"><label>Buy at or above (%)<br><span class="muted" style="font-size:11.5px">Share of everything that could be checked.</span></label><input id="setBuyAt" type="number" min="1" max="100"></div>
       <div class="field"><label>Sell at or below (%)</label><input id="setSellAt" type="number" min="0" max="99"></div>
       <div class="field"><label>A buy also needs the price checks at least (%)<br><span class="muted" style="font-size:11.5px">0 switches it off. A good company is not a good buy at any price.</span></label><input id="setPriceFloor" type="number" min="0" max="100"></div>
+      <div class="field"><label>Refuse to judge below (%)<br><span class="muted" style="font-size:11.5px">If less than this much of the evidence could be answered, no verdict is given at all.</span></label><input id="setJudgeAbove" type="number" min="0" max="100"></div>
+      <div class="field"><label>Warn below (%)<br><span class="muted" style="font-size:11.5px">A verdict is still given, with the thin-evidence warning on it.</span></label><input id="setThinBelow" type="number" min="0" max="100"></div>
       <div class="field"><label>Auto-refresh on page load</label><select id="setAutoRefresh"><option value="yes">Yes</option><option value="no">No</option></select></div>
     </div>
     <button class="btn" onclick="saveRules()">Save Rules</button>
     <details class="aside"><summary>Why changing a bar splits the record</summary><div>Changing a buy or sell bar creates a <b>different system</b>. Every call graded before the change was made by one that no longer exists, so you'll be asked what you expect the change to do and what result would prove it wrong. Before you see any data. That's the only defence against searching a small sample until something looks significant.</div></details>
+  </div>
+
+  <!-- WHAT COUNTS FOR HOW MUCH (2026-10-07). Every check's weight, editable, because which things
+       matter more is the owner's call and not the author's. The shares update as you type, so the
+       consequence of a change is visible before it is saved. -->
+  <div class="card" style="margin-top:16px" id="weightsCard">
+    <h3>What counts for how much</h3>
+    <div class="muted" style="font-size:12.5px;margin-bottom:12px">
+      Every check, and how much it is worth against the others. 0 means you do not care about it:
+      it still runs and still shows, it just stops counting. These are weights, not percentages, so
+      a 9 counts four and a half times what a 2 counts.
+    </div>
+    <div id="weightShares" class="muted" style="font-size:12.5px;margin-bottom:12px"></div>
+    <div id="weightsBody"></div>
+    <div class="row" style="margin-top:12px;gap:8px">
+      <button class="btn" onclick="saveWeights()">Save weights</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetWeights()">Back to the defaults</button>
+    </div>
   </div>
 
   <div class="card" style="margin-top:16px">
@@ -4246,6 +4266,9 @@ function enterSession(){
   document.getElementById('setBuyAt').value=buyAt();
   document.getElementById('setSellAt').value=sellAt();
   document.getElementById('setPriceFloor').value=Number.isFinite(D.rules.priceFloor)?D.rules.priceFloor:50;
+  document.getElementById('setJudgeAbove').value=judgeAbove();
+  document.getElementById('setThinBelow').value=thinBelow();
+  try{ renderWeights(); }catch(e){}
   document.getElementById('setAutoRefresh').value=D.rules.autoRefresh;
   applyTheme();
   fillPolicyInputs();
@@ -5563,13 +5586,67 @@ const DEFAULT_WEIGHT=5;
    returns cash is a fact about it, not evidence that it is good. ANALYSIS-AUDIT.md lists
    everything else held out of the verdict and why. */
 const SCORED_SECTIONS=['quality','priceChecks','momentum','context','wallStreet'];
+/* Which checks belong to which section. scoreStock builds the arrays at run time, so this is the
+   only place the membership is written down ahead of a score existing, which the Settings editor
+   needs in order to list every check before anything has been analysed. */
+const CHECK_NAMES={
+  quality:['Free Cash Flow','Cash vs Debt','Revenue Growth (YoY)','Gross Margin','Operating Margin','ROE','Insider Buying','Current Ratio','EPS Beats','Competitive Moat','Clear Growth Runway','Revenue Guidance'],
+  priceChecks:['P/E vs Own History','PEG Ratio','P/E','Forward P/E','DCF Value','Comp Analysis'],
+  momentum:['Beating the Market','6-Month Return','12-Month Return','Near 52-Week High'],
+  context:['Legal and regulatory news','Customer concentration','Supplier concentration','Layoffs or restructuring','Suppliers you would not own','Customers you would not own','More than one supplier','More than one customer','Press coverage','Who they sell to is mapped','Who they buy from is mapped'],
+  wallStreet:['Price Target Upside','Analyst Consensus','Volume Trend'],
+};
+/* What each check asks, for the editor. Taken from the targets the checks themselves print. */
+const CHECK_TARGET={
+  'Free Cash Flow':'Positive','Cash vs Debt':'Cash > Debt','Revenue Growth (YoY)':'at least 10%',
+  'Gross Margin':'at least 40%','Operating Margin':'Expanding','ROE':'at least 15%',
+  'Insider Buying':'A cluster of buys','Current Ratio':'at least 1.5','EPS Beats':'4 of the last 4 quarters',
+  'Competitive Moat':'Durable','Clear Growth Runway':'Yes','Revenue Guidance':'Raised',
+  'P/E vs Own History':'Below its own average','PEG Ratio':'1.5 or under','P/E':'Under 30',
+  'Forward P/E':'Lower than trailing','DCF Value':'Undervalued','Comp Analysis':'Cheaper than peers',
+  'Beating the Market':'Beat the S&P over 12 months','6-Month Return':'Positive',
+  '12-Month Return':'Positive','Near 52-Week High':'Within 20% of the high',
+  'Legal and regulatory news':'None in 30 days','Customer concentration':'No customer over a third',
+  'Supplier concentration':'No supplier over a third','Layoffs or restructuring':'None in 30 days',
+  'Suppliers you would not own':'None under your sell line','Customers you would not own':'None under your sell line',
+  'More than one supplier':'2 or more','More than one customer':'2 or more',
+  'Press coverage':'3 or more stories in 30 days','Who they sell to is mapped':'At least one customer',
+  'Who they buy from is mapped':'At least one supplier',
+  'Price Target Upside':'At least 10% above the price','Analyst Consensus':'Majority buy-rated',
+  'Volume Trend':'Rising against the prior 20 days',
+};
 function allScoredChecks(sc){
   const out=[];
   for(const k of SCORED_SECTIONS){ const arr=sc&&sc[k]; if(Array.isArray(arr))out.push(...arr); }
   return out;
 }
+/* THE SHIPPED NUMBERS ARE A DEFAULT, NOT THE RULE (2026-10-07).
+
+   The owner's point: some things matter more than others, and which ones is their call rather than
+   mine. Every weight in CHECK_WEIGHT is now a default that a number in Settings overrides, stored
+   per account in D.rules.weights.
+
+   A weight of 0 is meaningful and is kept: it means "I do not care about this check", and the
+   check then answers, displays, and contributes nothing. That is different from deleting it, which
+   would also remove it from the page. */
 function weightOf(c){
+  const u=(D&&D.rules&&D.rules.weights)||null;
+  if(u&&Object.prototype.hasOwnProperty.call(u,c.name)&&Number.isFinite(u[c.name]))return u[c.name];
   return Object.prototype.hasOwnProperty.call(CHECK_WEIGHT,c.name)?CHECK_WEIGHT[c.name]:DEFAULT_WEIGHT;
+}
+/* The effective weight of a check by name, for the Settings editor and for the share arithmetic. */
+function effectiveWeight(name){ return weightOf({name}); }
+/* What each section is worth under the current weights, so the editor can show the shares moving
+   as somebody types rather than after a reload. */
+function weightShares(){
+  const secs={quality:'Quality',priceChecks:'Price',momentum:'Momentum',context:'News and supply chain',wallStreet:'Wall Street'};
+  const out=[]; let total=0;
+  for(const k of SCORED_SECTIONS){
+    const sum=(CHECK_NAMES[k]||[]).reduce((a,n)=>a+effectiveWeight(n),0);
+    out.push({key:k,name:secs[k],weight:sum}); total+=sum;
+  }
+  out.forEach(x=>x.share=total?x.weight/total*100:0);
+  return {rows:out,total};
 }
 /* The whole verdict, from everything that answered. */
 function weightedScore(sc){
@@ -5655,7 +5732,8 @@ function sellAt(){
 /* Low confidence is not a different verdict, it is the same verdict with a warning attached. The
    line is 55%: below that, more than two fifths of the weight never answered and the reader is
    being shown an opinion formed on a minority of the evidence. */
-const THIN_BELOW=55;
+const THIN_BELOW_DEFAULT=55;
+function thinBelow(){ const v=(D&&D.rules||{}).thinBelow; return Number.isFinite(v)?v:THIN_BELOW_DEFAULT; }
 /* ================= AND BELOW THIS, NO VERDICT AT ALL (2026-10-07) =================
 
    Found by a council review, then verified by running it: a company with ONE answered check that
@@ -5673,7 +5751,8 @@ const THIN_BELOW=55;
    enough to form an opinion worth disclaiming. Below 40, three fifths of the weight never answered,
    and any number computed on the rest is arithmetic rather than evidence. The two thresholds are
    deliberately different: one frames a real answer, the other refuses to give one. */
-const JUDGE_ABOVE=40;
+const JUDGE_ABOVE_DEFAULT=40;
+function judgeAbove(){ const v=(D&&D.rules||{}).judgeAbove; return Number.isFinite(v)?v:JUDGE_ABOVE_DEFAULT; }
 function verdictOf(sc,isHolding,sym){
   /* "No data" for a rate limit told the reader the company had no data, which is false and reads
      as a broken terminal. Each failure says its own thing, in the words a person would use. */
@@ -5690,16 +5769,16 @@ function verdictOf(sc,isHolding,sym){
   }
 
   /* The floor, before anything else is decided. */
-  if(ws.confidence<JUDGE_ABOVE){
+  if(ws.confidence<judgeAbove()){
     const bars0=sectionBreakdown(sc);
     const missing=bars0.filter(b=>b.score===null).map(b=>b.name);
     return {label:'NOT ENOUGH TO JUDGE',cls:'pill-na',key:'na',thin:true,
       score:ws.score,confidence:ws.confidence,detail:'too little answered',
-      why:'Only '+ws.confidence+'% of the checks could be answered for this company, which is under the '+JUDGE_ABOVE+'% this terminal needs before it will call anything. '
+      why:'Only '+ws.confidence+'% of the checks could be answered for this company, which is under the '+judgeAbove()+'% this terminal needs before it will call anything. '
         +(missing.length?'Nothing came back for '+missing.join(', ')+'. ':'')
         +'It is not a buy, a hold or a sell; there is not enough here to say.'};
   }
-  const thin=ws.confidence<THIN_BELOW;
+  const thin=ws.confidence<thinBelow();
   /* The warning goes BEFORE the arithmetic, not after it. Appended, it reads as a footnote to a
      conclusion the reader has already accepted; first, it is the frame they read the number in. */
   /* A model supplied some of what this rests on. Said before the arithmetic, for the same reason
@@ -13331,13 +13410,20 @@ function ruleSnapshot(){
   const r=D.rules||{};
   /* The rule log exists so a change in the record can be attributed to a change in the rulebook,
      so every number that can move a verdict belongs in this snapshot. */
-  return{buyAt:r.buyAt,sellAt:r.sellAt,priceFloor:r.priceFloor};
+  /* The weights are part of the rulebook: change one and every verdict can move, so a snapshot
+     that cannot see them would let the record record a change it could not explain. Summed and
+     listed rather than deep-copied, which is enough to detect a change and short enough to print. */
+  const w=r.weights||null;
+  return{buyAt:r.buyAt,sellAt:r.sellAt,priceFloor:r.priceFloor,
+    judgeAbove:r.judgeAbove,thinBelow:r.thinBelow,
+    weights:w?Object.keys(w).sort().map(k=>k+':'+w[k]).join(','):'default'};
 }
 function rulesDiffer(a,b){
   return a.qBuy!==b.qBuy||a.pBuy!==b.pBuy||a.mBuy!==b.mBuy||a.qSell!==b.qSell;
 }
 function describeRules(r){
-  return 'buy at ≥'+buyAt()+'%, sell at ≤'+sellAt()+'%, price floor '+(r.priceFloor==null?50:r.priceFloor)+'%';
+  return 'buy at ≥'+buyAt()+'%, sell at ≤'+sellAt()+'%, price floor '+(r.priceFloor==null?50:r.priceFloor)+'%'
+    +(r.weights?', custom weights':', default weights');
 }
 /* How many distinct rule-sets does the current graded record actually span? If the answer is more
    than one, the headline expectancy is an average across different systems and should not be read
@@ -13362,7 +13448,13 @@ function saveRules(){
   /* A sell line at or above the buy line makes every company both at once, and the verdict would
      be decided by which branch ran first. Clamped rather than refused, and said out loud. */
   if(sl>=b){ sl=Math.max(0,b-1); toast('The sell line has to sit below the buy line. Set to '+sl+'%.'); }
-  const after={ buyAt:b, sellAt:sl, priceFloor:Math.min(100,Math.max(0,n('setPriceFloor',50))) };
+  let ja=Math.min(100,Math.max(0,n('setJudgeAbove',40)));
+  let tb=Math.min(100,Math.max(0,n('setThinBelow',55)));
+  /* The floor must sit under the warning line or one of them can never fire: a floor above the
+     warning would refuse every verdict the warning was meant to qualify. */
+  if(ja>tb){ tb=ja; toast('The warning line cannot sit below the refuse-to-judge line. Set to '+tb+'%.'); }
+  const after=Object.assign({},ruleSnapshot(),
+    { buyAt:b, sellAt:sl, priceFloor:Math.min(100,Math.max(0,n('setPriceFloor',50))), judgeAbove:ja, thinBelow:tb });
   const autoRefresh=document.getElementById('setAutoRefresh').value;
 
   if(rulesDiffer(before,after)){
@@ -13389,6 +13481,7 @@ function saveRules(){
   }
 
   D.rules.buyAt=after.buyAt;D.rules.sellAt=after.sellAt;D.rules.priceFloor=after.priceFloor;
+  D.rules.judgeAbove=after.judgeAbove;D.rules.thinBelow=after.thinBelow;
   /* The old count-based keys are dropped on the first save, so nothing can read a stale bar that
      no longer means anything. The migration in buyAt()/sellAt() has already run by this point. */
   delete D.rules.qBuy;delete D.rules.pBuy;delete D.rules.mBuy;delete D.rules.cBuy;delete D.rules.qSell;
@@ -14748,6 +14841,109 @@ function fillLevelInput(){
     const shown=Object.keys(TAB_LEVEL).filter(t=>TAB_LEVEL[t]<=userLevel());
     note.textContent=shown.length+' of '+Object.keys(TAB_LEVEL).length+' screens in the sidebar. Nothing is locked: More opens the rest.';
   }
+}
+/* THE RULE-CHANGE GATE, shared (2026-10-07).
+
+   It was written inline inside saveRules. The weights editor needs exactly the same thing for
+   exactly the same reason, and two copies of a prompt that writes to the record is how the two
+   quietly stop matching. Returns false when the person backs out, and writes nothing in that case.
+
+   Why it asks at all: a changed rule makes a different system, and every call graded before it was
+   made by one that no longer exists. Stating the expectation and the failure test BEFORE any result
+   is visible is the only defence against reading a small sample until it says something. */
+function recordRuleChange(before,after){
+  const expect=(prompt(
+    'You are changing the system, not adjusting a setting.\n\n'+
+    'From: '+describeRules(before)+'\n'+
+    'To:   '+describeRules(after)+'\n\n'+
+    'What do you expect this change to do? Write it down BEFORE you see the result.'
+  )||'').trim();
+  if(!expect){ toast('Change cancelled. A rule change needs a stated expectation.'); return false; }
+  const detect=(prompt(
+    'And how would you know it FAILED?\n\n'+
+    'Name the result that would make you undo this. If you cannot state one, the change is unfalsifiable.'
+  )||'').trim();
+  if(!detect){ toast('Change cancelled. A rule change needs a failure test.'); return false; }
+  if(!D.ruleChanges)D.ruleChanges=[];
+  D.ruleChanges.push({ts:Date.now(),date:new Date().toISOString().slice(0,10),
+    from:before,to:after,expect,detect,
+    callsBefore:(D.calls||[]).filter(c=>c.verdict==='buy'||c.verdict==='sell').length});
+  if(D.ruleChanges.length>200)D.ruleChanges=D.ruleChanges.slice(D.ruleChanges.length-200);
+  return true;
+}
+/* ================= THE WEIGHTS EDITOR (2026-10-07) =================
+   Thirty-six numbers, grouped as they are scored, each one a plain input. The section shares
+   recompute on every keystroke rather than on save, because the thing somebody actually wants to
+   know is "what does raising this do to the rest", and that answer is useless after the fact. */
+function renderWeights(){
+  const host=document.getElementById('weightsBody');
+  if(!host)return;
+  const secs={quality:'Quality: is the business good',priceChecks:'Price: are you overpaying',
+    momentum:'Momentum: is the market agreeing',context:'The news, and who they trade with',
+    wallStreet:'Wall Street: what everyone else thinks'};
+  let h='';
+  for(const k of SCORED_SECTIONS){
+    const names=[...(CHECK_NAMES[k]||[])].sort((a,b)=>effectiveWeight(b)-effectiveWeight(a));
+    h+='<div class="section-title" style="margin-top:18px">'+esc(secs[k])+'</div>'+
+       '<table class="tbl" style="font-size:13px"><tbody>'+names.map(n=>
+        '<tr><td style="width:84px"><input type="number" min="0" max="10" value="'+effectiveWeight(n)+
+          '" data-wt="'+esc(n)+'" oninput="renderWeightShares()" style="width:70px"></td>'+
+        '<td><b>'+esc(n)+'</b><div class="muted" style="font-size:12px">'+esc(CHECK_TARGET[n]||'')+'</div></td></tr>').join('')+
+       '</tbody></table>';
+  }
+  host.innerHTML=h;
+  renderWeightShares();
+}
+/* Reads the inputs rather than the saved values, so the shares follow what is on screen. */
+function renderWeightShares(){
+  const el=document.getElementById('weightShares');
+  if(!el)return;
+  const live={};
+  document.querySelectorAll('#weightsBody input[data-wt]').forEach(i=>{
+    const v=parseInt(i.value); live[i.dataset.wt]=Number.isFinite(v)?Math.max(0,Math.min(10,v)):0;
+  });
+  const secs={quality:'Quality',priceChecks:'Price',momentum:'Momentum',context:'News and chain',wallStreet:'Wall Street'};
+  let total=0; const rows=[];
+  for(const k of SCORED_SECTIONS){
+    const sum=(CHECK_NAMES[k]||[]).reduce((a,n)=>a+(live[n]!=null?live[n]:effectiveWeight(n)),0);
+    rows.push([secs[k],sum]); total+=sum;
+  }
+  el.innerHTML=total
+    ? rows.map(([n,w])=>esc(n)+' <b>'+(w/total*100).toFixed(1)+'%</b>').join(' · ')+' · total weight '+total
+    : '<span class="neg">Every weight is zero, so nothing can be scored. Give at least one check a weight.</span>';
+}
+function saveWeights(){
+  if(!D)return;
+  const before=ruleSnapshot();
+  const w={};
+  document.querySelectorAll('#weightsBody input[data-wt]').forEach(i=>{
+    const v=parseInt(i.value); w[i.dataset.wt]=Number.isFinite(v)?Math.max(0,Math.min(10,v)):0;
+  });
+  const total=Object.values(w).reduce((a,b)=>a+b,0);
+  /* Everything at zero divides by zero and would make every company unscoreable. Refused rather
+     than clamped, because silently keeping the old numbers would be worse than saying no. */
+  if(!total){ toast('Every weight is zero, so nothing could be scored. At least one check needs a weight.'); return; }
+  if(!D.rules)D.rules={};
+  const after=Object.assign({},ruleSnapshot(),{weights:Object.keys(w).sort().map(k=>k+':'+w[k]).join(',')});
+  /* THE SAME GATE THE BARS GO THROUGH, and for the same reason. Changing what a check is worth
+     changes every verdict this terminal will give, which makes it a different system rather than a
+     setting. The record has to be attributable to the system that produced it, so a weight change
+     asks what it is expected to do and what would prove it wrong, before any result is visible. */
+  if(rulesDiffer(before,after)&&!recordRuleChange(before,after))return;
+  D.rules.weights=w;
+  saveDB();
+  renderWeights();renderAll();
+  toast('Weights saved. Scores are recomputed from them on the next refresh.');
+}
+function resetWeights(){
+  if(!D||!D.rules)return;
+  const before=ruleSnapshot();
+  const after=Object.assign({},before,{weights:'default'});
+  if(rulesDiffer(before,after)&&!recordRuleChange(before,after))return;
+  delete D.rules.weights;
+  saveDB();
+  renderWeights();renderAll();
+  toast('Back to the shipped weights.');
 }
 function fillPolicyInputs(){
   const p=policy();
@@ -20398,7 +20594,7 @@ h3{margin-bottom:10px}
      goes in by heading like every other group, which is the whole point of this design: the two
      cards were written months apart and neither needed touching for this. It sits before Advanced
      because Advanced is the catch-all and matches everything. */
-  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|Rule change log)/i],['Broker and keys',/^(API keys|Your broker)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
+  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|What counts for how much|Rule change log)/i],['Broker and keys',/^(API keys|Your broker)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
   function groupOf(card){ var h=card.querySelector('h3'); var txt=h?h.textContent.trim():''; for(var i=0;i<GROUPS.length;i++)if(GROUPS[i][1].test(txt))return GROUPS[i][0]; return 'Advanced'; }
   function cards(){ var tab=document.getElementById('tab-settings'); return tab?Array.prototype.slice.call(tab.children).filter(function(el){ return el.classList&&(el.classList.contains('card')||el.classList.contains('addwrap')); }):[]; }
   window.showSettings=function(name){
