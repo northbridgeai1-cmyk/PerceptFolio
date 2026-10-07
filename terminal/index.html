@@ -2421,13 +2421,15 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
        which does all of it and more. Two places to do the same sum is two places to maintain and one
        more thing to scan past. -->
 
-  <div class="section-title">Risk-adjusted return</div>
+  <div class="section-title">Is the return worth the swings?</div>
+  <div class="muted" style="font-size:12.5px;margin:-6px 0 10px">Professionals call this the Sharpe ratio.</div>
   <div class="card">
     <details class="aside"><summary>What Sharpe measures here</summary><div>Return per unit of volatility, from your own daily snapshots. Shown with its confidence interval, because a Sharpe ratio computed on a few months of data carries an error bar usually wider than the number itself, and a point estimate without one is the same false precision as a hit rate without a sample size.</div></details>
     <div id="sharpeBody"></div>
   </div>
 
-  <div class="section-title">Loss severity. VaR and Expected Shortfall</div>
+  <div class="section-title">How bad a bad day gets</div>
+  <div class="muted" style="font-size:12.5px;margin:-6px 0 10px">Professionals call these Value at Risk and Expected Shortfall.</div>
   <div class="card">
     <div id="varBody"></div>
   </div>
@@ -4931,11 +4933,43 @@ function w(term){
   const x=word(term);
   return x.tip?'<span title="'+esc(x.tip)+'" style="border-bottom:1px dotted currentColor">'+esc(x.show)+'</span>':esc(x.show);
 }
+/* WHERE A THING LIVES, for the terms that are a screen rather than just a word (2026-10-07).
+
+   The owner asked where the Sharpe ratio was. It was on the Risk screen, under a heading that
+   named the statistic instead of the question it answers, and at beginner level Risk sits behind
+   More. Three separate reasons not to find something, and the fix for the first two is the heading;
+   this is the fix for the third. A glossary that defines a word and does not say where to see it
+   has answered the easier half of the question. */
+const WORD_WHERE={
+  'sharpe ratio':['risk','Risk'],
+  'volatility':['analyzer','Analyze, under any stock'],
+  'beta':['analyzer','Analyze, under any stock'],
+  'drawdown':['projections','Projections'],
+  'monte carlo':['projections','Projections'],
+  'concentration':['portfolio','Portfolio'],
+  'watchlist':['watchlist','Lists'],
+  'verdict':['analyzer','Analyze, and the Portfolio table'],
+  'expectancy':['dashboard','Today, under Track record'],
+  'liquidity':['analyzer','Analyze, under any stock'],
+  'momentum':['analyzer','Analyze, under any stock'],
+  'cost basis':['portfolio','Portfolio'],
+  'position':['portfolio','Portfolio'],
+  'dividend':['analyzer','Analyze, under any stock'],
+  'screener':['screener','Find stocks'],
+};
 /* The whole table, for Settings. Sorted, so looking a word up is scanning rather than hunting. */
 function glossaryHtml(){
-  const rows=Object.keys(PLAIN_WORDS).sort().map(k=>
-    '<tr><td style="white-space:nowrap"><b>'+esc(k)+'</b></td><td>'+esc(PLAIN_WORDS[k])+'</td></tr>').join('');
-  return '<table class="tbl" style="font-size:13px"><tbody>'+rows+'</tbody></table>';
+  const rows=Object.keys(PLAIN_WORDS).sort().map(k=>{
+    const at=WORD_WHERE[k];
+    /* The link opens the screen even when the level has it behind More: showTab reveals it, which
+       is the same behaviour a chip or the search box already has. Nothing is locked. */
+    const where=at
+      ? '<a href="#" onclick="showTab(\''+at[0]+'\');return false">'+esc(at[1])+'</a>'
+      : '<span class="muted">\u2014</span>';
+    return '<tr><td style="white-space:nowrap"><b>'+esc(k)+'</b></td><td>'+esc(PLAIN_WORDS[k])+
+      '</td><td style="white-space:nowrap;font-size:12.5px">'+where+'</td></tr>';
+  }).join('');
+  return '<table class="tbl" style="font-size:13px"><thead><tr><th>Word</th><th>What it means</th><th>Where to see it</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
 
 /* ================= ONE STOCK, PROJECTED (2026-10-06) =================
@@ -11333,10 +11367,18 @@ function renderAnalysis(sym,sc){
       '<button class="btn btn-ghost btn-sm" style="border-color:var(--research);color:var(--research)" onclick="toggleFactorPanel()">Academic Context. What does research say about this style?</button>'+
     '</div>'+
     '<div id="factorPanel" class="card" style="margin-top:12px;display:none;background:var(--panel2)">'+renderFactorPanel(sc)+'</div>'+
-    '<h3 style="margin-top:22px">4 · Risk-Adjusted Outlook: Is the expected return worth the volatility?</h3>'+
+    /* "Risk-Adjusted Outlook" was the last heading on this screen written in the vocabulary of the
+       thing rather than of the question. The owner could not find the Sharpe ratio, which is what
+       this section is, which is the clearest possible evidence that naming a section after its
+       statistic hides it. */
+    '<h3 style="margin-top:22px">4 · '+(userLevel()===0
+      ? 'Is the return worth the swings?'
+      : 'Is the return worth the swings? (the Sharpe ratio)')+'</h3>'+
     (sc.riskRating?
       '<div class="row" style="margin:10px 0"><span class="pill '+sc.riskRating.cls+'">'+esc(sc.riskRating.label)+'</span>'+
-      (sc.sharpe!=null?'<span class="muted">Sharpe ratio '+sc.sharpe.toFixed(2)+', expected excess return per unit of volatility. Above 1.0 is strong, 0–0.5 is fair, below 0 means the expected return doesn\'t clear the risk-free rate given how much this stock swings.</span>':'')+'</div>'+
+      (sc.sharpe!=null?'<span class="muted"><b>'+sc.sharpe.toFixed(2)+'</b> of return for every unit it swings. '
+        +(sc.sharpe>=1?'Above 1 is strong.':sc.sharpe>=0.5?'Between 0.5 and 1 is fair.':sc.sharpe>=0?'Under 0.5 is weak.':'Below 0 means you are not being paid for the risk at all.')
+        +' '+w('sharpe ratio')+' is the name for this.</span>':'')+'</div>'+
       '<details class="aside"><summary>Assumptions behind this figure</summary><div>Assumptions: 4.5% risk-free rate, 8% expected market return, beta '+(sc.riskBeta!=null?sc.riskBeta.toFixed(2):'1.00')+', volatility '+(sc.riskSigma!=null?(sc.riskSigma*100).toFixed(1)+'%':'-')+' ('+esc(sc.riskSigmaSource||'assumed')+'). Same CAPM/GBM method as the Monte Carlo tool in the Risk tab, which lets you customize the rate assumptions.</div></details>'+
       (sc.riskRange?
         '<div class="grid grid-3" style="margin-bottom:10px">'+

@@ -32,9 +32,9 @@ const liftConst = (name, close) => {
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const build = level => new Function('userLevel', 'esc',
-  liftConst('const PLAIN_WORDS={', '\n};') + '\n' +
+  liftConst('const PLAIN_WORDS={', '\n};') + '\n' + liftConst('const WORD_WHERE={', '\n};') + '\n' +
   lift('function word(term)') + '\n' + lift('function w(term)') + '\n' + lift('function glossaryHtml()') + '\n' +
-  'return {word, w, glossaryHtml, PLAIN_WORDS};')(() => level, esc);
+  'return {word, w, glossaryHtml, PLAIN_WORDS, WORD_WHERE};')(() => level, esc);
 
 let pass = 0, fail = 0;
 const t = (n, ok, got) => { if (ok) { pass++; console.log('  PASS  ' + n); }
@@ -96,6 +96,21 @@ console.log('\nTHE GLOSSARY IS THE WHOLE TABLE, IN ONE PLACE');
   t('the glossary does not itself change with level', g === adv.glossaryHtml());
   t('it is on the Settings screen and filled when Settings opens',
     /id="glossaryCard"/.test(src) && /id="glossaryBody"/.test(src) && /g\.innerHTML=glossaryHtml\(\)/.test(src));
+
+  /* WHERE A THING LIVES (2026-10-07). The owner asked where the Sharpe ratio was. Defining a word
+     and not saying where to see it answers the easier half of the question. */
+  t('the glossary has a third column saying where to find it', /Where to see it/.test(g), g.slice(0, 200));
+  t('sharpe is pointed at the Risk screen', /sharpe ratio<\/b><\/td><td>[^<]*<\/td><td[^>]*><a[^>]*>Risk<\/a>/.test(g), g.match(/sharpe[\s\S]{0,220}/));
+  t('and the link opens that screen', /showTab\('risk'\)/.test(g));
+  /* It must open even when the reader's level keeps that screen behind More, which showTab already
+     handles for chips and the search box. */
+  t('every destination is a real tab', Object.values(beg.WORD_WHERE).every(([tab]) => src.includes('data-tab="' + tab + '"')),
+    Object.values(beg.WORD_WHERE).filter(([tab]) => !src.includes('data-tab="' + tab + '"')));
+  t('every word with a location is a word in the glossary',
+    Object.keys(beg.WORD_WHERE).every(k => beg.PLAIN_WORDS[k]),
+    Object.keys(beg.WORD_WHERE).filter(k => !beg.PLAIN_WORDS[k]));
+  t('a word with nowhere to point says so rather than linking nowhere',
+    Object.keys(beg.PLAIN_WORDS).some(k => !beg.WORD_WHERE[k]) && /\u2014/.test(g));
 }
 
 console.log('\nWORDS ONLY: NO NUMBER, THRESHOLD OR VERDICT DEPENDS ON THE LEVEL');
