@@ -20404,6 +20404,38 @@ header{border-bottom-color:var(--line)}
 </style>
 
 <style id="v4-friendly">
+/* RATES AND THE ECONOMY: RESTORED 2026-10-07.
+
+   These rules lived in the <style id="v2-world"> block, and I deleted that whole block when I
+   removed the World globe on the same day. The globe's styles were in it; so were these, and
+   nothing in the markup or the JavaScript referenced "world", so nothing failed and no test
+   caught it. The panel kept rendering and every tile collapsed into a plain stacked block: a
+   label, a number, a date, over and over down the page.
+
+   The lesson is about the cut, not the CSS. A named style block is not a feature boundary, and
+   deleting one wholesale assumes it only ever held the thing it was named after. Restored verbatim
+   from the commit before the removal. */
+/* Rates and the economy: tiles in the stat idiom, and the curve. */
+.rates-sec{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+.rates-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.rate-tile{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel2)}
+.rate-tile .rl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.rate-tile .rv{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:3px;line-height:1.1}
+.rate-tile .rc{font-size:11.5px;margin-top:4px;font-variant-numeric:tabular-nums;min-height:15px}
+.rate-tile .rd{font-size:10.5px;color:var(--muted);margin-top:4px}
+.rates-curve{display:flex;align-items:center;gap:16px;margin-top:12px;flex-wrap:wrap}
+.rates-curve svg{max-width:100%;height:auto;flex:0 0 auto}
+.rates-curve .ax{font-family:var(--mono);font-size:9.5px;fill:var(--muted)}
+.rates-curve .now{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.rates-curve .was{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-dasharray:4 4;opacity:.7}
+.rates-curve .dot{fill:var(--accent)}
+.rates-curve-note{font-size:12.5px;line-height:1.6;flex:1 1 180px}
+.rates-curve-note .rl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-right:4px}
+.rates-legend{display:flex;gap:14px;font-size:11.5px;margin-top:2px}
+.rates-legend i{display:inline-block;width:18px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:6px}
+.rates-legend i.was{border-top:1.5px dashed var(--muted)}
+.rates{display:flex;flex-wrap:wrap;gap:6px 0;font-size:13.5px;align-items:baseline}
+
 /* ===== Friendly, 2026-10-06. "Make it feel more friendly and usable for everyone." =====
 
    THE FOURTH PASS, AND IT REVERSES PART OF THE SECOND AND THIRD ON PURPOSE.
