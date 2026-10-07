@@ -37,7 +37,7 @@ export const SCREENS: ReadonlyArray<{ id: string; name: string; asks: string; st
   { id: 'map', name: 'Map', asks: 'Who does this company depend on, and who depends on it?' },
   { id: 'world', name: 'World', asks: 'What does a country make and sell, and to whom?' },
   { id: 'screener', name: 'Screener', asks: 'Which names on a list clear the rulebook?' },
-  { id: 'analyzer', name: 'Analyzer', asks: 'How does one company do on the twenty-two checks?' },
+  { id: 'analyzer', name: 'Analyzer', asks: 'How does one company do on the thirty-six checks?' },
   { id: 'risk', name: 'Risk', asks: 'What does a bad month do to the book?' },
   { id: 'projections', name: 'Projections', asks: 'What range of outcomes is plausible, under stated assumptions?' },
   { id: 'alerts', name: 'Alerts', asks: 'What crossed a line while I was away?' },

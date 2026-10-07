@@ -61,7 +61,7 @@ export function Landing() {
         <div><h2 id="h-score" className="mb-5">Every verdict shows its working.</h2>
           <p className="text-dim">Twelve checks on the quality of the business, six on the price, four on momentum. Each one names what it measured, the bar it had to clear, and whether it did. <b className="font-semibold text-text">A score is only a summary of the rows underneath it.</b> You read the ones that failed.</p>
           <p className="mt-4 text-dim">What each check measures, and where each bar sits, is the rulebook. It is inside the terminal, not on this page.</p>
-          <p className="mt-6 max-w-[52ch] border-t border-line pt-5 text-[15px] text-faint">Two of the twenty-two are yours to answer, and the terminal leaves them unset rather than pretend to know.</p></div>
+          <p className="mt-6 max-w-[52ch] border-t border-line pt-5 text-[15px] text-faint">Four of the thirty-six are yours to answer. Above the beginner setting the terminal leaves them unset rather than pretend to know; at the beginner setting a model answers them, marked as its answer, and yours overrides it.</p></div>
       </div></section>
 
       <section id="record" className="sec" aria-labelledby="h-record"><div className="wrap grid grid-cols-[5fr_7fr] items-center gap-[clamp(40px,6vw,96px)] min-[781px]:max-[960px]:gap-[clamp(56px,9vw,96px)] max-[780px]:grid-cols-1 max-[780px]:gap-10">

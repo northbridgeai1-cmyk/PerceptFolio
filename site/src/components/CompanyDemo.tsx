@@ -6,7 +6,7 @@ import { WORKER } from '@/lib/config';
 /* A5.1. A real company in the time it takes to read this. Everything on this card is public
    data through the worker's keyless routes: ten years of statements from SEC EDGAR, five years
    of daily closes, the filings of the last year, and the count of 13F filers naming the issuer.
-   The twenty-two checks are not here on purpose: they read a market-data feed that is licensed
+   The thirty-six checks are not here on purpose: they read a market-data feed that is licensed
    per person, and they run inside the terminal under bars the person sets. The card shows the
    record the checks read, dated and sourced, and says so. */
 type Edgar = { entity: string; years: number[]; lines: Record<string, { label: string; years: Record<string, number> }>; source: string };
@@ -66,7 +66,7 @@ export function CompanyDemo() {
           {holders ? <p className="text-[13px] text-dim"><span className="num text-text">{holders.latest.filers.toLocaleString()}</span> for the quarter ended {holders.latest.period}, <span className="num">{holders.change >= 0 ? '+' : ''}{holders.change.toLocaleString()}</span> on the quarter before. Filers, not shares.</p> : <p className="text-[13px] text-faint">{busy ? 'reading' : ''}</p>}
         </div>
       </div>
-      <p className="border-t border-line bg-panel2 px-5 py-3 text-[13px] text-faint">This is the public record the twenty-two checks read. The checks themselves run inside the terminal, on a market-data feed licensed to the person, under bars that person set; they are not a recommendation and they are not on this page. Source line: SEC EDGAR (public domain), the price feed named above, EDGAR full-text search.</p>
+      <p className="border-t border-line bg-panel2 px-5 py-3 text-[13px] text-faint">This is the public record the thirty-six checks read. The checks themselves run inside the terminal, on a market-data feed licensed to the person, under bars that person set; they are not a recommendation and they are not on this page. Source line: SEC EDGAR (public domain), the price feed named above, EDGAR full-text search.</p>
     </div>
   );
 }

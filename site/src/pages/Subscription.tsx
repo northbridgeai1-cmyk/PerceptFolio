@@ -38,7 +38,7 @@ export function Subscription() {
         <p className="mb-8 max-w-[60ch] text-dim">Nothing is held back for a higher tier. There is no higher tier.</p>
         <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[12px] border border-line bg-line max-[880px]:grid-cols-2 max-[600px]:grid-cols-1" role="list">
           {([
-            ['The 22 checks', 'Twelve on quality, six on price, four on momentum. Each names what it measured, the bar it had to clear, and whether it cleared it.'],
+            ['The 36 checks', 'Twelve on quality, six on price, four on momentum, eleven on the news and who they trade with, three on what Wall Street thinks. Each names what it measured, the bar it had to clear, and whether it cleared it.'],
             ['The record', 'Every verdict logged with the price and the index at that instant, marked on fixed horizons, hash-chained, and posted daily to a clock you do not control.'],
             ['Sizing', 'Five limits checked before money moves. Any one of them can say no, and the terminal shows you which one did.'],
             ['Market data', 'US listings, built in. Bring your own Finnhub key instead if you would rather.'],

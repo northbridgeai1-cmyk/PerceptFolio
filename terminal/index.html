@@ -2141,15 +2141,13 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
 
   <div class="section-title">Market weather. Long-run valuation</div>
   <div id="weatherVerdict" style="margin-bottom:14px"></div>
-  <div class="section-title">Business cycle</div>
-  <div class="card">
-    <div class="row" style="margin-bottom:8px">
-      <input id="cycleQ" list="cycleAreas" placeholder="Country: Ecuador, Japan, G7…" style="max-width:280px" autocomplete="off" onchange="setCycleArea()" onkeydown="if(event.key==='Enter')setCycleArea()">
-      <datalist id="cycleAreas"></datalist>
-    </div>
-    <div id="cycleBox"></div>
-    <div class="muted" id="cycleNote" style="font-size:13px;margin-top:6px"></div>
-  </div>
+  <!-- THE BUSINESS CYCLE WAS REMOVED ON 2026-10-07, on the owner's instruction.
+
+       It plotted a country on the OECD's composite leading indicator. It reached no verdict, moved
+       no score, and answered a question neither of this product's two users has: the side-hustler
+       wants candidates and the once-a-month investor wants to know whether anything needs doing.
+       "Where is Japan on the cycle" is neither. ANALYSIS-AUDIT.md already listed it among the
+       things held out of the verdict. -->
   <div class="grid grid-3" id="weatherCards">
     <div class="card" aria-busy="true"><span class="sr-only">Loading</span><div class="sk-wrap"><span class="sk sk-row sk-w1"></span><span class="sk sk-row sk-w4"></span><span class="sk sk-row sk-w2"></span><span class="sk sk-row sk-w3"></span></div></div>
   </div>
@@ -4325,7 +4323,7 @@ const TOUR=[
     body:'This runs your own rules, the ones you just set, across a list of companies and shows only the ones that clear them. It is not a tip sheet: change your rules and the answers change.' },
   { tab:'analyzer', tag:'Analyze', cls:'t-violet',
     q:'Is this company any good?',
-    body:'Type a name. You get twenty-two checks: twelve on the business, six on the price, four on whether the market agrees. Read the rows that failed, not only the score. The score is just a summary of those rows.' },
+    body:'Type a name. You get thirty-six checks: twelve on the business, six on the price, four on whether the market agrees, eleven on the news and who they trade with, three on what Wall Street thinks. Read the rows that failed, not only the score. The score is just a summary of those rows.' },
   { tab:'history', tag:'History', cls:'t-blue',
     q:'This is the part nobody else does.',
     body:'Every call you make is scored later against the market, on a fixed date, and never changed afterwards. It will say <b>not enough yet</b> for a while, and that is honest rather than broken. Come back in a few months and it will tell you whether your rules are any good.' }
@@ -4667,7 +4665,7 @@ function paletteActions(sym){
       toast('Portfolio filtered to '+sym+'. Press Show all to see the rest.');}});
   if(c.watched)A.push({icon:'i-watch',label:'Open in Watchlist',note:'on your list',
     run:()=>{showTab('watchlist');const f=document.getElementById('wlFilterQ');if(f){f.value=sym;renderAll();}}});
-  A.push({icon:'i-analyzer',label:'Analyze '+sym,note:c.scored?'re-score':'22 checks',run:()=>analyzeStock(sym)});
+  A.push({icon:'i-analyzer',label:'Analyze '+sym,note:c.scored?'re-score':'36 checks',run:()=>analyzeStock(sym)});
   A.push({icon:'i-map',label:'Map '+sym,note:c.mapped?'already mapped':'suppliers & customers',
     run:()=>{showTab('map');const t=document.getElementById('mapTicker');if(t){t.value=sym;loadMap();}}});
   A.push({icon:'i-world',label:'Plants worldwide',note:'from OpenStreetMap',run:()=>{showTab('world');if(window.wdFromTicker)wdFromTicker(sym);}});
@@ -14665,7 +14663,7 @@ async function reviewDigest(sym){
   try{
     const sc=D.analyses&&D.analyses[sym]; const now=sc&&!sc.error?checkBitmap(sc):null;
     if(now&&snap.checks&&now.length===snap.checks.length){
-      checked.push('the 22 checks');
+      checked.push('the 36 checks');
       for(let i=0;i<now.length;i++){ if(now[i]!==snap.checks[i]&&now[i]!=='-'&&snap.checks[i]!=='-')rows.push(digestRow('Check',CHECK_ORDER[i]+': '+(now[i]==='1'?'now passes':'now fails')+' (was '+(snap.checks[i]==='1'?'pass':'fail')+')',day(D.lastRefresh))); }
     }
   }catch(e){}
@@ -16556,7 +16554,6 @@ async function loadMarketData(force){
       renderRegimeBanner({});   // clears rather than leaving a stale banner
       renderWeather({error:'NEEDS_WORKER'});
       renderRates({error:'NEEDS_WORKER'});
-      renderCycle();
       return;
     }
     if(force)macroCache={};
@@ -16607,7 +16604,6 @@ async function loadMarketData(force){
     renderRegimeBanner(out);
     renderWeather(out);
     renderRates(out);
-    renderCycle();
   }finally{macroLoading=false;}
 }
 /* The code a profile presents to the worker for macro data and earnings dates: its own invite,
@@ -16693,118 +16689,6 @@ function renderRates(data){
     '<div class="rates-sec">The price of money</div><div class="rates-grid">'+rates.join('')+'</div>'+curve+
     (econ.length?'<div class="rates-sec" style="margin-top:14px">The economy</div><div class="rates-grid">'+econ.join('')+'</div>':'')+
     '<div class="muted" style="font-size:11.5px;margin-top:10px">FRED, as of '+esc(day(asOf))+'</div>';
-}
-
-/* ---- The business cycle: the OECD's composite leading indicator, placed on the cycle ----
-   Twenty-two areas (the G20 and a few aggregates) from the worker's /cycle, kept for the day.
-   Level against 100 (the long-run trend) and the three-month change give a phase: below and
-   rising is recovery, above and rising expansion, above and falling slowdown, below and falling
-   contraction. The indicator is built to lead turning points by six to nine months, so this is
-   where it points, not where output has been measured. */
-let CYCLE=null, cycleLoading=null;
-function loadCycle(){
-  if(CYCLE)return Promise.resolve(CYCLE);
-  const today=new Date().toISOString().slice(0,10);
-  try{ const c=JSON.parse(localStorage.getItem('pf_cycle_v1')||'null'); if(c&&c.asOf===today&&c.areas){ CYCLE=c; return Promise.resolve(CYCLE); } }catch(e){}
-  if(cycleLoading)return cycleLoading;
-  const code=accessCodeFor(USER);
-  if(!syncConfigured()&&!code)return Promise.resolve(null);
-  const base=(syncConfigured()?syncCfg.url:INVITE_WORKER).replace(/\/+$/,'');
-  const auth=syncConfigured()?{headers:{'Authorization':'Bearer '+syncCfg.key}}:{};
-  cycleLoading=fetch(base+'/cycle'+(syncConfigured()?'':'?code='+encodeURIComponent(code)),auth).then(r=>r.ok?r.json():null).then(j=>{
-    cycleLoading=null; if(!j||!j.areas)return null; CYCLE=j; try{ localStorage.setItem('pf_cycle_v1',JSON.stringify(j)); }catch(e){} return CYCLE;
-  }).catch(()=>{ cycleLoading=null; return null; });
-  return cycleLoading;
-}
-/* The OECD's leading indicator: level against 100 and the three-month change give the phase it
-   points to, six to nine months out. Kept for the twenty-two areas it covers, as the "ahead" dot. */
-function cyclePhase(months){
-  if(!months||months.length<4)return null;
-  const last=months[months.length-1], prev=months[months.length-4];
-  const dev=last[1]-100, slope=last[1]-prev[1];
-  return Object.assign({level:last[1],month:last[0],dev,slope},phaseOf(dev/1.0,slope/0.5));
-}
-/* A state (how far from trend, which way it is moving) is a point on the wave. Rising phases sit
-   on the climb from the trough to the second peak, falling phases on the descent from the first
-   peak to the trough, so every dot lands between the diagram's two peaks. */
-function phaseOf(devN,slopeN){
-  const phase=devN>=0?(slopeN>=0?'Expansion':'Past the peak'):(slopeN>=0?'Past the trough':'Contraction');
-  let tt=Math.PI/2-Math.atan2(slopeN,devN);
-  while(tt<-Math.PI/2)tt+=2*Math.PI; while(tt>=3*Math.PI/2)tt-=2*Math.PI;
-  if(tt<Math.PI/2)tt+=2*Math.PI;               /* rising: onto the second climb */
-  return {phase,t:tt};
-}
-/* Every country: the IMF's real GDP growth. This year's growth against the country's own trend
-   (the median of the past ten years, the pandemic swing left out), and the change from last year,
-   give where it sits; next year's projection gives where the Fund expects it to be. */
-function imfPhase(c,year){
-  if(!c||!c.g)return null;
-  const g=c.g, now=g[year]!=null?year:(g[year-1]!=null?year-1:null); if(now==null)return null;
-  const hist=[]; for(let y=now-10;y<now;y++){ if(y===2020||y===2021)continue; if(g[y]!=null)hist.push(g[y]); }
-  if(hist.length<4)return null;
-  const s=hist.slice().sort((a,b)=>a-b), trend=s[Math.floor(s.length/2)];
-  const mean=hist.reduce((a,b)=>a+b,0)/hist.length, sd=Math.max(0.8,Math.sqrt(hist.reduce((a,b)=>a+(b-mean)*(b-mean),0)/hist.length));
-  const cur=g[now], prev=g[now-1]!=null?g[now-1]:cur, next=g[now+1];
-  const here=phaseOf((cur-trend)/sd,(cur-prev)/sd);
-  const ahead=next!=null?Object.assign({g:next,year:now+1},phaseOf((next-trend)/sd,(next-cur)/sd)):null;
-  return {year:now,g:cur,prev,trend,sd,phase:here.phase,t:here.t,ahead};
-}
-function cycleCountries(){
-  const out={}; if(!CYCLE)return out;
-  Object.entries((CYCLE.imf&&CYCLE.imf.countries)||{}).forEach(([k,c])=>{ out[k]={name:c.name,imf:c,oecd:CYCLE.areas&&CYCLE.areas[k]||null}; });
-  Object.entries(CYCLE.areas||{}).forEach(([k,a])=>{ if(!out[k])out[k]={name:a.name,imf:null,oecd:a}; });
-  return out;
-}
-function cycleAreaFor(text){
-  const all=cycleCountries(), q=String(text||'').trim().toLowerCase(); if(!q)return null;
-  const keys=Object.keys(all), nm=k=>all[k].name.toLowerCase();
-  return keys.find(k=>k.toLowerCase()===q)||keys.find(k=>nm(k)===q)||keys.find(k=>nm(k).indexOf(q)===0)||keys.find(k=>nm(k).indexOf(q)>=0)||null;
-}
-function setCycleArea(){ const el=document.getElementById('cycleQ'); if(!el)return; const k=cycleAreaFor(el.value); if(k){ try{ localStorage.setItem('pf_cycle_area',k); }catch(e){} renderCycle(); } else { const st=document.getElementById('cycleNote'); if(st)st.textContent='Not a country the IMF or the OECD covers.'; } }
-function renderCycle(){
-  const box=document.getElementById('cycleBox'); if(!box)return;
-  loadCycle().then(j=>{
-    const note=document.getElementById('cycleNote'), list=document.getElementById('cycleAreas');
-    if(!j){ box.innerHTML=''; if(note)note.textContent=(!syncConfigured()&&!accessCodeFor(USER))?'Needs an access code: Settings → Access code.':'The cycle data did not load.'; return; }
-    const all=cycleCountries(), year=(j.imf&&j.imf.year)||new Date().getUTCFullYear();
-    if(list&&!list.children.length)Object.keys(all).sort((a,b)=>all[a].name.localeCompare(all[b].name)).forEach(k=>{ const o=document.createElement('option'); o.value=all[k].name; list.appendChild(o); });
-    let key=null; try{ key=localStorage.getItem('pf_cycle_area'); }catch(e){}
-    if(!key||!all[key])key=all.USA?'USA':Object.keys(all)[0];
-    const me=all[key], q=document.getElementById('cycleQ'); if(q&&document.activeElement!==q)q.value=me.name;
-    const now=me.imf?imfPhase(me.imf,year):null, lead=me.oecd?cyclePhase(me.oecd.months):null;
-    const here=now||lead; if(!here){ box.innerHTML=''; if(note)note.textContent='Not enough data for '+me.name+'.'; return; }
-    /* The diagram: real GDP over time, a dashed trend, one and a half cycles of the wave, the
-       textbook's labels. Dots sit on the wave between the two peaks. */
-    const W=680,H=300,X0=48,X1=650,Y0=22,Y1=262,A=52;
-    const trendY=x=>Y1-30-(x-X0)/(X1-X0)*120;
-    const XT=tt=>X0+14+(tt/(3*Math.PI))*(X1-X0-24), YT=tt=>trendY(XT(tt))-A*Math.sin(tt);
-    let d=''; for(let i=0;i<=180;i++){ const tt=i/180*3*Math.PI; d+=(i?'L':'M')+XT(tt).toFixed(1)+' '+YT(tt).toFixed(1); }
-    const others=Object.keys(all).filter(k=>k!==key).map(k=>{ const c=all[k]; const p=c.imf?imfPhase(c.imf,year):(c.oecd?cyclePhase(c.oecd.months):null); return p?{k,name:c.name,p}:null; }).filter(Boolean);
-    const dot=(tt,r,fill,stroke,title)=>'<circle cx="'+XT(tt).toFixed(1)+'" cy="'+YT(tt).toFixed(1)+'" r="'+r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1.5">'+(title?'<title>'+esc(title)+'</title>':'')+'</circle>';
-    const arrow=(tt,label,dx,dy)=>{ const x=XT(tt),y=YT(tt),lx=x+dx,ly=y+dy; return '<line x1="'+lx.toFixed(1)+'" y1="'+(ly-4).toFixed(1)+'" x2="'+(x+(dx>0?3:-3)).toFixed(1)+'" y2="'+(y+(dy>0?4:-4)).toFixed(1)+'" stroke="var(--text)" stroke-width="1" marker-end="url(#cyArrow)"/><text x="'+lx.toFixed(1)+'" y="'+(ly+(dy>0?12:-6)).toFixed(1)+'" text-anchor="middle" font-size="12.5" fill="var(--text)">'+label+'</text>'; };
-    const aheadT=lead?lead.t:(now&&now.ahead?now.ahead.t:null);
-    box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="auto" role="img" aria-label="'+esc(me.name)+' on the business cycle">'+
-      '<defs><marker id="cyArrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--text)"/></marker></defs>'+
-      '<line x1="'+X0+'" y1="'+Y1+'" x2="'+X0+'" y2="'+Y0+'" stroke="var(--text)" stroke-width="1.2" marker-end="url(#cyArrow)"/>'+
-      '<line x1="'+X0+'" y1="'+Y1+'" x2="'+(X1+14)+'" y2="'+Y1+'" stroke="var(--text)" stroke-width="1.2" marker-end="url(#cyArrow)"/>'+
-      '<text transform="translate(16 '+((Y0+Y1)/2)+') rotate(-90)" text-anchor="middle" font-size="12.5" fill="var(--text)">Real GDP</text>'+
-      '<text x="'+(X1+8)+'" y="'+(Y1+18)+'" text-anchor="end" font-size="12.5" fill="var(--text)">Time</text>'+
-      '<line x1="'+(X0+8)+'" y1="'+trendY(X0+8).toFixed(1)+'" x2="'+(X1-4)+'" y2="'+trendY(X1-4).toFixed(1)+'" stroke="var(--text)" stroke-width="1.2" stroke-dasharray="5 4"/>'+
-      '<path d="'+d+'" fill="none" stroke="#3b7dd8" stroke-width="2.2"/>'+
-
-      others.map(x=>dot(x.p.t,3.2,'var(--muted)','none',x.name+' · '+x.p.phase)).join('')+
-      (aheadT!=null?'<line x1="'+XT(here.t).toFixed(1)+'" y1="'+YT(here.t).toFixed(1)+'" x2="'+XT(aheadT).toFixed(1)+'" y2="'+YT(aheadT).toFixed(1)+'" stroke="var(--brand2)" stroke-width="1" stroke-dasharray="2 3"/>'+dot(aheadT,6,'var(--bg)','var(--brand2)','ahead'):'')+
-      dot(here.t,7.5,'var(--brand2)','var(--bg)',me.name)+
-      '<text x="'+XT(here.t).toFixed(1)+'" y="'+(YT(here.t)+(Math.sin(here.t)>=0?24:-14)).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text)">'+esc(me.name)+'</text>'+
-      '</svg>';
-    const pct=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(1)+'%';
-    let line='<b>'+esc(me.name)+'</b>';
-    if(now){ line+=' · growth '+pct(now.g)+' in '+now.year+', trend '+pct(now.trend)+', '+(now.g>=now.prev?'up':'down')+' from '+pct(now.prev)+' · <b class="'+(/Expansion|trough/.test(now.phase)?'pos':'warn')+'">'+now.phase+'</b>'; }
-    else if(lead){ line+=' · OECD indicator '+lead.level.toFixed(2)+' · <b>'+lead.phase+'</b>'; }
-    if(lead&&now)line+=' · ahead: OECD indicator '+lead.level.toFixed(2)+', '+(lead.slope>=0?'rising':'falling')+' → '+lead.phase.toLowerCase();
-    else if(now&&now.ahead)line+=' · ahead: IMF projects '+pct(now.ahead.g)+' in '+now.ahead.year+' → '+now.ahead.phase.toLowerCase();
-    if(note)note.innerHTML=line+'<span class="muted"> · IMF World Economic Outlook; the OECD leading indicator, where the area has one, is built to lead by six to nine months. Grey dots: every other country.</span>';
-  });
 }
 
 /* ---- Earnings dates: one calendar for the whole market, a day at a time ----
@@ -18640,7 +18524,7 @@ function checkAuditHTML(winRaw){
   const E=checkEfficacy(days);
   if(!E.ok){
     return '<details class="aside"><summary>Why there is no audit yet</summary><div>'+
-      '<b>The 22 checks have not been audited yet.</b> That needs marked calls carrying the check results they were made on, which are recorded from now on; there are '+
+      '<b>The 36 checks have not been audited yet.</b> That needs marked calls carrying the check results they were made on, which are recorded from now on; there are '+
       E.n+' so far and it takes at least 8 before any per-check correlation means anything. '+
       'Until then every check is weighted equally because nothing yet says otherwise, not because anything says it should be.</div></details>';
   }
@@ -18652,7 +18536,7 @@ function checkAuditHTML(winRaw){
   const fr=x=>(x>=0?'+':'')+x.toFixed(2);
   return '<div style="margin-top:16px;border-top:1px solid var(--border);overflow:hidden">'+
     '<div style="padding:11px 15px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:12.5px;font-weight:650">'+
-      'Do the 22 checks predict anything · '+esc(winRaw)+'-day marks</div>'+
+      'Do the 36 checks predict anything · '+esc(winRaw)+'-day marks</div>'+
     '<div style="overflow-x:auto"><table><thead><tr>'+
       '<th>Check</th><th>Correlation with edge</th><th>95% range</th><th>Passed</th><th>Failed</th><th>Reading</th>'+
     '</tr></thead><tbody>'+sorted.map(p=>
@@ -19641,7 +19525,7 @@ async function companySheetHTML(sym,sc){
       if(peers.length){
         const scored=[];
         for(const pz of peers){ try{ let psc=(D.analyses||{})[pz]; if(!psc||psc.error||Date.now()-(psc.when||0)>36*3600*1000){ psc=await scoreStock(pz); D.analyses[pz]=psc; } if(psc&&!psc.error)scored.push({pz,psc}); }catch(e){} }
-        if(scored.length){ saveDB(); h+='<h2>Peers, through the same bars</h2><table><thead><tr><th>Ticker</th><th>Price</th><th>Quality</th><th>Value</th><th>Momentum</th><th>Verdict under your bars</th></tr></thead><tbody>'+[{pz:sym,psc:sc}].concat(scored).map(({pz,psc})=>{ const vv=verdictOf(psc,(D.holdings||[]).some(x=>x.sym===pz&&x.type==='Stock'),pz); return '<tr><td><b>'+esc2(pz)+'</b></td><td>'+fmt$(psc.price)+'</td><td>'+psc.qScore+'/12</td><td>'+psc.pScore+'/6</td><td>'+psc.mScore+'/4</td><td>'+esc2(vv.label)+'</td></tr>'; }).join('')+'</tbody></table><p class="m">Peers as Finnhub lists them; the same twenty-two checks under the same bars. A comparison, not a ranking.</p>'; }
+        if(scored.length){ saveDB(); h+='<h2>Peers, through the same bars</h2><table><thead><tr><th>Ticker</th><th>Price</th><th>Quality</th><th>Value</th><th>Momentum</th><th>Verdict under your bars</th></tr></thead><tbody>'+[{pz:sym,psc:sc}].concat(scored).map(({pz,psc})=>{ const vv=verdictOf(psc,(D.holdings||[]).some(x=>x.sym===pz&&x.type==='Stock'),pz); return '<tr><td><b>'+esc2(pz)+'</b></td><td>'+fmt$(psc.price)+'</td><td>'+psc.qScore+'/12</td><td>'+psc.pScore+'/6</td><td>'+psc.mScore+'/4</td><td>'+esc2(vv.label)+'</td></tr>'; }).join('')+'</tbody></table><p class="m">Peers as Finnhub lists them; the same thirty-six checks under the same bars. A comparison, not a ranking.</p>'; }
       }
     }
   }catch(e){}

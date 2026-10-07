@@ -802,14 +802,12 @@ t('the terminal keeps the calendar for the day', /localStorage\.setItem\('pf_ear
 t('a recorded call carries the next earnings date it knew about', /earningsAt:\(typeof nextEarnings==='function'&&nextEarnings\(sym\)\)\?nextEarnings\(sym\)\.d:null/.test(term));
 t('the date is printed on the holding and watchlist rows', /earningsCell\(h\.sym\)/.test(term) && /earningsCell\(s\)/.test(term));
 t('the rates line never feeds a verdict', /function renderRates\(data\)/.test(term) && !/renderRates\([^)]*\)[^\n]*levels\.push/.test(term));
-/* The business cycle: the OECD's leading indicator for twenty-two areas, one CSV a day (the JSON
-   answer for several areas comes back cut), placed on the cycle by level and three-month slope. */
+/* THE BUSINESS CYCLE WAS REMOVED FROM THE TERMINAL ON 2026-10-07, on the owner's instruction: it
+   plotted a country on the OECD's leading indicator, reached no verdict and moved no score. The
+   worker route that served it is left alone and still tested below; nothing in the terminal calls
+   it now, and it is cheap, cached and harmless where it sits. */
 t('the cycle route reads the OECD as CSV, cached a day, behind the same door as macro data', /DF_CLI,4\.1\/\.M\.LI\.\.\.AA\.\.\.H\?startPeriod=' \+ start \+ '&format=csv'/.test(worker) && /const ck = 'cycle:' \+ today;/.test(worker) && /The cycle needs a live invite code, or the sync key\./.test(worker));
-t('a phase is distance from trend and direction, and nothing else', /const phase=devN>=0\?\(slopeN>=0\?'Expansion':'Past the peak'\):\(slopeN>=0\?'Past the trough':'Contraction'\);/.test(term));
-t('every country comes from the IMF outlook; its trend is its own median, the pandemic swing left out', /NGDP_RPCH/.test(worker) && /if\(y===2020\|\|y===2021\)continue;/.test(term));
-t('the diagram is real GDP over time with a dashed trend and nothing written on the curve', /Real GDP<\/text>/.test(term) && />Time<\/text>/.test(term) && /stroke-dasharray="5 4"/.test(term) && !/Trough<\/text>/.test(term) && !/>Peak<\/text>/.test(term) && !/'Contraction',-54/.test(term));
-t('the cycle card says what the indicator is and how far it leads', /built to lead by six to nine months/.test(term));
-t('the cycle card never feeds a verdict', !/renderCycle\([^)]*\)[^\n]*levels\.push/.test(term));
+t('and nothing in the terminal draws a cycle any more', !/renderCycle/.test(term) && !/id="cycleBox"/.test(term));
 /* The thesis is a sheet behind the holding's menu. */
 t('the thesis form is a sheet, not a panel on the tab', /<div class="addwrap" id="thesisWrap">/.test(term) && /function openThesis\(sym\)/.test(term));
 t('the holding menu opens it', /run:"openThesis\('"\+sym\+"'\)"/.test(term));
@@ -2738,7 +2736,7 @@ t('M4 reduces the check correlation matrix the same way effective bets does',
 t('it says what redundancy costs an equal-weighted score',
   /Counting one idea three times and calling it three points/.test(term));
 t('with too few marked calls it says so rather than ranking noise',
-  /The 22 checks have not been audited yet/.test(term));
+  /The 36 checks have not been audited yet/.test(term));
 t('it states its own falsification',
   /the checklist is not selecting stocks and the score is arithmetic on noise/.test(term));
 
