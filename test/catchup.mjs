@@ -42,6 +42,7 @@ function harness(opts = {}) {
     _newsAutoLoaded: false,
     hasMarketData: () => opts.marketData !== false,
     sessionAlive: () => (opts.aliveUntil === undefined ? true : ran.length < opts.aliveUntil),
+    autoBrokerSync: boom('broker'),
     refreshAllSoon: boom('prices+scores'),
     renderCommand: () => ran.push('what-needs-you'),
     loadNews: boom('news'),
@@ -68,8 +69,12 @@ console.log('\nIT DOES THE WHOLE LOT, IN THE ORDER THAT MATTERS');
 {
   const h = harness();
   await h.run();
-  t('prices and every score run first', h.ran[0] === 'prices+scores', h.ran);
-  t('then what needs you is redrawn', h.ran.indexOf('what-needs-you') === 1, h.ran);
+  /* THE ORDER IS THE POINT (2026-10-07). The broker and the catch-up were two racing
+     fire-and-forget calls, and the common losing order priced the book before the broker had
+     finished handing over holdings, leaving the newest positions at cost until the next refresh. */
+  t('the broker is read first, before anything prices it', h.ran[0] === 'broker', h.ran);
+  t('then prices and every score', h.ran[1] === 'prices+scores', h.ran);
+  t('then what needs you is redrawn', h.ran.indexOf('what-needs-you') === 2, h.ran);
   t('then the news', h.ran.indexOf('news') > h.ran.indexOf('what-needs-you'), h.ran);
   t('then the market readings', h.ran.indexOf('market') > h.ran.indexOf('news'), h.ran);
   t('and fear and greed', h.ran.includes('feargreed'));
@@ -115,6 +120,11 @@ console.log('\nIT DOES NOT RUN ON EVERY RELOAD');
 
 console.log('\nONE FAILING STEP CANNOT STOP THE REST');
 {
+  const h = harness({ throws: ['broker'] });
+  await h.run();
+  t('a failing broker does not stop the pricing', h.ran.includes('prices+scores'), h.ran);
+}
+{
   const h = harness({ throws: ['prices+scores'] });
   await h.run();
   t('the news still loads when prices fail', h.ran.includes('news'), h.ran);
@@ -137,6 +147,7 @@ console.log('\nTHE SESSION CAN END WHILE IT WORKS');
   const h = harness({ aliveUntil: 1 });
   await h.run();
   t('a sign-out during the first step stops the rest', !h.ran.includes('news'), h.ran);
+  t('and the broker was the step it got to', h.ran[0] === 'broker', h.ran);
   t('and nothing is written', !h.ran.includes('save'), h.ran);
 }
 
@@ -148,7 +159,7 @@ console.log('\nIT NEVER BLOCKS THE DOOR, AND IT SAYS WHAT IT IS DOING');
   t('and a throw in it cannot break the sign-in', /try\{ catchUpEverything\(\); \}catch/.test(login));
   const body = lift('async function catchUpEverything()');
   t('every step is individually wrapped', (body.match(/try\{/g) || []).length >= 5, (body.match(/try\{/g) || []).length);
-  t('it says what it is doing while it works', /Bringing everything up to date/.test(body) && /Reading the news/.test(body));
+  t('it says what it is doing while it works', /Reading your broker/.test(body) && /Pricing everything and scoring it/.test(body) && /Reading the news/.test(body));
   t('and says when it is finished and that nothing needs pressing', /Nothing needs pressing/.test(body));
   t('the finished line clears itself rather than sitting there', /setTimeout\(\(\)=>\{ try\{ catchUpStatus\(''\); \}catch\(e\)\{\} \}, 12000\)/.test(body));
   t('there is a line on the dashboard for it', /id="catchUpLine"/.test(src));

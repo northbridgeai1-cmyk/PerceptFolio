@@ -119,8 +119,12 @@ console.log('\nTARGETS: REACHABLE WITH A FINGER');
 console.log('\nAND THE PASS IS REVERTIBLE, LIKE THE THREE BEFORE IT');
 {
   t('it is one named block', (src.match(/<style id="v4-friendly">/g) || []).length === 1);
-  t('it is the last stylesheet in the file',
-    src.lastIndexOf('<style id=') === src.indexOf('<style id="v4-friendly">'));
+  /* Counted as real tags, not as text: the note explaining the restored rates rules quotes the
+     name of the block they came from, and an assertion that matches prose matches that too. */
+  t('it is the last stylesheet in the file', (() => {
+    const tags = [...src.matchAll(/\n<style id="([^"]+)">/g)].map(m => m[1]);
+    return tags[tags.length - 1] === 'v4-friendly';
+  })());
   t('it says what it reverses and why', /reverses part of the second and third on purpose/i.test(src));
 }
 

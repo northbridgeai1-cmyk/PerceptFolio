@@ -189,6 +189,43 @@ console.log('\nIT STILL NAMES A REASON, NOT JUST A NUMBER');
   t('the owner is told it is a position to close', /position to think about closing/.test(V(allFail, true, 'X').why));
 }
 
+console.log('\nTHE SPLIT: BUY, HOLD, SELL AS PERCENTAGES');
+{
+  /* The owner's shape: "70% buy, 30% hold, 0% sell". The whole weight divided three ways:
+     passed is buy, failed is sell, and could-not-answer is the neutral middle. */
+  const all = weightedScore(allPass).split;
+  t('everything passing is 100% buy', all.buy === 100 && all.hold === 0 && all.sell === 0, all);
+  const none = weightedScore(allFail).split;
+  t('everything failing is 100% sell', none.sell === 100 && none.buy === 0, none);
+  /* The owner's own example: everything answerable passes, the manual ones are blank. */
+  const nh = weightedScore(noHomework).split;
+  t('passes-all-with-blanks reads as buy plus hold, no sell', nh.sell === 0 && nh.buy > 0 && nh.hold > 0, nh);
+  t('and it matches the confidence, since hold IS the unanswered weight',
+    nh.buy === weightedScore(noHomework).confidence, { buy: nh.buy, confidence: weightedScore(noHomework).confidence });
+  /* The property that matters most: three numbers a reader can add up. */
+  const cases = [allPass, allFail, noHomework, mk(() => null), mk((n, k, i) => i % 3 === 0 ? true : i % 3 === 1 ? false : null)];
+  t('the three always sum to exactly 100', cases.every(c => { const s = weightedScore(c).split; return s.buy + s.hold + s.sell === 100; }),
+    cases.map(c => weightedScore(c).split));
+  t('and none of them is ever negative', cases.every(c => { const s = weightedScore(c).split; return s.buy >= 0 && s.hold >= 0 && s.sell >= 0; }));
+  t('nothing answered is 100% hold', weightedScore(mk(() => null)).split.hold === 100);
+  /* Shown as one bar in three colours, with the numbers written beside it so colour is never the
+     only carrier. */
+  t('it renders as a three-colour bar', /function splitBarHtml\(ws\)/.test(src)
+    && /var\(--green\)/.test(src) && /var\(--yellow\)/.test(src) && /var\(--red\)/.test(src));
+  t('with each number in words beside it', /% buy<\/b>/.test(src) && /% hold<\/b>/.test(src) && /% sell<\/b>/.test(src));
+  t('and the middle one says it means cannot tell', /can\\u2019t tell/.test(src) || /can’t tell/.test(src));
+}
+
+console.log('\nTHE WHOLE-BOOK REVIEW IS RED, ORANGE, GREEN');
+{
+  t('sell is red, look is orange, keep is green',
+    /const TONE=\{sell:'var\(--red\)',look:'var\(--yellow\)',keep:'var\(--green\)'/.test(src));
+  t('the colour is a bar and the ticker, never the row background',
+    /border-left:3px solid '\+TONE\[key\]/.test(src) && !/background:'\+TONE/.test(src));
+  t('and the heading still says the word, so colour is never the only signal',
+    /block\('Think about selling','sell'/.test(src) && /block\('Keep','keep'/.test(src));
+}
+
 console.log('\nTHE WEIGHTS ARE A DEFAULT, AND THE OWNER\'S NUMBER WINS');
 {
   /* "Some things are more important than others" and which ones is the owner's call. Every weight

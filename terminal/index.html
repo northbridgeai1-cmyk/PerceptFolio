@@ -3998,9 +3998,16 @@ async function finishLogin(email){
   /* The sidebar belongs to the account, so it is rebuilt on every sign-in rather than left as the
      previous account's shape. */
   try{ if(typeof applyNavLevel==='function')applyNavLevel(); fillLevelInput(); }catch(e){}
-  /* Deliberately not awaited. See autoBrokerSync: entry must never wait on a broker. */
-  try{ autoBrokerSync(); }catch(e){}
-  /* And everything else, also not awaited. See catchUpEverything. */
+  /* ONE SEQUENCE, NOT TWO RACING ONES (2026-10-07).
+
+     The broker sync and the catch-up were two independent fire-and-forget calls. They raced, and
+     the losing order was the common one: prices and scores would run, THEN the broker would hand
+     over three holdings nobody had priced, and those three sat at cost until the next refresh. The
+     owner's instruction is that everything is ready the moment they enter, and two unordered
+     promises cannot promise that.
+
+     The broker is now the first step INSIDE the catch-up, awaited, because what it returns changes
+     what everything after it has to work on. Still not awaited by the caller: entry never waits. */
   try{ catchUpEverything(); }catch(e){}
 }
 /* Screener/Risk/Monte Carlo results (and their Chart.js instances) live in module-level globals
@@ -5711,12 +5718,57 @@ function weightedScore(sc){
     if(c.pass===true)passed+=w;
   }
   const total=answered+missing;
-  if(!answered)return {score:null,confidence:0,passed:0,answered:0,missing,total};
+  /* Nothing answered is not "no split", it is entirely the neutral middle: nothing points either
+     way because nothing is known. Returning the field is also what keeps the shape the same on
+     every path, so a caller never has to check whether it exists. */
+  if(!answered)return {score:null,confidence:0,passed:0,answered:0,missing,total,split:{buy:0,hold:100,sell:0}};
+  /* ================= THE SPLIT: BUY, HOLD, SELL AS PERCENTAGES (2026-10-07) =================
+
+     The owner's shape: "70% buy, 30% hold, 0% sell".
+
+     It is the whole weight divided three ways, and it is arithmetic rather than opinion:
+
+         buy   the weight of checks that PASSED            evidence for the company
+         sell  the weight of checks that FAILED            evidence against it
+         hold  the weight of checks that could not answer  evidence that does not exist yet
+
+     Calling the third one "hold" is the one judgement call in here and it is defensible: a check
+     with no data is not telling you to buy and not telling you to sell, so in a three-way split it
+     is neutral. It is labelled "can't tell" underneath so nobody reads it as a positive finding.
+
+     The three always sum to 100, which is why they are rounded against each other rather than
+     independently: three separate Math.rounds can produce 99 or 101, and a split that does not add
+     up is the kind of small wrongness that makes a reader stop trusting the big numbers too. */
+  const pct=n=>total?n/total*100:0;
+  let buy=Math.round(pct(passed)), sell=Math.round(pct(answered-passed));
+  let hold=100-buy-sell;
+  /* Rounding can push the remainder negative when the other two both round up. Give the pennies
+     back to whichever of the two is larger rather than letting hold go below zero. */
+  if(hold<0){ if(buy>=sell)buy+=hold; else sell+=hold; hold=0; }
   return {
     score:Math.round(passed/answered*100),
     confidence:total?Math.round(answered/total*100):0,
     passed,answered,missing,total,
+    split:{buy,hold,sell},
   };
+}
+/* The split as one bar in three colours, plus the three numbers written out. Green for buy, amber
+   for hold, red for sell, matching the colours the keep/look/sell list uses, so the same idea is
+   the same colour everywhere in the terminal. Colour is never the only carrier: each segment has
+   its number beside it in words. */
+function splitBarHtml(ws){
+  if(!ws||!ws.split)return '';
+  const sp=ws.split;
+  const seg=(w,c)=>w>0?'<i style="display:block;height:100%;width:'+w+'%;background:'+c+'"></i>':'';
+  return '<div style="margin-top:14px">'+
+    '<div style="display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--panel2)">'+
+      seg(sp.buy,'var(--green)')+seg(sp.hold,'var(--yellow)')+seg(sp.sell,'var(--red)')+
+    '</div>'+
+    '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:13px">'+
+      '<span><b class="pos">'+sp.buy+'% buy</b> <span class="muted">checks it passed</span></span>'+
+      '<span><b style="color:var(--yellow)">'+sp.hold+'% hold</b> <span class="muted">can\u2019t tell</span></span>'+
+      '<span><b class="neg">'+sp.sell+'% sell</b> <span class="muted">checks it failed</span></span>'+
+    '</div></div>';
 }
 /* Which sections drove it. The reason line names the weakest one, because "62%" is a number and
    "the price is what is holding it back" is a reason. */
@@ -11460,12 +11512,21 @@ async function analyzeBook(){
   });
   const group=(k)=>rows.filter(r=>r.bucket===k).sort((a,b)=>b.pct-a.pct);
   const money=v=>pmask(fmt$(v));
-  const block=(title,cls,note,list)=>!list.length?'':
-    '<div style="margin-top:16px"><div class="section-title" style="margin-top:0">'+title+' <span class="muted" style="font-weight:400">'+list.length+'</span></div>'+
+  /* ================= RED, ORANGE, GREEN (2026-10-07) =================
+     The owner's instruction for the whole-book review: sell in red, hold in orange, buy in green.
+
+     The colour is carried by a bar down the left of each block and by the ticker, never by the row
+     background: a full red row makes a holding look like an error state, and these are judgements
+     rather than faults. The heading still says the word, so nothing here depends on seeing colour
+     at all, which is the rule every other verdict in this terminal follows. */
+  const TONE={sell:'var(--red)',look:'var(--yellow)',keep:'var(--green)',unreviewed:'var(--muted)'};
+  const block=(title,key,note,list)=>!list.length?'':
+    '<div style="margin-top:16px;border-left:3px solid '+TONE[key]+';padding-left:14px">'+
+    '<div class="section-title" style="margin-top:0">'+title+' <span class="muted" style="font-weight:400">'+list.length+'</span></div>'+
     '<div class="muted" style="font-size:12.5px;margin:-6px 0 10px">'+note+'</div>'+
     '<table class="tbl" style="font-size:13px"><tbody>'+list.map(r=>
-      '<tr><td style="white-space:nowrap"><b>'+esc(r.sym)+'</b></td>'+
-      '<td class="muted" style="white-space:nowrap">'+r.pct.toFixed(1)+'% · '+money(r.val)+'</td>'+
+      '<tr><td style="white-space:nowrap"><b style="color:'+TONE[key]+'">'+esc(r.sym)+'</b></td>'+
+      '<td class="muted" style="white-space:nowrap">'+r.pct.toFixed(1)+'% \u00b7 '+money(r.val)+'</td>'+
       '<td>'+esc(r.why)+'</td>'+
       '<td style="text-align:right"><button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(r.sym)+'\')">Open</button></td></tr>').join('')+
     '</tbody></table></div>';
@@ -11473,10 +11534,10 @@ async function analyzeBook(){
   body.innerHTML=
     '<div class="muted" style="font-size:13px">Against your own rules: at most '+p.maxPosition+'% in one name, '+p.risk+' risk.'+
       (p.exclusions?' Avoiding '+esc(p.exclusions)+'.':'')+'</div>'+
-    block('Think about selling','neg','Your rules say these no longer qualify. It is your call, not the terminal’s.',sell)+
-    block('Worth a look','warn','Not a sell. Either too much of your money, or the price has run ahead of the business.',look)+
-    block('Keep','pos','Still passes everything you asked for.',keep)+
-    block('Not reviewed','muted','No score yet, which is not the same as a pass.',un)+
+    block('Think about selling','sell','Your rules say these no longer qualify. It is your call, not the terminal’s.',sell)+
+    block('Worth a look','look','Not a sell. Either too much of your money, or the price has run ahead of the business.',look)+
+    block('Keep','keep','Still passes everything you asked for.',keep)+
+    block('Not reviewed','unreviewed','No score yet, which is not the same as a pass.',un)+
     '<div class="muted" style="font-size:11.5px;margin-top:14px">This is your rulebook applied to your holdings. Change the rules in Settings and these answers change. Nothing here is advice and nothing is a recommendation to buy or sell.</div>';
   if(btn){btn.disabled=false;btn.textContent='Check again';}
 }
@@ -11597,6 +11658,7 @@ function renderAnalysis(sym,sc){
       /* THE SCORE AND HOW MUCH OF IT IS KNOWN, then every section it came from. This used to print
          four fractions with different denominators and leave the reader to combine them, which is
          the job the terminal exists to do. */
+      splitBarHtml(weightedScore(sc))+
       (v.score!=null?'<div style="font-size:13px;margin-top:12px;display:flex;gap:18px;flex-wrap:wrap">'+
         '<span><b style="font-size:17px">'+v.score+'%</b> <span class="muted">score</span></span>'+
         '<span><b style="font-size:17px">'+v.confidence+'%</b> <span class="muted">of the checks could be answered</span></span>'+
@@ -14053,7 +14115,12 @@ async function catchUpEverything(){
   _catchingUp=true;
   D.lastCatchUp=Date.now();
   try{
-    catchUpStatus('Bringing everything up to date\u2026');
+    /* The book first: a broker that hands over new holdings must do it BEFORE anything prices or
+       scores them, or the newest positions are the ones with no price. */
+    catchUpStatus('Reading your broker\u2026');
+    try{ await autoBrokerSync(); }catch(e){}
+    if(!sessionAlive())return;
+    catchUpStatus('Pricing everything and scoring it\u2026');
     /* Prices and every score. This is the same work the Run review button does. */
     try{ await refreshAllSoon(); }catch(e){}
     if(!sessionAlive())return;
@@ -14148,7 +14215,8 @@ async function autoBrokerSync(){
     try{ showBrokerState({connected:true,accounts:j.accounts,lastSyncAt:j.syncedAt}); }catch(e){}
     /* Nobody asked for this sync, so it speaks only when it has something to say. */
     if(said&&said.changed)toast('From your broker: '+said.text);
-    await refreshAllSoon();
+    /* The repricing used to happen here. It is the caller's next step now, so a sync that brings
+       in new holdings is followed by exactly one pricing pass rather than two overlapping ones. */
   }catch(e){ /* silent on purpose: see above */ }
 }
 /* refreshAll drops itself if one is already running, and on the way in one usually is: finishLogin

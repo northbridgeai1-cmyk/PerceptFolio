@@ -94,7 +94,10 @@ console.log('\nTHE HAPPY PATH: IT SYNCS, THEN IT REPRICES');
   t('it carries the access code', h.log.urls.every(u => u.includes('code=ABCDE-FGHIJ')), h.log.urls);
   t('it makes exactly those two calls', h.log.urls.length === 2, h.log.urls);
   t('it saves what came back', h.log.saved === 1, h.log.saved);
-  t('and it reprices, which is the "reloads everything" half', h.log.refreshed === 1, h.log.refreshed);
+  /* The repricing moved OUT of here on 2026-10-07: it is the catch-up's next step now, so a sync
+     that brings in new holdings gets exactly one pricing pass instead of two overlapping ones.
+     test/catchup.mjs asserts the order. */
+  t('it no longer reprices by itself', h.log.refreshed === 0, h.log.refreshed);
   t('it says what arrived', h.log.toasts.some(m => /From your broker/.test(m)), h.log.toasts);
   t('and it remembers when it ran', h.D.brokerAutoAt > 0, h.D.brokerAutoAt);
 }
@@ -167,7 +170,7 @@ console.log('\nFAILURE IS SILENT, BECAUSE NOBODY ASKED FOR THIS');
   const h = harness({ changed: false });
   await h.run();
   t('a sync that found nothing stays quiet', h.log.toasts.length === 0, h.log.toasts);
-  t('but it still reprices', h.log.refreshed === 1, h.log.refreshed);
+  t('and repricing is the caller\'s job either way', h.log.refreshed === 0, h.log.refreshed);
 }
 
 console.log('\nTHE SESSION CAN END MID-FLIGHT');
@@ -201,10 +204,13 @@ console.log('\nREPRICING OBEYS ITS OWN SETTINGS');
 
 console.log('\nAND IT IS ACTUALLY CALLED ON THE WAY IN');
 {
+  /* finishLogin no longer calls it directly: it calls catchUpEverything, which awaits the broker
+     as its first step so nothing prices a book the broker has not finished handing over. */
   const login = lift('async function finishLogin(');
-  t('finishLogin calls it', /autoBrokerSync\(\)/.test(login), login.slice(-400));
-  t('without awaiting it, so a slow broker cannot block entry', !/await\s+autoBrokerSync/.test(login));
-  t('and a throw in it cannot break the sign-in', /try\{ autoBrokerSync\(\); \}catch/.test(login));
+  t('finishLogin starts the catch-up, not the broker directly', /catchUpEverything\(\)/.test(login) && !/\bautoBrokerSync\(\);/.test(login));
+  t('without awaiting it, so a slow broker cannot block entry', !/await\s+catchUpEverything/.test(login));
+  t('and a throw in it cannot break the sign-in', /try\{ catchUpEverything\(\); \}catch/.test(login));
+  t('and the catch-up awaits the broker first', /try\{ await autoBrokerSync\(\); \}catch/.test(src));
 }
 {
   const gap = liftConst('const BROKER_AUTO_GAP_MS=', ';');
