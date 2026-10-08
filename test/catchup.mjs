@@ -48,6 +48,7 @@ function harness(opts = {}) {
     loadNews: boom('news'),
     loadMarketData: boom('market'),
     loadFearGreed: boom('feargreed'),
+    resumeMarketScan: boom('resume-scan'),
     renderAll: () => ran.push('render'),
     saveDB: () => ran.push('save'),
     document: { getElementById: () => null },
@@ -82,6 +83,11 @@ console.log('\nIT DOES THE WHOLE LOT, IN THE ORDER THAT MATTERS');
   t('and the result is saved', h.ran.includes('save'));
   /* The three that used to wait for somebody to open a tab. */
   t('the three that used to need a tab opened all ran', ['news', 'market', 'feargreed'].every(x => h.ran.includes(x)));
+  /* AN UNFINISHED MARKET SCAN PICKS ITSELF BACK UP (2026-10-08). A closed tab runs nothing, so
+     "keep it running" means never pressing the button twice for the same scan. It goes last,
+     because it is an hour's walk and the reader is looking at prices and news first. */
+  t('an unfinished market scan resumes, last', h.ran[h.ran.length - 1] === 'resume-scan'
+    || h.ran.indexOf('resume-scan') > h.ran.indexOf('market'), h.ran);
 }
 
 console.log('\nIT RESPECTS A NO');

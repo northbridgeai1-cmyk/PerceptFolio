@@ -2304,7 +2304,7 @@ table thead th{position:sticky;top:0;z-index:2;background:var(--panel2)}
   <div id="screenerOutcome" style="display:none"></div>
   <div class="card" style="overflow-x:auto">
     <table>
-      <thead><tr><th>Ticker</th><th>Share price</th><th class="th-quality">Quality <span class="th-den">/12</span></th><th class="th-value">Value <span class="th-den">/6</span></th><th class="th-momentum">Momentum <span class="th-den">/4</span></th><th class="th-ai">Verdict</th><th class="th-mine">My call</th><th></th></tr></thead>
+      <thead><tr><th>Ticker</th><th>Share price</th><th>Buy / hold / sell</th><th class="th-quality">Quality <span class="th-den">/12</span></th><th class="th-value">Value <span class="th-den">/6</span></th><th class="th-momentum">Momentum <span class="th-den">/4</span></th><th class="th-ai">Verdict</th><th class="th-mine">My call</th><th></th></tr></thead>
       <tbody id="screenerBody"></tbody>
     </table>
     <div id="screenerEmpty" class="empty">Run a screen to see results here. Anything scoring at or above your buy bar (Settings) will sort to the top.</div>
@@ -7686,10 +7686,24 @@ function renderScreenerTable(){
     /* This row used to print the raw code: "no data (NO_DATA)". verdictOf already turns every one
        of these into a sentence, and there was no reason for the screener to have its own, worse
        vocabulary for the same four failures. */
-    if(sc.error)return '<tr><td><b>'+esc(sym)+'</b></td><td colspan="4" class="muted">'+esc(verdictOf(sc,false,sym).label)+'</td><td></td><td></td><td></td></tr>';
+    if(sc.error)return '<tr><td><b>'+esc(sym)+'</b></td><td colspan="5" class="muted">'+esc(verdictOf(sc,false,sym).label)+'</td><td></td><td></td><td></td></tr>';
     const v=verdictOf(sc,D.holdings.some(h=>h.sym===sym&&h.type==='Stock'),sym);
     const inWatch=D.watchlist.includes(sym);
-    return '<tr><td><b>'+esc(sym)+'</b></td><td>'+fmt$(sc.price)+'</td><td>'+sc.qScore+'/12</td><td>'+sc.pScore+'/6</td><td>'+sc.mScore+'/4</td>'+
+    /* THE SPLIT, PER RESULT (2026-10-08). The three section fractions beside it say what scored;
+       this says what it adds up to, in the same three colours as the book review and the verdict
+       box. A scan is a list of twenty names and the eye needs something it can compare down a
+       column faster than it can read four fractions. */
+    const sws=weightedScore(sc);
+    const sbar=sws&&sws.split
+      ? (sp=>'<div title="'+sp.buy+'% passed, '+sp.hold+'% could not be answered, '+sp.sell+'% failed" '+
+          'style="display:flex;height:7px;width:88px;border-radius:999px;overflow:hidden;background:var(--panel2)">'+
+          [[sp.buy,'var(--green)'],[sp.hold,'var(--yellow)'],[sp.sell,'var(--red)']]
+            .map(([w,c])=>w>0?'<i style="display:block;height:100%;width:'+w+'%;background:'+c+'"></i>':'').join('')+
+          '</div><div class="muted" style="font-size:10.5px;margin-top:3px;white-space:nowrap">'+sp.buy+' / '+sp.hold+' / '+sp.sell+'</div>')(sws.split)
+      : '<span class="muted" style="font-size:11.5px">\u2014</span>';
+    return '<tr><td style="vertical-align:top"><b>'+esc(sym)+'</b></td><td style="vertical-align:top">'+fmt$(sc.price)+'</td>'+
+      '<td style="vertical-align:top">'+sbar+'</td>'+
+      '<td style="vertical-align:top">'+sc.qScore+'/12</td><td style="vertical-align:top">'+sc.pScore+'/6</td><td style="vertical-align:top">'+sc.mScore+'/4</td>'+
       '<td><span class="pill '+v.cls+'">'+v.label+'</span></td>'+
       '<td class="mycall-cell">'+myTagSelect(sym)+'</td>'+
       /* P4. Row actions behind the same 3-dot menu as everywhere else, so a wide table stays a
@@ -14091,6 +14105,38 @@ async function prefillChains(){
   saveDB();
 }
 
+/* ================= THE SCAN PICKS ITSELF BACK UP (2026-10-08) =================
+
+   The owner's ask: keep it running even when I close the tab.
+
+   A closed tab runs nothing. There is no JavaScript in a browser that survives its own window, and
+   anything claiming otherwise would be a lie told by a progress bar. What IS possible is the thing
+   actually wanted: never pressing the button twice for the same scan.
+
+   The scan already kept its place. D.marketScan.cursor is saved after every name, so closing the
+   tab at company 400 of 4,000 lost nothing. What it did not do was start again by itself, so the
+   place it kept sat there until somebody remembered to press Scan the market. That is the gap.
+
+   So an unfinished scan resumes on the way in, as the last step of the catch-up, after prices and
+   news are done, because those are what the reader is looking at first and the scan is the thing
+   that runs for an hour underneath. Not awaited: it is a long walk and nothing should wait for it.
+
+   It resumes only a scan somebody started and did not finish. It does not start one. Beginning a
+   four-thousand-company walk because a person signed in would be deciding on their behalf to spend
+   their data allowance, and the button exists so that is their decision. */
+const SCAN_RESUME_WITHIN_MS=7*864e5;
+async function resumeMarketScan(){
+  if(!D||isDemoUser()||!hasMarketData())return;
+  const s=(D.marketScan)||null;
+  /* Only an unfinished one: a cursor past zero means it was started, and `done` is set when the
+     walk reaches the end of the listing. */
+  if(!s||!s.started||s.done||!(s.cursor>0))return;
+  /* And only a recent one. Resuming a scan abandoned two months ago would be scoring the listing
+     against a rulebook and a market that have both moved on. */
+  if(Date.now()-s.started>SCAN_RESUME_WITHIN_MS)return;
+  try{ await startMarketScan(); }catch(e){}
+}
+
 /* ================= EVERYTHING, ON THE WAY IN (2026-10-07) =================
 
    The owner's instruction: whenever I enter the terminal it refreshes everything, so it is all up
@@ -14167,6 +14213,8 @@ async function catchUpEverything(){
     if(!sessionAlive())return;
     try{ renderAll(); renderCommand(); }catch(e){}
     saveDB();
+    /* Last, and not awaited: an unfinished market scan is an hour's walk and nothing waits for it. */
+    try{ resumeMarketScan(); }catch(e){}
     catchUpStatus('Up to date as of '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'. Nothing needs pressing.');
     /* The finished line is not an alert, so it goes quiet on its own rather than sitting there. */
     setTimeout(()=>{ try{ catchUpStatus(''); }catch(e){} }, 12000);
@@ -17767,9 +17815,9 @@ function priceSourceLine(){
    neither, and a list of neithers is what makes a screener useless. A find older than a week is
    dropped, because a verdict from a price nine days ago is not a verdict about today. */
 const SCAN_STALE_MS=7*864e5;
-function scanState(){ if(!D.marketScan)D.marketScan={cursor:0,started:0,hits:[],scanned:0}; return D.marketScan; }
+function scanState(){ if(!D.marketScan)D.marketScan={cursor:0,started:0,hits:[],scanned:0,done:false}; return D.marketScan; }
 let _scanRunning=false,_scanStop=false;
-function clearMarketScan(){ D.marketScan={cursor:0,started:0,hits:[],scanned:0}; saveDB(); renderMarketScan(); }
+function clearMarketScan(){ D.marketScan={cursor:0,started:0,hits:[],scanned:0,done:false}; saveDB(); renderMarketScan(); }
 function stopMarketScan(){ _scanStop=true; }
 function scanHits(){
   const s=scanState(), cut=Date.now()-SCAN_STALE_MS;
@@ -17807,6 +17855,9 @@ async function startMarketScan(){
   if(btn)btn.style.display='none'; if(stop)stop.style.display='inline-block';
   const note=document.getElementById('mktScanNote');
   try{
+    /* Cleared here rather than at the end, so a scan that was finished and is being run again from
+       the button does not immediately look done. */
+    s.done=false;
     while(!_scanStop&&s.cursor<rows.length){
       const sym=rows[s.cursor][0], name=rows[s.cursor][1];
       if(note)note.innerHTML='<b>Scanning '+esc(sym)+'</b> \u00b7 '+(s.cursor+1).toLocaleString()+' of '+rows.length.toLocaleString()+' \u00b7 it keeps its place, so stopping loses nothing.';
@@ -17830,6 +17881,9 @@ async function startMarketScan(){
     }
     if(s.cursor>=rows.length){ s.cursor=0; s.started=Date.now(); toast('The scan has been all the way through the listing. It starts again from the top.'); }
   }finally{
+    /* Reaching the end of the listing is what "done" means; stopping early is not. Without this a
+       finished scan would be resumed on every sign-in forever, re-walking a completed list. */
+    try{ const st=scanState(); if(st.cursor>=(rows?rows.length:0))st.done=true; }catch(e){}
     _scanRunning=false; saveDB();
     if(btn)btn.style.display='inline-block'; if(stop)stop.style.display='none';
     renderMarketScan();
