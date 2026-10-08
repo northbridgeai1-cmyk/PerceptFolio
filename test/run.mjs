@@ -462,10 +462,23 @@ t('there is exactly one settings grouping mechanism', (() => {
 })());
 /* Renamed 'Broker and keys' 2026-09-29: sixty walkers hunting for "bring in my account" met the
      word broker nowhere on the way in, so it now appears in the group name itself. */
-  t('the broker and keys group exists, and takes both cards by their headings',
-  /\['Broker and keys',\/\^\(API keys\|Your broker\)\/i\]/.test(term));
+  /* Regrouped on 2026-10-08. Six tabs became five, grouped by the question somebody arrives with
+     rather than by subsystem: General, Your rules, Connections, Your book, Advanced. Seven cards
+     had been landing in Advanced because it is the catch-all and the patterns had drifted, and one
+     pattern ("Sync across") named a card renamed long ago, so it matched nothing at all. */
+  t('the credential cards share one group, by their headings',
+  /\['Connections', \/\^\(Access code\|Market data\|Your broker\|API keys\)\/i\]/.test(term));
 t('it sits before the catch-all, or Advanced would swallow it',
-  term.indexOf("['API keys'") < term.indexOf("['Advanced',/./]"));
+  term.indexOf("['Connections'") < term.indexOf("['Advanced',    /./]"));
+t('and the glossary is in General, not buried in Advanced',
+  /\['General',     \/\^\(Install\|Getting started\|Appearance\|What the words mean\)\/i\]/.test(term));
+/* The old pattern named a card renamed long ago, so it matched nothing and its three cards fell
+   through to Advanced. The same stale name was also in an instruction telling somebody to open a
+   settings card that no longer exists. Both checked here, because a group pattern and the words
+   pointing a user at it have to name the same thing. */
+t('no group pattern names a card that does not exist', !/'Sync across/.test(term));
+t('and no instruction sends anybody to a settings card that is gone',
+  !/Settings \u2192 Sync across/.test(term) && /Settings \u2192 Your book \u2192 Where your book is kept/.test(term));
 t('the cards it names are still direct children of the settings pane, which is what the scan walks',
   (() => {
     const a = term.indexOf('id="tab-settings"');

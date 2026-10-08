@@ -4168,7 +4168,7 @@ async function setUpDevice(){
        has never synced (the code is redeemed). createProfile tells the two apart through /invite. */
     let inv=null; try{ const r=await fetch(INVITE_WORKER+'/invite?code='+encodeURIComponent(code)); inv=await r.json(); }catch(e){}
     if(inv&&inv.valid===false&&/redeemed/i.test(inv.error||'')){
-      say('Your terminal was set up on another device, but that device has not synced yet. On it, open Settings → Sync across your devices → Sync now. Then press this button again.');
+      say('Your terminal was set up on another device, but that device has not synced yet. On it, open Settings → Your book → Where your book is kept → Sync now. Then press this button again.');
       return;
     }
     say('');
@@ -20766,7 +20766,35 @@ h3{margin-bottom:10px}
      goes in by heading like every other group, which is the whole point of this design: the two
      cards were written months apart and neither needed touching for this. It sits before Advanced
      because Advanced is the catch-all and matches everything. */
-  var GROUPS=[['General',/^(Install|Getting started|Appearance)/i],['Access and data',/^(Access code|Market data)/i],['Policy and rules',/^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|What counts for how much|Rule change log)/i],['Broker and keys',/^(API keys|Your broker)/i],['Sync and backup',/^(Sync across|Backup)/i],['Advanced',/./]];
+  /* ================= THE SETTINGS GROUPS, REORGANISED (2026-10-08) =================
+
+     Nineteen cards across six tabs, and seven of them were landing in Advanced because Advanced is
+     the catch-all and five of the six patterns had drifted out of date. Among the seven: the
+     plain-English glossary, which is the least advanced thing in this product and exists for
+     somebody on their first morning.
+
+     One pattern was matching nothing at all. "Sync and backup" looked for a card called "Sync
+     across", which has not existed since the book moved to the server and the card was renamed
+     "Where your book is kept". So that tab held one card, Backup, and the three things that are
+     actually about where the book lives were in Advanced.
+
+     Five tabs now, grouped by the question somebody arrives with rather than by subsystem:
+
+       General       setting the thing up, and what the words mean
+       Your rules    everything that decides a verdict, in the order you would set it
+       Connections   the key, the data, the broker, the API keys: anything with a credential
+       Your book     where it is kept, copied, shared, exported
+       Advanced      the audit trail, the operator's screenshot tool, and deleting the account
+
+     ADVANCED IS STILL THE CATCH-ALL, deliberately: a card added later with no pattern lands
+     somewhere visible rather than disappearing. But nothing lands there by accident now. */
+  var GROUPS=[
+    ['General',     /^(Install|Getting started|Appearance|What the words mean)/i],
+    ['Your rules',  /^(Investment policy|Buy \/ Sell Rules|Buy \/ sell rules|What counts for how much|Rule change log)/i],
+    ['Connections', /^(Access code|Market data|Your broker|API keys)/i],
+    ['Your book',   /^(Where your book is kept|The record.s server copy|Backup|Shared calls)/i],
+    ['Advanced',    /./],
+  ];
   function groupOf(card){ var h=card.querySelector('h3'); var txt=h?h.textContent.trim():''; for(var i=0;i<GROUPS.length;i++)if(GROUPS[i][1].test(txt))return GROUPS[i][0]; return 'Advanced'; }
   function cards(){ var tab=document.getElementById('tab-settings'); return tab?Array.prototype.slice.call(tab.children).filter(function(el){ return el.classList&&(el.classList.contains('card')||el.classList.contains('addwrap')); }):[]; }
   window.showSettings=function(name){
