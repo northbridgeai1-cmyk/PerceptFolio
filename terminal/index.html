@@ -11493,22 +11493,32 @@ async function analyzeBook(){
     const sc=h.type==='Stock'?D.analyses[h.sym]:null;
     const v=sc?verdictOf(sc,true,h.sym):null;
     const tooBig=pct>p.maxPosition;
+    /* ================= FOUR ANSWERS, WORST FIRST (2026-10-08) =================
+       The owner's sections: Sell, Hold, Keep, Buy more.
+
+       The pair that needed defining is KEEP against BUY MORE, because both are a company the rules
+       like. The difference is not how good it is; it is whether there is ROOM. A company already
+       held at twice the position limit is not something to buy more of however well it scores, and
+       filing it under "buy more" would have the terminal recommending a breach of the very rulebook
+       it is enforcing. So buy more needs the verdict AND the headroom.
+
+       HOLD against KEEP is the other pair. Keep is "nothing to do". Hold is "nothing to do yet, and
+       here is what is stopping it": the price has run ahead, momentum is weak, too much of your
+       money is already in it, or too little could be checked. Both mean do not act; only one of
+       them has a reason worth reading.
+
+       Size still speaks first wherever it applies, because it is the one thing the reader can act
+       on without agreeing with any score. */
     let bucket, why;
-    /* SIZE IS SAID ALONGSIDE THE VERDICT, NOT INSTEAD OF IT. This used to be an else-if chain, so a
-       holding that was both a sell and far over its limit showed only the checklist reason and the
-       78%-of-the-book fact disappeared. Size is the first clause when it applies, because it is the
-       one the owner's rulebook exists to catch and the one the reader can act on without agreeing
-       with any score. */
     const sizeWhy='This is '+pct.toFixed(1)+'% of your money and your limit is '+p.maxPosition+'%.';
+    const room=pct<=p.maxPosition;
     if(!sc){ bucket='unreviewed'; why=tooBig?sizeWhy+' Not scored yet.':'Not scored yet.'; }
     else if(v&&v.key==='sell'){ bucket='sell'; why=(tooBig?sizeWhy+' ':'')+(v.why||('Your rules say '+v.label.toLowerCase()+'.')); }
-    else if(tooBig){ bucket='look'; why=sizeWhy+(v&&v.why?' '+v.why:''); }
-    /* WATCH is gone as a verdict, so "worth a look" is now decided by WHY it is a hold rather than
-       by a fourth label. A hold whose reason is the price or the momentum is a look; a hold that is
-       simply sitting between the lines is a keep. detail carries which. */
-    else if(v&&v.key==='hold'&&/pricey|momentum|not enough data/.test(v.detail||'')){ bucket='look'; why=v.why||(v.label+'.'); }
+    else if(tooBig){ bucket='hold'; why=sizeWhy+(v&&v.why?' '+v.why:''); }
+    else if(v&&v.key==='buy'&&room){ bucket='buymore'; why=v.why||'Clears every line you set, and you have room under your limit.'; }
+    else if(v&&v.key==='hold'&&/pricey|momentum|not enough data|context/.test(v.detail||'')){ bucket='hold'; why=v.why||(v.label+'.'); }
     else { bucket='keep'; why=v?(v.why||v.label+'.'):'Passes your rules.'; }
-    return {sym:h.sym, pct, bucket, why, val};
+    return {sym:h.sym, pct, bucket, why, val, ws:sc?weightedScore(sc):null};
   });
   const group=(k)=>rows.filter(r=>r.bucket===k).sort((a,b)=>b.pct-a.pct);
   const money=v=>pmask(fmt$(v));
@@ -11519,24 +11529,41 @@ async function analyzeBook(){
      background: a full red row makes a holding look like an error state, and these are judgements
      rather than faults. The heading still says the word, so nothing here depends on seeing colour
      at all, which is the rule every other verdict in this terminal follows. */
-  const TONE={sell:'var(--red)',look:'var(--yellow)',keep:'var(--green)',unreviewed:'var(--muted)'};
+  const TONE={sell:'var(--red)',hold:'var(--yellow)',keep:'var(--green)',buymore:'var(--brand2)',unreviewed:'var(--muted)'};
+  /* THE SPLIT, PER HOLDING (2026-10-08). The owner wants to see WHY a name landed where it did, and
+     the reason sentence says it in words while this says it in proportion: how much of the evidence
+     passed, how much failed, how much could not be answered. Same three colours as everywhere else.
+     A holding with no score at all gets no bar rather than an empty one, because a blank bar reads
+     as "all neutral" when the truth is "never looked at". */
+  const miniBar=ws=>{
+    if(!ws||!ws.split)return '<span class="muted" style="font-size:11.5px">not scored</span>';
+    const sp=ws.split, seg=(w,c)=>w>0?'<i style="display:block;height:100%;width:'+w+'%;background:'+c+'"></i>':'';
+    return '<div title="'+sp.buy+'% passed, '+sp.hold+'% could not be answered, '+sp.sell+'% failed" '+
+      'style="display:flex;height:7px;width:104px;border-radius:999px;overflow:hidden;background:var(--panel2)">'+
+      seg(sp.buy,'var(--green)')+seg(sp.hold,'var(--yellow)')+seg(sp.sell,'var(--red)')+'</div>'+
+      '<div class="muted" style="font-size:10.5px;margin-top:3px;white-space:nowrap">'+sp.buy+' / '+sp.hold+' / '+sp.sell+'</div>';
+  };
   const block=(title,key,note,list)=>!list.length?'':
     '<div style="margin-top:16px;border-left:3px solid '+TONE[key]+';padding-left:14px">'+
     '<div class="section-title" style="margin-top:0">'+title+' <span class="muted" style="font-weight:400">'+list.length+'</span></div>'+
     '<div class="muted" style="font-size:12.5px;margin:-6px 0 10px">'+note+'</div>'+
     '<table class="tbl" style="font-size:13px"><tbody>'+list.map(r=>
-      '<tr><td style="white-space:nowrap"><b style="color:'+TONE[key]+'">'+esc(r.sym)+'</b></td>'+
-      '<td class="muted" style="white-space:nowrap">'+r.pct.toFixed(1)+'% \u00b7 '+money(r.val)+'</td>'+
-      '<td>'+esc(r.why)+'</td>'+
-      '<td style="text-align:right"><button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(r.sym)+'\')">Open</button></td></tr>').join('')+
+      '<tr><td style="white-space:nowrap;vertical-align:top"><b style="color:'+TONE[key]+'">'+esc(r.sym)+'</b></td>'+
+      '<td style="vertical-align:top">'+miniBar(r.ws)+'</td>'+
+      '<td class="muted" style="white-space:nowrap;vertical-align:top">'+r.pct.toFixed(1)+'% \u00b7 '+money(r.val)+'</td>'+
+      '<td style="vertical-align:top">'+esc(r.why)+'</td>'+
+      '<td style="text-align:right;vertical-align:top"><button class="btn btn-ghost btn-sm" onclick="analyzeStock(\''+esc(r.sym)+'\')">Open</button></td></tr>').join('')+
     '</tbody></table></div>';
-  const keep=group('keep'), look=group('look'), sell=group('sell'), un=group('unreviewed');
+  /* `hold` is already the holdings array in this function, so the bucket is holdRows: shadowing it
+     would have silently replaced the list every later line reads from. */
+  const keep=group('keep'), holdRows=group('hold'), sell=group('sell'), buymore=group('buymore'), un=group('unreviewed');
   body.innerHTML=
     '<div class="muted" style="font-size:13px">Against your own rules: at most '+p.maxPosition+'% in one name, '+p.risk+' risk.'+
       (p.exclusions?' Avoiding '+esc(p.exclusions)+'.':'')+'</div>'+
-    block('Think about selling','sell','Your rules say these no longer qualify. It is your call, not the terminal’s.',sell)+
-    block('Worth a look','look','Not a sell. Either too much of your money, or the price has run ahead of the business.',look)+
-    block('Keep','keep','Still passes everything you asked for.',keep)+
+    block('Sell','sell','Your rules say these no longer qualify. It is your call, not the terminal’s.',sell)+
+    block('Hold','hold','Not a sell, and not one to add to yet. The reason is on the row.',holdRows)+
+    block('Keep','keep','Nothing to do. Still passes everything you asked for.',keep)+
+    block('Buy more','buymore','Clears every line you set, and you are under your own position limit on each.',buymore)+
     block('Not reviewed','unreviewed','No score yet, which is not the same as a pass.',un)+
     '<div class="muted" style="font-size:11.5px;margin-top:14px">This is your rulebook applied to your holdings. Change the rules in Settings and these answers change. Nothing here is advice and nothing is a recommendation to buy or sell.</div>';
   if(btn){btn.disabled=false;btn.textContent='Check again';}

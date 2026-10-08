@@ -216,14 +216,32 @@ console.log('\nTHE SPLIT: BUY, HOLD, SELL AS PERCENTAGES');
   t('and the middle one says it means cannot tell', /can\\u2019t tell/.test(src) || /can’t tell/.test(src));
 }
 
-console.log('\nTHE WHOLE-BOOK REVIEW IS RED, ORANGE, GREEN');
+console.log('\nTHE WHOLE-BOOK REVIEW: FOUR SECTIONS, WORST FIRST');
 {
-  t('sell is red, look is orange, keep is green',
-    /const TONE=\{sell:'var\(--red\)',look:'var\(--yellow\)',keep:'var\(--green\)'/.test(src));
+  /* Sell, Hold, Keep, Buy more. The pair that needed defining is Keep against Buy more: both are a
+     company the rules like, and the difference is whether there is ROOM under the position limit.
+     A holding already over the limit must never be filed under "buy more", or the terminal is
+     recommending a breach of the rulebook it exists to enforce. */
+  t('there are four sections plus the unreviewed one', ['Sell', 'Hold', 'Keep', 'Buy more', 'Not reviewed']
+    .every(n => new RegExp("block\\('" + n + "'").test(src)), src.match(/block\('[^']+'/g));
+  t('buy more needs the verdict AND the room', /v\.key==='buy'&&room/.test(src) && /const room=pct<=p\.maxPosition;/.test(src));
+  t('over the limit goes to hold, never to buy more', /else if\(tooBig\)\{ bucket='hold'/.test(src));
+  t('and that ordering runs before the buy-more branch',
+    src.indexOf("else if(tooBig){ bucket='hold'") < src.indexOf("v.key==='buy'&&room"));
+  t('sell is red, hold is orange, keep is green, buy more is its own colour',
+    /const TONE=\{sell:'var\(--red\)',hold:'var\(--yellow\)',keep:'var\(--green\)',buymore:'var\(--brand2\)'/.test(src));
+  t('every row carries its own split bar', /const miniBar=ws=>/.test(src) && /miniBar\(r\.ws\)/.test(src));
+  t('a holding that was never scored says so rather than drawing an empty bar',
+    /not scored<\/span>/.test(src));
+  t('and the bar carries the three numbers in text too', /sp\.buy\+' \/ '\+sp\.hold\+' \/ '\+sp\.sell/.test(src));
+  t('the row carries the score it was built from', /ws:sc\?weightedScore\(sc\):null/.test(src));
+  /* `hold` is the holdings array in that function; shadowing it would have silently replaced the
+     list every later line reads from. */
+  t('the hold bucket does not shadow the holdings array', /const keep=group\('keep'\), holdRows=group\('hold'\)/.test(src));
   t('the colour is a bar and the ticker, never the row background',
     /border-left:3px solid '\+TONE\[key\]/.test(src) && !/background:'\+TONE/.test(src));
   t('and the heading still says the word, so colour is never the only signal',
-    /block\('Think about selling','sell'/.test(src) && /block\('Keep','keep'/.test(src));
+    /block\('Sell','sell'/.test(src) && /block\('Keep','keep'/.test(src) && /block\('Buy more','buymore'/.test(src));
 }
 
 console.log('\nTHE WEIGHTS ARE A DEFAULT, AND THE OWNER\'S NUMBER WINS');
